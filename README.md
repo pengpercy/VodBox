@@ -61,7 +61,7 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 ## 验证与剩余范围
 
-本地已验证配置、目录源、SQLite 隔离与 upsert、无痕记录、播放请求取消、直播/节目表解析、Python/Node 协议，以及 macOS x64 的 AOT JSON/SQLite/QuickJS 调用与 LibVLC 音频解码。六平台运行和安装包验证以 Actions 实际结果为准。
+六个 RID 的 Native AOT 构建、8 项功能测试、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试与全部安装包生成已通过 [CI 验证](https://github.com/pengpercy/VodBox/actions/runs/37223401606)（7105ef7）。macOS 安装包另外执行严格签名与依赖哈希校验。用户提供来源中的一个 HLS 直播流在 macOS x64 实际进入 Playing，解码 H.264/AAC 并观察到 VideoToolbox 日志；详见 [播放测试记录](docs/playback-testing.md)。有画面的交互、长时稳定性和各系统完整安装流程仍需真机验证。
 
 后续阶段尚未完成：网页嗅探与浏览器宿主、通用请求头/流代理、JSON 解析链、弹幕、自动下一集、大屏模式、节目表界面、媒体键与休眠抑制、配置仓库、DLNA/局域网同步、SMB/WebDAV、自动更新。旧配置与 Java 兼容层不在当前范围内。
 

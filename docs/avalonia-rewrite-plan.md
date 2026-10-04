@@ -6,7 +6,7 @@
 
 工程位于 VodBox 仓库，首版已经实现桌面壳、LibVLC 播放、版本化配置、C# JSON 目录源、分类/搜索/详情/选集、SQLite 历史与收藏、无痕播放、直播列表解析、XMLTV 解析及三种脚本宿主。Avalonia 采用编译绑定、源码生成 MVVM/JSON、Design.DataContext 与系统材质回退。下文阶段清单继续作为后续实现和验收路线，不表示每项已完成。
 
-六个 RID 的本机 Native AOT 编译、真实 LibVLC WAV 解码和随包 QuickJS/Python/Node 协议测试已通过 Actions。Windows ZIP 和 Linux ARM64 deb/rpm/AppImage 已通过；修复后的 macOS x64 app/ZIP/DMG 本地签名、解码和脚本测试已通过。最新完整六平台打包结果以仓库 Actions 为准。尚未完成各平台有画面的交互、硬件解码、长时稳定性和全部安装后的真机测试。
+六个 RID 的本机 Native AOT 编译、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试及全部安装包生成均已通过 [Actions 验证](https://github.com/pengpercy/VodBox/actions/runs/37223401606)（代码提交 7105ef7）。Windows x64/ARM64 生成 ZIP，macOS Intel/Apple Silicon 生成 app/ZIP/DMG，Linux x64/ARM64 生成 deb/rpm/AppImage。打包检查实际依赖文件哈希，macOS 另外验证 ad-hoc 签名与封包后的宿主运行。尚未完成各平台有画面的交互、长时稳定性和全部安装后的真机测试；本地公开直播测试已观察到 VideoToolbox 解码，但未完成全面硬件解码验证。
 
 当前 C# Provider 实现 JSON 目录契约，HTTP XML 源、聚合搜索、海报缓存、设置持久化、自动下一集、备用线路、节目表界面、浏览器嗅探、解析链、弹幕及局域网扩展仍在后续清单中。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定，不能依赖安装目录执行 npm install。
 
