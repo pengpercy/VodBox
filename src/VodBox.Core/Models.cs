@@ -57,7 +57,7 @@ public sealed record HistoryEntry(string ConfigId, string SourceId, string Media
 public sealed record FavoriteEntry(string ConfigId, string SourceId, string MediaId, string Title);
 public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null);
 public sealed record LiveChannel(string Id, string Name, string Group, IReadOnlyList<string> Uris,
-    string? Logo = null, string? TvgId = null);
+    string? Logo = null, string? TvgId = null, Dictionary<string, string>? Headers = null);
 public sealed record Programme(string ChannelId, string Title, DateTimeOffset Start, DateTimeOffset End);
 
 public static class WireJson

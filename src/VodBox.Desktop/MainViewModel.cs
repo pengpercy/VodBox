@@ -169,7 +169,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     partial void OnSelectedAudioChanged(MediaTrack? value) { if (value is not null) _ = RunAsync(() => Engine.SelectTrackAsync(TrackKind.Audio, value.Id, default)); }
     partial void OnSelectedSubtitleChanged(MediaTrack? value) { if (value is not null) _ = RunAsync(() => Engine.SelectTrackAsync(TrackKind.Subtitle, value.Id, default)); }
     public Task AddSubtitleAsync(string path) => RunAsync(() => Engine.AddSubtitleAsync(path, default));
-    [RelayCommand] private Task PlayChannelAsync(LiveChannel? channel) => channel is null ? Task.CompletedTask : PlayRequestAsync(new() { Uri = channel.Uris.First(), Title = channel.Name, IsLive = true, SourceId = "live" });
+    [RelayCommand] private Task PlayChannelAsync(LiveChannel? channel) => channel is null ? Task.CompletedTask : PlayRequestAsync(new() { Uri = channel.Uris.First(), Title = channel.Name, IsLive = true, SourceId = "live", Headers = channel.Headers ?? [] });
     [RelayCommand] private Task ResumeHistoryAsync(HistoryEntry? entry) => entry is null ? Task.CompletedTask : PlayRequestAsync(new() { Uri = entry.Uri, Title = entry.Title, SourceId = entry.SourceId, MediaId = entry.MediaId, EpisodeId = entry.EpisodeId, StartPositionMs = entry.PositionMs });
     [RelayCommand] private Task ToggleFavoriteAsync() => RunAsync(async () =>
     {

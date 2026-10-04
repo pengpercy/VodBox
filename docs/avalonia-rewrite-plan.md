@@ -1,6 +1,16 @@
 # VodBox：FongMi/TV 的 Avalonia 跨平台重写方案
 
-源码分析日期：2026-10-04；方案更新日期：2026-10-05。工程已进入实现阶段；跨平台发布与真实播放器验证仍需逐项完成。阶段耗时是工程估算，不是实测。
+源码分析日期：2026-10-04；方案更新日期：2026-10-05。工程已进入实现阶段；实现与验证状态见下一节。阶段耗时是工程估算，不是实测。
+
+## 当前实现状态（2026-10-05）
+
+工程位于 VodBox 仓库，首版已经实现桌面壳、LibVLC 播放、版本化配置、C# JSON 目录源、分类/搜索/详情/选集、SQLite 历史与收藏、无痕播放、直播列表解析、XMLTV 解析及三种脚本宿主。Avalonia 采用编译绑定、源码生成 MVVM/JSON、Design.DataContext 与系统材质回退。下文阶段清单继续作为后续实现和验收路线，不表示每项已完成。
+
+六个 RID 的本机 Native AOT 编译、真实 LibVLC WAV 解码和随包 QuickJS/Python/Node 协议测试已通过 Actions。Windows ZIP 和 Linux ARM64 deb/rpm/AppImage 已通过；修复后的 macOS x64 app/ZIP/DMG 本地签名、解码和脚本测试已通过。最新完整六平台打包结果以仓库 Actions 为准。尚未完成各平台有画面的交互、硬件解码、长时稳定性和全部安装后的真机测试。
+
+当前 C# Provider 实现 JSON 目录契约，HTTP XML 源、聚合搜索、海报缓存、设置持久化、自动下一集、备用线路、节目表界面、浏览器嗅探、解析链、弹幕及局域网扩展仍在后续清单中。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定，不能依赖安装目录执行 npm install。
+
+用户提供的饭太硬地址作为后续测试来源；它返回旧配置，不能直接作为新版配置加载。已提取公开直播列表形成新版测试示例，未导入 Java 插件；网络可达性与实际播放记录见 [播放测试](playback-testing.md)。
 
 ## 1. 结论与范围
 
@@ -12,7 +22,7 @@
 - 播放内核采用 LibVLC + LibVLCSharp，参考 Screenbox 的封装和会话管理；mpv 不再是计划中的对照原型或首版依赖。
 - 内容源支持 C# Provider、QuickJS、Python、Node.js 四种实现方式。
 - Java Spider 的业务逻辑按需要用 C# Provider 重写；不实现 Java/JVM/Dex 兼容层，不随包分发 JRE。
-- QuickJS 使用开源 C# 绑定，定义 VodBox 自有宿主 API。
+- QuickJS-NG 通过项目内薄 C ABI 和 C# LibraryImport 源码生成绑定接入，定义 VodBox 自有宿主 API，避免反射式 CLR 互操作。
 - Python 和 Node.js 明确保留，属于正式支持范围；在脚本运行时阶段交付，不因为不兼容旧配置而移除。
 - 首版暂不兼容 TV 旧配置、旧插件接口和旧本地 API。使用版本化的新 JSON 配置与统一插件契约；将来若需要兼容，再作为独立需求评估。
 - 构建、打包、发布结构参照 Downio，覆盖三平台六 RID；播放器和脚本运行时各自维护原生依赖清单。

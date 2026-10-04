@@ -69,6 +69,10 @@ public sealed class InfrastructureTests
     {
         var channels = LiveParser.Parse("新闻,#genre#\n频道,https://example.com/a\n频道,https://example.com/b");
         Assert.Equal(2, Assert.Single(channels).Uris.Count);
+        var m3u = LiveParser.Parse("#EXTM3U\n#EXTINF:-1 http-user-agent=\"AptvPlayer-UA\",CCTV1\n#EXTVLCOPT:http-referrer=https://example.com/\nhttps://example.com/live\n#EXTINF:-1,Other\nhttps://example.com/other");
+        Assert.Equal("AptvPlayer-UA", m3u[0].Headers!["User-Agent"]);
+        Assert.Equal("https://example.com/", m3u[0].Headers!["Referer"]);
+        Assert.Empty(m3u[1].Headers!);
         using var xml = new MemoryStream(Encoding.UTF8.GetBytes("<tv><programme channel='c' start='20261005120000 +0800' stop='20261005130000 +0800'><title>节目</title></programme></tv>"));
         var programme = Assert.Single(LiveParser.ParseEpg(xml));
         Assert.Equal(4, programme.Start.Hour);

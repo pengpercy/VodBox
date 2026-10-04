@@ -2,9 +2,17 @@
   "schemaVersion": 1,
   "id": "user-live-test",
   "sources": [],
-  "liveSources": [{
-    "id": "fmm-live", "name": "用户提供配置中的直播测试列表",
-    "uri": "https://nos.netease.com/ysf/3d75a78a0fc7ede372c03598d6d10367.m3u",
-    "epg": "https://live.fanmingming.cn/e.xml"
-  }]
+  "liveSources": [
+    {
+      "id": "fmm-live",
+      "name": "用户提供配置中的直播测试列表",
+      "uri": "https://nos.netease.com/ysf/3d75a78a0fc7ede372c03598d6d10367.m3u",
+      "epg": "https://live.fanmingming.cn/e.xml"
+    },
+    {
+      "id": "aptv-live",
+      "name": "用户提供配置中的 IPv4 测试列表",
+      "uri": "https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u"
+    }
+  ]
 }

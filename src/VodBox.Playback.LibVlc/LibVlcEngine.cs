@@ -26,8 +26,13 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         var bundled = AppLayout.VlcDirectory;
         var installed = "/Applications/VLC.app/Contents/MacOS/lib";
         string? path = configured ?? (Directory.Exists(bundled) ? Directory.Exists(Path.Combine(bundled, "lib")) ? Path.Combine(bundled, "lib") : bundled : OperatingSystem.IsMacOS() && Directory.Exists(installed) ? installed : null);
-        if (Directory.Exists(Path.Combine(bundled, "plugins")))
-            NativeEnvironment.SetPluginPath(Path.Combine(bundled, "plugins"));
+        string plugins = Path.Combine(bundled, "plugins");
+        if (!Directory.Exists(plugins) && path is not null)
+        {
+            string adjacent = Path.Combine(path, "plugins");
+            plugins = Directory.Exists(adjacent) ? adjacent : Path.GetFullPath(Path.Combine(path, "..", "plugins"));
+        }
+        if (Directory.Exists(plugins)) NativeEnvironment.SetPluginPath(plugins);
         // LibVLCSharp's Linux loader uses LD_LIBRARY_PATH, set by the launcher before process startup.
         VlcCore.Initialize(OperatingSystem.IsLinux() ? null : path);
         List<string> options = ["--no-video-title-show", "--no-osd"];

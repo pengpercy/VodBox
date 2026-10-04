@@ -15,7 +15,7 @@ public static partial class LiveParser
         content = content.TrimStart('\uFEFF', ' ', '\n', '\r');
         if (content.StartsWith('[')) return JsonSerializer.Deserialize(content, VodBoxJson.Default.ListLiveChannel) ?? [];
         var channels = new List<LiveChannel>(); string group = "未分组";
-        string? name = null, id = null, logo = null;
+        string? name = null, id = null, logo = null; Dictionary<string, string>? headers = null;
         foreach (var raw in content.Split('\n'))
         {
             var line = raw.Trim(); if (line.Length == 0) continue;
@@ -24,24 +24,37 @@ public static partial class LiveParser
                 var comma = line.LastIndexOf(','); name = comma >= 0 ? line[(comma + 1)..] : "频道";
                 var attrs = Attributes().Matches(line).ToDictionary(x => x.Groups[1].Value, x => x.Groups[2].Value);
                 group = attrs.GetValueOrDefault("group-title", "未分组"); id = attrs.GetValueOrDefault("tvg-id"); logo = attrs.GetValueOrDefault("tvg-logo");
+                headers = new(StringComparer.OrdinalIgnoreCase);
+                if (attrs.TryGetValue("http-user-agent", out var agent)) headers["User-Agent"] = agent;
+                if (attrs.TryGetValue("http-referrer", out var referer)) headers["Referer"] = referer;
+            }
+            else if (line.StartsWith("#EXTVLCOPT:", StringComparison.OrdinalIgnoreCase))
+            {
+                var separator = line.IndexOf('=', 11);
+                if (separator > 11)
+                {
+                    string key = line[11..separator].ToLowerInvariant();
+                    string? header = key switch { "http-user-agent" => "User-Agent", "http-referrer" => "Referer", _ => null };
+                    if (header is not null) (headers ??= new(StringComparer.OrdinalIgnoreCase))[header] = line[(separator + 1)..];
+                }
             }
             else if (!line.StartsWith('#'))
             {
-                if (name is not null) { Add(name, group, line, id, logo); name = null; }
+                if (name is not null) { Add(name, group, line, id, logo, headers); name = null; headers = null; }
                 else
                 {
                     var comma = line.IndexOf(','); if (comma < 0) continue;
                     var title = line[..comma]; var url = line[(comma + 1)..];
-                    if (url == "#genre#") group = title; else Add(title, group, url, null, null);
+                    if (url == "#genre#") group = title; else Add(title, group, url, null, null, null);
                 }
             }
         }
         return channels;
-        void Add(string title, string category, string url, string? tvg, string? image)
+        void Add(string title, string category, string url, string? tvg, string? image, Dictionary<string, string>? requestHeaders)
         {
             var existing = channels.FindIndex(x => x.Name == title && x.Group == category);
             if (existing >= 0) channels[existing] = channels[existing] with { Uris = channels[existing].Uris.Append(url).Distinct().ToList() };
-            else channels.Add(new(tvg ?? $"{category}/{title}", title, category, [url], image, tvg));
+            else channels.Add(new(tvg ?? $"{category}/{title}", title, category, [url], image, tvg, requestHeaders));
         }
     }
 
