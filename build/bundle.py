@@ -128,7 +128,13 @@ def bundle_linux(output):
     shutil.copytree(plugins, output / "native/vlc/plugins", dirs_exist_ok=True, symlinks=True)
     for pattern in ("libvlc.so*", "libvlccore.so*", "libicu*.so*"):
         for file in system_lib.glob(pattern):
-            shutil.copy2(file, target / file.name, follow_symlinks=True)
+            canonical = file.resolve()
+            destination = target / canonical.name
+            if not destination.exists(): shutil.copy2(canonical, destination)
+            if file.name != canonical.name:
+                alias = target / file.name
+                alias.unlink(missing_ok=True)
+                alias.symlink_to(canonical.name)
     # Resolve the closure against the target runner. Keep the platform's glibc/loader and GPU drivers.
     excluded = ("ld-linux", "libc.so", "libm.so", "libpthread.so", "libdl.so", "librt.so", "libresolv.so",
                 "libnss_", "libGLX_mesa", "libEGL_mesa", "libvulkan", "libdrm", "libgbm")
