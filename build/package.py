@@ -18,6 +18,7 @@ def run(*args, **kwargs):
 
 def package(rid, source, output, version):
     output.mkdir(parents=True, exist_ok=True)
+    verify_manifest(source / "native-manifest.json", source)
     stem = f"VodBox_{version}.{rid}"
     if rid.startswith("win"):
         shutil.make_archive(str(output / stem), "zip", source)
@@ -55,6 +56,7 @@ def package(rid, source, output, version):
         if identity != "-": command += ["--options", "runtime", "--timestamp"]
         run(*command, app)
         run("codesign", "--verify", "--deep", "--strict", app)
+        verify_manifest(resources / "native-manifest.json", contents)
         run(sys.executable, ROOT / "build/smoke.py", rid, contents / "MacOS")
         run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, output / (stem + ".zip"))
         with tempfile.TemporaryDirectory(prefix="vodbox-dmg-") as directory:
@@ -107,13 +109,24 @@ def refresh_manifest(directory, layout_root=None):
     root = layout_root or directory
     candidates = root.rglob("*") if layout_root else (directory / relative for relative in manifest["files"])
     for file in candidates:
-        if file == path or not file.is_file() or file.is_symlink(): continue
+        # The outer bundle seal signs the main executable after this resource is written.
+        # codesign verifies that executable; the manifest verifies stable dependency files.
+        if file == path or (layout_root and file == root / "MacOS/VodBox") or not file.is_file() or file.is_symlink(): continue
         relative = file.relative_to(root).as_posix()
         if file.exists():
             with file.open("rb") as source: files[relative] = hashlib.file_digest(source, "sha256").hexdigest()
     manifest["files"] = files
     if layout_root: manifest["layout"] = "macos-contents"
     path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+def verify_manifest(path, root):
+    manifest = json.loads(path.read_text())
+    for relative, expected in manifest["files"].items():
+        file = root / relative
+        with file.open("rb") as source:
+            actual = hashlib.file_digest(source, "sha256").hexdigest()
+        if actual != expected: raise ValueError(f"Bundled dependency SHA256 mismatch: {relative}")
+    print(f"Dependency manifest: OK ({len(manifest['files'])} files)", flush=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

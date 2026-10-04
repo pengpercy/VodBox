@@ -112,7 +112,7 @@ def bundle(rid, output):
                 "vlc": ASSETS["vlcVersion"] if "vlc" in asset else "system 3.x", "assets": asset,
                 "files": {}}
     for file in output.rglob("*"):
-        if file.is_file() and not file.is_symlink() and any(x in file.parts for x in ("native", "plugin-host", "runtimes")):
+        if file.is_file() and not file.is_symlink() and file.suffix not in (".pdb", ".dbg") and not any(part.endswith(".dSYM") for part in file.parts) and any(x in file.parts for x in ("native", "plugin-host", "runtimes")):
             with file.open("rb") as content:
                 manifest["files"][file.relative_to(output).as_posix()] = hashlib.file_digest(content, "sha256").hexdigest()
     (output / "native-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
