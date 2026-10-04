@@ -24,7 +24,7 @@ public sealed class InfrastructureTests
         Assert.Empty((await provider.SearchAsync("不存在", default)).Items);
         var request = await provider.ResolvePlaybackAsync("sample", "main", default);
         Assert.Equal("catalog", request.SourceId);
-        Assert.EndsWith("/examples/sample.mp4", new Uri(request.Uri).LocalPath);
+        Assert.Equal(Path.Combine(Root, "examples", "sample.mp4"), new Uri(request.Uri).LocalPath);
     }
 
     [Fact]

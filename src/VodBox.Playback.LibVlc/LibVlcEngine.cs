@@ -28,7 +28,8 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         string? path = configured ?? (Directory.Exists(bundled) ? Directory.Exists(Path.Combine(bundled, "lib")) ? Path.Combine(bundled, "lib") : bundled : OperatingSystem.IsMacOS() && Directory.Exists(installed) ? installed : null);
         if (Directory.Exists(Path.Combine(bundled, "plugins")))
             NativeEnvironment.SetPluginPath(Path.Combine(bundled, "plugins"));
-        VlcCore.Initialize(path);
+        // LibVLCSharp's Linux loader uses LD_LIBRARY_PATH, set by the launcher before process startup.
+        VlcCore.Initialize(OperatingSystem.IsLinux() ? null : path);
         List<string> options = ["--no-video-title-show", "--no-osd"];
         if (headless) options.AddRange(["--aout=dummy", "--vout=dummy"]);
         if (rebuildPluginCache) options.Add("--reset-plugins-cache");

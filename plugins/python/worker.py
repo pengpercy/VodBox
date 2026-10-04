@@ -7,6 +7,11 @@ import json
 import sys
 import traceback
 
+# Windows redirected pipes may otherwise use an ANSI code page, breaking Chinese metadata.
+sys.stdin.reconfigure(encoding="utf-8")
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 spec = importlib.util.spec_from_file_location("vodbox_provider", sys.argv[1])
 provider = importlib.util.module_from_spec(spec)
 with contextlib.redirect_stdout(sys.stderr):
