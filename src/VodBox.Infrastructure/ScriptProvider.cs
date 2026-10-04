@@ -19,7 +19,9 @@ public sealed class ScriptProvider(SourceDefinition source, string pluginHostPat
         if (source.Entry is null || !Uri.TryCreate(source.Entry, UriKind.Absolute, out var entry) || !entry.IsFile)
             throw new InvalidDataException("脚本 entry 必须是本地文件 URI。请先将插件保存到受管理目录。");
         var info = new ProcessStartInfo { RedirectStandardInput = true, RedirectStandardOutput = true,
-            RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(entry.LocalPath)! };
+            RedirectStandardError = true, StandardInputEncoding = new System.Text.UTF8Encoding(false),
+            StandardOutputEncoding = System.Text.Encoding.UTF8, StandardErrorEncoding = System.Text.Encoding.UTF8,
+            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(entry.LocalPath)! };
         if (source.Runtime == ProviderRuntime.Quickjs)
         {
             if (pluginHostPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))

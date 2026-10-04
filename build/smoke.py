@@ -12,7 +12,7 @@ def smoke(rid, directory):
     if rid.startswith("linux"):
         environment["LD_LIBRARY_PATH"] = str(directory / "native/vlc/lib") + (":" + environment["LD_LIBRARY_PATH"] if environment.get("LD_LIBRARY_PATH") else "")
     result = subprocess.run([str(directory / ("VodBox" + exe)), "--diagnostics", "--native"],
-                            env=environment, capture_output=True, text=True, timeout=60)
+                            env=environment, capture_output=True, text=True, encoding="utf-8", timeout=60)
     print(result.stdout, end="")
     if result.returncode:
         raise RuntimeError(result.stderr)
@@ -29,7 +29,7 @@ def smoke(rid, directory):
                        for index, (method, params) in enumerate(operations))
     for command, name in workers:
         result = subprocess.run([str(x) for x in command], input=requests, env=environment,
-                                capture_output=True, text=True, timeout=30)
+                                capture_output=True, text=True, encoding="utf-8", timeout=30)
         if result.returncode:
             raise RuntimeError(f"{name}: {result.stderr}")
         responses = [json.loads(line) for line in result.stdout.splitlines()]
