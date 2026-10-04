@@ -7,6 +7,7 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 from bundle import download, ROOT
@@ -23,15 +24,23 @@ def package(rid, source, output, version):
     elif rid.startswith("osx"):
         app = output / rid / "VodBox.app"
         contents = app / "Contents"
-        shutil.copytree(source, contents / "MacOS", dirs_exist_ok=True, symlinks=True)
-        (contents / "Resources").mkdir(parents=True, exist_ok=True)
+        if app.exists(): shutil.rmtree(app)
+        shutil.copytree(source, contents / "MacOS", symlinks=True, ignore=shutil.ignore_patterns("*.pdb", "*.dbg", "*.dSYM"))
+        resources = contents / "Resources/vodbox"; resources.mkdir(parents=True)
+        for name in ("examples", "plugins", "runtimes", "licenses", "native-manifest.json"):
+            original = contents / "MacOS" / name
+            if original.exists(): shutil.move(str(original), resources / name)
+        shutil.move(str(contents / "MacOS/native"), resources / "native")
+        (contents / "Helpers").mkdir()
+        shutil.move(str(contents / "MacOS/plugin-host"), contents / "Helpers/plugin-host")
         with (contents / "Info.plist").open("wb") as file:
             plistlib.dump({"CFBundleName": "VodBox", "CFBundleDisplayName": "VodBox", "CFBundleIdentifier": "app.vodbox.desktop",
                           "CFBundleExecutable": "VodBox", "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version,
                           "CFBundleVersion": version, "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "12.0"}, file)
         identity = os.environ.get("CODESIGN_IDENTITY") or "-"
         macho = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca")
-        for file in (contents / "MacOS").rglob("*"):
+        for file in sorted(contents.rglob("*"), key=lambda x: len(x.parts), reverse=True):
+            if file == contents / "MacOS/VodBox": continue
             if file.is_file() and not file.is_symlink():
                 with file.open("rb") as content:
                     native = content.read(4) in macho
@@ -41,11 +50,12 @@ def package(rid, source, output, version):
                     run(*command, file)
         # Signing changes plugin sizes/mtimes. Rebuild VLC's cache before sealing the app.
         run(contents / "MacOS/VodBox", "--diagnostics", "--native", "--rebuild-vlc-cache", timeout=300)
-        refresh_manifest(contents / "MacOS")
+        refresh_manifest(resources, contents)
         command = ["codesign", "--force", "--sign", identity]
         if identity != "-": command += ["--options", "runtime", "--timestamp"]
         run(*command, app)
         run("codesign", "--verify", "--deep", "--strict", app)
+        run(sys.executable, ROOT / "build/smoke.py", rid, contents / "MacOS")
         run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, output / (stem + ".zip"))
         with tempfile.TemporaryDirectory(prefix="vodbox-dmg-") as directory:
             stage = Path(directory)
@@ -90,15 +100,19 @@ def package(rid, source, output, version):
             digest = hashlib.file_digest(source, "sha256").hexdigest()
         file.with_suffix(file.suffix + ".sha256").write_text(digest + "  " + file.name + "\n")
 
-def refresh_manifest(directory):
+def refresh_manifest(directory, layout_root=None):
     path = directory / "native-manifest.json"
     manifest = json.loads(path.read_text())
     files = {}
-    for relative in manifest["files"]:
-        file = directory / relative
+    root = layout_root or directory
+    candidates = root.rglob("*") if layout_root else (directory / relative for relative in manifest["files"])
+    for file in candidates:
+        if file == path or not file.is_file() or file.is_symlink(): continue
+        relative = file.relative_to(root).as_posix()
         if file.exists():
             with file.open("rb") as source: files[relative] = hashlib.file_digest(source, "sha256").hexdigest()
     manifest["files"] = files
+    if layout_root: manifest["layout"] = "macos-contents"
     path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 if __name__ == "__main__":

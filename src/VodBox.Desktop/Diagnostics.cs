@@ -11,7 +11,7 @@ internal static class Diagnostics
         {
             Console.WriteLine($"VodBox 0.1.0 | {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}");
             using var http = new HttpClient();
-            string location = Path.Combine(AppContext.BaseDirectory, "examples", "vodbox.json");
+            string location = Path.Combine(Core.AppLayout.AssetsDirectory, "examples", "vodbox.json");
             var config = await new ConfigLoader(http).LoadAsync(location);
             var source = config.Sources.First(x => x.Runtime == Core.ProviderRuntime.Csharp);
             await using var provider = new CatalogProvider(source, http);

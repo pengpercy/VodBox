@@ -23,7 +23,7 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
     {
         if (_player is not null) return;
         var configured = Environment.GetEnvironmentVariable("VODBOX_VLC_PATH");
-        var bundled = Path.Combine(AppContext.BaseDirectory, "native", "vlc");
+        var bundled = AppLayout.VlcDirectory;
         var installed = "/Applications/VLC.app/Contents/MacOS/lib";
         string? path = configured ?? (Directory.Exists(bundled) ? Directory.Exists(Path.Combine(bundled, "lib")) ? Path.Combine(bundled, "lib") : bundled : OperatingSystem.IsMacOS() && Directory.Exists(installed) ? installed : null);
         if (Directory.Exists(Path.Combine(bundled, "plugins")))

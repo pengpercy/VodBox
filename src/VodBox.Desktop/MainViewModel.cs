@@ -64,8 +64,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         _store = designMode ? new PreviewStore() : new LibraryStore(Path.Combine(AppPaths.DataDirectory, "library.db"));
         _coordinator = new(Engine, _store);
-        var host = Path.Combine(AppContext.BaseDirectory, "plugin-host", OperatingSystem.IsWindows() ? "VodBox.PluginHost.exe" : "VodBox.PluginHost");
-        _factory = new(_http, host, AppContext.BaseDirectory);
+        var host = Path.Combine(AppLayout.PluginHostDirectory, OperatingSystem.IsWindows() ? "VodBox.PluginHost.exe" : "VodBox.PluginHost");
+        _factory = new(_http, host, AppLayout.AssetsDirectory);
         Engine.StateChanged += OnPlaybackState;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>
         {
@@ -81,7 +81,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     public async Task InitializeAsync()
     {
         var saved = Path.Combine(AppPaths.DataDirectory, "config.json");
-        ConfigLocation = File.Exists(saved) ? saved : Path.Combine(AppContext.BaseDirectory, "examples", "vodbox.json");
+        ConfigLocation = File.Exists(saved) ? saved : Path.Combine(AppLayout.AssetsDirectory, "examples", "vodbox.json");
         if (File.Exists(ConfigLocation)) await LoadConfigAsync();
     }
     private async Task RunAsync(Func<Task> action, bool busy = true)

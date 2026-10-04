@@ -49,7 +49,7 @@ python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages
 
 默认 macOS 使用本地 ad-hoc 签名供验证，未做 Apple notarization。`CODESIGN_IDENTITY` 可以选择已安装的 Developer ID；正式分发前仍需配置签名与公证流程。CI 默认仅上传构建和安装包 artifacts；推送与 VERSION 匹配的 `v*` tag 才创建草稿 Release。
 
-Python、Node、VLC 的下载地址与 SHA-256 固定在 `build/native-assets.json`，QuickJS 固定提交与压缩包 SHA-256。`native-manifest.json` 记录实际打包文件的校验值。调试符号与运行包分离。AOT 主要减小托管运行时开销；完整 VLC 编解码插件和外部脚本运行时仍占据大部分包体积。
+Python、Node、VLC 的下载地址与 SHA-256 固定在 `build/native-assets.json`，QuickJS 固定提交与压缩包 SHA-256。`native-manifest.json` 记录实际打包文件的校验值。调试符号与运行包分离。Node 仅携带运行时和许可证，排除 npm、开发头文件与文档。macOS 使用标准 app bundle 资源目录，封包前验证签名、原生解码和三种脚本宿主。AOT 主要减小托管运行时开销；完整 VLC 编解码插件和外部脚本运行时仍占据大部分包体积。
 
 ## 内容源与插件
 

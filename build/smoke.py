@@ -16,11 +16,14 @@ def smoke(rid, directory):
     print(result.stdout, end="")
     if result.returncode:
         raise RuntimeError(result.stderr)
-    examples = directory / "examples"
+    mac_resources = directory.parent / "Resources/vodbox"
+    assets = mac_resources if rid.startswith("osx") and mac_resources.is_dir() else directory
+    host = directory.parent / "Helpers/plugin-host" if assets == mac_resources else directory / "plugin-host"
+    examples = assets / "examples"
     workers = [
-        ([directory / "plugin-host" / ("VodBox.PluginHost" + exe), examples / "demo.js"], "QuickJS"),
-        ([directory / "runtimes/python" / ("python.exe" if windows else "bin/python3"), "-B", directory / "plugins/python/worker.py", examples / "demo.py"], "Python"),
-        ([directory / "runtimes/node" / ("node.exe" if windows else "bin/node"), directory / "plugins/node/worker.mjs", examples / "demo.mjs"], "Node")
+        ([host / ("VodBox.PluginHost" + exe), examples / "demo.js"], "QuickJS"),
+        ([assets / "runtimes/python" / ("python.exe" if windows else "bin/python3"), "-B", assets / "plugins/python/worker.py", examples / "demo.py"], "Python"),
+        ([assets / "runtimes/node" / ("node.exe" if windows else "bin/node"), assets / "plugins/node/worker.mjs", examples / "demo.mjs"], "Node")
     ]
     operations = [("init", {"mediaUri": "https://example.com/sample.mp4"}), ("categories", {}),
                   ("items", {}), ("search", {"query": "missing"}), ("detail", {"mediaId": "sample"}),

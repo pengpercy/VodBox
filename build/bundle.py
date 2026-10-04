@@ -52,7 +52,16 @@ def bundle(rid, output):
                 raise ValueError(f"Unexpected {runtime} archive layout")
             target = output / "runtimes" / runtime
             if target.exists(): shutil.rmtree(target)
-            shutil.copytree(roots[0], target, symlinks=True)
+            if runtime == "node":
+                # Providers need Node itself, not npm, development headers or documentation.
+                binary = "node.exe" if rid.startswith("win") else "bin/node"
+                destination = target / binary
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(roots[0] / binary, destination)
+                for notice in roots[0].glob("LICENSE*"):
+                    shutil.copy2(notice, target / notice.name)
+            else:
+                shutil.copytree(roots[0], target, symlinks=True)
     if "vlc" in asset:
         archive = download(asset["vlc"])
         if rid.startswith("osx"):
@@ -92,8 +101,13 @@ def bundle(rid, output):
     library = next(native_build.rglob("*vodbox_quickjs" + suffix))
     (output / "plugin-host").mkdir(exist_ok=True)
     shutil.copy2(library, output / "plugin-host" / library.name)
+    quickjs_license = native_build / "_deps/quickjs-src/LICENSE"
+    notices = output / "licenses/quickjs"
+    notices.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(quickjs_license, notices / "LICENSE")
     for directory in ("examples", "plugins"):
-        shutil.copytree(ROOT / directory, output / directory, dirs_exist_ok=True)
+        shutil.copytree(ROOT / directory, output / directory, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     manifest = {"rid": rid, "python": ASSETS["pythonVersion"], "node": ASSETS["nodeVersion"],
                 "vlc": ASSETS["vlcVersion"] if "vlc" in asset else "system 3.x", "assets": asset,
                 "files": {}}
