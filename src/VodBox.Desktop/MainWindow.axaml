@@ -43,9 +43,12 @@
           <Button Content="全屏" Click="FullscreenClick" />
         </StackPanel>
       </Grid>
-      <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+      <Grid Grid.Row="1" ColumnDefinitions="*,180,Auto" ColumnSpacing="8">
         <TextBox Text="{Binding Url}" PlaceholderText="粘贴媒体 URL，或打开本地文件" />
-        <Button Grid.Column="1" Content="播放地址" Command="{Binding OpenUrlCommand}" />
+        <ComboBox Grid.Column="1" ItemsSource="{Binding Resolvers}" SelectedItem="{Binding SelectedResolver}">
+          <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ResolverDefinition"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Grid.Column="2" Content="播放地址" Command="{Binding OpenUrlCommand}" />
       </Grid>
       <Grid Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
         <Grid RowDefinitions="Auto,*" RowSpacing="12">

@@ -16,14 +16,16 @@ public sealed record SourceDefinition
     public string Provider { get; init; } = "catalog";
     public string? Entry { get; init; }
     public Dictionary<string, JsonElement> Options { get; init; } = [];
+    public string? ResolverId { get; init; }
 }
 
 public sealed record VodBoxConfig
 {
-    public int SchemaVersion { get; init; } = 1;
-    public string Id { get; init; } = "default";
-    public List<SourceDefinition> Sources { get; init; } = [];
-    public List<LiveSourceDefinition> LiveSources { get; init; } = [];
+    public int SchemaVersion { get; set; } = 1;
+    public string Id { get; set; } = "default";
+    public List<SourceDefinition> Sources { get; set; } = [];
+    public List<LiveSourceDefinition> LiveSources { get; set; } = [];
+    public List<ResolverDefinition> Resolvers { get; set; } = [];
 }
 
 public sealed record Category(string Id, string Name);
@@ -47,13 +49,15 @@ public sealed record PlaybackRequest
     public string MediaId { get; init; } = "";
     public string EpisodeId { get; init; } = "";
     public bool IsLive { get; init; }
+    public string? ResolverId { get; init; }
+    public string? OriginalUri { get; init; }
 }
 
 public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration,
     bool CanSeek, string? Error = null);
 public sealed record PlaybackEvent(long SessionId, PlaybackSnapshot Snapshot);
 public sealed record HistoryEntry(string ConfigId, string SourceId, string MediaId, string EpisodeId,
-    string Title, string Uri, long PositionMs, DateTimeOffset UpdatedAt);
+    string Title, string Uri, long PositionMs, DateTimeOffset UpdatedAt, ResolutionKind ResolutionKind = ResolutionKind.Direct, string? ResolverId = null);
 public sealed record FavoriteEntry(string ConfigId, string SourceId, string MediaId, string Title);
 public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null, Dictionary<string, string>? EpgMap = null);
 public sealed record LiveChannel(string Id, string Name, string Group, IReadOnlyList<string> Uris,

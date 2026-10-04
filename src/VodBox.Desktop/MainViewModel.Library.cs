@@ -50,7 +50,10 @@ public partial class MainViewModel
     {
         token.ThrowIfCancellationRequested();
         _aggregateCancellation?.Cancel(); _playlist.Clear(); await _coordinator.StopAsync();
-        _config = config; SelectedSource = null; await _sourceTask;
+        _config = config; _resolution.Configure(config);
+        Resolvers.Clear(); Resolvers.Add(new() { Id = "_direct", Name = "直接播放", Kind = ResolutionKind.Direct });
+        Resolvers.Add(new() { Id = "_browser", Name = "网页嗅探", Kind = ResolutionKind.Browser });
+        foreach (var resolver in config.Resolvers ?? []) Resolvers.Add(resolver); SelectedResolver = Resolvers[0]; SelectedSource = null; await _sourceTask;
         Sources.Clear(); foreach (var source in config.Sources) Sources.Add(source);
         SelectedSource = Sources.FirstOrDefault(x => x.Id == _preferredSourceId) ?? Sources.FirstOrDefault();
         await _sourceTask;

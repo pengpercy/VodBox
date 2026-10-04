@@ -14,6 +14,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private readonly ILibraryStore _store;
     private readonly PlaybackCoordinator _coordinator;
+    private readonly PlaybackResolutionService _resolution;
     private readonly ProviderFactory _factory;
     private IContentProvider? _provider;
     private CancellationTokenSource? _browse;
@@ -37,6 +38,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<string> LiveGroups { get; } = [];
     public ObservableCollection<ProgrammeRow> Programmes { get; } = [];
     public LibVlcEngine Engine { get; } = new();
+    public ObservableCollection<ResolverDefinition> Resolvers { get; } = [new() { Id = "_direct", Name = "直接播放", Kind = ResolutionKind.Direct }];
+    [ObservableProperty] private ResolverDefinition? _selectedResolver;
     public ObservableCollection<SourceDefinition> Sources { get; } = [];
     public ObservableCollection<Category> Categories { get; } = [];
     public ObservableCollection<MediaItem> Items { get; } = [];
@@ -88,8 +91,10 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     public MainViewModel(bool designMode = false)
     {
         _designMode = designMode;
+        SelectedResolver = Resolvers[0];
         _store = designMode ? new PreviewStore() : new LibraryStore(Path.Combine(AppPaths.DataDirectory, "library.db"));
-        _coordinator = new(Engine, _store);
+        _resolution = new(_http);
+        _coordinator = new(Engine, _store, _resolution);
         var host = Path.Combine(AppLayout.PluginHostDirectory, OperatingSystem.IsWindows() ? "VodBox.PluginHost.exe" : "VodBox.PluginHost");
         _factory = new(_http, host, AppLayout.AssetsDirectory);
         _configurations = new(Path.Combine(AppPaths.ConfigurationDirectory, "configurations"));
@@ -133,7 +138,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand] private Task NextEpisodeAsync() => RunAsync(async () => { if (!await _playlist.MoveAsync(1, SkipIntroSeconds * 1000L, _lifetime.Token)) Status = "已经是最后一集。"; });
     [RelayCommand] private Task PreviousEpisodeAsync() => RunAsync(async () => { if (!await _playlist.MoveAsync(-1, SkipIntroSeconds * 1000L, _lifetime.Token)) Status = "已经是第一集。"; });
     public Task OpenFileAsync(string path) => PlayRequestAsync(new() { Uri = new Uri(Path.GetFullPath(path)).AbsoluteUri, Title = Path.GetFileName(path), MediaId = Path.GetFullPath(path) });
-    [RelayCommand] private Task OpenUrlAsync() => PlayRequestAsync(new() { Uri = Url.Trim(), Title = Url.Trim(), MediaId = Url.Trim() });
+    [RelayCommand] private Task OpenUrlAsync() => PlayRequestAsync(new() { Uri = Url.Trim(), Title = Url.Trim(), MediaId = Url.Trim(), ResolverId = SelectedResolver?.Id });
     private Task PlayRequestAsync(PlaybackRequest request) => RunAsync(async () =>
     {
         if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out _)) throw new InvalidDataException("请输入完整媒体 URL。");
@@ -154,7 +159,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         if (entry is null) return;
         if (entry.SourceId == "local")
-        { await PlayRequestAsync(new() { Uri = entry.Uri, Title = entry.Title, MediaId = entry.MediaId, StartPositionMs = ResumePlayback ? entry.PositionMs : 0 }); return; }
+        { await PlayRequestAsync(new() { Uri = entry.Uri, Title = entry.Title, MediaId = entry.MediaId, ResolutionKind = entry.ResolutionKind, ResolverId = entry.ResolverId, StartPositionMs = ResumePlayback ? entry.PositionMs : 0 }); return; }
         await OpenStoredItemAsync(entry.ConfigId, entry.SourceId, entry.MediaId);
         var detail = _detail ?? throw new InvalidDataException("无法加载该媒体详情。");
         var line = detail.PlaybackLines.FirstOrDefault(x => x.Episodes.Any(e => e.Id == entry.EpisodeId)) ?? throw new InvalidDataException("记录中的集数已经被移除。");
@@ -202,7 +207,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         await _sourceTask; await _sourceGate.WaitAsync();
         try { if (_provider is not null) await _provider.DisposeAsync(); }
         finally { _sourceGate.Release(); }
-        await _coordinator.DisposeAsync(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
+        await _coordinator.DisposeAsync(); await _resolution.DisposeAsync(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
     }
 
 }

@@ -68,3 +68,5 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 本轮增强已有 14 项功能测试和本地 Native AOT 编译验证，跨平台及桌面交互验收继续进行。后续阶段尚未完成：海报缓存、分类筛选、网页嗅探与浏览器宿主、通用请求头/流代理、JSON 解析链、弹幕、大屏模式、媒体键与休眠抑制、DLNA/局域网同步、SMB/WebDAV、自动更新。旧配置与 Java 兼容层不在当前范围内。
 
 参考项目：[FongMi/TV](https://github.com/FongMi/TV)、[Screenbox](https://github.com/huynhsontung/Screenbox)、[Downio](https://github.com/pengpercy/Downio)。当前实现没有复制其应用源码。分发原生依赖前应保留各依赖的许可证与 notice；相关文件随运行时打包。
+
+解析器配置、HLS 请求头代理与独立浏览器嗅探使用说明见 [播放解析](docs/playback-resolution.md)。完整重写的逐项覆盖及尚未实现内容见 [实现进度](docs/implementation-progress.md)。

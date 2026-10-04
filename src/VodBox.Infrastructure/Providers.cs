@@ -69,12 +69,26 @@ public sealed class CatalogProvider : IContentProvider
 
 public sealed class ProviderFactory(HttpClient http, string pluginHostPath, string assetsDirectory) : IProviderFactory
 {
-    public IContentProvider Create(SourceDefinition source) => source.Runtime switch
+    public IContentProvider Create(SourceDefinition source)
     {
+        IContentProvider provider = source.Runtime switch
+        {
         ProviderRuntime.Csharp when source.Provider == "catalog" => new CatalogProvider(source, http),
         ProviderRuntime.Csharp when source.Provider == "maccms-json" => new MacCmsProvider(source, http, false),
         ProviderRuntime.Csharp when source.Provider == "maccms-xml" => new MacCmsProvider(source, http, true),
         ProviderRuntime.Csharp => throw new NotSupportedException($"尚未注册 C# Provider：{source.Provider}"),
         _ => new ScriptProvider(source, pluginHostPath, assetsDirectory)
-    };
+        };
+        return source.ResolverId is null ? provider : new ResolvedSource(provider, source.ResolverId);
+    }
+    private sealed class ResolvedSource(IContentProvider inner, string resolverId) : IContentProvider
+    {
+        public string SourceId => inner.SourceId;
+        public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken token) => inner.GetCategoriesAsync(token);
+        public Task<MediaPage> GetItemsAsync(string? category, string? cursor, CancellationToken token) => inner.GetItemsAsync(category, cursor, token);
+        public Task<MediaPage> SearchAsync(string query, CancellationToken token) => inner.SearchAsync(query, token);
+        public Task<MediaDetail> GetDetailAsync(string media, CancellationToken token) => inner.GetDetailAsync(media, token);
+        public async Task<PlaybackRequest> ResolvePlaybackAsync(string media, string episode, CancellationToken token) => (await inner.ResolvePlaybackAsync(media, episode, token)) with { ResolverId = resolverId };
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
 }

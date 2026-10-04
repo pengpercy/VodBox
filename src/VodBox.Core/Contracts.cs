@@ -5,6 +5,11 @@ public interface IProviderFactory
     IContentProvider Create(SourceDefinition source);
 }
 
+public interface IPlaybackResolver
+{
+    Task<PlaybackRequest> ResolveAsync(PlaybackRequest request, CancellationToken cancellationToken);
+}
+
 public interface IContentProvider : IAsyncDisposable
 {
     string SourceId { get; }

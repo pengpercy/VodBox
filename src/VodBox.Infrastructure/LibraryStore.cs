@@ -12,6 +12,9 @@ public sealed class LibraryStore : ILibraryStore
         _connectionString = new SqliteConnectionStringBuilder { DataSource = path }.ToString();
         using var connection = Open();
         using var cmd = connection.CreateCommand();
+        cmd.CommandText = "PRAGMA user_version";
+        int version = Convert.ToInt32(cmd.ExecuteScalar());
+        if (version > 2) throw new InvalidDataException("数据库版本高于当前应用支持的版本。");
         cmd.CommandText = """
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS history(config TEXT, source TEXT, media TEXT, episode TEXT,
@@ -19,9 +22,14 @@ public sealed class LibraryStore : ILibraryStore
                 PRIMARY KEY(config,source,media,episode));
             CREATE TABLE IF NOT EXISTS favorites(config TEXT, source TEXT, media TEXT, title TEXT NOT NULL,
                 PRIMARY KEY(config,source,media));
-            PRAGMA user_version=1;
             """;
         cmd.ExecuteNonQuery();
+        if (version < 2)
+        {
+            using var transaction = connection.BeginTransaction(); cmd.Transaction = transaction;
+            cmd.CommandText = "ALTER TABLE history ADD COLUMN resolution INTEGER NOT NULL DEFAULT 0; ALTER TABLE history ADD COLUMN resolver TEXT; PRAGMA user_version=2;";
+            cmd.ExecuteNonQuery(); transaction.Commit();
+        }
     }
     private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
 
@@ -29,19 +37,20 @@ public sealed class LibraryStore : ILibraryStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var connection = Open(); using var cmd = connection.CreateCommand();
-        cmd.CommandText = "INSERT INTO history VALUES($c,$s,$m,$e,$t,$u,$p,$d) ON CONFLICT(config,source,media,episode) DO UPDATE SET title=$t,uri=$u,position=$p,updated=$d";
+        cmd.CommandText = "INSERT INTO history(config,source,media,episode,title,uri,position,updated,resolution,resolver) VALUES($c,$s,$m,$e,$t,$u,$p,$d,$r,$v) ON CONFLICT(config,source,media,episode) DO UPDATE SET title=$t,uri=$u,position=$p,updated=$d,resolution=$r,resolver=$v";
         Bind(cmd, entry.ConfigId, entry.SourceId, entry.MediaId, entry.Title);
         cmd.Parameters.AddWithValue("$e", entry.EpisodeId); cmd.Parameters.AddWithValue("$u", entry.Uri);
         cmd.Parameters.AddWithValue("$p", entry.PositionMs); cmd.Parameters.AddWithValue("$d", entry.UpdatedAt.ToString("O"));
+        cmd.Parameters.AddWithValue("$r", (int)entry.ResolutionKind); cmd.Parameters.AddWithValue("$v", (object?)entry.ResolverId ?? DBNull.Value);
         cmd.ExecuteNonQuery(); return Task.CompletedTask;
     }
     public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var connection = Open(); using var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT * FROM history ORDER BY updated DESC LIMIT 200";
+        cmd.CommandText = "SELECT config,source,media,episode,title,uri,position,updated,resolution,resolver FROM history ORDER BY updated DESC LIMIT 200";
         using var reader = cmd.ExecuteReader(); var entries = new List<HistoryEntry>();
-        while (reader.Read()) entries.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetInt64(6), DateTimeOffset.Parse(reader.GetString(7))));
+        while (reader.Read()) entries.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetInt64(6), DateTimeOffset.Parse(reader.GetString(7)), (ResolutionKind)reader.GetInt32(8), reader.IsDBNull(9) ? null : reader.GetString(9)));
         return Task.FromResult<IReadOnlyList<HistoryEntry>>(entries);
     }
     public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken cancellationToken = default)

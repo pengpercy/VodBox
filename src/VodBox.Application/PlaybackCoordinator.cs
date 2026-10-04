@@ -3,7 +3,7 @@ using VodBox.Core;
 namespace VodBox.Application;
 
 /// <summary>Serializes native transitions and cancels obsolete source resolution.</summary>
-public sealed class PlaybackCoordinator(IPlaybackEngine engine, ILibraryStore store) : IAsyncDisposable
+public sealed class PlaybackCoordinator(IPlaybackEngine engine, ILibraryStore store, IPlaybackResolver? resolver = null) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _transition = new(1, 1);
     private readonly object _pendingLock = new();
@@ -29,6 +29,7 @@ public sealed class PlaybackCoordinator(IPlaybackEngine engine, ILibraryStore st
         try
         {
             var request = await resolve(pending.Token);
+            if (resolver is not null) request = await resolver.ResolveAsync(request, pending.Token);
             pending.Token.ThrowIfCancellationRequested();
             await _transition.WaitAsync(pending.Token);
             try
@@ -63,9 +64,9 @@ public sealed class PlaybackCoordinator(IPlaybackEngine engine, ILibraryStore st
         bool completed = snapshot.Duration > TimeSpan.Zero && snapshot.Position >= snapshot.Duration
             - TimeSpan.FromSeconds(Math.Min(30, snapshot.Duration.TotalSeconds * .05));
         return store.SaveHistoryAsync(new HistoryEntry(_configId, request.SourceId,
-            string.IsNullOrEmpty(request.MediaId) ? request.Uri : request.MediaId, request.EpisodeId,
-            request.Title, request.Uri, completed ? 0 : (long)snapshot.Position.TotalMilliseconds,
-            DateTimeOffset.UtcNow), cancellationToken);
+            string.IsNullOrEmpty(request.MediaId) ? request.OriginalUri ?? request.Uri : request.MediaId, request.EpisodeId,
+            request.Title, request.OriginalUri ?? request.Uri, completed ? 0 : (long)snapshot.Position.TotalMilliseconds,
+            DateTimeOffset.UtcNow, request.ResolutionKind, request.ResolverId), cancellationToken);
     }
 
     public async Task StopAsync()
