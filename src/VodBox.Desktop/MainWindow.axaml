@@ -58,18 +58,27 @@
                 <ComboBox.ItemTemplate><DataTemplate x:DataType="core:Category"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
             </Grid>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding SearchText}" PlaceholderText="搜索当前内容源" /><Button Grid.Column="1" Content="搜索" Command="{Binding SearchCommand}" /></Grid>
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Text="{Binding SearchText}" PlaceholderText="搜索内容" /><Button Grid.Column="1" Content="当前源" Command="{Binding SearchCommand}" /><Button Grid.Column="2" Content="全源搜索" Command="{Binding SearchAllCommand}" /></Grid>
+          </StackPanel>
+          <StackPanel IsVisible="{Binding ShowLive}" Spacing="8">
+            <ComboBox ItemsSource="{Binding LiveGroups}" SelectedItem="{Binding SelectedLiveGroup}" HorizontalAlignment="Stretch" />
+            <TextBox Text="{Binding LiveSearch}" PlaceholderText="搜索直播频道" />
+            <Button Content="切换备用地址" Command="{Binding NextLiveMirrorCommand}" />
           </StackPanel>
           <Grid Grid.Row="1">
-            <Grid IsVisible="{Binding ShowLibrary}" RowDefinitions="*,Auto" RowSpacing="8">
-              <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="Transparent">
+            <Grid IsVisible="{Binding ShowLibrary}" RowDefinitions="*,Auto,Auto" RowSpacing="8">
+              <ListBox IsVisible="{Binding !AggregateResultsVisible}" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="Transparent">
                 <ListBox.ItemTemplate><DataTemplate x:DataType="core:MediaItem">
                   <Border Padding="12" Margin="0,4" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="8">
                     <StackPanel Spacing="6"><TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" /><TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" /></StackPanel>
                   </Border>
                 </DataTemplate></ListBox.ItemTemplate>
               </ListBox>
-              <Button Grid.Row="1" Content="加载更多" Command="{Binding LoadMoreCommand}" HorizontalAlignment="Center" />
+              <ListBox IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchResults}" SelectionChanged="SearchSelectionChanged" Background="Transparent">
+                <ListBox.ItemTemplate><DataTemplate x:DataType="core:SearchHit"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding SourceName}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+              <ItemsControl Grid.Row="1" IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchErrors}" MaxHeight="70" />
+              <Button Grid.Row="2" IsVisible="{Binding !AggregateResultsVisible}" Content="加载更多" Command="{Binding LoadMoreCommand}" HorizontalAlignment="Center" />
             </Grid>
             <ListBox IsVisible="{Binding ShowLive}" ItemsSource="{Binding Channels}" SelectionChanged="LiveSelectionChanged">
               <ListBox.ItemTemplate><DataTemplate x:DataType="core:LiveChannel"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Name}" FontSize="16" /><TextBlock Text="{Binding Group}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
@@ -77,10 +86,21 @@
             <ListBox IsVisible="{Binding ShowHistory}" ItemsSource="{Binding History}" SelectionChanged="HistorySelectionChanged">
               <ListBox.ItemTemplate><DataTemplate x:DataType="core:HistoryEntry"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding UpdatedAt}" Classes="muted" FontSize="11" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
             </ListBox>
-            <ListBox IsVisible="{Binding ShowFavorites}" ItemsSource="{Binding Favorites}">
+            <ListBox IsVisible="{Binding ShowFavorites}" ItemsSource="{Binding Favorites}" SelectionChanged="FavoriteSelectionChanged">
               <ListBox.ItemTemplate><DataTemplate x:DataType="core:FavoriteEntry"><StackPanel Margin="8"><TextBlock Text="{Binding Title}" /><TextBlock Text="{Binding SourceId}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
             </ListBox>
             <ScrollViewer IsVisible="{Binding ShowSettings}"><StackPanel Spacing="16">
+              <TextBlock Text="已保存的配置" FontWeight="SemiBold" FontSize="18" />
+              <ComboBox ItemsSource="{Binding SavedConfigurations}" SelectedItem="{Binding SelectedSavedConfiguration}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="core:SavedConfiguration"><TextBlock Text="{Binding Id}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Content="切换到保存的配置" Command="{Binding LoadSavedConfigurationCommand}" CommandParameter="{Binding SelectedSavedConfiguration}" />
+              <Button Content="移除保存的配置" Command="{Binding RemoveSavedConfigurationCommand}" CommandParameter="{Binding SelectedSavedConfiguration}" />
+              <TextBlock Text="播放偏好" FontWeight="SemiBold" FontSize="18" />
+              <ToggleSwitch Content="自动播放下一集" IsChecked="{Binding AutoNext}" />
+              <ToggleSwitch Content="从上次进度继续" IsChecked="{Binding ResumePlayback}" />
+              <TextBlock Text="跳过片头（秒）" /><NumericUpDown Minimum="0" Maximum="600" Increment="5" Value="{Binding SkipIntroSeconds}" />
+              <TextBlock Text="跳过片尾（秒，自动下一集时生效）" /><NumericUpDown Minimum="0" Maximum="600" Increment="5" Value="{Binding SkipOutroSeconds}" />
               <TextBlock Text="内容配置" FontWeight="SemiBold" FontSize="18" /><TextBox Text="{Binding ConfigLocation}" PlaceholderText="VodBox JSON 配置路径或 URL" />
               <Button Content="加载配置" Command="{Binding LoadConfigCommand}" /><Button Content="从文件选择配置" Click="OpenConfigClick" />
               <TextBlock Text="支持 C#、QuickJS、Python 与 Node.js 内容源。旧 TV 配置暂不支持。" TextWrapping="Wrap" Classes="muted" />
@@ -92,15 +112,25 @@
           <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180">
             <vlc:VideoView x:Name="VideoSurface" />
           </Border>
-          <TextBlock Grid.Row="1" Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+            <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Content="上一集" Command="{Binding PreviousEpisodeCommand}" />
+            <Button Grid.Column="2" Content="下一集" Command="{Binding NextEpisodeCommand}" />
+          </Grid>
           <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <ComboBox ItemsSource="{Binding Lines}" SelectedItem="{Binding SelectedLine}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PlaybackLine"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
             <Button Grid.Column="1" Content="收藏 / 取消" Command="{Binding ToggleFavoriteCommand}" />
           </Grid>
           <TextBlock Grid.Row="3" Text="{Binding Description}" TextWrapping="Wrap" MaxHeight="85" Classes="muted" />
-          <ListBox Grid.Row="4" ItemsSource="{Binding Episodes}" SelectionChanged="EpisodeSelectionChanged" Background="Transparent">
+          <ListBox Grid.Row="4" IsVisible="{Binding !ShowLive}" ItemsSource="{Binding Episodes}" SelectionChanged="EpisodeSelectionChanged" Background="Transparent">
             <ListBox.ItemTemplate><DataTemplate x:DataType="core:Episode"><TextBlock Text="{Binding Title}" Margin="8,4" /></DataTemplate></ListBox.ItemTemplate>
           </ListBox>
+          <Grid Grid.Row="4" IsVisible="{Binding ShowLive}" RowDefinitions="Auto,*" RowSpacing="8">
+            <TextBlock Text="{Binding EpgStatus}" Classes="muted" TextWrapping="Wrap" />
+            <ListBox Grid.Row="1" ItemsSource="{Binding Programmes}">
+              <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProgrammeRow"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding Time}" Classes="muted" FontSize="12" /><TextBlock Text="正在播出" IsVisible="{Binding IsCurrent}" Foreground="#60AEFF" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
         </Grid>
       </Grid>
       <TextBlock Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />

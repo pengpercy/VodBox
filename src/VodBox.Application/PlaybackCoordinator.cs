@@ -59,9 +59,12 @@ public sealed class PlaybackCoordinator(IPlaybackEngine engine, ILibraryStore st
         var snapshot = engine.Snapshot;
         if (request is null || request.IsLive || Incognito || snapshot.Position <= TimeSpan.Zero)
             return Task.CompletedTask;
+        // Do not resume a completed episode at its final frame, immediately ending it again.
+        bool completed = snapshot.Duration > TimeSpan.Zero && snapshot.Position >= snapshot.Duration
+            - TimeSpan.FromSeconds(Math.Min(30, snapshot.Duration.TotalSeconds * .05));
         return store.SaveHistoryAsync(new HistoryEntry(_configId, request.SourceId,
             string.IsNullOrEmpty(request.MediaId) ? request.Uri : request.MediaId, request.EpisodeId,
-            request.Title, request.Uri, (long)snapshot.Position.TotalMilliseconds,
+            request.Title, request.Uri, completed ? 0 : (long)snapshot.Position.TotalMilliseconds,
             DateTimeOffset.UtcNow), cancellationToken);
     }
 

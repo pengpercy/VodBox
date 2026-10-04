@@ -19,7 +19,17 @@ internal static class Diagnostics
             var page = await provider.GetItemsAsync(null, null, default);
             Console.WriteLine($"Config/schema: OK | categories={categories.Count}, items={page.Items.Count}");
             string temp = Path.Combine(Path.GetTempPath(), "vodbox-diagnostics-" + Guid.NewGuid().ToString("N"));
-            try { var store = new LibraryStore(Path.Combine(temp, "test.db")); await store.GetHistoryAsync(); Console.WriteLine("SQLite: OK"); }
+            try
+            {
+                var store = new LibraryStore(Path.Combine(temp, "test.db")); await store.GetHistoryAsync(); Console.WriteLine("SQLite: OK");
+                var preferences = new PreferencesStore(Path.Combine(temp, "preferences.json"));
+                await preferences.SaveAsync(new Core.AppPreferences { Volume = 35, AutoNext = false });
+                if ((await preferences.LoadAsync()).Volume != 35) throw new InvalidDataException("偏好设置校验失败。");
+                var configurations = new ConfigurationRepository(Path.Combine(temp, "configurations"));
+                await configurations.SaveAsync(config, location);
+                if ((await configurations.LoadAsync(config.Id)).Id != config.Id) throw new InvalidDataException("配置快照校验失败。");
+                Console.WriteLine("AOT preferences/configuration: OK");
+            }
             finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(temp, true); }
             if (args.Contains("--native"))
             {

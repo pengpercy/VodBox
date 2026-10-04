@@ -44,6 +44,10 @@ public sealed partial class MainWindow : Window
             if (e.Key == Key.Space && e.Source is not TextBox) { await _viewModel.TogglePauseCommand.ExecuteAsync(null); e.Handled = true; }
         };
     }
+    private async void FavoriteSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    { if (_viewModel is not null && e.AddedItems.Count > 0 && e.AddedItems[0] is FavoriteEntry entry) await _viewModel.OpenFavoriteCommand.ExecuteAsync(entry); }
+    private async void SearchSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    { if (_viewModel is not null && e.AddedItems.Count > 0 && e.AddedItems[0] is SearchHit hit) await _viewModel.OpenSearchResultCommand.ExecuteAsync(hit); }
     private async Task<string?> PickAsync(string title)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new() { Title = title, AllowMultiple = false });

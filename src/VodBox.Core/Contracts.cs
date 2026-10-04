@@ -1,5 +1,10 @@
 namespace VodBox.Core;
 
+public interface IProviderFactory
+{
+    IContentProvider Create(SourceDefinition source);
+}
+
 public interface IContentProvider : IAsyncDisposable
 {
     string SourceId { get; }

@@ -73,7 +73,7 @@ public static partial class LiveParser
         }
         return programs;
     }
-    private static DateTimeOffset ParseTime(string value)
+    internal static DateTimeOffset ParseTime(string value)
     {
         // Explicit numeric offset is required; never infer the machine's local zone.
         var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);

@@ -21,6 +21,21 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private MediaDetail? _detail;
     private string? _nextCursor;
     private readonly DispatcherTimer _saveTimer;
+    private readonly bool _designMode;
+    private readonly ConfigurationRepository _configurations;
+    private readonly PreferencesStore _preferencesStore;
+    private readonly PlaylistSession _playlist;
+    private readonly AggregateSearch _aggregateSearch;
+    private readonly EpgService _epg;
+    private bool _initialized;
+    private CancellationTokenSource? _preferencesSave;
+    private Task _preferencesSaveTask = Task.CompletedTask;
+    private long _advanceSession;
+    public ObservableCollection<SavedConfiguration> SavedConfigurations { get; } = [];
+    public ObservableCollection<SearchHit> SearchResults { get; } = [];
+    public ObservableCollection<string> SearchErrors { get; } = [];
+    public ObservableCollection<string> LiveGroups { get; } = [];
+    public ObservableCollection<ProgrammeRow> Programmes { get; } = [];
     public LibVlcEngine Engine { get; } = new();
     public ObservableCollection<SourceDefinition> Sources { get; } = [];
     public ObservableCollection<Category> Categories { get; } = [];
@@ -58,14 +73,30 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private PlaybackLine? _selectedLine;
     [ObservableProperty] private MediaTrack? _selectedAudio;
     [ObservableProperty] private MediaTrack? _selectedSubtitle;
+    [ObservableProperty] private SavedConfiguration? _selectedSavedConfiguration;
+    [ObservableProperty] private bool _aggregateResultsVisible;
+    [ObservableProperty] private bool _autoNext = true;
+    [ObservableProperty] private bool _resumePlayback = true;
+    [ObservableProperty] private int _skipIntroSeconds;
+    [ObservableProperty] private int _skipOutroSeconds;
+    [ObservableProperty] private string _theme = "Dark";
+    [ObservableProperty] private string _liveSearch = "";
+    [ObservableProperty] private string _selectedLiveGroup = "全部";
+    [ObservableProperty] private string _epgStatus = "选择频道查看节目表。";
     public bool IsScrubbing { get; set; }
 
     public MainViewModel(bool designMode = false)
     {
+        _designMode = designMode;
         _store = designMode ? new PreviewStore() : new LibraryStore(Path.Combine(AppPaths.DataDirectory, "library.db"));
         _coordinator = new(Engine, _store);
         var host = Path.Combine(AppLayout.PluginHostDirectory, OperatingSystem.IsWindows() ? "VodBox.PluginHost.exe" : "VodBox.PluginHost");
         _factory = new(_http, host, AppLayout.AssetsDirectory);
+        _configurations = new(Path.Combine(AppPaths.ConfigurationDirectory, "configurations"));
+        _preferencesStore = new(Path.Combine(AppPaths.ConfigurationDirectory, "preferences.json"));
+        _playlist = new(_coordinator, _factory);
+        _aggregateSearch = new(_factory);
+        _epg = new(_http, AppPaths.CacheDirectory);
         Engine.StateChanged += OnPlaybackState;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>
         {
@@ -78,12 +109,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _saveTimer.Tick += async (_, _) => await RunAsync(() => _coordinator.SaveProgressAsync(), busy: false);
         if (!designMode) _saveTimer.Start();
     }
-    public async Task InitializeAsync()
-    {
-        var saved = Path.Combine(AppPaths.DataDirectory, "config.json");
-        ConfigLocation = File.Exists(saved) ? saved : Path.Combine(AppLayout.AssetsDirectory, "examples", "vodbox.json");
-        if (File.Exists(ConfigLocation)) await LoadConfigAsync();
-    }
     private async Task RunAsync(Func<Task> action, bool busy = true)
     {
         if (busy) IsBusy = true;
@@ -92,85 +117,51 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         catch (Exception ex) { Status = ex.Message; Console.Error.WriteLine(ex); }
         finally { if (busy) IsBusy = false; }
     }
-    [RelayCommand] private Task LoadConfigAsync() => RunAsync(async () =>
-    {
-        var config = await new ConfigLoader(_http).LoadAsync(ConfigLocation);
-        _config = config;
-        Sources.Clear(); foreach (var source in config.Sources) Sources.Add(source);
-        SelectedSource = Sources.FirstOrDefault();
-        Channels.Clear();
-        foreach (var live in config.LiveSources)
-        {
-            var uri = new Uri(live.Uri); var text = uri.IsFile ? await File.ReadAllTextAsync(uri.LocalPath) : await _http.GetStringAsync(uri);
-            foreach (var channel in LiveParser.Parse(text)) Channels.Add(channel);
-        }
-        Status = $"已加载 {Sources.Count} 个内容源、{Channels.Count} 个直播频道。";
-    });
-    partial void OnSelectedSourceChanged(SourceDefinition? value) { if (value is not null) _ = SwitchSourceAsync(value); }
-    private Task SwitchSourceAsync(SourceDefinition source) => RunAsync(async () =>
-    {
-        _browse?.Cancel(); _browse = new(); var token = _browse.Token;
-        if (_provider is not null) await _provider.DisposeAsync();
-        _provider = _factory.Create(source);
-        var categories = await _provider.GetCategoriesAsync(token);
-        if (token.IsCancellationRequested) return;
-        Categories.Clear(); Categories.Add(new("", "全部")); foreach (var category in categories) Categories.Add(category);
-        SelectedCategory = Categories.First();
-    });
-    partial void OnSelectedCategoryChanged(Category? value) { if (value is not null) _ = BrowseAsync(); }
-    [RelayCommand] private Task BrowseAsync() => RunAsync(async () =>
-    {
-        if (_provider is null) return;
-        var page = await _provider.GetItemsAsync(string.IsNullOrEmpty(SelectedCategory?.Id) ? null : SelectedCategory.Id, null, _browse?.Token ?? default);
-        Items.Clear(); foreach (var item in page.Items) Items.Add(item); _nextCursor = page.NextCursor;
-    });
-    [RelayCommand] private Task LoadMoreAsync() => RunAsync(async () =>
-    {
-        if (_provider is null || _nextCursor is null) return;
-        var page = await _provider.GetItemsAsync(string.IsNullOrEmpty(SelectedCategory?.Id) ? null : SelectedCategory.Id, _nextCursor, _browse?.Token ?? default);
-        foreach (var item in page.Items) Items.Add(item); _nextCursor = page.NextCursor;
-    });
-    [RelayCommand] private Task SearchAsync() => RunAsync(async () =>
-    {
-        if (_provider is null) return;
-        var page = await _provider.SearchAsync(SearchText, _browse?.Token ?? default);
-        Items.Clear(); foreach (var item in page.Items) Items.Add(item); _nextCursor = page.NextCursor;
-    });
-    partial void OnSelectedItemChanged(MediaItem? value) { if (value is not null) _ = DetailAsync(value); }
-    private Task DetailAsync(MediaItem item) => RunAsync(async () =>
-    {
-        if (_provider is null) return;
-        var detail = await _provider.GetDetailAsync(item.Id, _browse?.Token ?? default);
-        if (SelectedItem?.Id != item.Id) return;
-        _detail = detail; Description = detail.Description;
-        Lines.Clear(); foreach (var line in detail.PlaybackLines) Lines.Add(line); SelectedLine = Lines.FirstOrDefault();
-    });
-    partial void OnSelectedLineChanged(PlaybackLine? value)
-    { Episodes.Clear(); if (value is not null) foreach (var episode in value.Episodes) Episodes.Add(episode); }
     [RelayCommand] private Task PlayEpisodeAsync(Episode? episode) => RunAsync(async () =>
     {
-        if (_provider is null || _detail is null || episode is null) return;
-        var provider = _provider; var id = _detail.Item.Id;
-        await _coordinator.PlayAsync(token => provider.ResolvePlaybackAsync(id, episode.Id, token), _config.Id);
+        var detail = _detail; var source = SelectedSource; var line = SelectedLine;
+        if (detail is null || source is null || line is null || episode is null) return;
+        _playingChannel = null;
+        long position = SkipIntroSeconds * 1000L;
+        if (ResumePlayback)
+        {
+            var history = (await _store.GetHistoryAsync()).FirstOrDefault(x => x.ConfigId == _config.Id && x.SourceId == source.Id && x.MediaId == detail.Item.Id && x.EpisodeId == episode.Id);
+            if (history is not null) position = Math.Max(position, history.PositionMs);
+        }
+        await _playlist.PlayAsync(source, detail, line, episode, _config.Id, position, _lifetime.Token);
     });
+    [RelayCommand] private Task NextEpisodeAsync() => RunAsync(async () => { if (!await _playlist.MoveAsync(1, SkipIntroSeconds * 1000L, _lifetime.Token)) Status = "已经是最后一集。"; });
+    [RelayCommand] private Task PreviousEpisodeAsync() => RunAsync(async () => { if (!await _playlist.MoveAsync(-1, SkipIntroSeconds * 1000L, _lifetime.Token)) Status = "已经是第一集。"; });
     public Task OpenFileAsync(string path) => PlayRequestAsync(new() { Uri = new Uri(Path.GetFullPath(path)).AbsoluteUri, Title = Path.GetFileName(path), MediaId = Path.GetFullPath(path) });
     [RelayCommand] private Task OpenUrlAsync() => PlayRequestAsync(new() { Uri = Url.Trim(), Title = Url.Trim(), MediaId = Url.Trim() });
     private Task PlayRequestAsync(PlaybackRequest request) => RunAsync(async () =>
     {
         if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out _)) throw new InvalidDataException("请输入完整媒体 URL。");
-        await _coordinator.PlayAsync(_ => Task.FromResult(request), _config.Id);
+        _playlist.Clear(); _playingChannel = null;
+        await _coordinator.PlayAsync(_ => Task.FromResult(request), _config.Id, _lifetime.Token);
     });
     [RelayCommand] private Task TogglePauseAsync() => RunAsync(() => Engine.Snapshot.State == PlaybackState.Paused ? Engine.PlayAsync(default) : Engine.PauseAsync(default));
-    [RelayCommand] private Task StopAsync() => RunAsync(() => _coordinator.StopAsync());
+    [RelayCommand] private Task StopAsync() => RunAsync(async () =>
+    { _playlist.Clear(); await _coordinator.StopAsync(); Position = 0; Duration = 0; TimeText = "00:00 / 00:00"; NowPlaying = "已停止"; });
     public Task SeekAsync() => RunAsync(() => Engine.SeekAsync(TimeSpan.FromMilliseconds(Position), default), false);
-    partial void OnVolumeChanged(double value) => _ = RunAsync(() => Engine.SetVolumeAsync(value / 100, default), false);
-    partial void OnRateChanged(double value) => _ = RunAsync(() => Engine.SetRateAsync(value, default), false);
+    partial void OnVolumeChanged(double value) { _ = RunAsync(() => Engine.SetVolumeAsync(value / 100, default), false); SchedulePreferencesSave(); }
+    partial void OnRateChanged(double value) { _ = RunAsync(() => Engine.SetRateAsync(value, default), false); SchedulePreferencesSave(); }
     partial void OnIncognitoChanged(bool value) => _coordinator.Incognito = value;
     partial void OnSelectedAudioChanged(MediaTrack? value) { if (value is not null) _ = RunAsync(() => Engine.SelectTrackAsync(TrackKind.Audio, value.Id, default)); }
     partial void OnSelectedSubtitleChanged(MediaTrack? value) { if (value is not null) _ = RunAsync(() => Engine.SelectTrackAsync(TrackKind.Subtitle, value.Id, default)); }
     public Task AddSubtitleAsync(string path) => RunAsync(() => Engine.AddSubtitleAsync(path, default));
-    [RelayCommand] private Task PlayChannelAsync(LiveChannel? channel) => channel is null ? Task.CompletedTask : PlayRequestAsync(new() { Uri = channel.Uris.First(), Title = channel.Name, IsLive = true, SourceId = "live", Headers = channel.Headers ?? [] });
-    [RelayCommand] private Task ResumeHistoryAsync(HistoryEntry? entry) => entry is null ? Task.CompletedTask : PlayRequestAsync(new() { Uri = entry.Uri, Title = entry.Title, SourceId = entry.SourceId, MediaId = entry.MediaId, EpisodeId = entry.EpisodeId, StartPositionMs = entry.PositionMs });
+    [RelayCommand] private Task ResumeHistoryAsync(HistoryEntry? entry) => RunAsync(async () =>
+    {
+        if (entry is null) return;
+        if (entry.SourceId == "local")
+        { await PlayRequestAsync(new() { Uri = entry.Uri, Title = entry.Title, MediaId = entry.MediaId, StartPositionMs = ResumePlayback ? entry.PositionMs : 0 }); return; }
+        await OpenStoredItemAsync(entry.ConfigId, entry.SourceId, entry.MediaId);
+        var detail = _detail ?? throw new InvalidDataException("无法加载该媒体详情。");
+        var line = detail.PlaybackLines.FirstOrDefault(x => x.Episodes.Any(e => e.Id == entry.EpisodeId)) ?? throw new InvalidDataException("记录中的集数已经被移除。");
+        SelectedLine = line;
+        await _playlist.PlayAsync(SelectedSource!, detail, line, line.Episodes.First(x => x.Id == entry.EpisodeId), _config.Id,
+            ResumePlayback ? Math.Max(entry.PositionMs, SkipIntroSeconds * 1000L) : SkipIntroSeconds * 1000L, _lifetime.Token);
+    });
     [RelayCommand] private Task ToggleFavoriteAsync() => RunAsync(async () =>
     {
         if (SelectedItem is null || SelectedSource is null) return;
@@ -191,6 +182,11 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         Duration = e.Snapshot.Duration.TotalMilliseconds;
         TimeText = $"{e.Snapshot.Position:hh\\:mm\\:ss} / {e.Snapshot.Duration:hh\\:mm\\:ss}";
         if (e.Snapshot.Error is not null) Status = e.Snapshot.Error;
+        if (e.Snapshot.State is PlaybackState.Paused or PlaybackState.Ended) _ = RunAsync(() => _coordinator.SaveProgressAsync(), false);
+        bool advance = e.Snapshot.State == PlaybackState.Ended || (SkipOutroSeconds > 0 && e.Snapshot.State == PlaybackState.Playing
+            && e.Snapshot.Duration.TotalSeconds > SkipOutroSeconds && e.Snapshot.Position.TotalSeconds >= e.Snapshot.Duration.TotalSeconds - SkipOutroSeconds);
+        if (AutoNext && advance && _playlist.HasNext && _advanceSession != e.SessionId)
+        { _advanceSession = e.SessionId; _ = NextEpisodeAsync(); }
         if (e.Snapshot.State == PlaybackState.Playing && AudioTracks.Count == 0)
         {
             foreach (var track in Engine.GetTracks(TrackKind.Audio)) AudioTracks.Add(track);
@@ -199,10 +195,16 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     });
     public async ValueTask DisposeAsync()
     {
-        _saveTimer.Stop(); _browse?.Cancel(); Engine.StateChanged -= OnPlaybackState;
-        if (_provider is not null) await _provider.DisposeAsync();
-        await _coordinator.DisposeAsync(); _http.Dispose(); _browse?.Dispose();
+        _disposed = true; _saveTimer.Stop(); Engine.StateChanged -= OnPlaybackState;
+        _lifetime.Cancel(); _browse?.Cancel(); _aggregateCancellation?.Cancel(); _epgCancellation?.Cancel();
+        _preferencesSave?.Cancel(); await _preferencesSaveTask;
+        if (!_designMode && _initialized) await _preferencesStore.SaveAsync(CapturePreferences());
+        await _sourceTask; await _sourceGate.WaitAsync();
+        try { if (_provider is not null) await _provider.DisposeAsync(); }
+        finally { _sourceGate.Release(); }
+        await _coordinator.DisposeAsync(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
     }
+
 }
 
 internal sealed class PreviewStore : ILibraryStore

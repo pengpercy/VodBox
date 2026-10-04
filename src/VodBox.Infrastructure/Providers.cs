@@ -67,11 +67,13 @@ public sealed class CatalogProvider : IContentProvider
     }
 }
 
-public sealed class ProviderFactory(HttpClient http, string pluginHostPath, string assetsDirectory)
+public sealed class ProviderFactory(HttpClient http, string pluginHostPath, string assetsDirectory) : IProviderFactory
 {
     public IContentProvider Create(SourceDefinition source) => source.Runtime switch
     {
         ProviderRuntime.Csharp when source.Provider == "catalog" => new CatalogProvider(source, http),
+        ProviderRuntime.Csharp when source.Provider == "maccms-json" => new MacCmsProvider(source, http, false),
+        ProviderRuntime.Csharp when source.Provider == "maccms-xml" => new MacCmsProvider(source, http, true),
         ProviderRuntime.Csharp => throw new NotSupportedException($"尚未注册 C# Provider：{source.Provider}"),
         _ => new ScriptProvider(source, pluginHostPath, assetsDirectory)
     };

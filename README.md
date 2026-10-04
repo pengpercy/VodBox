@@ -2,12 +2,14 @@
 
 使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、LibVLC 播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑可通过 C# Provider 实现，不包含 JVM/Dex 兼容层；暂不兼容旧 TV 配置。
 
-当前工程是首版实现，不是 FongMi/TV 全功能移植。方案与分阶段范围见 [实现方案](docs/avalonia-rewrite-plan.md)。
+当前工程是首版实现，不是 FongMi/TV 全功能移植。方案与分阶段范围见 [实现方案](docs/avalonia-rewrite-plan.md)，逐项进度与未完成任务见 [功能清单](docs/implementation-progress.md)。
 
 ## 已实现
 
 - 本地文件/URL 播放、暂停、停止、进度、音量、倍速、字幕与音轨选择、全屏。
-- 新版 JSON 配置，C# 目录源的分类、分页、搜索、详情和选集。
+- 新版 JSON 配置，C# 目录源及 MacCMS HTTP JSON/XML 采集源的分类、分页、搜索、详情、多线路和选集。
+- 配置快照仓库、偏好设置持久化、全源并发搜索、收藏打开、历史重新解析、连续播放与片头片尾设置。
+- 直播分组/搜索/备用地址、UTF-8/UTF-16/GB18030 编码、gzip XMLTV 缓存与节目表界面。
 - QuickJS-NG 独立 AOT 宿主，LibraryImport 源码生成绑定；Python/Node 独立进程 NDJSON 协议。
 - SQLite 历史、续播、收藏和无痕播放；M3U/TXT/JSON 直播列表与 XMLTV 解析。
 - MVVM 与 JSON 源码生成、XAML 编译绑定、`Design.DataContext` 预览数据。
@@ -63,6 +65,6 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 六个 RID 的 Native AOT 构建、8 项功能测试、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试与全部安装包生成已通过 [CI 验证](https://github.com/pengpercy/VodBox/actions/runs/37223401606)（7105ef7）。macOS 安装包另外执行严格签名与依赖哈希校验。用户提供来源中的一个 HLS 直播流在 macOS x64 实际进入 Playing，解码 H.264/AAC 并观察到 VideoToolbox 日志；详见 [播放测试记录](docs/playback-testing.md)。有画面的交互、长时稳定性和各系统完整安装流程仍需真机验证。
 
-后续阶段尚未完成：网页嗅探与浏览器宿主、通用请求头/流代理、JSON 解析链、弹幕、自动下一集、大屏模式、节目表界面、媒体键与休眠抑制、配置仓库、DLNA/局域网同步、SMB/WebDAV、自动更新。旧配置与 Java 兼容层不在当前范围内。
+本轮增强已有 14 项功能测试和本地 Native AOT 编译验证，跨平台及桌面交互验收继续进行。后续阶段尚未完成：海报缓存、分类筛选、网页嗅探与浏览器宿主、通用请求头/流代理、JSON 解析链、弹幕、大屏模式、媒体键与休眠抑制、DLNA/局域网同步、SMB/WebDAV、自动更新。旧配置与 Java 兼容层不在当前范围内。
 
 参考项目：[FongMi/TV](https://github.com/FongMi/TV)、[Screenbox](https://github.com/huynhsontung/Screenbox)、[Downio](https://github.com/pengpercy/Downio)。当前实现没有复制其应用源码。分发原生依赖前应保留各依赖的许可证与 notice；相关文件随运行时打包。

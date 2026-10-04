@@ -55,9 +55,9 @@ public sealed record PlaybackEvent(long SessionId, PlaybackSnapshot Snapshot);
 public sealed record HistoryEntry(string ConfigId, string SourceId, string MediaId, string EpisodeId,
     string Title, string Uri, long PositionMs, DateTimeOffset UpdatedAt);
 public sealed record FavoriteEntry(string ConfigId, string SourceId, string MediaId, string Title);
-public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null);
+public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null, Dictionary<string, string>? EpgMap = null);
 public sealed record LiveChannel(string Id, string Name, string Group, IReadOnlyList<string> Uris,
-    string? Logo = null, string? TvgId = null, Dictionary<string, string>? Headers = null);
+    string? Logo = null, string? TvgId = null, Dictionary<string, string>? Headers = null, string LiveSourceId = "");
 public sealed record Programme(string ChannelId, string Title, DateTimeOffset Start, DateTimeOffset End);
 
 public static class WireJson
@@ -85,4 +85,6 @@ public sealed record RpcResponse(int ApiVersion, long RequestId, JsonElement Res
 [JsonSerializable(typeof(RpcResponse))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(AppPreferences))]
+[JsonSerializable(typeof(List<SavedConfiguration>))]
 public partial class VodBoxJson : JsonSerializerContext;
