@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "vodbox-examples",
+  "sources": [
+    { "id": "catalog", "name": "示例目录 · C#", "runtime": "csharp", "provider": "catalog", "entry": "catalog.json" },
+    { "id": "quickjs", "name": "示例插件 · QuickJS", "runtime": "quickjs", "entry": "demo.js" },
+    { "id": "python", "name": "示例插件 · Python", "runtime": "python", "entry": "demo.py" },
+    { "id": "node", "name": "示例插件 · Node.js", "runtime": "node", "entry": "demo.mjs" }
+  ],
+  "liveSources": []
+}

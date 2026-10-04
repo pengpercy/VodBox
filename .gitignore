@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.packages/
+.cache/
+artifacts/
+build/native/
+*.user
+.DS_Store
+**/__pycache__/
+*.pyc
+.idea/
+**/packages.*.lock.json

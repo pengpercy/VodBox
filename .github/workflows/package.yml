@@ -1,0 +1,55 @@
+name: Package
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+jobs:
+  package:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022, rid: win-x64 }
+          - { os: windows-11-arm, rid: win-arm64 }
+          - { os: macos-15-intel, rid: osx-x64 }
+          - { os: macos-15, rid: osx-arm64 }
+          - { os: ubuntu-22.04, rid: linux-x64 }
+          - { os: ubuntu-22.04-arm, rid: linux-arm64 }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v7
+        with:
+          name: vodbox.${{ matrix.rid }}
+          path: artifacts/build
+      - name: Extract build
+        shell: bash
+        run: |
+          mkdir -p artifacts/publish/${{ matrix.rid }}
+          tar -xzf artifacts/build/VodBox.${{ matrix.rid }}.tar.gz -C artifacts/publish/${{ matrix.rid }}
+      - name: Linux packaging tools
+        if: startsWith(matrix.rid, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby-dev build-essential rpm squashfs-tools libfuse2
+          sudo gem install fpm --version 1.16.0 --no-document
+      - name: Package
+        shell: bash
+        run: python build/package.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/packages --version ${{ inputs.version }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: package.${{ matrix.rid }}
+          path: |
+            artifacts/packages/*.zip
+            artifacts/packages/*.dmg
+            artifacts/packages/*.deb
+            artifacts/packages/*.rpm
+            artifacts/packages/*.AppImage
+            artifacts/packages/*.sha256
+          retention-days: 14

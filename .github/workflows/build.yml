@@ -1,0 +1,83 @@
+name: Build
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: '0.1.0'
+jobs:
+  build:
+    name: AOT ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022, rid: win-x64 }
+          - { os: windows-11-arm, rid: win-arm64 }
+          - { os: macos-15-intel, rid: osx-x64 }
+          - { os: macos-15, rid: osx-arm64 }
+          - { os: ubuntu-22.04, rid: linux-x64 }
+          - { os: ubuntu-22.04-arm, rid: linux-arm64 }
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.packages
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.20.0'
+      - uses: actions/cache@v4
+        with:
+          path: .packages
+          key: nuget-${{ matrix.rid }}-${{ hashFiles('**/packages.lock.json') }}
+      - name: Linux native dependencies
+        if: startsWith(matrix.rid, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake zlib1g-dev libicu-dev libvlc-dev vlc-plugin-base vlc-plugin-video-output
+      - name: Restore and test
+        run: |
+          dotnet restore VodBox.slnx --locked-mode --configfile build/NuGet.ci.config
+          dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore -m:1
+      - name: Build QuickJS native bridge
+        run: |
+          if [[ '${{ matrix.rid }}' == 'win-arm64' ]]; then
+            cmake -S build/quickjs -B artifacts/quickjs -A ARM64
+          else
+            cmake -S build/quickjs -B artifacts/quickjs -DCMAKE_BUILD_TYPE=Release
+          fi
+          cmake --build artifacts/quickjs --config Release --target vodbox_quickjs --parallel 2
+      - name: Publish Native AOT
+        run: |
+          dotnet publish src/VodBox.Desktop/VodBox.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained -o artifacts/publish/${{ matrix.rid }} -p:RestoreConfigFile="${{ github.workspace }}/build/NuGet.ci.config" -p:Version=${{ inputs.version }} -p:TreatWarningsAsErrors=true -m:1
+          dotnet publish src/VodBox.PluginHost/VodBox.PluginHost.csproj -c Release -r ${{ matrix.rid }} --self-contained -o artifacts/publish/${{ matrix.rid }}/plugin-host -p:RestoreConfigFile="${{ github.workspace }}/build/NuGet.ci.config" -p:Version=${{ inputs.version }} -p:TreatWarningsAsErrors=true -m:1
+      - name: Bundle pinned native runtimes
+        run: python build/bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+      - name: Run AOT diagnostics and worker protocols
+        run: python build/smoke.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+      - name: Separate debug symbols and archive
+        run: |
+          python build/archive.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/build
+      - uses: actions/upload-artifact@v6
+        with:
+          name: vodbox.${{ matrix.rid }}
+          path: artifacts/build/VodBox.${{ matrix.rid }}.tar.gz
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        with:
+          name: symbols.${{ matrix.rid }}
+          path: artifacts/build/symbols.${{ matrix.rid }}/
+          if-no-files-found: ignore
+          retention-days: 7

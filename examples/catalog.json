@@ -1,0 +1,9 @@
+{
+  "categories": [{ "id": "demo", "name": "协议示例" }],
+  "items": [{
+    "id": "sample", "title": "本地媒体示例", "categoryId": "demo",
+    "description": "将自己的媒体保存为 examples/sample.mp4，或通过「打开媒体」选择文件。此示例不附带影片。",
+    "remarks": "VodBox 新配置格式",
+    "episodes": [{ "id": "main", "title": "播放本地示例", "uri": "sample.mp4" }]
+  }]
+}

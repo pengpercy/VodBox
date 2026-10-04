@@ -1,0 +1,68 @@
+# VodBox
+
+使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、LibVLC 播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑可通过 C# Provider 实现，不包含 JVM/Dex 兼容层；暂不兼容旧 TV 配置。
+
+当前工程是首版实现，不是 FongMi/TV 全功能移植。方案与分阶段范围见 [实现方案](docs/avalonia-rewrite-plan.md)。
+
+## 已实现
+
+- 本地文件/URL 播放、暂停、停止、进度、音量、倍速、字幕与音轨选择、全屏。
+- 新版 JSON 配置，C# 目录源的分类、分页、搜索、详情和选集。
+- QuickJS-NG 独立 AOT 宿主，LibraryImport 源码生成绑定；Python/Node 独立进程 NDJSON 协议。
+- SQLite 历史、续播、收藏和无痕播放；M3U/TXT/JSON 直播列表与 XMLTV 解析。
+- MVVM 与 JSON 源码生成、XAML 编译绑定、`Design.DataContext` 预览数据。
+- Mica 优先，AcrylicBlur/Blur/实色回退。Mica 原生效果限 Windows 11；其他平台使用可用的材质效果。
+- Downio 风格的 Build / Package / CI / Draft Release 工作流，覆盖六个 RID 的本机 AOT 构建。
+
+## 版本与开发
+
+固定 .NET SDK **10.0.401** / 运行时 **10.0.12**、Avalonia **12.1.3**、LibVLCSharp **3.10.1**。需要对应平台的 C/C++ 工具链；macOS 使用 Xcode Command Line Tools，Windows 使用 Visual Studio C++ 工具链，Linux 使用 clang/zlib 开发包。
+
+```sh
+dotnet restore VodBox.slnx
+dotnet build VodBox.slnx -c Release
+dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release
+dotnet run --project src/VodBox.Desktop
+```
+
+本机若已由 Codex 将 SDK 放入项目 `.cache/dotnet`，可用 `.cache/dotnet/dotnet` 替代上述 `dotnet`。项目级 NuGet.Config 继承系统包源/代理，使用华为镜像和 nuget.org 映射；CI 使用 `build/NuGet.ci.config`，避免依赖本机镜像或代理。
+
+设计预览打开 `src/VodBox.Desktop/MainWindow.axaml`。设计数据不访问 SQLite、网络、脚本或原生播放器。设计器使用深色实色底板；系统级材质需运行应用查看。
+
+开发运行播放前需安装 VLC 3.x，或配置 `VODBOX_VLC_PATH` 为原生库目录。打包产物携带播放器与三种脚本运行时；开发目录中的 QuickJS 宿主需按下列步骤构建并复制到桌面输出的 `plugin-host` 子目录。Python/Node 开发模式可使用系统运行时或 `VODBOX_PYTHON` / `VODBOX_NODE` 指定路径。
+
+## Native AOT 与打包
+
+下面以 macOS Intel 为例。每个 RID 在对应的本机 runner 上构建，避免混用架构。
+
+```sh
+cmake -S build/quickjs -B artifacts/quickjs -DCMAKE_BUILD_TYPE=Release
+cmake --build artifacts/quickjs --config Release --target vodbox_quickjs --parallel 2
+dotnet publish src/VodBox.Desktop -c Release -r osx-x64 --self-contained -o artifacts/publish/osx-x64
+dotnet publish src/VodBox.PluginHost -c Release -r osx-x64 --self-contained -o artifacts/publish/osx-x64/plugin-host
+python3 build/bundle.py osx-x64 artifacts/publish/osx-x64
+python3 build/smoke.py osx-x64 artifacts/publish/osx-x64
+python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages
+```
+
+输出格式：Windows ZIP；macOS `.app`、ZIP、DMG；Linux deb、rpm、AppImage。Linux 构建机需安装 libvlc-dev、vlc-plugin-base、vlc-plugin-video-output、libicu-dev；打包机额外安装 dpkg-deb、rpm、Ruby/fpm 1.16.0。原生依赖闭包从目标 runner 收集，保留系统 glibc、显示服务器、字体与 GPU 驱动依赖。Linux 产物基线为 Ubuntu 22.04 / glibc 2.35，不承诺兼容所有发行版。
+
+默认 macOS 使用本地 ad-hoc 签名供验证，未做 Apple notarization。`CODESIGN_IDENTITY` 可以选择已安装的 Developer ID；正式分发前仍需配置签名与公证流程。CI 默认仅上传构建和安装包 artifacts；推送与 VERSION 匹配的 `v*` tag 才创建草稿 Release。
+
+Python、Node、VLC 的下载地址与 SHA-256 固定在 `build/native-assets.json`，QuickJS 固定提交与压缩包 SHA-256。`native-manifest.json` 记录实际打包文件的校验值。调试符号与运行包分离。AOT 主要减小托管运行时开销；完整 VLC 编解码插件和外部脚本运行时仍占据大部分包体积。
+
+## 内容源与插件
+
+`examples/vodbox.json` 演示四种源类型，`examples/catalog.json` 是 C# 目录格式。示例不附带影片；可以把自己的媒体放到 `examples/sample.mp4`，也可在三个脚本源的 `options.mediaUri` 中填写媒体地址。
+
+插件实现 `init`、`categories`、`items`、`search`、`detail`、`resolvePlayback`。QuickJS 使用全局 `VodBoxProvider` 对象；Node 使用 default export；Python 使用同名函数。返回模型以 `VodBox.Core` 为准，协议版本为 1，stdout 仅用于 NDJSON，日志发到 stderr。Python 支持同步与 async 函数，Node 支持 Promise，QuickJS 支持立即可完成的 Promise jobs。
+
+QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR 反射对象暴露、Node 模块兼容或浏览器 DOM。插件入口必须是本地文件 URI；相对路径由配置加载器解析。
+
+## 验证与剩余范围
+
+本地已验证配置、目录源、SQLite 隔离与 upsert、无痕记录、播放请求取消、直播/节目表解析、Python/Node 协议，以及 macOS x64 的 AOT JSON/SQLite/QuickJS 调用与 LibVLC 音频解码。六平台运行和安装包验证以 Actions 实际结果为准。
+
+后续阶段尚未完成：网页嗅探与浏览器宿主、通用请求头/流代理、JSON 解析链、弹幕、自动下一集、大屏模式、节目表界面、媒体键与休眠抑制、配置仓库、DLNA/局域网同步、SMB/WebDAV、自动更新。旧配置与 Java 兼容层不在当前范围内。
+
+参考项目：[FongMi/TV](https://github.com/FongMi/TV)、[Screenbox](https://github.com/huynhsontung/Screenbox)、[Downio](https://github.com/pengpercy/Downio)。当前实现没有复制其应用源码。分发原生依赖前应保留各依赖的许可证与 notice；相关文件随运行时打包。

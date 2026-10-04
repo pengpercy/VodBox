@@ -1,0 +1,120 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core" xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
+        x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
+        Title="VodBox" Width="1280" Height="850" MinWidth="960" MinHeight="640"
+        TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
+        TransparencyBackgroundFallback="{DynamicResource WindowFallbackBrush}" Background="Transparent">
+  <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
+  <Window.Resources>
+    <SolidColorBrush x:Key="WindowFallbackBrush" Color="#111317" />
+    <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#7016191F" />
+    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#B020252E" />
+    <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#A01B2028" />
+  </Window.Resources>
+  <Window.Styles>
+    <Style Selector="Button.nav"><Setter Property="HorizontalAlignment" Value="Stretch" /><Setter Property="HorizontalContentAlignment" Value="Left" /><Setter Property="Padding" Value="18,12" /><Setter Property="Background" Value="Transparent" /><Setter Property="CornerRadius" Value="8" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9BA4B4" /></Style>
+    <Style Selector="Border.panel"><Setter Property="Background" Value="#1A1E25" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="16" /></Style>
+  </Window.Styles>
+  <Grid RowDefinitions="*,Auto" ColumnDefinitions="180,*">
+    <Border Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Spacing="8">
+          <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
+          <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" />
+          <Button Content="发现" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="发现" />
+          <Button Content="直播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="直播" />
+          <Button Content="历史" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="历史" />
+          <Button Content="收藏" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="收藏" />
+          <Separator Margin="0,12" />
+          <Button Content="设置" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="设置" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Spacing="12">
+          <ToggleSwitch Content="无痕播放" IsChecked="{Binding Incognito}" FontSize="12" />
+          <TextBlock Text="0.1.0 · LibVLC" Classes="muted" FontSize="11" Margin="8,0" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Column="1" Margin="24,24,24,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Text="{Binding PageTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button Content="打开媒体" Click="OpenFileClick" />
+          <Button Content="全屏" Click="FullscreenClick" />
+        </StackPanel>
+      </Grid>
+      <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Text="{Binding Url}" PlaceholderText="粘贴媒体 URL，或打开本地文件" />
+        <Button Grid.Column="1" Content="播放地址" Command="{Binding OpenUrlCommand}" />
+      </Grid>
+      <Grid Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
+        <Grid RowDefinitions="Auto,*" RowSpacing="12">
+          <StackPanel IsVisible="{Binding ShowLibrary}" Spacing="10">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+              <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="core:SourceDefinition"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <ComboBox Grid.Column="1" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="core:Category"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding SearchText}" PlaceholderText="搜索当前内容源" /><Button Grid.Column="1" Content="搜索" Command="{Binding SearchCommand}" /></Grid>
+          </StackPanel>
+          <Grid Grid.Row="1">
+            <Grid IsVisible="{Binding ShowLibrary}" RowDefinitions="*,Auto" RowSpacing="8">
+              <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="Transparent">
+                <ListBox.ItemTemplate><DataTemplate x:DataType="core:MediaItem">
+                  <Border Padding="12" Margin="0,4" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="8">
+                    <StackPanel Spacing="6"><TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" /><TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" /></StackPanel>
+                  </Border>
+                </DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+              <Button Grid.Row="1" Content="加载更多" Command="{Binding LoadMoreCommand}" HorizontalAlignment="Center" />
+            </Grid>
+            <ListBox IsVisible="{Binding ShowLive}" ItemsSource="{Binding Channels}" SelectionChanged="LiveSelectionChanged">
+              <ListBox.ItemTemplate><DataTemplate x:DataType="core:LiveChannel"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Name}" FontSize="16" /><TextBlock Text="{Binding Group}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <ListBox IsVisible="{Binding ShowHistory}" ItemsSource="{Binding History}" SelectionChanged="HistorySelectionChanged">
+              <ListBox.ItemTemplate><DataTemplate x:DataType="core:HistoryEntry"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding UpdatedAt}" Classes="muted" FontSize="11" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <ListBox IsVisible="{Binding ShowFavorites}" ItemsSource="{Binding Favorites}">
+              <ListBox.ItemTemplate><DataTemplate x:DataType="core:FavoriteEntry"><StackPanel Margin="8"><TextBlock Text="{Binding Title}" /><TextBlock Text="{Binding SourceId}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <ScrollViewer IsVisible="{Binding ShowSettings}"><StackPanel Spacing="16">
+              <TextBlock Text="内容配置" FontWeight="SemiBold" FontSize="18" /><TextBox Text="{Binding ConfigLocation}" PlaceholderText="VodBox JSON 配置路径或 URL" />
+              <Button Content="加载配置" Command="{Binding LoadConfigCommand}" /><Button Content="从文件选择配置" Click="OpenConfigClick" />
+              <TextBlock Text="支持 C#、QuickJS、Python 与 Node.js 内容源。旧 TV 配置暂不支持。" TextWrapping="Wrap" Classes="muted" />
+              <TextBlock Text="快捷键：空格 暂停/继续，Esc 退出全屏。" Classes="muted" TextWrapping="Wrap" />
+            </StackPanel></ScrollViewer>
+          </Grid>
+        </Grid>
+        <Grid Grid.Column="1" RowDefinitions="2*,Auto,Auto,Auto,*" RowSpacing="12">
+          <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180">
+            <vlc:VideoView x:Name="VideoSurface" />
+          </Border>
+          <TextBlock Grid.Row="1" Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
+          <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <ComboBox ItemsSource="{Binding Lines}" SelectedItem="{Binding SelectedLine}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PlaybackLine"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+            <Button Grid.Column="1" Content="收藏 / 取消" Command="{Binding ToggleFavoriteCommand}" />
+          </Grid>
+          <TextBlock Grid.Row="3" Text="{Binding Description}" TextWrapping="Wrap" MaxHeight="85" Classes="muted" />
+          <ListBox Grid.Row="4" ItemsSource="{Binding Episodes}" SelectionChanged="EpisodeSelectionChanged" Background="Transparent">
+            <ListBox.ItemTemplate><DataTemplate x:DataType="core:Episode"><TextBlock Text="{Binding Title}" Margin="8,4" /></DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Grid>
+      <TextBlock Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+    </Grid>
+    <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource PlayerControlsSurfaceBrush}" Padding="24,16">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><Slider x:Name="SeekSlider" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" PointerPressed="SeekPressed" PointerReleased="SeekReleased" /><TextBlock Grid.Column="1" Text="{Binding TimeText}" VerticalAlignment="Center" Classes="muted" /></Grid>
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="12">
+          <Button Content="暂停 / 继续" Command="{Binding TogglePauseCommand}" /><Button Grid.Column="1" Content="停止" Command="{Binding StopCommand}" /><Button Grid.Column="2" Content="添加字幕" Click="AddSubtitleClick" />
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right"><TextBlock Text="音量" VerticalAlignment="Center" /><Slider Width="100" Minimum="0" Maximum="100" Value="{Binding Volume}" /><NumericUpDown Width="88" Minimum="0.25" Maximum="4" Increment="0.25" Value="{Binding Rate}" FormatString="0.00x" /></StackPanel>
+          <ComboBox Grid.Column="4" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" PlaceholderText="音轨" MaxWidth="130"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+          <ComboBox Grid.Column="5" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitle}" PlaceholderText="字幕" MaxWidth="130"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

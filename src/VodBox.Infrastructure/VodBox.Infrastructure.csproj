@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="../VodBox.Core/VodBox.Core.csproj" /><PackageReference Include="Microsoft.Data.Sqlite.Core" /><PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" /></ItemGroup></Project>

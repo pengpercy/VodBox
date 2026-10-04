@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VodBox.Core/VodBox.Core.csproj" />
+    <Project Path="src/VodBox.Application/VodBox.Application.csproj" />
+    <Project Path="src/VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
+    <Project Path="src/VodBox.Playback.LibVlc/VodBox.Playback.LibVlc.csproj" />
+    <Project Path="src/VodBox.PluginHost/VodBox.PluginHost.csproj" />
+    <Project Path="src/VodBox.Desktop/VodBox.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/"><Project Path="tests/VodBox.Tests/VodBox.Tests.csproj" /></Folder>
+</Solution>

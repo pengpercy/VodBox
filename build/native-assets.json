@@ -1,0 +1,83 @@
+{
+  "pythonVersion": "3.13.7",
+  "nodeVersion": "22.20.0",
+  "vlcVersion": "3.0.24",
+  "runtimes": {
+    "osx-x64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-x86_64-apple-darwin-install_only.tar.gz",
+        "sha256": "4fb42ffc8aad2a42ca7646715b8926bc6b2e0d31f13d2fec25943dc236a6fd60"
+      },
+      "node": {
+        "url": "https://nodejs.org/dist/v22.20.0/node-v22.20.0-darwin-x64.tar.gz",
+        "sha256": "00df9c5df3e4ec6848c26b70fb47bf96492f342f4bed6b17f12d99b3a45eeecc"
+      },
+      "vlc": {
+        "url": "https://download.videolan.org/vlc/3.0.24/macosx/vlc-3.0.24-intel64.dmg",
+        "sha256": "1ef6c903e2dc026d4e58ddf7b2a9ed0eb6f8caf80a9a9f46f96490340b962707"
+      }
+    },
+    "osx-arm64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-aarch64-apple-darwin-install_only.tar.gz",
+        "sha256": "7f5ec658219bdb1d1142c6abab89680322166c78350a017fb0af3c869dceee41"
+      },
+      "node": {
+        "url": "https://nodejs.org/dist/v22.20.0/node-v22.20.0-darwin-arm64.tar.gz",
+        "sha256": "cc04a76a09f79290194c0646f48fec40354d88969bec467789a5d55dd097f949"
+      },
+      "vlc": {
+        "url": "https://download.videolan.org/vlc/3.0.24/macosx/vlc-3.0.24-arm64.dmg",
+        "sha256": "64a89d93cdd30b0e97131743e246373db82d6826ea882d265d46d74b136da2b7"
+      }
+    },
+    "win-x64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-x86_64-pc-windows-msvc-install_only.tar.gz",
+        "sha256": "005cb2abf4cfa4aaa48fb10ce4e33fe4335ea4d1f55202dbe4e20c852e45e0f9"
+      },
+      "node": {
+        "url": "https://nodejs.org/dist/v22.20.0/node-v22.20.0-win-x64.zip",
+        "sha256": "bb819d6eb8f5bfda294bbc83a7e4ec6539da67c4233d54b0d655b9248b15e29d"
+      },
+      "vlc": {
+        "url": "https://download.videolan.org/vlc/3.0.24/win64/vlc-3.0.24-win64.7z",
+        "sha256": "1ed59c09152e78aff84663fa76efab26057716576db74332858810e5ef54ae1f"
+      }
+    },
+    "win-arm64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-aarch64-pc-windows-msvc-install_only.tar.gz",
+        "sha256": "1f1f9941838bb294b3cfb6462b25506e60c5ed4f30a45d40a55d98f69e49d6ee"
+      },
+      "node": {
+        "url": "https://nodejs.org/dist/v22.20.0/node-v22.20.0-win-arm64.zip",
+        "sha256": "b12919e609b4fa1176ba8a155b49f761419a0c7cc97b42e6be09874a3f760ab6"
+      },
+      "vlc": {
+        "url": "https://download.videolan.org/vlc/3.0.24/winarm64/vlc-3.0.24-winarm64.7z",
+        "sha256": "4c448ca4995bafc4954a4c929bc7dad756eb0a234afc9d58946ad05b8fe51389"
+      }
+    },
+    "linux-x64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-x86_64-unknown-linux-gnu-install_only.tar.gz",
+        "sha256": "0a01bad99fd4a165a11335c29eb43015dfdb8bd5ba8e305538ebb54f3bf3146d"
+      },
+      "node": {
+        "url": "https://nodejs.org/dist/v22.20.0/node-v22.20.0-linux-x64.tar.gz",
+        "sha256": "eeaccb0378b79406f2208e8b37a62479c70595e20be6b659125eb77dd1ab2a29"
+      }
+    },
+    "linux-arm64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-aarch64-unknown-linux-gnu-install_only.tar.gz",
+        "sha256": "7d4448fe9b6fa37d8d16635d52d1d8ffb42576d85e23331ae345a07cfa60bc61"
+      },
+      "node": {
+        "url": "https://nodejs.org/dist/v22.20.0/node-v22.20.0-linux-arm64.tar.gz",
+        "sha256": "4181609e03dcb9880e7e5bf956061ecc0503c77a480c6631d868cb1f65a2c7dd"
+      }
+    }
+  }
+}

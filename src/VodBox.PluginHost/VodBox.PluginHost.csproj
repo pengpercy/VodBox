@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><PublishAot>true</PublishAot><PublishTrimmed>true</PublishTrimmed><AllowUnsafeBlocks>true</AllowUnsafeBlocks><OptimizationPreference>Speed</OptimizationPreference></PropertyGroup><ItemGroup><ProjectReference Include="../VodBox.Core/VodBox.Core.csproj" /></ItemGroup></Project>

@@ -1,0 +1,43 @@
+name: Draft Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  version:
+    runs-on: ubuntu-22.04
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        shell: bash
+        run: |
+          version=$(cat VERSION)
+          test "$GITHUB_REF_NAME" = "v$version"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.value }}
+  package:
+    needs: [version, build]
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.version.outputs.value }}
+  release:
+    needs: [version, package]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: package.*
+          merge-multiple: true
+          path: artifacts/release
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/release/* --draft --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes

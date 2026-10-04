@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><AssemblyName>VodBox</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <PublishAot>true</PublishAot><PublishTrimmed>true</PublishTrimmed><TrimMode>full</TrimMode>
+    <OptimizationPreference>Speed</OptimizationPreference><InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" /><PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" /><PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="CommunityToolkit.Mvvm" /><PackageReference Include="LibVLCSharp.Avalonia" />
+    <ProjectReference Include="../VodBox.Application/VodBox.Application.csproj" />
+    <ProjectReference Include="../VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
+    <ProjectReference Include="../VodBox.Playback.LibVlc/VodBox.Playback.LibVlc.csproj" />
+    <Content Include="../../examples/**" Link="examples/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../plugins/**" Link="plugins/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

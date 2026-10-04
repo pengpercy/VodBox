@@ -1,0 +1,88 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace VodBox.Core;
+
+public enum ProviderRuntime { Csharp, Quickjs, Python, Node }
+public enum ResolutionKind { Direct, Json, Browser }
+public enum PlaybackState { Idle, Resolving, Loading, Playing, Paused, Buffering, Ended, Failed }
+public enum TrackKind { Audio, Subtitle }
+
+public sealed record SourceDefinition
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public ProviderRuntime Runtime { get; init; }
+    public string Provider { get; init; } = "catalog";
+    public string? Entry { get; init; }
+    public Dictionary<string, JsonElement> Options { get; init; } = [];
+}
+
+public sealed record VodBoxConfig
+{
+    public int SchemaVersion { get; init; } = 1;
+    public string Id { get; init; } = "default";
+    public List<SourceDefinition> Sources { get; init; } = [];
+    public List<LiveSourceDefinition> LiveSources { get; init; } = [];
+}
+
+public sealed record Category(string Id, string Name);
+public sealed record MediaItem(string Id, string Title, string? Poster = null, string? Remarks = null);
+public sealed record Episode(string Id, string Title);
+public sealed record PlaybackLine(string Id, string Name, IReadOnlyList<Episode> Episodes);
+public sealed record MediaDetail(MediaItem Item, string Description, IReadOnlyList<PlaybackLine> PlaybackLines);
+public sealed record MediaPage(IReadOnlyList<MediaItem> Items, string? NextCursor = null);
+public sealed record SubtitleSource(string Uri, string Name, string? Language = null);
+public sealed record MediaTrack(string Id, string Name, TrackKind Kind);
+
+public sealed record PlaybackRequest
+{
+    public required string Uri { get; init; }
+    public string Title { get; init; } = "媒体";
+    public ResolutionKind ResolutionKind { get; init; }
+    public Dictionary<string, string> Headers { get; init; } = [];
+    public List<SubtitleSource> Subtitles { get; init; } = [];
+    public long StartPositionMs { get; init; }
+    public string SourceId { get; init; } = "local";
+    public string MediaId { get; init; } = "";
+    public string EpisodeId { get; init; } = "";
+    public bool IsLive { get; init; }
+}
+
+public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration,
+    bool CanSeek, string? Error = null);
+public sealed record PlaybackEvent(long SessionId, PlaybackSnapshot Snapshot);
+public sealed record HistoryEntry(string ConfigId, string SourceId, string MediaId, string EpisodeId,
+    string Title, string Uri, long PositionMs, DateTimeOffset UpdatedAt);
+public sealed record FavoriteEntry(string ConfigId, string SourceId, string MediaId, string Title);
+public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null);
+public sealed record LiveChannel(string Id, string Name, string Group, IReadOnlyList<string> Uris,
+    string? Logo = null, string? TvgId = null);
+public sealed record Programme(string ChannelId, string Title, DateTimeOffset Start, DateTimeOffset End);
+
+public static class WireJson
+{
+    public static JsonSerializerOptions Options => VodBoxJson.Default.Options;
+    public static System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> TypeInfo<T>() =>
+        (System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>)(VodBoxJson.Default.GetTypeInfo(typeof(T))
+            ?? throw new NotSupportedException($"JSON 类型未注册：{typeof(T).Name}"));
+}
+
+public sealed record ScriptParams(string? CategoryId = null, string? Cursor = null, string? Query = null, string? MediaId = null, string? EpisodeId = null);
+public sealed record RpcRequest(int ApiVersion, long RequestId, string SourceId, string Method, JsonElement Params);
+public sealed record RpcResponse(int ApiVersion, long RequestId, JsonElement Result, string? Error = null);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UseStringEnumConverter = true, WriteIndented = false)]
+[JsonSerializable(typeof(VodBoxConfig))]
+[JsonSerializable(typeof(MediaPage))]
+[JsonSerializable(typeof(MediaDetail))]
+[JsonSerializable(typeof(PlaybackRequest))]
+[JsonSerializable(typeof(IReadOnlyList<Category>))]
+[JsonSerializable(typeof(List<LiveChannel>))]
+[JsonSerializable(typeof(ScriptParams))]
+[JsonSerializable(typeof(Dictionary<string, JsonElement>))]
+[JsonSerializable(typeof(RpcRequest))]
+[JsonSerializable(typeof(RpcResponse))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(JsonElement))]
+public partial class VodBoxJson : JsonSerializerContext;

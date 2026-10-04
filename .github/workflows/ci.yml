@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  version:
+    runs-on: ubuntu-22.04
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.value }}
+  package:
+    needs: [version, build]
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.version.outputs.value }}
