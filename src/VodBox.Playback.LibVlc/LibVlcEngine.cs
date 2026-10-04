@@ -5,7 +5,7 @@ using VlcCore = LibVLCSharp.Shared.Core;
 
 namespace VodBox.Playback.LibVlc;
 
-public sealed class LibVlcEngine(bool headless = false) : IPlaybackEngine
+public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache = false) : IPlaybackEngine
 {
     private readonly SemaphoreSlim _commands = new(1, 1);
     private LibVLC? _lib;
@@ -29,7 +29,10 @@ public sealed class LibVlcEngine(bool headless = false) : IPlaybackEngine
         if (Directory.Exists(Path.Combine(bundled, "plugins")))
             NativeEnvironment.SetPluginPath(Path.Combine(bundled, "plugins"));
         VlcCore.Initialize(path);
-        _lib = new LibVLC(headless ? ["--no-video-title-show", "--no-osd", "--aout=dummy", "--vout=dummy"] : ["--no-video-title-show", "--no-osd"]);
+        List<string> options = ["--no-video-title-show", "--no-osd"];
+        if (headless) options.AddRange(["--aout=dummy", "--vout=dummy"]);
+        if (rebuildPluginCache) options.Add("--reset-plugins-cache");
+        _lib = new LibVLC(options.ToArray());
         _player = new MediaPlayer(_lib);
         _player.Opening += (_, _) => Update(PlaybackState.Loading);
         _player.Playing += (_, _) =>

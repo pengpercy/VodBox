@@ -2,7 +2,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType><AssemblyName>VodBox</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <PublishAot>true</PublishAot><PublishTrimmed>true</PublishTrimmed><TrimMode>full</TrimMode>
+    <PublishAot Condition="'$(RuntimeIdentifier)' != ''">true</PublishAot>
+    <PublishTrimmed Condition="'$(RuntimeIdentifier)' != ''">true</PublishTrimmed><TrimMode>full</TrimMode>
     <OptimizationPreference>Speed</OptimizationPreference><InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>

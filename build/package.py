@@ -39,7 +39,12 @@ def package(rid, source, output, version):
                     command = ["codesign", "--force", "--sign", identity]
                     if identity != "-": command += ["--options", "runtime", "--timestamp"]
                     run(*command, file)
-        run("codesign", "--force", "--sign", identity, app)
+        # Signing changes plugin sizes/mtimes. Rebuild VLC's cache before sealing the app.
+        run(contents / "MacOS/VodBox", "--diagnostics", "--native", "--rebuild-vlc-cache", timeout=300)
+        refresh_manifest(contents / "MacOS")
+        command = ["codesign", "--force", "--sign", identity]
+        if identity != "-": command += ["--options", "runtime", "--timestamp"]
+        run(*command, app)
         run("codesign", "--verify", "--deep", "--strict", app)
         run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, output / (stem + ".zip"))
         with tempfile.TemporaryDirectory(prefix="vodbox-dmg-") as directory:
@@ -84,6 +89,17 @@ def package(rid, source, output, version):
         with file.open("rb") as source:
             digest = hashlib.file_digest(source, "sha256").hexdigest()
         file.with_suffix(file.suffix + ".sha256").write_text(digest + "  " + file.name + "\n")
+
+def refresh_manifest(directory):
+    path = directory / "native-manifest.json"
+    manifest = json.loads(path.read_text())
+    files = {}
+    for relative in manifest["files"]:
+        file = directory / relative
+        if file.exists():
+            with file.open("rb") as source: files[relative] = hashlib.file_digest(source, "sha256").hexdigest()
+    manifest["files"] = files
+    path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

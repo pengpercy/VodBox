@@ -23,13 +23,13 @@ internal static class Diagnostics
             finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(temp, true); }
             if (args.Contains("--native"))
             {
-                await using var engine = new LibVlcEngine(headless: true);
+                await using var engine = new LibVlcEngine(headless: true, rebuildPluginCache: args.Contains("--rebuild-vlc-cache"));
                 string wav = Path.Combine(Path.GetTempPath(), "vodbox-audio-" + Guid.NewGuid().ToString("N") + ".wav");
                 try
                 {
                     WriteTestWave(wav);
                     await engine.OpenAsync(new() { Uri = new Uri(wav).AbsoluteUri, Title = "诊断音频" }, 1, default);
-                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                     while (engine.Snapshot.Position <= TimeSpan.Zero || engine.Snapshot.Duration <= TimeSpan.Zero)
                     {
                         if (engine.Snapshot.State == Core.PlaybackState.Failed) throw new InvalidOperationException(engine.Snapshot.Error);
