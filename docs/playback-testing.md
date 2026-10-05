@@ -87,3 +87,8 @@ macOS JIT 实际 VideoToolbox H.264 解码至 3.40 秒，视频 216 块、音频
 xsmp3/psmp3 公开分类与专辑均可读，两个首集媒体小范围读取 HTTP 200 / audio/mpeg。相声分类 12 专辑，首专辑 50 集，JIT LibVLC 解码 3.03 秒 / 317 音频块；单田芳评书 50 集，JIT 及严格 Native AOT 都解码 3.21 秒 / 332 音频块。相声 AOT 内容及解析通过，但媒体 TLS 握手超时，未记为 AOT 解码通过。没有忽略 TLS 校验或回退明文媒体。
 
 完整 123 项本地回归、11 项音频专项测试、最终严格 Native AOT 发布通过。搜索实际跳回首页，明确不支持，诊断显示 unsupported；音频验收使用 DecodedAudio，未伪装成视频解码。配置 `examples/audio-sites.json` 可直接使用，完整范围见 [音频 Spider](audio-site-spider.md)。本轮没有运行 Actions。
+
+
+## mpv IPlaybackEngine 验收（2026-10-05）
+
+完整 126 项回归、3 项 MpvEngine 专项通过。真实 libmpv JIT 及严格 Native AOT 均通过含 AAC 音轨的 15 秒合成视频：观察位置/时长/暂停/seekable、续播 1.5 秒、暂停精确跳转 2.5 秒、恢复、音轨缓存、音频 120ms / 字幕 -340ms 延迟以及停止/释放。日志 `/private/tmp/vodbox-mpv-engine-native-aot.log`。旧合成样本只有视频轨道，音轨检查失败后使用自生成音视频样本修正，未放宽音轨断言。它是接口/native ABI 验证，不能代替主窗口路由或 GUI 验收；没有运行 Actions。

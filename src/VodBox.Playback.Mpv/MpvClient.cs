@@ -3,10 +3,21 @@ using System.Runtime.InteropServices;
 namespace VodBox.Playback.Mpv;
 
 public readonly record struct MpvEvent(int Id, int Error, ulong ReplyUserData,
-    int? EndReason = null, int? EndError = null, long? PlaylistEntryId = null, string? LogText = null);
+    int? EndReason = null, int? EndError = null, long? PlaylistEntryId = null, string? LogText = null,
+    string? PropertyName = null, double? PropertyDouble = null, bool? PropertyFlag = null);
+
+public enum MpvPropertyFormat { None = 0, Flag = 3, Double = 5 }
+public interface IMpvClient : IDisposable
+{
+    void Command(params string[] arguments);
+    double? GetDouble(string property);
+    string? GetString(string property);
+    void Observe(string property, ulong id, MpvPropertyFormat format);
+    MpvEvent PollEvent();
+}
 
 /// <summary>Low-level, serialized client API. Run calls on a worker, never the GUI/render thread.</summary>
-public sealed class MpvClient : IDisposable
+public sealed class MpvClient : IMpvClient
 {
     private readonly object _gate = new();
     private readonly MpvHandle _handle;
@@ -71,6 +82,24 @@ public sealed class MpvClient : IDisposable
         }
     }
 
+    public string? GetString(string property)
+    {
+        Validate(property);
+        lock (_gate)
+        {
+            EnsureAlive(); var pointer = MpvNative.GetString(_handle, property);
+            if (pointer == 0) return null;
+            try { return Marshal.PtrToStringUTF8(pointer); }
+            finally { MpvNative.Free(pointer); }
+        }
+    }
+    public void Observe(string property, ulong id, MpvPropertyFormat format)
+    {
+        Validate(property);
+        if (format is not (MpvPropertyFormat.None or MpvPropertyFormat.Flag or MpvPropertyFormat.Double)) throw new ArgumentOutOfRangeException(nameof(format));
+        lock (_gate) { EnsureAlive(); MpvNative.Check(MpvNative.Observe(_handle, id, property, (int)format)); }
+    }
+
     // Copy primitive fields before the next wait; native event payload ownership stays with mpv.
     public unsafe MpvEvent PollEvent()
     {
@@ -80,6 +109,13 @@ public sealed class MpvClient : IDisposable
             var pointer = MpvNative.WaitEvent(_handle, 0);
             if (pointer == 0) throw new InvalidOperationException("mpv_wait_event returned null.");
             var value = *(NativeEvent*)pointer;
+            if (value.Id == 22 && value.Data != 0)
+            {
+                var property = *(NativeProperty*)value.Data;
+                return new(value.Id, value.Error, value.ReplyUserData, PropertyName: Marshal.PtrToStringUTF8(property.Name),
+                    PropertyDouble: property.Format == 5 && property.Data != 0 ? *(double*)property.Data : null,
+                    PropertyFlag: property.Format == 3 && property.Data != 0 ? *(int*)property.Data != 0 : null);
+            }
             if (value.Id == 7 && value.Data != 0)
             {
                 var end = *(NativeEndFile*)value.Data;

@@ -2,7 +2,7 @@
 
 本清单以原重写方案为目标。CI 通过不等于功能完成；一个功能写入代码、单元测试通过、跨平台编译通过、桌面交互验收通过是不同层次。旧配置与 Java/JVM/Dex 兼容层按用户决定不实施。
 
-本清单包含 45 项能力：17 项有基础验证，23 项已有实现但仍需完整验收，5 项仍需实现。按能力项计数，不代表工时比例或完整移植百分比。
+本清单包含 46 项能力：17 项有基础验证，24 项已有实现但仍需完整验收，5 项仍需实现。按能力项计数，不代表工时比例或完整移植百分比。
 
 ## 已实现并有基础验证
 
@@ -25,6 +25,8 @@
 - [x] 用户提供测试来源中的实际 HLS H.264 / AAC 接收与 VideoToolbox 解码记录。
 
 ## 本轮已写入功能，继续做集成与跨平台验收
+
+- [~] libmpv IPlaybackEngine：惰性初始化、观察属性事件、后台缓存轨道、暂停/恢复/精确跳转/速度/音量、字幕、截图命令与音频/字幕延迟。126 项完整回归、macOS x64 真实 JIT/严格 Native AOT 控制验证通过；主窗口双内核路由、设置、切换与其他平台待验收。
 
 - [~] C# AppGet Spider：V119 签名表单 / 显式 Qiji V122 JSON、分类/推荐、分页筛选、搜索、多线路分集、直接媒体/站内与外部 JSON 解析、播放令牌刷新；104 项本地回归通过。咕咕固定视频 5092 的 macOS JIT/Native AOT 真实解码通过；Qiji 仅 fixture 验证，不代表首发 V122 已覆盖。其他版本、网页解析、登录/验证码交互仍待实现。
 - [~] C# App99 Spider：显式 BN v2、匿名签名/加解密、分类分页筛选、搜索、多线路与外部 JSON 解析、每次播放刷新详情。112 项本地回归通过；双星 macOS JIT 实际解码通过，剧圈分类/搜索/解析通过。Guard、登录、各平台窗口和长时播放仍待验收。
@@ -73,7 +75,7 @@
 
 MacCMS 适配依据公开接口字段独立实现，没有复制上游应用代码；接口参考：[官方 Provide.php](https://github.com/magicblack/maccms10/blob/master/application/api/controller/Provide.php)。不导入旧 TV 配置或 Java 插件。
 
-`csp_*` 通常对应 Java Spider 入口。当前没有 JAR/JVM 加载器；已增加 `csp_Bili` 的 C# 公开投稿基础适配并做真实点播/弹幕验证，`csp_BiliGuard` 与其余 Spider 未移植。QuickJS/Python/Node 的 VodBox 接口不代表旧 drpy 可直接运行。两个源共 98 个站点条目、69 个精确 Java 入口，按频率推进，详见 [Spider 优先级](spider-migration-priority.md) 和统计快照。
+`csp_*` 通常对应 Java Spider 入口。当前没有 JAR/JVM 加载器；已注册 `csp_Bili`、显式 AppGet/App99 和两个限定音频站点的 XBPQ 别名；这些是独立 C# 协议适配，范围见各专项文档。Guard 与其他未核实入口仍未注册。QuickJS/Python/Node 的 VodBox 接口不代表旧 drpy 可直接运行。两个源共 98 个站点条目、69 个精确 Java 入口，按频率推进，详见 [Spider 优先级](spider-migration-priority.md) 和统计快照。
 
 缓存 / 直播 / 播放控制阶段：[ed2cc55 六 RID 构建与打包全部通过](https://github.com/pengpercy/VodBox/actions/runs/37245948796)，包含 27 项测试。本轮继续增加分页、筛选、可见海报加载及无反射视频句柄控件，37 项本地测试通过，包含真实 XAML 的无窗口预览与主题资源验证；这些测试不验证原生视频画面或 Mica。
 
@@ -93,3 +95,5 @@ Spider 阶段：本地 78 项测试通过。真实 WBI 搜索/正常访客会话
 
 
 2026-10-05 后续优先级已按用户要求调整：当前高频 Spider 批次收尾后先完善 LibVLC/libmpv 双播放内核、手动/自动选择及桌面接入，再持续补 Spider。现有实现不能声称覆盖两个配置的大多数入口；Guard 和多种应用协议仍待核对，不为达到覆盖比例而注册未经验证的入口。
+
+播放内核恢复开发：MpvEngine 已通过 3 项专项/126 项全部测试和真实 JIT/Native AOT 状态、轨道、暂停、跳转、延迟及生命周期验证。详见 [mpv 播放接口](mpv-engine.md)。主窗口目前仍 LibVLC，不误记为路由/自动回退已完成。

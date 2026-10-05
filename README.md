@@ -88,3 +88,5 @@ C# AppGet（V119 / 显式 Qiji V122）已注册 `appget` / `csp_AppGet`，支持
 C# App99 已注册 `app99` / `csp_App99` 的显式 `bn-v2` 协议，支持匿名分类、分页筛选、搜索、多线路分集和 JSON 解析；双星真实 LibVLC 解码通过。配置示例见 `examples/app99.json`，协议范围与验收见 [App99 Spider](docs/app99-spider.md)。`csp_App99Guard` 尚未接入。
 
 相声/评书音频专辑已接入 C# `audio-site`（显式 `audio-zblog-v1`，亦可用 `csp_XBPQ` 别名），支持两个已核对站点的分类分页、专辑分集和音频播放，不支持通用 XBPQ 规则与站点搜索。见 [示例](examples/audio-sites.json) 和 [音频 Spider](docs/audio-site-spider.md)。
+
+libmpv 已新增可接入 PlaybackCoordinator 的 `MpvEngine`，事件状态、轨道、控制与延迟已通过 macOS JIT/Native AOT 实测；主窗口路由与设置仍在后续接入。详见 [mpv 播放接口](docs/mpv-engine.md)。

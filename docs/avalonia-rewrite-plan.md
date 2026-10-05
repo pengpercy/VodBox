@@ -196,7 +196,7 @@ Provider 实例键至少包含配置 ID、站点 key、运行时、插件内容�
 7. Linux 分别验证 X11 / XWayland / 原生 Wayland 的实际支持路径，未验证路径明确标记。
 8. 压测跨屏 DPI、全屏、暂停后 seek、切文件、睡眠恢复与长时间运行。
 
-门槛：三平台画面、字幕、控制层可用，重复关闭不崩溃。LibVLC 为确定路线；若原型发现问题，先排查 VideoView 与平台承载实现，出现必须更换内核的证据时再单独修订方案，不提前安排双内核开发。
+门槛：三平台画面、字幕、控制层可用，重复关闭不崩溃。按用户后续决定保留 LibVLC 与 libmpv，统一播放请求与生命周期；自动模式仅允许一次明确回退，固定模式不自动切换。主窗口双内核接入按最新开发顺序推进。
 
 参考：[Screenbox 播放设计](screenbox-playback-analysis.md)、[LibVLCSharp Avalonia 控件](https://github.com/videolan/libvlcsharp/blob/3.x/src/LibVLCSharp.Avalonia/README.md)。
 
@@ -502,3 +502,5 @@ TV 仓库标示 GPL-3.0。重写语言本身不会消除复制或改编代码的
 ## 最新开发顺序（2026-10-05）
 
 按用户最新决定，Spider 先按使用频率形成阶段性覆盖，完成当前 App99 与相声/评书批次后转入播放内核：补齐 mpv IPlaybackEngine、LibVLC/mpv 统一路由、用户手动选择、受限自动回退、设置持久化以及桌面视频与弹幕显示。随后回头扩大 Spider 覆盖，不等待全部 69 个 Java 入口移植完再开发播放器。123 项本地回归通过；多数原入口尤其 Guard 尚未验收，覆盖率与功能完成度分别记录，保持两种内核及 Python/Node，不增加 Java 兼容层，CI 继续批量验证。
+
+播放内核进展：MpvEngine 已实现统一播放接口、观察事件、轨道与控制；126 项回归通过，macOS x64 JIT 与严格 Native AOT 实际验证通过。下一阶段接统一路由与主窗口，当前仍不计为双内核 GUI 已完成。见 [mpv 播放接口](mpv-engine.md)。

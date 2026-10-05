@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using VodBox.Core;
 using VodBox.Playback.Mpv;
 
 if (args.Length != 1 || !File.Exists(args[0])) throw new ArgumentException("Pass a local video fixture path.");
@@ -29,6 +30,21 @@ client.Dispose(); client.Dispose();
 try { client.PollEvent(); throw new InvalidOperationException("Disposed handle accepted."); }
 catch (ObjectDisposedException) { }
 Console.WriteLine($"Real libmpv: OK | duration={duration:F2}s | seek/pause/resume/rate/volume/UTF-8/error/dispose");
+
+await using var engine = new MpvEngine(headless: true);
+await engine.SetVolumeAsync(.35, default); await engine.SetRateAsync(1.5, default);
+await engine.OpenAsync(new() { Uri = new Uri(fixture.Path).AbsoluteUri, StartPositionMs = 1500 }, 7, default);
+await Until(() => engine.Snapshot.State == PlaybackState.Playing && engine.Snapshot.CanSeek && engine.Snapshot.Position.TotalSeconds > 1.4, "engine observed state/start");
+await engine.PauseAsync(default); await Until(() => engine.Snapshot.State == PlaybackState.Paused, "engine pause event");
+await engine.SeekAsync(TimeSpan.FromSeconds(2.5), default); await Until(() => Math.Abs(engine.Snapshot.Position.TotalSeconds - 2.5) < .15, "engine seek event");
+if (engine.GetTracks(TrackKind.Audio).Count == 0 || engine.GetTracks(TrackKind.Subtitle).All(x => x.Id != "no")) throw new InvalidOperationException("Engine track cache missing.");
+if (engine.Client!.GetString("track-list/0/type") is null) throw new InvalidOperationException("String property ABI missing.");
+await engine.SetAudioDelayAsync(120, default); await engine.SetSubtitleDelayAsync(-340, default);
+if (Math.Abs((engine.Client.GetDouble("audio-delay") ?? 0) - .12) > .0001 || Math.Abs((engine.Client.GetDouble("sub-delay") ?? 0) + .34) > .0001)
+    throw new InvalidOperationException("Engine delays mismatch.");
+await engine.PlayAsync(default); await Until(() => engine.Snapshot.State == PlaybackState.Playing, "engine resume");
+await engine.StopAsync(default); if (engine.Snapshot.State != PlaybackState.Idle) throw new InvalidOperationException("Engine stop state.");
+Console.WriteLine("Real MpvEngine: OK | observed position/duration/pause/seekable, UTF-8 tracks, delays, lifecycle");
 
 static bool DrainLoaded(MpvClient client)
 {

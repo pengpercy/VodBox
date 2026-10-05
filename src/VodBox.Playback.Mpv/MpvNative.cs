@@ -36,6 +36,15 @@ internal static partial class MpvNative
     [LibraryImport(Library, EntryPoint = "mpv_get_property", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static partial int GetDouble(MpvHandle handle, string name, int format, out double value);
+    [LibraryImport(Library, EntryPoint = "mpv_get_property_string", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial nint GetString(MpvHandle handle, string name);
+    [LibraryImport(Library, EntryPoint = "mpv_free")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial void Free(nint pointer);
+    [LibraryImport(Library, EntryPoint = "mpv_observe_property", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int Observe(MpvHandle handle, ulong id, string name, int format);
     [LibraryImport(Library, EntryPoint = "mpv_wait_event")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static partial nint WaitEvent(MpvHandle handle, double timeout);
@@ -64,6 +73,8 @@ internal struct NativeEvent { public int Id; public int Error; public ulong Repl
 internal struct NativeEndFile { public int Reason; public int Error; public long PlaylistEntryId; }
 [StructLayout(LayoutKind.Sequential)]
 internal struct NativeLogMessage { public nint Prefix; public nint Level; public nint Text; public int LogLevel; }
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeProperty { public nint Name; public int Format; public nint Data; }
 
 public sealed class MpvException(int code, string message) : Exception($"mpv ({code}): {message}")
 {
