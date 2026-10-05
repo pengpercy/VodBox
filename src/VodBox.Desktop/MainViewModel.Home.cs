@@ -12,7 +12,7 @@ public partial class MainViewModel
     public string BrowseReturnLabel => ShowHome ? "返回首页" : "返回浏览";
     public string HomeTitle => SelectedSource?.Name ?? Sources.FirstOrDefault()?.Name ?? "影视";
     public bool HasConfiguredSources => Sources.Count > 0 || _config.LiveSources.Count > 0;
-    public string VodSourceSummary => Sources.Count == 0 ? "未配置" : $"{Sources.Count} 个站点 · {HomeTitle}";
+    public string VodSourceSummary => Sources.Count == 0 ? "未配置" : $"已配置（{Sources.Count} 个站点）";
     public string LiveSourceSummary => _config.LiveSources.Count == 0 ? "未配置" : $"{_config.LiveSources.Count} 个直播源";
     public ObservableCollection<HistoryEntry> RecentHistory { get; } = [];
     public ObservableCollection<MediaCard> HomeCards { get; } = [];
