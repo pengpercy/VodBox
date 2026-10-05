@@ -481,3 +481,7 @@ TV 仓库标示 GPL-3.0。重写语言本身不会消除复制或改编代码的
 官方文档入口：[配置](https://fongmi.github.io/TV/config/)、[扩展](https://fongmi.github.io/TV/spider/)、[本地 API](https://fongmi.github.io/TV/local/)、[功能](https://fongmi.github.io/TV/features/)。
 
 本方案没有编写应用业务代码、修改 CI、发布产物或推送 GitHub。下一次进入实现，建议直接从“工程骨架 + 三平台本地视频播放原型”开始，以实测决定渲染路径，再按上面的任务顺序扩展。
+
+## 用户测试源与 Spider 排期更新
+
+两个用户源的统计共 98 个条目（94 个 Java Spider、4 个 drpy），精确 Java 入口 69 个。按频率先完善 `csp_Bili` 9 次 / `csp_BiliGuard` 7 次的哔哩哔哩相关适配，随后 `csp_AppGet` 4 次、App99 候选家族和其他重复内容入口。Guard 不自动合并，不等于已覆盖。详见 [移植优先级](spider-migration-priority.md)。当前公开投稿基础适配已接入并在 macOS JIT/Native AOT 实际播放、弹幕验证通过，本地 78 项测试通过；旧片单/Guard/DASH/账号待补。双内核主窗口切换排在这批 Spider 之后，CI 继续手动集中验证。

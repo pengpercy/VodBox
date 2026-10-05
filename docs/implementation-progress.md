@@ -2,7 +2,7 @@
 
 本清单以原重写方案为目标。CI 通过不等于功能完成；一个功能写入代码、单元测试通过、跨平台编译通过、桌面交互验收通过是不同层次。旧配置与 Java/JVM/Dex 兼容层按用户决定不实施。
 
-本清单包含 41 项能力：17 项有基础验证，19 项已有实现但仍需完整验收，5 项仍需实现。按能力项计数，不代表工时比例或完整移植百分比。
+本清单包含 42 项能力：17 项有基础验证，20 项已有实现但仍需完整验收，5 项仍需实现。按能力项计数，不代表工时比例或完整移植百分比。
 
 ## 已实现并有基础验证
 
@@ -26,6 +26,7 @@
 
 ## 本轮已写入功能，继续做集成与跨平台验收
 
+- [~] C# 哔哩哔哩公开投稿 Spider：热门、关键词分类、搜索分页、分集、实时播放解析与自动 XML 弹幕；macOS JIT/AOT 实际解码通过，Guard/片单/DASH/账号功能未实现。
 - [~] C# MacCMS JSON / XML HTTP 采集适配：分类、分页、搜索、详情、多线路与选集；合成 HTTP fixture 测试通过。
 - [~] 原配置位置与解析后快照的配置仓库；原子写入、离线切换与配置移除。
 - [~] 音量、倍速、自动下一集、续播、片头片尾和主题偏好持久化。
@@ -68,7 +69,7 @@
 
 MacCMS 适配依据公开接口字段独立实现，没有复制上游应用代码；接口参考：[官方 Provide.php](https://github.com/magicblack/maccms10/blob/master/application/api/controller/Provide.php)。不导入旧 TV 配置或 Java 插件。
 
-`csp_*` Spider 尚未实现：这些标识通常对应配置所引用 JAR 内的 Java Spider 类，当前没有 JAR/JVM 加载器，也没有对应站点的 C# 移植。QuickJS、Python、Node 的 VodBox 插件接口可用，不代表可直接运行旧 Spider 或旧 drpy 脚本。后续需要按站点实现 C# 的首页、分类、搜索、详情与播放解析，再接入现有源接口；不需要增加 Java 兼容层。
+`csp_*` 通常对应 Java Spider 入口。当前没有 JAR/JVM 加载器；已增加 `csp_Bili` 的 C# 公开投稿基础适配并做真实点播/弹幕验证，`csp_BiliGuard` 与其余 Spider 未移植。QuickJS/Python/Node 的 VodBox 接口不代表旧 drpy 可直接运行。两个源共 98 个站点条目、69 个精确 Java 入口，按频率推进，详见 [Spider 优先级](spider-migration-priority.md) 和统计快照。
 
 缓存 / 直播 / 播放控制阶段：[ed2cc55 六 RID 构建与打包全部通过](https://github.com/pengpercy/VodBox/actions/runs/37245948796)，包含 27 项测试。本轮继续增加分页、筛选、可见海报加载及无反射视频句柄控件，37 项本地测试通过，包含真实 XAML 的无窗口预览与主题资源验证；这些测试不验证原生视频画面或 Mica。
 
@@ -83,3 +84,5 @@ MacCMS 适配依据公开接口字段独立实现，没有复制上游应用代�
 双内核阶段：根据用户要求保留 LibVLC 与 libmpv，核心选择策略已通过 10 项测试，完整本地测试共 65 项。libmpv C ABI、SafeHandle、事件轮询、OpenGL Render API 和 Avalonia 实验表面已完成，macOS x64 真实 Native AOT 控制与 GPU 渲染隔离测试通过。主窗口仍使用 LibVLC；实际路由/设置切换、失败回退、状态迁移、网络浏览/投屏和六 RID 双内核打包尚未完成。本轮未触发 CI。
 
 窗口外观：主窗口启用 `ExtendClientAreaToDecorationsHint` 与 40 DIP 标题栏高度，使用 Avalonia 12 的 `WindowDecorationProperties.ElementRole=TitleBar` 标记拖动区域，并保留系统窗口按钮。透明标题栏与现有 Mica/Acrylic/Blur 回退共用背景。65 项本地测试与真实 XAML 设计预览通过；跨平台原生按钮/拖动行为仍待真机验收。
+
+Spider 阶段：本地 78 项测试通过。真实 WBI 搜索/正常访客会话、分集 cid、每次刷新媒体地址、Cookie 不传 CDN、取消与四路并发已验证；HTTP 弹幕补齐 gzip/deflate（raw/zlib）/Brotli 解压及逐层大小限制。macOS x64 最新 Native AOT 发布零警告，实际热门/搜索各 20 项、1200 条弹幕、H.264 VideoToolbox 解码通过。后续先完善哔哩哔哩相关适配，再 AppGet、App99 候选家族及重复内容入口；双内核切换后置，本轮未触发 Actions。

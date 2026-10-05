@@ -68,9 +68,43 @@ internal static class Diagnostics
                 }
                 finally { File.Delete(wav); }
             }
+            int biliArgument = Array.IndexOf(args, "--bilibili-smoke");
+            if (biliArgument >= 0)
+            {
+                string mediaId = biliArgument + 1 < args.Length && !args[biliArgument + 1].StartsWith("--", StringComparison.Ordinal)
+                    ? args[biliArgument + 1] : "BV1WSHL66EdZ";
+                await BilibiliSmokeAsync(http, mediaId, args.Contains("--native"));
+            }
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    private static async Task BilibiliSmokeAsync(HttpClient http, string mediaId, bool decode)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var config = await new ConfigLoader(http).LoadAsync(Path.Combine(Core.AppLayout.AssetsDirectory, "examples", "bilibili.json"), deadline.Token);
+        await using var provider = new ProviderFactory(http, "unused", "unused").Create(config.Sources.Single());
+        var categories = await provider.GetCategoriesAsync(deadline.Token);
+        var popular = await provider.GetItemsAsync("popular", null, deadline.Token);
+        var search = await provider.SearchAsync("Avalonia", deadline.Token);
+        if (popular.Items.Count == 0 || search.Items.Count == 0) throw new InvalidDataException("哔哩哔哩列表或搜索没有返回内容。");
+        var detail = await provider.GetDetailAsync(mediaId, deadline.Token);
+        string episodeId = detail.PlaybackLines.First().Episodes.First().Id;
+        var request = await provider.ResolvePlaybackAsync(mediaId, episodeId, deadline.Token);
+        var comments = await new DanmakuLoader(http).LoadAsync(request.DanmakuUri!, deadline.Token);
+        Console.WriteLine($"C# Bilibili Spider: OK | categories={categories.Count}, popular={popular.Items.Count}, search={search.Items.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}, danmaku={comments.Count}");
+        if (!decode) return;
+        await using var engine = new LibVlcEngine(headless: true);
+        await engine.OpenAsync(request, 2, deadline.Token);
+        using var media = engine.Player!.Media!;
+        while (engine.Snapshot.Position.TotalSeconds < 3 || engine.Player.VideoTrack < 0 || media.Statistics.DecodedVideo == 0)
+        {
+            if (engine.Snapshot.State == Core.PlaybackState.Failed) throw new InvalidOperationException(engine.Snapshot.Error);
+            await Task.Delay(100, deadline.Token);
+        }
+        var statistics = media.Statistics;
+        Console.WriteLine($"Bilibili LibVLC decode: OK | position={engine.Snapshot.Position.TotalSeconds:F2}s, duration={engine.Snapshot.Duration.TotalSeconds:F2}s, videoTrack={engine.Player.VideoTrack}, decodedVideo={statistics.DecodedVideo}, decodedAudio={statistics.DecodedAudio}");
+        await engine.StopAsync(default);
     }
     private static void WriteTestWave(string path)
     {

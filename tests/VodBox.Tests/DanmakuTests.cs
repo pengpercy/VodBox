@@ -65,6 +65,36 @@ public sealed class DanmakuTests
         var comments = await loader.LoadAsync("https://example.com/comments.xml.gz"); Assert.Equal("测试", Assert.Single(comments).Text);
         await Assert.ThrowsAsync<InvalidDataException>(() => loader.LoadAsync("https://example.com/bomb.gz"));
     }
+    [Theory]
+    [InlineData("gzip")]
+    [InlineData("deflate")]
+    [InlineData("zlib")]
+    [InlineData("br")]
+    public async Task HttpContentEncodingIsDecodedWithExpansionLimits(string coding)
+    {
+        using var http = new HttpClient(new EncodedHandler(coding));
+        var loader = new DanmakuLoader(http);
+        Assert.Equal("HTTP 编码", Assert.Single(await loader.LoadAsync("https://example.com/comments.xml")).Text);
+        await Assert.ThrowsAsync<InvalidDataException>(() => loader.LoadAsync("https://example.com/bomb.xml"));
+    }
+    private sealed class EncodedHandler(string coding) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            byte[] content = request.RequestUri!.AbsolutePath.Contains("bomb", StringComparison.Ordinal) ? new byte[DanmakuLoader.MaximumBytes + 1] : Encoding.UTF8.GetBytes("<i><d p='0,1,25,16777215'>HTTP 编码</d></i>");
+            using var output = new MemoryStream();
+            using (Stream encoder = coding switch
+            {
+                "gzip" => new GZipStream(output, CompressionLevel.Fastest, true),
+                "deflate" => new DeflateStream(output, CompressionLevel.Fastest, true),
+                "zlib" => new ZLibStream(output, CompressionLevel.Fastest, true),
+                _ => new BrotliStream(output, CompressionLevel.Fastest, true)
+            }) encoder.Write(content);
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(output.ToArray()) };
+            response.Content.Headers.ContentEncoding.Add(coding == "zlib" ? "deflate" : coding);
+            return Task.FromResult(response);
+        }
+    }
     private sealed class FixtureHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)

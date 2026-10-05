@@ -18,6 +18,9 @@ public sealed class DanmakuLoader(HttpClient http)
         {
             using var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false); response.EnsureSuccessStatusCode();
             await using var body = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false); bytes = await ReadBoundedAsync(body, token).ConfigureAwait(false);
+            if (response.Content.Headers.ContentEncoding.Count > 3) throw new InvalidDataException("弹幕 HTTP 压缩层数超过三层。");
+            foreach (string coding in response.Content.Headers.ContentEncoding.Reverse())
+                bytes = await DecompressAsync(bytes, coding, token).ConfigureAwait(false);
         }
         else
         {
@@ -28,6 +31,22 @@ public sealed class DanmakuLoader(HttpClient http)
         if (bytes.Length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b)
         { using var input = new MemoryStream(bytes); await using var gzip = new GZipStream(input, CompressionMode.Decompress); bytes = await ReadBoundedAsync(gzip, token).ConfigureAwait(false); }
         return await Task.Run(() => Parse(bytes, token), token).ConfigureAwait(false);
+    }
+    private static async Task<byte[]> DecompressAsync(byte[] bytes, string coding, CancellationToken token)
+    {
+        if (coding.Equals("identity", StringComparison.OrdinalIgnoreCase)) return bytes;
+        using var input = new MemoryStream(bytes);
+        // HTTP deflate is deployed both as RFC 1950 zlib and as raw RFC 1951 streams.
+        bool zlib = bytes.Length >= 2 && (bytes[0] & 15) == 8 && (bytes[0] >> 4) <= 7 && ((bytes[0] << 8) + bytes[1]) % 31 == 0;
+        await using Stream decoded = coding.ToLowerInvariant() switch
+        {
+            "gzip" => new GZipStream(input, CompressionMode.Decompress),
+            "deflate" when zlib => new ZLibStream(input, CompressionMode.Decompress),
+            "deflate" => new DeflateStream(input, CompressionMode.Decompress),
+            "br" => new BrotliStream(input, CompressionMode.Decompress),
+            _ => throw new InvalidDataException("不支持的弹幕 HTTP 压缩格式：" + coding)
+        };
+        return await ReadBoundedAsync(decoded, token).ConfigureAwait(false);
     }
     private static async Task<byte[]> ReadBoundedAsync(Stream stream, CancellationToken token)
     {

@@ -7,7 +7,7 @@
 ## 已实现
 
 - 本地文件/URL 播放、暂停、停止、进度、音量、倍速、字幕与音轨选择、全屏。
-- 新版 JSON 配置，C# 目录源及 MacCMS HTTP JSON/XML 采集源的分类、分页、搜索、详情、多线路和选集。
+- 新版 JSON 配置，C# 目录源及 MacCMS HTTP JSON/XML 采集源的分类、分页、搜索、详情、多线路和选集；哔哩哔哩公开投稿的 C# Spider 基础适配。
 - 配置快照仓库、偏好设置持久化、全源并发搜索、收藏打开、历史重新解析、连续播放与片头片尾设置。
 - 直播分组/搜索/备用地址、UTF-8/UTF-16/GB18030 编码、gzip XMLTV 缓存与节目表界面。
 - QuickJS-NG 独立 AOT 宿主，LibraryImport 源码生成绑定；Python/Node 独立进程 NDJSON 协议。
@@ -65,7 +65,7 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 六个 RID 的 Native AOT 构建、27 项功能测试、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试与全部安装包生成已通过 [CI 验证](https://github.com/pengpercy/VodBox/actions/runs/37245948796)（ed2cc55）。macOS 安装包另外执行严格签名与依赖哈希校验。用户提供来源中的一个 HLS 直播流在 macOS x64 实际进入 Playing，解码 H.264/AAC 并观察到 VideoToolbox 日志；详见 [播放测试记录](docs/playback-testing.md)。有画面的交互、长时稳定性和各系统完整安装流程仍需真机验证。
 
-本轮继续实现海报缓存 / 缩略图、历史管理、直播收藏 / 恢复 / 有限重试 / 节目表刷新、音频字幕延迟 / 截图、快捷键 / 拖放 / 主题，以及 DASH 请求头代理。65 项自动测试通过，新增弹幕加载 / 时间轴 / 透明叠层、数据备份 / 合并导入、单源搜索分页、MacCMS 年份 / 完结筛选、可见海报加载和无窗口 XAML 预览测试。已验证的跨平台打包版本见上方 CI 链接；当前改动的本机 Native AOT 与实际 HLS 的 150ms 音频延迟验证通过；本轮新增功能的跨平台 CI 与桌面验收独立进行。通用筛选元数据、聚合分页、全屏弹幕验收、大屏布局、媒体键 / 休眠、DLNA / 局域网、SMB / WebDAV、自动更新及完整桌面验收仍需继续。旧配置与 Java 兼容层不在当前范围内。
+本轮继续实现海报缓存 / 缩略图、历史管理、直播收藏 / 恢复 / 有限重试 / 节目表刷新、音频字幕延迟 / 截图、快捷键 / 拖放 / 主题，以及 DASH 请求头代理。78 项自动测试通过，新增弹幕加载 / 时间轴 / 透明叠层、数据备份 / 合并导入、单源搜索分页、MacCMS 年份 / 完结筛选、可见海报加载和无窗口 XAML 预览测试。已验证的跨平台打包版本见上方 CI 链接；当前改动的本机 Native AOT 与实际 HLS 的 150ms 音频延迟验证通过；本轮新增功能的跨平台 CI 与桌面验收独立进行。通用筛选元数据、聚合分页、全屏弹幕验收、大屏布局、媒体键 / 休眠、DLNA / 局域网、SMB / WebDAV、自动更新及完整桌面验收仍需继续。旧配置与 Java 兼容层不在当前范围内。
 
 参考项目：[FongMi/TV](https://github.com/FongMi/TV)、[Screenbox](https://github.com/huynhsontung/Screenbox)、[Downio](https://github.com/pengpercy/Downio)。当前实现没有复制其应用源码。分发原生依赖前应保留各依赖的许可证与 notice；相关文件随运行时打包。
 
@@ -80,3 +80,5 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
 
 按最新要求继续实现 LibVLC + libmpv 双内核，计划提供自动与手动选择。新增 libmpv 原生绑定、Avalonia OpenGL 实验表面和内核选择策略；macOS x64 的真实 libmpv 控制与 GPU 播放已通过 Native AOT 隔离验证。主窗口切换和双内核原生依赖打包尚未接入，当前主窗口仍使用 LibVLC。详见 [实现记录](docs/danmaku.md)。
+
+`examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，`csp_BiliGuard` 和其他 Java Spider 尚未移植。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。

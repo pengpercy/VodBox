@@ -49,3 +49,5 @@ libmpv 本身可以用于 Windows、macOS 和 Linux。按 [mpv 嵌入文档](htt
 下一阶段：实现 `IPlaybackEngine` 的异步控制与会话事件、音轨/字幕、延迟和截图；接入已单测的 `PlaybackEnginePolicy` 与实际主窗口路由，增加设置选择、启动失败一次回退、切换时的进度/音量/倍率/字幕状态恢复；完成三平台六 RID 原生依赖清单、双内核打包与真机验证。网络浏览与投屏仍需独立应用层开发。
 
 仓库内另提供 `tests/VodBox.Mpv.UiSmoke`，可使用相同 publish 命令与 `VODBOX_MPV_PATH` 运行 AOT 视频表面测试；输入 640px 宽、至少四秒的视频，驱动打开短时窗口并自动关闭。无 GPU 初始化时十秒超时，以非零退出码报告失败。这些原生测试需手动执行；65 项常规自动测试包含内核选择策略，但不会启动 GUI 或下载原生库。
+
+哔哩哔哩 C# Spider 按分集 cid 自动返回 XML 弹幕地址；HTTP Content-Encoding 新增 gzip、deflate（raw / zlib）与 Brotli 解码，最多三层，每层展开仍不超过 8 MiB，本地 gzip 文件继续支持。该扩展修复真实 B 站 XML 的 raw deflate 响应；现有媒体时钟和透明叠层复用。当前本地 78 项测试通过，macOS x64 Native AOT 实际加载 1200 条弹幕并解码同一分集，见 [播放测试](playback-testing.md)。

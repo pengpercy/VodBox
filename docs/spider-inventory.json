@@ -1,0 +1,1631 @@
+{
+  "capturedAt": "2026-10-05T12:55:07+08:00",
+  "countingUnit": "site-entry",
+  "grouping": "Java: exact api name, Guard variants not merged; JavaScript: engine filename",
+  "sources": [
+    {
+      "name": "饭太硬",
+      "sha256": "aa410c48c279996f3be79bb26a0bb096c9096c4367e3a1b1ae05458beb6f3426",
+      "sites": 48,
+      "liveSources": 6,
+      "kinds": {
+        "java-spider": 45,
+        "javascript": 3
+      }
+    },
+    {
+      "name": "宝盒",
+      "sha256": "ede90a4f96802f7352fa4480120924806461e4eedd764fb024e8266302186799",
+      "sites": 50,
+      "liveSources": 6,
+      "kinds": {
+        "java-spider": 49,
+        "javascript": 1
+      }
+    }
+  ],
+  "totalSites": 98,
+  "uniquePlugins": 70,
+  "plugins": [
+    {
+      "plugin": "csp_Bili",
+      "kind": "java-spider",
+      "count": 9,
+      "bySource": {
+        "宝盒": 9
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 36,
+          "key": "csp_Bili",
+          "name": "哔哩┃综合",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 37,
+          "key": "csp_Bili",
+          "name": "哔哩┃哔哩",
+          "jarVariant": "7dd5d83b47c2"
+        },
+        {
+          "source": "宝盒",
+          "index": 38,
+          "key": "csp_Bili短剧",
+          "name": "哔哩┃短剧",
+          "jarVariant": "03a9faabe32c"
+        },
+        {
+          "source": "宝盒",
+          "index": 39,
+          "key": "影视解说",
+          "name": "影视┃解说",
+          "jarVariant": "03a9faabe32c"
+        },
+        {
+          "source": "宝盒",
+          "index": 42,
+          "key": "小灯塔国学",
+          "name": "宝宝📚国学",
+          "jarVariant": "fc35aac81899"
+        },
+        {
+          "source": "宝盒",
+          "index": 44,
+          "key": "csp_少儿",
+          "name": "学前📚教育",
+          "jarVariant": "5379476782f4"
+        },
+        {
+          "source": "宝盒",
+          "index": 45,
+          "key": "csp_小学",
+          "name": "小学📚课堂",
+          "jarVariant": "5379476782f4"
+        },
+        {
+          "source": "宝盒",
+          "index": 46,
+          "key": "csp_初中",
+          "name": "初中📚课堂",
+          "jarVariant": "5379476782f4"
+        },
+        {
+          "source": "宝盒",
+          "index": 47,
+          "key": "csp_高中",
+          "name": "高中📚课堂",
+          "jarVariant": "5379476782f4"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c",
+        "7dd5d83b47c2",
+        "03a9faabe32c",
+        "fc35aac81899",
+        "5379476782f4"
+      ]
+    },
+    {
+      "plugin": "csp_BiliGuard",
+      "kind": "java-spider",
+      "count": 7,
+      "bySource": {
+        "饭太硬": 7
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 29,
+          "key": "MTV",
+          "name": "🎶明星┃MV",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 40,
+          "key": "Bili",
+          "name": "🅱哔哔合集┃弹幕",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 41,
+          "key": "Biliych",
+          "name": "🅱哔哔演唱会┃弹幕",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 43,
+          "key": "少儿教育",
+          "name": "📚少儿┃教育",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 44,
+          "key": "小学课堂",
+          "name": "📚小学┃课堂",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 45,
+          "key": "初中课堂",
+          "name": "📚初中┃课堂",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 46,
+          "key": "高中教育",
+          "name": "📚高中┃课堂",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "script:drpy2.min.js",
+      "kind": "javascript",
+      "count": 4,
+      "bySource": {
+        "饭太硬": 3,
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 32,
+          "key": "虎牙js",
+          "name": "🐯虎牙┃直播",
+          "jarVariant": null
+        },
+        {
+          "source": "饭太硬",
+          "index": 33,
+          "key": "斗鱼js",
+          "name": "🐟斗鱼┃直播",
+          "jarVariant": null
+        },
+        {
+          "source": "饭太硬",
+          "index": 42,
+          "key": "dr_兔小贝",
+          "name": "📚儿童┃启蒙",
+          "jarVariant": null
+        },
+        {
+          "source": "宝盒",
+          "index": 43,
+          "key": "儿童",
+          "name": "儿童📚启蒙",
+          "jarVariant": null
+        }
+      ],
+      "jarVariants": []
+    },
+    {
+      "plugin": "csp_AppGet",
+      "kind": "java-spider",
+      "count": 4,
+      "bySource": {
+        "宝盒": 4
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 6,
+          "key": "新首发",
+          "name": "首发┃零八",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 9,
+          "key": "咕咕动漫",
+          "name": "咕咕┃十一",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 28,
+          "key": "一碗",
+          "name": "一碗┃肥二",
+          "jarVariant": "d8b07eb0d0d8"
+        },
+        {
+          "source": "宝盒",
+          "index": 29,
+          "key": "蔬菜",
+          "name": "蔬菜┃肥五",
+          "jarVariant": "d8b07eb0d0d8"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c",
+        "d8b07eb0d0d8"
+      ]
+    },
+    {
+      "plugin": "csp_App99",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "宝盒": 2
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 8,
+          "key": "双星99",
+          "name": "双星┃零十",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 18,
+          "key": "剧圈99",
+          "name": "剧圈┃二一",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AppDrama",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "宝盒": 2
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 19,
+          "key": "天堂",
+          "name": "天堂┃二二",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 20,
+          "key": "橘汁",
+          "name": "橘汁┃二三",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AppSxGuard",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "饭太硬": 2
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 18,
+          "key": "剧圈",
+          "name": "🐻剧圈┃多线",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 23,
+          "key": "咕咕",
+          "name": "🦉咕咕┃动漫",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_AppYd",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "宝盒": 2
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 26,
+          "key": "布布影视APP",
+          "name": "大鹅┃二九",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 27,
+          "key": "云朵影视APP",
+          "name": "云朵┃三十",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_S_zpsGuard",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "饭太硬": 2
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 34,
+          "key": "ZPan",
+          "name": "🎈盘搜┃四盘",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 35,
+          "key": "JPan",
+          "name": "🦋易搜┃四盘",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_T4Guard",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "饭太硬": 2
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 7,
+          "key": "光影",
+          "name": "🌞光影┃不卡",
+          "jarVariant": "89ab88306905"
+        },
+        {
+          "source": "饭太硬",
+          "index": 15,
+          "key": "奶酪",
+          "name": "🧀奶酪┃秒播",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_XBPQ",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "宝盒": 2
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 32,
+          "key": "相声",
+          "name": "相声┃大全",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 33,
+          "key": "评书",
+          "name": "评书┃大全",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_XPath",
+      "kind": "java-spider",
+      "count": 2,
+      "bySource": {
+        "宝盒": 2
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 49,
+          "key": "ext_live_protocol",
+          "name": "导航 http://bhapp.top/",
+          "jarVariant": "15ea06f0d36c"
+        },
+        {
+          "source": "宝盒",
+          "index": 50,
+          "key": "cc",
+          "name": "请勿相信视频中任何广告",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AiDjGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 22,
+          "key": "AiDj",
+          "name": "❤️AI┃短漫剧",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_AllliveGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 28,
+          "key": "alllive",
+          "name": "🎮一直播┃直播",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_App99Guard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 17,
+          "key": "视界",
+          "name": "🌸茉莉┃多线",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_AppRJ",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 2,
+          "key": "天天",
+          "name": "热播┃零二",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AppTTGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 16,
+          "key": "热播",
+          "name": "📺热播┃多线",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_AppTe",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 22,
+          "key": "csp_APPTe",
+          "name": "天鹅┃二五",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AppV6",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 16,
+          "key": "麦田",
+          "name": "麦田┃十八",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AppXY",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 11,
+          "key": "csp_XY",
+          "name": "星丫┃十三",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_AppgzGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 11,
+          "key": "瓜子",
+          "name": "👀瓜子┃不卡",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_AueteGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 20,
+          "key": "奥特",
+          "name": "🏝奥特┃多线",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_BpanSoGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 37,
+          "key": "BpanSo",
+          "name": "🐞盘他┃嘟嘟",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_BttwooGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 12,
+          "key": "比特",
+          "name": "🍄比特┃不卡",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Czsapp",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 15,
+          "key": "csp_Czsapp",
+          "name": "厂长┃十七",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_Djuu",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 40,
+          "key": "csp_Djuu",
+          "name": "嗨歌┃悠悠",
+          "jarVariant": "b0de027cde39"
+        }
+      ],
+      "jarVariants": [
+        "b0de027cde39"
+      ]
+    },
+    {
+      "plugin": "csp_Dm84Guard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 24,
+          "key": "Dm84",
+          "name": "🚌巴士┃动漫",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_DouDouGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 1,
+          "key": "点我切源",
+          "name": "豆豆┃片单",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Douban",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 1,
+          "key": "豆瓣",
+          "name": "中秋快乐🥮免费分享",
+          "jarVariant": "44d49997b3ac"
+        }
+      ],
+      "jarVariants": [
+        "44d49997b3ac"
+      ]
+    },
+    {
+      "plugin": "csp_DoubaoGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 26,
+          "key": "多多",
+          "name": "🏀多多┃回放",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Feiyu",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 17,
+          "key": "feiyu_video",
+          "name": "飞娱┃十九",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_FengYe",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 7,
+          "key": "枫叶影视",
+          "name": "枫叶┃零九",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_FirstAid",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 35,
+          "key": "Aid",
+          "name": "急救┃知识",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_FirstAidGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 31,
+          "key": "Aid",
+          "name": "🚑急救┃教学",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_GuaziTY",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 13,
+          "key": "瓜子",
+          "name": "体育┃十五",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_Gz360",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 4,
+          "key": "csp_Gz360",
+          "name": "瓜子┃零四",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_HeMa",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 10,
+          "key": "csp_duanju",
+          "name": "盒马┃十二",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_JPJGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 19,
+          "key": "荐片",
+          "name": "🥝荐片┃多线",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Jianpian",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 21,
+          "key": "荐片",
+          "name": "荐片┃二四",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_Jpys",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 23,
+          "key": "csp_Jpys",
+          "name": "金牌┃二六",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_JpysGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 14,
+          "key": "文采",
+          "name": "💮文采┃秒播",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Kanqiu",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 12,
+          "key": "88看球",
+          "name": "体育┃十四",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_KanqiuGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 25,
+          "key": "看球",
+          "name": "⚽八八┃看球",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_KkSsGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 38,
+          "key": "抠搜",
+          "name": "🌶️抠抠┃搜搜",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_KuKuMusic",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 31,
+          "key": "酷酷",
+          "name": "酷酷┃音乐",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_Kugou",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 41,
+          "key": "csp_Kugou",
+          "name": "某狗┃音乐",
+          "jarVariant": "b39b16a3cc6b"
+        }
+      ],
+      "jarVariants": [
+        "b39b16a3cc6b"
+      ]
+    },
+    {
+      "plugin": "csp_LibvioGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 10,
+          "key": "立播",
+          "name": "🌟立播┃不卡",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_LiveGzGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 27,
+          "key": "吃瓜",
+          "name": "🏐吃瓜┃看球",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_MusicGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 5,
+          "key": "MTV1",
+          "name": "🎙️易听┃音乐",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_MyDriveGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 2,
+          "key": "MDrive",
+          "name": "🗂我的云盘┃配置",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_NewCzGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 9,
+          "key": "厂长",
+          "name": "📔厂长┃不卡",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_NmyswvGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 13,
+          "key": "糯米",
+          "name": "🍓糯米┃秒播",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_PianKu8",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 5,
+          "key": "csp_PianKu8",
+          "name": "山楂┃零六",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_Push",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 48,
+          "key": "push_agent",
+          "name": "推送┃播放",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_PushGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 47,
+          "key": "push_agent",
+          "name": "🛴手机┃推送",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_SaoHuo",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 14,
+          "key": "csp_SaoHuo",
+          "name": "火火┃十六",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_SeedhubGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 6,
+          "key": "seed",
+          "name": "💡聚剧┃四盘",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_SixVGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 21,
+          "key": "新6V",
+          "name": "🧲新6V┃磁力",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_TingBook",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 30,
+          "key": "六月有声",
+          "name": "六月┃有声",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_Tingshu275Guard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 30,
+          "key": "有声小说",
+          "name": "🎧有声┃小说",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Tounimabi",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 25,
+          "key": "Osstexll",
+          "name": "八戒┃二八",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_UuSsGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 39,
+          "key": "UC",
+          "name": "🌈优汐┃搜搜",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_WoGGGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 3,
+          "key": "玩偶",
+          "name": "👽玩偶哥哥┃4K弹幕",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_Wwys",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 3,
+          "key": "csp_Wwys",
+          "name": "农民┃零三",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_XPathGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 48,
+          "key": "cc",
+          "name": "请勿信视频中任何广告",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_YCyzGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 8,
+          "key": "原创",
+          "name": "👒原创┃不卡",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_YGPGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 4,
+          "key": "YGP",
+          "name": "🚀荐影┃预告片",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_YXZB",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 34,
+          "key": "Live",
+          "name": "游戏┃直播",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    },
+    {
+      "plugin": "csp_YpanSoGuard",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "饭太硬": 1
+      },
+      "sites": [
+        {
+          "source": "饭太硬",
+          "index": 36,
+          "key": "YpanSo",
+          "name": "🐌盘她┃夸父",
+          "jarVariant": "89ab88306905"
+        }
+      ],
+      "jarVariants": [
+        "89ab88306905"
+      ]
+    },
+    {
+      "plugin": "csp_YunZhenXiang",
+      "kind": "java-spider",
+      "count": 1,
+      "bySource": {
+        "宝盒": 1
+      },
+      "sites": [
+        {
+          "source": "宝盒",
+          "index": 24,
+          "key": "YunZhenXiang",
+          "name": "秒播┃二七",
+          "jarVariant": "15ea06f0d36c"
+        }
+      ],
+      "jarVariants": [
+        "15ea06f0d36c"
+      ]
+    }
+  ]
+}
