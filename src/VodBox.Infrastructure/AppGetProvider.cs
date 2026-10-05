@@ -8,7 +8,7 @@ using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-/// <summary>Independent asynchronous AppGet V119 protocol adapter; never executes a JAR.</summary>
+/// <summary>Independent asynchronous AppGet protocol adapter; never executes a JAR.</summary>
 public sealed class AppGetProvider : IContentProvider
 {
     private static readonly HttpClient DefaultHttp = new(new SocketsHttpHandler
@@ -17,17 +17,17 @@ public sealed class AppGetProvider : IContentProvider
     });
     private readonly HttpClient _http;
     private readonly Uri _entry;
-    private readonly byte[] _key;
-    private readonly bool _discover;
-    private readonly string _apiPath, _userAgent, _version, _device;
+    private readonly byte[] _key, _iv;
+    private readonly bool _discover, _jsonRequests;
+    private readonly string _apiPath, _userAgent, _version, _device, _initAction, _searchAction, _detailAction;
     private readonly SemaphoreSlim _requests = new(4, 4), _initialization = new(1, 1);
     private readonly ConcurrentDictionary<string, CachedDetail> _details = new(StringComparer.Ordinal);
     private Uri? _endpoint;
     private Home? _home;
     private bool _disposed;
     public string SourceId { get; }
-    private sealed record Home(IReadOnlyList<Category> Categories, IReadOnlyList<MediaItem> Items, DateTimeOffset Expires);
-    private sealed record PlayEntry(string Url, string ParseApi, string Token, string UserAgent);
+    private sealed record Home(IReadOnlyList<Category> Categories, IReadOnlyList<MediaItem> Items, bool SearchVerification, DateTimeOffset Expires);
+    private sealed record PlayEntry(string Url, string ParseApi, string Token, string UserAgent, string PlayerParseType, string ParseType, string ParseUrl);
     private sealed record CachedDetail(MediaDetail Detail, IReadOnlyDictionary<string, PlayEntry> Entries, DateTimeOffset Expires);
 
     public AppGetProvider(SourceDefinition source) : this(source, DefaultHttp) { }
@@ -35,16 +35,27 @@ public sealed class AppGetProvider : IContentProvider
     {
         SourceId = source.Id; _http = http;
         _entry = HttpUri(source.Entry ?? "");
-        if (Option(source, "protocol") != "v119") throw new NotSupportedException("AppGet 首版仅支持显式 protocol=v119。");
+        string protocol = Option(source, "protocol");
+        _jsonRequests = protocol switch
+        {
+            "v119" => false,
+            "qiji-v122" => true,
+            _ => throw new NotSupportedException("AppGet 需要显式 protocol=v119 或 qiji-v122；其他版本尚未核实。")
+        };
+        _initAction = _jsonRequests ? "initV122" : "initV119";
+        _searchAction = _jsonRequests ? "searchList4" : "searchList";
+        _detailAction = _jsonRequests ? "vodDetail2" : "vodDetail";
         _key = Encoding.UTF8.GetBytes(Option(source, "key"));
         if (_key.Length != 16) throw new InvalidDataException("AppGet key 必须是 16 个 UTF-8 字节。");
+        _iv = Encoding.UTF8.GetBytes(Option(source, "iv", Option(source, "key")));
+        if (_iv.Length != 16) throw new InvalidDataException("AppGet iv 必须是 16 个 UTF-8 字节。");
         _discover = source.Options.TryGetValue("discovery", out var discovery) && discovery.ValueKind == JsonValueKind.True;
-        _apiPath = Option(source, "apiPath", "/api.php/getappapi");
+        _apiPath = Option(source, "apiPath", _jsonRequests ? "/api.php/qijiappapi" : "/api.php/getappapi");
         if (!_apiPath.StartsWith('/') || _apiPath.Contains("..", StringComparison.Ordinal) || _apiPath.Length > 256 ||
             !_apiPath.All(x => char.IsAsciiLetterOrDigit(x) || x is '/' or '.' or '_' or '-'))
             throw new InvalidDataException("AppGet apiPath 无效。");
         _userAgent = Header(Option(source, "userAgent", "okhttp/3.14.9"));
-        _version = Header(Option(source, "version", "210"));
+        _version = Header(Option(source, "version", _jsonRequests ? "305" : "210"));
         _device = Header(Option(source, "deviceId", Guid.NewGuid().ToString("N")));
         if (!_discover) _endpoint = Origin(_entry);
     }
@@ -79,7 +90,9 @@ public sealed class AppGetProvider : IContentProvider
         int page = PageNumber(cursor);
         if (string.IsNullOrWhiteSpace(query)) return new([]);
         if (query.Length > 256) throw new InvalidDataException("AppGet 搜索关键词过长。");
-        using var data = await FetchAsync("searchList", new() { ["keywords"] = query, ["type_id"] = "0", ["page"] = Number(page) }, token).ConfigureAwait(false);
+        if (_jsonRequests && (await HomeAsync(token).ConfigureAwait(false)).SearchVerification)
+            throw new NotSupportedException("AppGet 此站点搜索需要验证码，交互验证尚未接入。");
+        using var data = await FetchAsync(_searchAction, new() { ["keywords"] = query, ["type_id"] = "0", ["page"] = Number(page) }, token).ConfigureAwait(false);
         return Page(data.RootElement, "search_list", page);
     }
 
@@ -88,7 +101,7 @@ public sealed class AppGetProvider : IContentProvider
     {
         ThrowIfDisposed(); token.ThrowIfCancellationRequested(); ValidateId(mediaId);
         if (!refresh && _details.TryGetValue(mediaId, out var cached) && cached.Expires > DateTimeOffset.UtcNow) return cached;
-        using var document = await FetchAsync("vodDetail", new() { ["vod_id"] = mediaId }, token).ConfigureAwait(false);
+        using var document = await FetchAsync(_detailAction, new() { ["vod_id"] = mediaId }, token).ConfigureAwait(false);
         var root = document.RootElement;
         if (!root.TryGetProperty("vod", out var vod) || Text(vod, "vod_id") != mediaId) throw new InvalidDataException("AppGet 视频详情标识不一致。");
         var playlists = Array(root, "vod_play_list", 64);
@@ -104,7 +117,8 @@ public sealed class AppGetProvider : IContentProvider
                 if (string.IsNullOrWhiteSpace(url) || url.Length > 16384) throw new InvalidDataException("AppGet 分集地址为空或过长。");
                 string id = $"{lines.Count}:{episodes.Count}";
                 episodes.Add(new(id, Text(episode, "name")));
-                entries.Add(id, new(url, Text(player, "parse"), Text(episode, "token"), Text(player, "user_agent")));
+                entries.Add(id, new(url, Text(player, "parse"), Text(episode, "token"), Text(player, "user_agent"),
+                    Text(player, "player_parse_type"), Text(player, "parse_type"), Text(episode, "parse_api_url")));
             }
             if (episodes.Count > 0) lines.Add(new(Number(lines.Count), Text(player, "show"), episodes));
         }
@@ -120,18 +134,26 @@ public sealed class AppGetProvider : IContentProvider
         var detail = await DetailAsync(mediaId, deadline.Token, refresh: true).ConfigureAwait(false);
         if (!detail.Entries.TryGetValue(episodeId, out var entry)) throw new InvalidDataException("AppGet 所选分集不存在。");
         string url = entry.Url;
-        if (!IsMedia(url))
+        if (!IsMedia(url) && entry.ParseType != "0")
         {
-            // Ask the configured API to resolve an opaque token; never send API secrets to a third-party parser.
-            if (string.IsNullOrWhiteSpace(entry.ParseApi)) throw new NotSupportedException("AppGet 此线路需要尚未接入的外部解析器。");
-            using var parsed = await FetchAsync("vodParse", new()
+            if (entry.ParseType == "2") throw new NotSupportedException("AppGet 此线路要求网页解析，尚未接入。");
+            if (entry.PlayerParseType == "2")
             {
-                ["parse_api"] = entry.ParseApi, ["url"] = Uri.EscapeDataString(Encrypt(url)), ["token"] = entry.Token
-            }, deadline.Token).ConfigureAwait(false);
-            string json = Text(parsed.RootElement, "json");
-            using var result = JsonDocument.Parse(json);
-            url = Text(result.RootElement, "url");
-            if (!IsMedia(url)) throw new InvalidDataException("AppGet 解析器未返回支持的媒体地址。");
+                string location = string.IsNullOrWhiteSpace(entry.ParseUrl) ? entry.ParseApi + Uri.UnescapeDataString(url) : entry.ParseUrl;
+                url = await ExternalParseAsync(location, entry.UserAgent, deadline.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(entry.ParseApi)) throw new NotSupportedException("AppGet 此线路缺少站内解析标识。");
+                // A single form encoding is required; pre-escaping Base64 changes the ciphertext on the wire.
+                using var parsed = await FetchAsync("vodParse", new()
+                {
+                    ["parse_api"] = entry.ParseApi, ["url"] = Encrypt(Uri.UnescapeDataString(url)), ["token"] = entry.Token,
+                    ["player_parse_type"] = entry.PlayerParseType
+                }, deadline.Token).ConfigureAwait(false);
+                using var result = JsonDocument.Parse(Text(parsed.RootElement, "json"));
+                url = Text(result.RootElement, "url");
+            }
         }
         var episode = detail.Detail.PlaybackLines.SelectMany(x => x.Episodes).First(x => x.Id == episodeId);
         return new()
@@ -139,6 +161,28 @@ public sealed class AppGetProvider : IContentProvider
             Uri = HttpUri(url).AbsoluteUri, Title = $"{detail.Detail.Item.Title} · {episode.Title}", SourceId = SourceId, MediaId = mediaId, EpisodeId = episodeId,
             Headers = new() { ["User-Agent"] = string.IsNullOrEmpty(entry.UserAgent) ? _userAgent : Header(entry.UserAgent) }
         };
+    }
+
+    private async Task<string> ExternalParseAsync(string location, string userAgent, CancellationToken token)
+    {
+        if (location.Length > 16384) throw new InvalidDataException("AppGet 外部解析地址过长。");
+        var uri = HttpUri(location);
+        await _requests.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            // The parser receives no API signature, device identity, Cookie or form token.
+            request.Headers.TryAddWithoutValidation("User-Agent", string.IsNullOrWhiteSpace(userAgent) ? _userAgent : Header(userAgent));
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+            CheckResponse(response, uri);
+            await using var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
+            using var json = JsonDocument.Parse(await BoundedContent.ReadAsync(stream, 1024 * 1024, token).ConfigureAwait(false));
+            string url = Text(json.RootElement, "url");
+            if (url.Length == 0 && json.RootElement.TryGetProperty("data", out var data)) url = Text(data, "url");
+            return HttpUri(url).AbsoluteUri;
+        }
+        finally { _requests.Release(); }
     }
 
     private async Task<Home> HomeAsync(CancellationToken token)
@@ -151,7 +195,7 @@ public sealed class AppGetProvider : IContentProvider
         {
             home = Volatile.Read(ref _home);
             if (home is not null && home.Expires > DateTimeOffset.UtcNow) return home;
-            using var data = await FetchAsync("initV119", [], token).ConfigureAwait(false);
+            using var data = await FetchAsync(_initAction, [], token).ConfigureAwait(false);
             var categories = new List<Category>(); var items = new List<MediaItem>();
             if (data.RootElement.TryGetProperty("banner_list", out _)) items.AddRange(Items(data.RootElement, "banner_list"));
             foreach (var type in Array(data.RootElement, "type_list", 256).EnumerateArray())
@@ -162,7 +206,8 @@ public sealed class AppGetProvider : IContentProvider
                 if (items.Count < 1000 && type.TryGetProperty("recommend_list", out _))
                     items.AddRange(Items(type, "recommend_list").Take(1000 - items.Count));
             }
-            home = new(categories.DistinctBy(x => x.Id).ToArray(), items.DistinctBy(x => x.Id).Take(1000).ToArray(), DateTimeOffset.UtcNow.AddMinutes(10));
+            bool searchVerification = data.RootElement.TryGetProperty("config", out var config) && Flag(config, "system_search_verify_status");
+            home = new(categories.DistinctBy(x => x.Id).ToArray(), items.DistinctBy(x => x.Id).Take(1000).ToArray(), searchVerification, DateTimeOffset.UtcNow.AddMinutes(10));
             Volatile.Write(ref _home, home); return home;
         }
         finally { _initialization.Release(); }
@@ -189,14 +234,24 @@ public sealed class AppGetProvider : IContentProvider
                 Interlocked.CompareExchange(ref _endpoint, endpoint, null);
             }
             var uri = new Uri(endpoint, _apiPath + ".index/" + action);
-            using var request = new HttpRequestMessage(HttpMethod.Post, uri) { Content = new FormUrlEncodedContent(body) };
-            string timestamp = Number(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            using var request = new HttpRequestMessage(HttpMethod.Post, uri);
             request.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
-            request.Headers.TryAddWithoutValidation("app-version-code", _version);
-            request.Headers.TryAddWithoutValidation("app-ui-mode", "light");
-            request.Headers.TryAddWithoutValidation("app-api-verify-time", timestamp);
-            request.Headers.TryAddWithoutValidation("app-user-device-id", _device);
-            request.Headers.TryAddWithoutValidation("app-api-verify-sign", Encrypt(timestamp));
+            if (_jsonRequests)
+            {
+                body["version"] = _version;
+                request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, VodBoxJson.Default.DictionaryStringString));
+                request.Content.Headers.ContentType = new("application/json");
+            }
+            else
+            {
+                request.Content = new FormUrlEncodedContent(body);
+                string timestamp = Number(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                request.Headers.TryAddWithoutValidation("app-version-code", _version);
+                request.Headers.TryAddWithoutValidation("app-ui-mode", "light");
+                request.Headers.TryAddWithoutValidation("app-api-verify-time", timestamp);
+                request.Headers.TryAddWithoutValidation("app-user-device-id", _device);
+                request.Headers.TryAddWithoutValidation("app-api-verify-sign", Encrypt(timestamp));
+            }
             using var result = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
             CheckResponse(result, uri);
             await using var content = await result.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
@@ -208,7 +263,7 @@ public sealed class AppGetProvider : IContentProvider
             try
             {
                 using var aes = Aes.Create(); aes.Key = _key;
-                decoded = aes.DecryptCbc(Convert.FromBase64String(encrypted.GetString()!), _key, PaddingMode.PKCS7);
+                decoded = aes.DecryptCbc(Convert.FromBase64String(encrypted.GetString()!), _iv, PaddingMode.PKCS7);
             }
             catch (Exception error) when (error is FormatException or CryptographicException)
             { throw new InvalidDataException("AppGet 加密响应或密钥无效。", error); }
@@ -221,7 +276,7 @@ public sealed class AppGetProvider : IContentProvider
     private string Encrypt(string text)
     {
         using var aes = Aes.Create(); aes.Key = _key;
-        return Convert.ToBase64String(aes.EncryptCbc(Encoding.UTF8.GetBytes(text), _key, PaddingMode.PKCS7));
+        return Convert.ToBase64String(aes.EncryptCbc(Encoding.UTF8.GetBytes(text), _iv, PaddingMode.PKCS7));
     }
     private static void CheckResponse(HttpResponseMessage response, Uri expected)
     {
@@ -247,6 +302,19 @@ public sealed class AppGetProvider : IContentProvider
     }
     private static JsonElement Array(JsonElement root, string name, int maximum) => root.ValueKind == JsonValueKind.Object && root.TryGetProperty(name, out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() <= maximum ? list : throw new InvalidDataException("AppGet 列表缺失或过长：" + name);
     private static string Text(JsonElement root, string name) => root.ValueKind == JsonValueKind.Object && root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.String or JsonValueKind.Number ? value.ToString() : "";
+    private static bool Flag(JsonElement root, string name)
+    {
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty(name, out var value)) return false;
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False or JsonValueKind.Null => false,
+            JsonValueKind.Number when value.TryGetInt64(out long number) => number != 0,
+            JsonValueKind.String when value.GetString() is "1" or "true" => true,
+            JsonValueKind.String when value.GetString() is "0" or "false" or "" => false,
+            _ => throw new InvalidDataException("AppGet 搜索验证状态格式不受支持。")
+        };
+    }
     private static string Option(SourceDefinition source, string name, string fallback = "") => source.Options.TryGetValue(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : fallback;
     private static string Header(string value) => value.Length is > 0 and <= 2048 && value.All(x => x >= ' ' && x <= '~') ? value : throw new InvalidDataException("AppGet 请求头无效。");
     private static void ValidateId(string id) { if (id.Length is < 1 or > 128 || !id.All(char.IsAsciiDigit)) throw new InvalidDataException("AppGet 标识必须是数字。"); }

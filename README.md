@@ -83,4 +83,4 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 `examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，`csp_BiliGuard` 和其他 Java Spider 尚未移植。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
 
-C# AppGet V119 已显式注册 `appget` / `csp_AppGet`，支持分类、分页筛选、搜索、多线路分集和直接媒体/站内解析。示例 `examples/appget.json` 使用占位参数；真实播放与版本限制见 [AppGet Spider](docs/appget-spider.md)，不代表四个原条目均已可播放。
+C# AppGet（V119 / 显式 Qiji V122）已注册 `appget` / `csp_AppGet`，支持分类、分页筛选、搜索、多线路分集、直接媒体/站内解析和声明式外部 JSON 解析。示例 `examples/appget.json` 使用占位参数；真实播放与版本限制见 [AppGet Spider](docs/appget-spider.md)，不代表四个原条目均已可播放。

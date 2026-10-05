@@ -84,13 +84,21 @@ internal static class Diagnostics
                 int line = 0;
                 if (lineArgument >= 0 && (lineArgument + 1 >= args.Length || !int.TryParse(args[lineArgument + 1], out line) || line < 0))
                     throw new InvalidDataException("--appget-line 需要从 0 开始的线路编号。");
-                await AppGetSmokeAsync(http, args[appGetArgument + 1], args.Contains("--native"), line);
+                int mediaArgument = Array.IndexOf(args, "--appget-media");
+                string? mediaId = null;
+                if (mediaArgument >= 0)
+                {
+                    if (mediaArgument + 1 >= args.Length || args[mediaArgument + 1].StartsWith("--", StringComparison.Ordinal))
+                        throw new InvalidDataException("--appget-media 需要视频编号。");
+                    mediaId = args[mediaArgument + 1];
+                }
+                await AppGetSmokeAsync(http, args[appGetArgument + 1], args.Contains("--native"), line, mediaId);
             }
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
-    private static async Task AppGetSmokeAsync(HttpClient http, string location, bool decode, int lineIndex)
+    private static async Task AppGetSmokeAsync(HttpClient http, string location, bool decode, int lineIndex, string? mediaId)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         var config = await new ConfigLoader(http).LoadAsync(location, deadline.Token);
@@ -103,11 +111,11 @@ internal static class Diagnostics
             var item = page.Items.FirstOrDefault() ?? throw new InvalidDataException("AppGet 分类没有内容。");
             var search = await provider.SearchAsync(item.Title, deadline.Token);
             if (search.Items.Count == 0) throw new InvalidDataException("AppGet 搜索没有返回内容。");
-            var detail = await provider.GetDetailAsync(item.Id, deadline.Token);
+            var detail = await provider.GetDetailAsync(mediaId ?? item.Id, deadline.Token);
             Console.WriteLine($"C# AppGet catalog: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
             if (lineIndex >= detail.PlaybackLines.Count) throw new InvalidDataException("AppGet 所选线路不存在。");
             var episode = detail.PlaybackLines[lineIndex].Episodes.FirstOrDefault() ?? throw new InvalidDataException("AppGet 视频没有可用分集。");
-            var request = await provider.ResolvePlaybackAsync(item.Id, episode.Id, deadline.Token);
+            var request = await provider.ResolvePlaybackAsync(detail.Item.Id, episode.Id, deadline.Token);
             Console.WriteLine($"C# AppGet Spider: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
             if (!decode) continue;
             await using var engine = new LibVlcEngine(headless: true);

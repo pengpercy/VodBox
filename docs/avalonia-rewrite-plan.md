@@ -490,3 +490,8 @@ TV 仓库标示 GPL-3.0。重写语言本身不会消除复制或改编代码的
 ### AppGet V119 接入
 
 已新增原生 C# `AppGetProvider` 并显式注册 `appget` / `csp_AppGet`。配置明确指定 protocol、服务根/发现文件、key 与客户端版本；支持加密分类/推荐、分页筛选、搜索、详情多线路、直接媒体和站内解析，每次播放刷新详情/令牌。最多四路 HTTP，20 秒期限、8 MiB 响应上限，无 JAR、反射或 Python 依赖。本地 95 项回归通过。真实站点初始化三项通过，一碗完成内容到地址解析；媒体解码仍失败，不能计为全部可播放。其他版本、外部解析及认证分别排期。完整配置和边界见 [AppGet Spider](appget-spider.md)。
+
+
+### AppGet 播放解析与显式 Qiji V122 补齐
+
+实际核对发现旧协议参考对 AES 密文重复 URL 编码且缺少 player_parse_type，修正后咕咕视频 5092 已在 macOS JIT 使用 VideoToolbox H.264 解码至 3.40 秒，最终 Native AOT 实际解码至 3.16 秒。加入播放器声明的外部 JSON 解析（url/data.url、准备好的解析 URL、1 MiB 上限，仅传 User-Agent），以及源码生成的 Qiji V122 JSON 分支和独立 IV。Qiji 初始化声明验证码时停止搜索；不做自动版本猜测。完整本地回归更新为 104 项通过。Qiji 真实站点发现入口 TLS 错误，首发入口仍未验收，不能计为真实覆盖。具体配置、验证和限制见 AppGet 文档与播放测试记录。

@@ -86,6 +86,7 @@ public sealed record RpcResponse(int ApiVersion, long RequestId, JsonElement Res
 [JsonSerializable(typeof(List<LiveChannel>))]
 [JsonSerializable(typeof(ScriptParams))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
+[JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(RpcRequest))]
 [JsonSerializable(typeof(RpcResponse))]
 [JsonSerializable(typeof(string))]

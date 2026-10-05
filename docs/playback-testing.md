@@ -62,3 +62,14 @@ VodBox --diagnostics --bilibili-smoke BV1WSHL66EdZ --native
 最终 JIT 内容链路：咕咕分类 3/列表 30/搜索 1/线路 1/分集 4；蔬菜分类 7/列表 30/搜索 1/线路 2/分集 2。两项均在 `vodParse` 收到 code=0 与空 data 后明确失败，不将空结果当成功，未尝试绕过验证。日志 `/private/tmp/vodbox-appget-gugu-final-jit.log`、`/private/tmp/vodbox-appget-shucai-final-jit.log`。
 
 一碗首条线路媒体 HTTPS/HLS 连接失败，未产生可验证的视频解码；第二条线路只读检查 TLS 握手超时，未继续重复解码。失败日志 `/private/tmp/vodbox-appget-yiwan-jit.log`；首发初始化只读检查 HTTP 503。AppGet 的真实视频解码尚未通过，不能用初始化、内容接口或地址解析成功代替播放成功。V120/V122、外部解析、账号/验证码仍未实现。真实 key 不提交，示例仅含占位值；本轮不触发 GitHub Actions。
+
+
+### AppGet 解析参数修正与实际播放
+
+首版 vodParse 失败并非已确认需要登录：新协议参考传递 player_parse_type 且直接提交 AES Base64。取消密文预先 URL 编码、补齐该字段，并按协议解码不透明输入后，咕咕视频 5092 成功返回 MP4。首轮修正验证曾在分类接口遇到超时；固定视频复核通过，不新增无限自动重试。
+
+最终 104 项本地测试通过（AppGet 17 项），日志 `/private/tmp/vodbox-appget-final-parser-tests.log`。外部 JSON 解析新增顶层/嵌套 URL、准备好的 parse_api_url、协议/URI 校验、1 MiB 上限和共享四路取消测试；Qiji V122 的 JSON 请求、独立 IV、端点和验证码声明通过 fixture。
+
+macOS JIT 实际 VideoToolbox H.264 解码至 3.40 秒，视频 216 块、音频 387 块，日志 `/private/tmp/vodbox-appget-gugu-fixed-media-jit.log`。最终严格 Native AOT 发布通过，日志 `/private/tmp/vodbox-appget-parser-final-aot.log`；`artifacts/appget-parser-aot/VodBox` 同一视频解码至 3.16 秒，视频 200 块、音频 367 块，日志 `/private/tmp/vodbox-appget-gugu-parser-native-aot.log`。
+
+蔬菜以新参数复核仍返回 code=0 / 空 data；一碗媒体线路和首发初始化未通过项仍保留。显式 Qiji V122 参考发现文件遇到 TLS 错误，未进行证书绕过；只有 fixture 支持，不能计为四个原 AppGet 条目全部可用。CI 未触发。
