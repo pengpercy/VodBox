@@ -46,8 +46,13 @@ public sealed class CatalogProvider : IContentProvider
         var items = catalog.Items.Where(x => categoryId is null || x.CategoryId == categoryId).ToList();
         return new(items.Skip(offset).Take(30).Select(Card).ToList(), offset + 30 < items.Count ? (offset + 30).ToString() : null);
     }
-    public async Task<MediaPage> SearchAsync(string query, CancellationToken token) => new((await GetCatalogAsync(token)).Items
-        .Where(x => x.Title.Contains(query, StringComparison.OrdinalIgnoreCase)).Select(Card).ToList());
+    public Task<MediaPage> SearchAsync(string query, CancellationToken token) => SearchPageAsync(query, null, token);
+    public async Task<MediaPage> SearchPageAsync(string query, string? cursor, CancellationToken token)
+    {
+        int offset = cursor is null ? 0 : int.TryParse(cursor, out int value) && value >= 0 ? value : throw new InvalidDataException("无效搜索分页游标。");
+        var items = (await GetCatalogAsync(token)).Items.Where(x => x.Title.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+        return new(items.Skip(offset).Take(30).Select(Card).ToList(), offset + 30 < items.Length ? (offset + 30).ToString(System.Globalization.CultureInfo.InvariantCulture) : null);
+    }
     public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken token)
     {
         var item = (await GetCatalogAsync(token)).Items.First(x => x.Id == mediaId);
@@ -86,7 +91,9 @@ public sealed class ProviderFactory(HttpClient http, string pluginHostPath, stri
         public string SourceId => inner.SourceId;
         public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken token) => inner.GetCategoriesAsync(token);
         public Task<MediaPage> GetItemsAsync(string? category, string? cursor, CancellationToken token) => inner.GetItemsAsync(category, cursor, token);
+        public Task<MediaPage> GetItemsFilteredAsync(string? category, string? cursor, IReadOnlyDictionary<string, string> filters, CancellationToken token) => inner.GetItemsFilteredAsync(category, cursor, filters, token);
         public Task<MediaPage> SearchAsync(string query, CancellationToken token) => inner.SearchAsync(query, token);
+        public Task<MediaPage> SearchPageAsync(string query, string? cursor, CancellationToken token) => inner.SearchPageAsync(query, cursor, token);
         public Task<MediaDetail> GetDetailAsync(string media, CancellationToken token) => inner.GetDetailAsync(media, token);
         public async Task<PlaybackRequest> ResolvePlaybackAsync(string media, string episode, CancellationToken token) => (await inner.ResolvePlaybackAsync(media, episode, token)) with { ResolverId = resolverId };
         public ValueTask DisposeAsync() => inner.DisposeAsync();

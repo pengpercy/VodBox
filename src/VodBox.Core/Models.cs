@@ -10,13 +10,13 @@ public enum TrackKind { Audio, Subtitle }
 
 public sealed record SourceDefinition
 {
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public ProviderRuntime Runtime { get; init; }
-    public string Provider { get; init; } = "catalog";
-    public string? Entry { get; init; }
-    public Dictionary<string, JsonElement> Options { get; init; } = [];
-    public string? ResolverId { get; init; }
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    public ProviderRuntime Runtime { get; set; }
+    public string Provider { get; set; } = "catalog";
+    public string? Entry { get; set; }
+    public Dictionary<string, JsonElement> Options { get; set; } = [];
+    public string? ResolverId { get; set; }
 }
 
 public sealed record VodBoxConfig
@@ -39,18 +39,18 @@ public sealed record MediaTrack(string Id, string Name, TrackKind Kind);
 
 public sealed record PlaybackRequest
 {
-    public required string Uri { get; init; }
-    public string Title { get; init; } = "媒体";
-    public ResolutionKind ResolutionKind { get; init; }
-    public Dictionary<string, string> Headers { get; init; } = [];
-    public List<SubtitleSource> Subtitles { get; init; } = [];
-    public long StartPositionMs { get; init; }
-    public string SourceId { get; init; } = "local";
-    public string MediaId { get; init; } = "";
-    public string EpisodeId { get; init; } = "";
-    public bool IsLive { get; init; }
-    public string? ResolverId { get; init; }
-    public string? OriginalUri { get; init; }
+    public required string Uri { get; set; }
+    public string Title { get; set; } = "媒体";
+    public ResolutionKind ResolutionKind { get; set; }
+    public Dictionary<string, string> Headers { get; set; } = [];
+    public List<SubtitleSource> Subtitles { get; set; } = [];
+    public long StartPositionMs { get; set; }
+    public string SourceId { get; set; } = "local";
+    public string MediaId { get; set; } = "";
+    public string EpisodeId { get; set; } = "";
+    public bool IsLive { get; set; }
+    public string? ResolverId { get; set; }
+    public string? OriginalUri { get; set; }
 }
 
 public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration,
@@ -72,7 +72,7 @@ public static class WireJson
             ?? throw new NotSupportedException($"JSON 类型未注册：{typeof(T).Name}"));
 }
 
-public sealed record ScriptParams(string? CategoryId = null, string? Cursor = null, string? Query = null, string? MediaId = null, string? EpisodeId = null);
+public sealed record ScriptParams(string? CategoryId = null, string? Cursor = null, string? Query = null, string? MediaId = null, string? EpisodeId = null, Dictionary<string, string>? Filters = null);
 public sealed record RpcRequest(int ApiVersion, long RequestId, string SourceId, string Method, JsonElement Params);
 public sealed record RpcResponse(int ApiVersion, long RequestId, JsonElement Result, string? Error = null);
 

@@ -84,7 +84,9 @@ public sealed class ScriptProvider(SourceDefinition source, string pluginHostPat
     }
     public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken token) => CallAsync<IReadOnlyList<Category>>("categories", Args(new()), token);
     public Task<MediaPage> GetItemsAsync(string? categoryId, string? cursor, CancellationToken token) => CallAsync<MediaPage>("items", Args(new(CategoryId: categoryId, Cursor: cursor)), token);
-    public Task<MediaPage> SearchAsync(string query, CancellationToken token) => CallAsync<MediaPage>("search", Args(new(Query: query)), token);
+    public Task<MediaPage> GetItemsFilteredAsync(string? categoryId, string? cursor, IReadOnlyDictionary<string, string> filters, CancellationToken token) => CallAsync<MediaPage>("items", Args(new(CategoryId: categoryId, Cursor: cursor, Filters: new(filters))), token);
+    public Task<MediaPage> SearchAsync(string query, CancellationToken token) => SearchPageAsync(query, null, token);
+    public Task<MediaPage> SearchPageAsync(string query, string? cursor, CancellationToken token) => CallAsync<MediaPage>("search", Args(new(Query: query, Cursor: cursor)), token);
     public Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken token) => CallAsync<MediaDetail>("detail", Args(new(MediaId: mediaId)), token);
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId, string episodeId, CancellationToken token) =>
         (await CallAsync<PlaybackRequest>("resolvePlayback", Args(new(MediaId: mediaId, EpisodeId: episodeId)), token)) with { SourceId = SourceId, MediaId = mediaId, EpisodeId = episodeId };

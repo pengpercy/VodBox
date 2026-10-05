@@ -43,11 +43,13 @@ public sealed class ResolutionTests
         await Assert.ThrowsAsync<InvalidDataException>(() => resolver.ResolveAsync(new() { Uri = input, ResolverId = "cycle" }, default));
     }
 
-    [Fact]
-    public async Task ProxyRewritesHlsKeysAndPreservesByteRanges()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProxyRewritesHlsKeysAndPreservesByteRanges(bool opaque)
     {
         using var origin = new TcpListener(IPAddress.Loopback, 0); origin.Start();
-        string url = $"http://127.0.0.1:{((IPEndPoint)origin.LocalEndpoint).Port}/folder/list.m3u8";
+        string url = $"http://127.0.0.1:{((IPEndPoint)origin.LocalEndpoint).Port}/folder/{(opaque ? "gateway" : "list.m3u8")}";
         var upstream = Task.Run(async () =>
         {
             for (int i = 0; i < 3; i++)
@@ -61,7 +63,7 @@ public sealed class ResolutionTests
                 if (i == 0) { body = "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:4,\nsegment.ts\n"; status = "200 OK"; }
                 else if (i == 1) { Assert.Contains("/folder/key.bin", lines[0]); body = "key"; status = "200 OK"; }
                 else { Assert.Contains("/folder/segment.ts", lines[0]); Assert.Contains("Range: bytes=2-4", lines); body = "234"; status = "206 Partial Content"; extra = "Content-Range: bytes 2-4/10\r\n"; }
-                string mime = i == 0 ? "application/vnd.apple.mpegurl" : "application/octet-stream";
+                string mime = i == 0 ? opaque ? "text/plain" : "application/vnd.apple.mpegurl" : "application/octet-stream";
                 await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {body.Length}\r\n{extra}Connection: close\r\n\r\n{body}"));
             }
         });
@@ -74,6 +76,32 @@ public sealed class ResolutionTests
         using var response = await http.SendAsync(range); Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
         Assert.Equal("bytes 2-4/10", response.Content.Headers.ContentRange!.ToString()); Assert.Equal("234", await response.Content.ReadAsStringAsync());
         await upstream.WaitAsync(TimeSpan.FromSeconds(5)); Assert.Equal(url, request.OriginalUri);
+    }
+
+    [Fact]
+    public async Task ExpiredProxySessionCancelsStalledUpstreamBody()
+    {
+        using var origin = new TcpListener(IPAddress.Loopback, 0); origin.Start();
+        using var finished = new CancellationTokenSource(); var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        string address = $"http://127.0.0.1:{((IPEndPoint)origin.LocalEndpoint).Port}/stall";
+        var server = Task.Run(async () =>
+        {
+            using var client = await origin.AcceptTcpClientAsync(); var stream = client.GetStream();
+            using var reader = new StreamReader(stream, Encoding.ASCII, false, 1024, true);
+            while (!string.IsNullOrEmpty(await reader.ReadLineAsync())) { }
+            await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 100\r\nConnection: close\r\n\r\n")); entered.TrySetResult();
+            try { await Task.Delay(Timeout.Infinite, finished.Token); } catch (OperationCanceledException) { }
+        });
+        try
+        {
+            await using var proxy = new MediaProxy(); var first = proxy.Register(new() { Uri = address });
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) }; var pending = http.GetAsync(first.Uri);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            for (int i = 0; i < 3; i++) proxy.Register(new() { Uri = address });
+            try { using var response = await pending.WaitAsync(TimeSpan.FromSeconds(5)); Assert.False(response.IsSuccessStatusCode); }
+            catch (HttpRequestException) { }
+        }
+        finally { finished.Cancel(); origin.Stop(); await server; }
     }
 
     [Fact]

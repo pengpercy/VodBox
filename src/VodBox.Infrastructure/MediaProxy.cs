@@ -14,12 +14,15 @@ namespace VodBox.Infrastructure;
 public sealed partial class MediaProxy : IAsyncDisposable
 {
     private sealed record Route(Uri Target, bool Directory);
-    private sealed class Session(PlaybackRequest request)
+    private sealed class Session(PlaybackRequest request, CancellationToken shutdown) : IDisposable
     {
         public PlaybackRequest Request { get; } = request;
         public DateTimeOffset Created { get; } = DateTimeOffset.UtcNow;
         public ConcurrentDictionary<string, Route> Routes { get; } = new();
         public ConcurrentDictionary<string, string> Keys { get; } = new();
+        public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(shutdown);
+        private int _disposed;
+        public void Dispose() { if (Interlocked.Exchange(ref _disposed, 1) == 0) { Cancellation.Cancel(); Cancellation.Dispose(); } }
     }
     private readonly HttpClient _http = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All, UseCookies = false, AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
@@ -48,10 +51,10 @@ public sealed partial class MediaProxy : IAsyncDisposable
                 _accept = AcceptAsync();
             }
         }
-        var session = new Session(request); string id = Guid.NewGuid().ToString("N"); _sessions[id] = session;
+        var session = new Session(request, _shutdown.Token); string id = Guid.NewGuid().ToString("N"); _sessions[id] = session;
         while (_sessions.Count > 3)
         {
-            var oldest = _sessions.OrderBy(x => x.Value.Created).First(); _sessions.TryRemove(oldest.Key, out _);
+            var oldest = _sessions.OrderBy(x => x.Value.Created).First(); if (_sessions.TryRemove(oldest.Key, out var expired)) expired.Dispose();
         }
         return request with { Uri = Map(id, session, uri), OriginalUri = request.OriginalUri ?? request.Uri, Headers = [] };
     }
@@ -98,6 +101,7 @@ public sealed partial class MediaProxy : IAsyncDisposable
                 var local = new Uri(_origin!, first[1]); string[] route = local.AbsolutePath.Split('/', 5);
                 if (route.Length < 4 || route[1] != "media" || !_sessions.TryGetValue(route[2], out var session) || !session.Routes.TryGetValue(route[3], out var mapping))
                 { await ErrorAsync(stream, 404); return; }
+                var sessionToken = session.Cancellation.Token;
                 var target = mapping.Directory ? new Uri(mapping.Target, (route.Length > 4 ? route[4] : "") + local.Query) : mapping.Target;
                 if (target.Scheme is not ("http" or "https")) { await ErrorAsync(stream, 400); return; }
                 using var request = new HttpRequestMessage(first[0] == "HEAD" ? HttpMethod.Head : HttpMethod.Get, target);
@@ -117,16 +121,27 @@ public sealed partial class MediaProxy : IAsyncDisposable
                     if (name.Equals("Range", StringComparison.OrdinalIgnoreCase) || name.Equals("If-Range", StringComparison.OrdinalIgnoreCase))
                         request.Headers.TryAddWithoutValidation(name, line[(separator + 1)..].Trim());
                 }
-                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, _shutdown.Token);
-                await using var body = await response.Content.ReadAsStreamAsync(_shutdown.Token);
+                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, sessionToken);
+                await using var body = await response.Content.ReadAsStreamAsync(sessionToken);
                 Uri final = response.RequestMessage?.RequestUri ?? target;
                 string mime = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
                 bool hls = mime.Contains("mpegurl", StringComparison.OrdinalIgnoreCase) || final.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);
                 bool dash = mime.Contains("dash+xml", StringComparison.OrdinalIgnoreCase) || final.AbsolutePath.EndsWith(".mpd", StringComparison.OrdinalIgnoreCase);
+                byte[] prefix = []; int prefixLength = 0;
+                if (first[0] == "GET" && response.IsSuccessStatusCode && !hls && !dash)
+                {
+                    prefix = new byte[512]; prefixLength = await body.ReadAtLeastAsync(prefix, 16, throwOnEndOfStream: false, cancellationToken: sessionToken);
+                    string text = Encoding.UTF8.GetString(prefix, 0, prefixLength).TrimStart('﻿', ' ', '\r', '\n', '\t');
+                    hls = text.StartsWith("#EXTM3U", StringComparison.OrdinalIgnoreCase);
+                    dash = text.Contains("<MPD", StringComparison.Ordinal) || text.Contains(":MPD", StringComparison.Ordinal);
+                    if (hls) mime = "application/vnd.apple.mpegurl";
+                    else if (dash) mime = "application/dash+xml";
+                }
                 byte[]? rewritten = null;
                 if (first[0] == "GET" && response.IsSuccessStatusCode && (hls || dash))
                 {
-                    var bytes = await BoundedContent.ReadAsync(body, 8 * 1024 * 1024, _shutdown.Token);
+                    var remaining = await BoundedContent.ReadAsync(body, 8 * 1024 * 1024 - prefixLength, sessionToken);
+                    byte[] bytes = prefixLength == 0 ? remaining : [.. prefix.AsSpan(0, prefixLength), .. remaining];
                     rewritten = hls ? Encoding.UTF8.GetBytes(RewriteHls(TextEncoding.Decode(bytes), final, route[2], session)) : RewriteDash(bytes, final, route[2], session);
                 }
                 var headers = new StringBuilder($"HTTP/1.1 {(int)response.StatusCode} {response.ReasonPhrase}\r\nConnection: close\r\nContent-Type: {mime}\r\n");
@@ -135,14 +150,15 @@ public sealed partial class MediaProxy : IAsyncDisposable
                 if (length is not null) headers.Append("Content-Length: ").Append(length.Value.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
                 if (response.Content.Headers.ContentRange is { } range) headers.Append("Content-Range: ").Append(range).Append("\r\n");
                 if (response.Headers.AcceptRanges.Count > 0) headers.Append("Accept-Ranges: ").AppendJoin(",", response.Headers.AcceptRanges).Append("\r\n");
-                headers.Append("\r\n"); await stream.WriteAsync(Encoding.ASCII.GetBytes(headers.ToString()), _shutdown.Token);
+                headers.Append("\r\n"); await stream.WriteAsync(Encoding.ASCII.GetBytes(headers.ToString()), sessionToken);
                 if (first[0] == "HEAD") return;
-                if (rewritten is not null) { await stream.WriteAsync(rewritten, _shutdown.Token); Interlocked.Add(ref _bytes, rewritten.Length); }
+                if (rewritten is not null) { await stream.WriteAsync(rewritten, sessionToken); Interlocked.Add(ref _bytes, rewritten.Length); }
                 else
                 {
+                    if (prefixLength > 0) { await stream.WriteAsync(prefix.AsMemory(0, prefixLength), sessionToken); Interlocked.Add(ref _bytes, prefixLength); }
                     var buffer = new byte[81920]; int read;
-                    while ((read = await body.ReadAsync(buffer, _shutdown.Token)) > 0)
-                    { await stream.WriteAsync(buffer.AsMemory(0, read), _shutdown.Token); Interlocked.Add(ref _bytes, read); }
+                    while ((read = await body.ReadAsync(buffer, sessionToken)) > 0)
+                    { await stream.WriteAsync(buffer.AsMemory(0, read), sessionToken); Interlocked.Add(ref _bytes, read); }
                 }
             }
         }
@@ -249,6 +265,6 @@ public sealed partial class MediaProxy : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _shutdown.Cancel(); _listener?.Stop(); foreach (var client in _clients.Keys) client.Dispose();
-        await _accept; await Task.WhenAll(_clients.Values); _sessions.Clear(); _http.Dispose(); _slots.Dispose(); _shutdown.Dispose();
+        await _accept; await Task.WhenAll(_clients.Values); foreach (var session in _sessions.Values) session.Dispose(); _sessions.Clear(); _http.Dispose(); _slots.Dispose(); _shutdown.Dispose();
     }
 }

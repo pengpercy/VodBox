@@ -16,3 +16,7 @@ CI 使用应用生成的四秒 WAV 验证 AOT 原生解码，用示例插件验�
 ## 音频延迟增强验证
 
 在相同实际 CCTV1 HLS 来源再次解码，150ms 延迟设置后 LibVLC 返回 AudioDelay=150000 微秒，恢复零值成功；播放器状态 Playing，位置 5929ms。使用 dummy 音视频输出完成 native API 校验，不代表主观声画同步、字幕延迟或截图界面已经验收。
+
+## 请求头代理实际 HLS 验证
+
+通过给同一测试流添加 X-VodBox-Test 请求头触发回环媒体代理，macOS x64 在约 6060ms 时进入 Playing，日志确认 H.264 / AAC 和 VideoToolbox 解码。记录：`/private/tmp/vodbox-proxy-live-probe.log`。该测试使用实际 LibVLC 与 JIT 测试驱动，验证代理到解码链路，不等同于 AOT 桌面窗口或长时验收。

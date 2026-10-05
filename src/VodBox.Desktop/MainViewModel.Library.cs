@@ -97,6 +97,7 @@ public partial class MainViewModel
             if (_disposed || !ReferenceEquals(source, SelectedSource)) return;
             SelectedCategory = null; SelectedItem = null; _detail = null; _nextCursor = null;
             Categories.Clear(); Items.Clear(); Lines.Clear(); Episodes.Clear(); Description = "选择内容查看详情和播放线路。";
+            ConfigureLibraryFilters(source);
             if (source is null) return;
             var provider = _factory.Create(source); _provider = provider;
             var categories = await provider.GetCategoriesAsync(cancellation.Token);
@@ -112,30 +113,37 @@ public partial class MainViewModel
         await _sourceTask;
         if (_provider is null || _provider.SourceId != source.Id) throw new InvalidOperationException("内容源未能初始化。");
     }
+    private string? _activeSearchQuery;
+    private int _queryEpoch;
+    private IReadOnlyDictionary<string, string> _activeBrowseFilters = new Dictionary<string, string>();
     partial void OnSelectedCategoryChanged(Category? value) { if (value is not null) _ = BrowseAsync(); }
     [RelayCommand] private Task BrowseAsync() => QueryAsync(false);
     [RelayCommand] private Task SearchAsync() => QueryAsync(true);
     private Task QueryAsync(bool search) => RunAsync(async () =>
     {
         var provider = _provider; if (provider is null) return;
+        int epoch = ++_queryEpoch; _nextCursor = null;
+        var filters = CurrentBrowseFilters();
         _queryCancellation?.Cancel(); using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_browse?.Token ?? _lifetime.Token);
         _queryCancellation = cancellation; AggregateResultsVisible = false;
         try
         {
-            var page = search ? await provider.SearchAsync(SearchText, cancellation.Token)
-                : await provider.GetItemsAsync(string.IsNullOrEmpty(SelectedCategory?.Id) ? null : SelectedCategory.Id, null, cancellation.Token);
-            cancellation.Token.ThrowIfCancellationRequested(); if (!ReferenceEquals(provider, _provider)) return;
+            string query = SearchText;
+            var page = search ? await provider.SearchPageAsync(query, null, cancellation.Token)
+                : await provider.GetItemsFilteredAsync(string.IsNullOrEmpty(SelectedCategory?.Id) ? null : SelectedCategory.Id, null, filters, cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested(); if (!ReferenceEquals(provider, _provider) || epoch != _queryEpoch) return;
             Items.Clear(); foreach (var item in page.Items) Items.Add(item);
-            _nextCursor = search ? null : page.NextCursor;
+            _activeBrowseFilters = filters; _activeSearchQuery = search ? query : null; _nextCursor = page.NextCursor;
         }
         finally { if (ReferenceEquals(_queryCancellation, cancellation)) _queryCancellation = null; }
     });
     [RelayCommand] private Task LoadMoreAsync() => RunAsync(async () =>
     {
         var provider = _provider; string? cursor = _nextCursor; if (provider is null || cursor is null) return;
-        var token = _browse?.Token ?? _lifetime.Token;
-        var page = await provider.GetItemsAsync(string.IsNullOrEmpty(SelectedCategory?.Id) ? null : SelectedCategory.Id, cursor, token);
-        token.ThrowIfCancellationRequested(); if (!ReferenceEquals(provider, _provider) || cursor != _nextCursor) return;
+        int epoch = _queryEpoch; var token = _browse?.Token ?? _lifetime.Token;
+        var page = _activeSearchQuery is { } query ? await provider.SearchPageAsync(query, cursor, token)
+            : await provider.GetItemsFilteredAsync(string.IsNullOrEmpty(SelectedCategory?.Id) ? null : SelectedCategory.Id, cursor, _activeBrowseFilters, token);
+        token.ThrowIfCancellationRequested(); if (!ReferenceEquals(provider, _provider) || cursor != _nextCursor || epoch != _queryEpoch) return;
         foreach (var item in page.Items) Items.Add(item); _nextCursor = page.NextCursor;
     });
     [RelayCommand] private Task SearchAllAsync() => RunAsync(async () =>

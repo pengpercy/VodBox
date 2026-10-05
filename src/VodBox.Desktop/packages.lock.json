@@ -51,16 +51,6 @@
         "resolved": "8.4.2",
         "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
       },
-      "LibVLCSharp.Avalonia": {
-        "type": "Direct",
-        "requested": "[3.10.1, )",
-        "resolved": "3.10.1",
-        "contentHash": "TrYuHumRkrlRxBt5PnOb4plMFVki17Qms6EoRUeTzUD/jvaGgZhqsusT0OBessk+JMR5yq5mhkk4oGFPuUB6Ng==",
-        "dependencies": {
-          "Avalonia": "11.3.13",
-          "LibVLCSharp": "3.10.1"
-        }
-      },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
         "requested": "[10.0.12, )",

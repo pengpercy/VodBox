@@ -30,6 +30,8 @@
 
 当前浏览器限制：不连接既有浏览器会话；入口仅支持 User-Agent / Referer；不能处理登录、验证码、DRM、需要定制点击的页面以及独立调试目标中的跨域 iframe。媒体候选选择尚未提供多候选 UI。捕获后浏览器关闭，依赖浏览器持续运行的媒体需进一步实现。
 
-验证：27 项自动测试通过，新增 JSON 编码/链循环、HLS 密钥与 Range、DASH 嵌套 / 继承模板的回环 HTTP、SQLite v1→v2 保留历史测试。macOS 安装版 Chrome 的临时 profile / CDP 受控网页捕获成功；这不代表任意网站均可解析。
+验证：37 项自动测试通过，新增 JSON 编码/链循环、HLS 密钥与 Range、DASH 嵌套 / 继承模板的回环 HTTP、SQLite v1→v2 保留历史测试。macOS 安装版 Chrome 的临时 profile / CDP 受控网页捕获成功；这不代表任意网站均可解析。
 
 协议依据：[Chrome DevTools Network](https://chromedevtools.github.io/devtools-protocol/tot/Network/)、[Chrome Headless](https://developer.chrome.com/docs/automation-and-testing/headless)。协议消息使用 Utf8JsonWriter / JsonDocument，业务无运行时反射。
+
+代理会检查缺少明确 MIME / 文件扩展名的响应前缀，识别 HLS / DASH 清单；非清单字节完整转发。淘汰旧会话会取消其上游请求，避免阻塞响应占用连接。新增两项回环 TCP 测试验证这两种行为。真实用户来源 HLS 经自定义请求头代理后进入 Playing，并解码 H.264 / AAC，见播放测试记录。

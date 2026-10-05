@@ -1,5 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core" xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
+        xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core"
         x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
         Title="VodBox" Width="1280" Height="850" MinWidth="960" MinHeight="640"
         TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
@@ -77,6 +77,10 @@
                 <ComboBox.ItemTemplate><DataTemplate x:DataType="core:Category"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
             </Grid>
+            <Grid IsVisible="{Binding HasLibraryFilters}" ColumnDefinitions="*,*" ColumnSpacing="8">
+              <ComboBox ItemsSource="{Binding YearChoices}" SelectedItem="{Binding SelectedYear}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+              <ComboBox Grid.Column="1" ItemsSource="{Binding CompletionChoices}" SelectedItem="{Binding SelectedCompletion}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+            </Grid>
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Text="{Binding SearchText}" PlaceholderText="搜索内容" /><Button Grid.Column="1" Content="当前源" Command="{Binding SearchCommand}" /><Button Grid.Column="2" Content="全源搜索" Command="{Binding SearchAllCommand}" /></Grid>
           </StackPanel>
           <StackPanel IsVisible="{Binding ShowLive}" Spacing="8">
@@ -91,7 +95,7 @@
               <ListBox IsVisible="{Binding !AggregateResultsVisible}" ItemsSource="{Binding Cards}" SelectedItem="{Binding SelectedCard}" Background="Transparent">
                 <ListBox.ItemTemplate><DataTemplate x:DataType="vm:MediaCard">
                   <Border Padding="12" Margin="0,4" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="8">
-                    <Grid ColumnDefinitions="72,*" ColumnSpacing="12"><Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="4" Height="100" ClipToBounds="True"><Image Source="{Binding Poster}" Stretch="UniformToFill" /></Border><StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" /></StackPanel></Grid>
+                    <Grid ColumnDefinitions="72,*" ColumnSpacing="12"><Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="4" Height="100" ClipToBounds="True"><Image Source="{Binding Poster}" Stretch="UniformToFill" AttachedToVisualTree="PosterAttached" DetachedFromVisualTree="PosterDetached" DataContextChanged="PosterContextChanged" /></Border><StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" /></StackPanel></Grid>
                   </Border>
                 </DataTemplate></ListBox.ItemTemplate>
               </ListBox>
@@ -140,7 +144,7 @@
         </Grid>
         <Grid Grid.Column="1" RowDefinitions="2*,Auto,Auto,Auto,*" RowSpacing="12">
           <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180">
-            <vlc:VideoView x:Name="VideoSurface" />
+            <vm:VlcVideoSurface x:Name="VideoSurface" />
           </Border>
           <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
             <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />

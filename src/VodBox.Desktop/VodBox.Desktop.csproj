@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" /><PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" /><PackageReference Include="Avalonia.Fonts.Inter" />
-    <PackageReference Include="CommunityToolkit.Mvvm" /><PackageReference Include="LibVLCSharp.Avalonia" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
     <ProjectReference Include="../VodBox.Application/VodBox.Application.csproj" />
     <ProjectReference Include="../VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
     <ProjectReference Include="../VodBox.Playback.LibVlc/VodBox.Playback.LibVlc.csproj" />

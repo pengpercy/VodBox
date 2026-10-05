@@ -19,12 +19,18 @@ public sealed class MacCmsProvider(SourceDefinition source, HttpClient http, boo
     private sealed record Response(IReadOnlyList<Category> Categories, IReadOnlyList<Entry> Entries, int Page, int PageCount);
 
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken token) => (await FetchAsync("list", null, null, null, null, token)).Categories;
-    public async Task<MediaPage> GetItemsAsync(string? categoryId, string? cursor, CancellationToken token)
+    public Task<MediaPage> GetItemsAsync(string? categoryId, string? cursor, CancellationToken token) => GetItemsFilteredAsync(categoryId, cursor, new Dictionary<string, string>(), token);
+    public async Task<MediaPage> GetItemsFilteredAsync(string? categoryId, string? cursor, IReadOnlyDictionary<string, string> filters, CancellationToken token)
     {
         int page = cursor is null ? 1 : int.TryParse(cursor, out int value) && value > 0 ? value : throw new InvalidDataException("无效分页游标。");
-        return Page(await FetchAsync("detail", categoryId, page, null, null, token));
+        return Page(await FetchAsync("detail", categoryId, page, null, null, token, filters));
     }
-    public async Task<MediaPage> SearchAsync(string query, CancellationToken token) => Page(await FetchAsync("detail", null, 1, query, null, token));
+    public Task<MediaPage> SearchAsync(string query, CancellationToken token) => SearchPageAsync(query, null, token);
+    public async Task<MediaPage> SearchPageAsync(string query, string? cursor, CancellationToken token)
+    {
+        int page = cursor is null ? 1 : int.TryParse(cursor, out int value) && value > 0 ? value : throw new InvalidDataException("无效搜索分页游标。");
+        return Page(await FetchAsync("detail", null, page, query, null, token));
+    }
     private static MediaPage Page(Response response) => new(response.Entries.Select(x => x.Detail.Item).ToList(),
         response.Page < response.PageCount ? (response.Page + 1).ToString(CultureInfo.InvariantCulture) : null);
     public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken token) => (await DetailAsync(mediaId, token)).Detail;
@@ -53,7 +59,7 @@ public sealed class MacCmsProvider(SourceDefinition source, HttpClient http, boo
             foreach (var header in headers.EnumerateObject()) result[header.Name] = header.Value.GetString() ?? "";
         return result;
     }
-    private async Task<Response> FetchAsync(string action, string? category, int? page, string? query, string? ids, CancellationToken token)
+    private async Task<Response> FetchAsync(string action, string? category, int? page, string? query, string? ids, CancellationToken token, IReadOnlyDictionary<string, string>? filters = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!Uri.TryCreate(source.Entry, UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https"))
@@ -63,6 +69,12 @@ public sealed class MacCmsProvider(SourceDefinition source, HttpClient http, boo
         if (page is not null) parameters.Add(new("pg", page.Value.ToString(CultureInfo.InvariantCulture)));
         if (query is not null) parameters.Add(new("wd", query));
         if (ids is not null) parameters.Add(new("ids", ids));
+        if (filters is not null)
+            foreach (var filter in filters)
+            {
+                if (filter.Key is not ("year" or "isend" or "h" or "from")) throw new NotSupportedException("采集 API 不支持筛选字段：" + filter.Key);
+                if (!string.IsNullOrEmpty(filter.Value)) parameters.Add(new(filter.Key, filter.Value));
+            }
         // Preserve API-specific query parameters without retaining previous paging/action values.
         var replaced = parameters.Select(x => x.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var existing = endpoint.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)

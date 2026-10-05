@@ -12,12 +12,15 @@ public sealed partial class MainWindow : Window
 {
     private readonly MainViewModel? _viewModel;
     private bool _closing;
-    public MainWindow()
+    private readonly Dictionary<Image, MediaCard> _posterControls = [];
+    public MainWindow() : this(preview: false) { }
+    public MainWindow(bool preview)
     {
         InitializeComponent();
-        if (Design.IsDesignMode)
+        if (Design.IsDesignMode || preview)
         {
             // The designer has no desktop compositor; give sample content a readable backdrop.
+            DataContext = new DesignMainViewModel(); VideoSurface.IsVisible = false;
             Background = new SolidColorBrush(Color.Parse("#111317"));
             return;
         }
@@ -77,6 +80,16 @@ public sealed partial class MainWindow : Window
             }
             e.Handled = true;
         };
+    }
+    private void PosterAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e) => PosterContextChanged(sender, EventArgs.Empty);
+    private void PosterDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
+    { if (sender is Image image && _posterControls.Remove(image, out var previous)) MainViewModel.ReleasePoster(previous); }
+    private void PosterContextChanged(object? sender, EventArgs e)
+    {
+        if (sender is not Image image) return;
+        if (_posterControls.Remove(image, out var previous)) MainViewModel.ReleasePoster(previous);
+        if (_viewModel is not null && image.IsAttachedToVisualTree() && image.DataContext is MediaCard card)
+        { _posterControls[image] = card; _viewModel.ActivatePoster(card); }
     }
     private async void SnapshotClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

@@ -10,6 +10,19 @@ public sealed partial class MediaCard(MediaItem item) : ObservableObject, IDispo
     public string Title => Item.Title;
     public string? Remarks => Item.Remarks;
     [ObservableProperty] private Bitmap? _poster;
+    private CancellationTokenSource? _load;
     public bool IsDisposed { get; private set; }
-    public void Dispose() { IsDisposed = true; Poster?.Dispose(); Poster = null; }
+    public bool IsActive => _load is not null;
+    public CancellationToken LoadToken => _load?.Token ?? new CancellationToken(true);
+    public bool Activate(CancellationToken lifetime)
+    {
+        if (IsDisposed || IsActive) return false;
+        _load = CancellationTokenSource.CreateLinkedTokenSource(lifetime); return true;
+    }
+    public void Deactivate()
+    {
+        _load?.Cancel(); _load?.Dispose(); _load = null;
+        var previous = Poster; Poster = null; previous?.Dispose();
+    }
+    public void Dispose() { IsDisposed = true; Deactivate(); }
 }

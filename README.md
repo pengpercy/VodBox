@@ -63,9 +63,9 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 ## 验证与剩余范围
 
-六个 RID 的 Native AOT 构建、18 项功能测试、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试与全部安装包生成已通过 [CI 验证](https://github.com/pengpercy/VodBox/actions/runs/37244505010)（539b711）。macOS 安装包另外执行严格签名与依赖哈希校验。用户提供来源中的一个 HLS 直播流在 macOS x64 实际进入 Playing，解码 H.264/AAC 并观察到 VideoToolbox 日志；详见 [播放测试记录](docs/playback-testing.md)。有画面的交互、长时稳定性和各系统完整安装流程仍需真机验证。
+六个 RID 的 Native AOT 构建、27 项功能测试、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试与全部安装包生成已通过 [CI 验证](https://github.com/pengpercy/VodBox/actions/runs/37245948796)（ed2cc55）。macOS 安装包另外执行严格签名与依赖哈希校验。用户提供来源中的一个 HLS 直播流在 macOS x64 实际进入 Playing，解码 H.264/AAC 并观察到 VideoToolbox 日志；详见 [播放测试记录](docs/playback-testing.md)。有画面的交互、长时稳定性和各系统完整安装流程仍需真机验证。
 
-本轮继续实现海报缓存 / 缩略图、历史管理、直播收藏 / 恢复 / 有限重试 / 节目表刷新、音频字幕延迟 / 截图、快捷键 / 拖放 / 主题，以及 DASH 请求头代理。27 项自动测试通过，本机 Native AOT 与实际 HLS 的 150ms 音频延迟验证通过；本轮新增功能的跨平台 CI 与桌面验收独立进行。分类筛选、弹幕、大屏布局、媒体键 / 休眠、DLNA / 局域网、SMB / WebDAV、自动更新及完整桌面验收仍需继续。旧配置与 Java 兼容层不在当前范围内。
+本轮继续实现海报缓存 / 缩略图、历史管理、直播收藏 / 恢复 / 有限重试 / 节目表刷新、音频字幕延迟 / 截图、快捷键 / 拖放 / 主题，以及 DASH 请求头代理。37 项自动测试通过，新增单源搜索分页、MacCMS 年份 / 完结筛选、可见海报加载和无窗口 XAML 预览测试。上一轮六 RID 构建与打包全部通过；当前改动的本机 Native AOT 与实际 HLS 的 150ms 音频延迟验证通过；本轮新增功能的跨平台 CI 与桌面验收独立进行。通用筛选元数据、聚合分页、弹幕、大屏布局、媒体键 / 休眠、DLNA / 局域网、SMB / WebDAV、自动更新及完整桌面验收仍需继续。旧配置与 Java 兼容层不在当前范围内。
 
 参考项目：[FongMi/TV](https://github.com/FongMi/TV)、[Screenbox](https://github.com/huynhsontung/Screenbox)、[Downio](https://github.com/pengpercy/Downio)。当前实现没有复制其应用源码。分发原生依赖前应保留各依赖的许可证与 notice；相关文件随运行时打包。
 

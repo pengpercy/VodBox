@@ -1,1 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><IsTestProject>true</IsTestProject><IsAotCompatible>false</IsAotCompatible></PropertyGroup><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="xunit" /><PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference><ProjectReference Include="../../src/VodBox.Infrastructure/VodBox.Infrastructure.csproj" /><ProjectReference Include="../../src/VodBox.Application/VodBox.Application.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <IsAotCompatible>false</IsAotCompatible>
+    <!-- Protocol fixtures own explicit deadlines and cancellation sources. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Avalonia.Headless.XUnit" />
+    <PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference>
+    <ProjectReference Include="../../src/VodBox.Desktop/VodBox.Desktop.csproj" />
+    <ProjectReference Include="../../src/VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/VodBox.Application/VodBox.Application.csproj" />
+  </ItemGroup>
+</Project>

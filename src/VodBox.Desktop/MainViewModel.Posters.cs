@@ -26,20 +26,25 @@ public partial class MainViewModel
         foreach (MediaItem item in e.NewItems)
         {
             var card = new MediaCard(item); Cards.Add(card);
-            if (_designMode || string.IsNullOrWhiteSpace(item.Poster)) continue;
-            _posterTasks.RemoveAll(x => x.IsCompleted); _posterTasks.Add(LoadPosterAsync(card));
+
         }
     }
-    private async Task LoadPosterAsync(MediaCard card)
+    public void ActivatePoster(MediaCard card)
+    {
+        if (_designMode || _disposed || string.IsNullOrWhiteSpace(card.Item.Poster) || !card.Activate(_lifetime.Token)) return;
+        _posterTasks.RemoveAll(x => x.IsCompleted); _posterTasks.Add(LoadPosterAsync(card, card.LoadToken));
+    }
+    public static void ReleasePoster(MediaCard card) => card.Deactivate();
+    private async Task LoadPosterAsync(MediaCard card, CancellationToken token)
     {
         Bitmap? bitmap = null;
         try
         {
-            string? path = await _posters.GetAsync(card.Item.Poster, _lifetime.Token);
-            if (path is null || card.IsDisposed) return;
-            bitmap = await Task.Run(() => { using var stream = File.OpenRead(path); return Bitmap.DecodeToWidth(stream, 160); }, _lifetime.Token);
+            string? path = await _posters.GetAsync(card.Item.Poster, token);
+            if (path is null || card.IsDisposed || token.IsCancellationRequested) return;
+            bitmap = await Task.Run(() => { using var stream = File.OpenRead(path); return Bitmap.DecodeToWidth(stream, 160); }, token);
             await Dispatcher.UIThread.InvokeAsync(() =>
-            { if (!card.IsDisposed && !_disposed) { card.Poster = bitmap; bitmap = null; } });
+            { if (!card.IsDisposed && card.IsActive && !token.IsCancellationRequested && !_disposed) { card.Poster = bitmap; bitmap = null; } });
         }
         catch (Exception) { /* Invalid or missing posters retain the placeholder. */ }
         finally { bitmap?.Dispose(); }
