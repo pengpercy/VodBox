@@ -10,6 +10,7 @@ public sealed partial class MediaCard(MediaItem item) : ObservableObject, IDispo
     public string Title => Item.Title;
     public string? Remarks => Item.Remarks;
     [ObservableProperty] private Bitmap? _poster;
+    [ObservableProperty] private bool _isSelected;
     private CancellationTokenSource? _load;
     public bool IsDisposed { get; private set; }
     public bool IsActive => _load is not null;

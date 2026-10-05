@@ -13,19 +13,44 @@ public partial class MainViewModel
     private readonly PosterCache _posters;
     private readonly List<Task> _posterTasks = [];
     public ObservableCollection<MediaCard> Cards { get; } = [];
+    public ObservableCollection<MediaCardRow> CardRows { get; } = [];
+    public int CardColumns { get; private set; } = 3;
+    public void UpdateCardColumns(double width)
+    {
+        if (width <= 0) return;
+        int columns = Math.Clamp((int)(width / 160), 2, 10);
+        if (columns == CardColumns) return;
+        CardColumns = columns; RebuildCardRows();
+    }
+    private void RebuildCardRows()
+    {
+        CardRows.Clear();
+        foreach (var card in Cards) AppendCardRow(card);
+    }
+    private void AppendCardRow(MediaCard card)
+    {
+        if (CardRows.Count == 0 || CardRows[^1].Cards.Count == CardColumns)
+            CardRows.Add(new(CardColumns));
+        CardRows[^1].Cards.Add(card);
+    }
     [ObservableProperty] private MediaCard? _selectedCard;
-    partial void OnSelectedCardChanged(MediaCard? value) { if (value is not null) SelectedItem = value.Item; }
+    partial void OnSelectedCardChanged(MediaCard? oldValue, MediaCard? newValue)
+    {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) { newValue.IsSelected = true; SelectedItem = newValue.Item; }
+    }
     private void ItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (e.Action == NotifyCollectionChangedAction.Reset)
-        { foreach (var card in Cards) card.Dispose(); Cards.Clear(); SelectedCard = null; SelectedItem = null; return; }
+        { foreach (var card in Cards) card.Dispose(); Cards.Clear(); CardRows.Clear(); SelectedCard = null; SelectedItem = null; return; }
         if (e.OldItems is not null)
             foreach (MediaItem item in e.OldItems)
-            { var old = Cards.FirstOrDefault(x => ReferenceEquals(x.Item, item)); if (old is not null) { Cards.Remove(old); old.Dispose(); } }
+            { var old = Cards.FirstOrDefault(x => ReferenceEquals(x.Item, item)); if (old is not null) { if (ReferenceEquals(SelectedCard, old)) { SelectedCard = null; SelectedItem = null; } Cards.Remove(old); old.Dispose(); } }
+        if (e.OldItems is not null) RebuildCardRows();
         if (e.NewItems is null) return;
         foreach (MediaItem item in e.NewItems)
         {
-            var card = new MediaCard(item); Cards.Add(card);
+            var card = new MediaCard(item); Cards.Add(card); AppendCardRow(card);
 
         }
     }

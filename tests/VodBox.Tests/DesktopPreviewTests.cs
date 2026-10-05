@@ -98,6 +98,33 @@ public sealed class DesktopPreviewTests
         finally { window.Close(); await model.DisposeAsync(); }
     }
 
+    [AvaloniaFact]
+    public async Task PosterGridVirtualizesLargeCatalogAndPreservesSelectionAcrossReflow()
+    {
+        var window = new MainWindow(preview: true) { Width = 1280 };
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            model.Items.Clear();
+            for (int i = 0; i < 1000; i++) model.Items.Add(new(i.ToString(), $"影片 {i}"));
+            window.Show(); Dispatcher.UIThread.RunJobs();
+            var selected = model.Cards[123]; model.SelectedCard = selected;
+            var firstRow = model.CardRows[0];
+            model.Items.Add(new("more", "追加影片"));
+            Assert.Same(firstRow, model.CardRows[0]);
+            model.UpdateCardColumns(1000);
+            Assert.Same(selected, model.SelectedCard); Assert.True(selected.IsSelected);
+            Assert.Equal(model.Cards, model.CardRows.SelectMany(row => row.Cards));
+            Assert.All(model.CardRows, row => Assert.InRange(row.Cards.Count, 1, model.CardColumns));
+            Dispatcher.UIThread.RunJobs();
+            var images = window.FindControl<ListBox>("PosterGrid")!.GetVisualDescendants().OfType<Image>().Count();
+            Assert.InRange(images, 1, 100);
+            model.SelectedCard = model.Cards[0]; Assert.False(selected.IsSelected);
+            model.Items.Clear(); Assert.Empty(model.CardRows); Assert.Null(model.SelectedCard);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
     [Fact]
     public void PosterVisibilityCancelsOldLoadAndReleasesInactiveCard()
     {

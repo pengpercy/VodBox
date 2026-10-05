@@ -98,11 +98,21 @@
           </StackPanel>
           <Grid Grid.Row="1">
             <Grid IsVisible="{Binding ShowLibrary}" RowDefinitions="*,Auto,Auto" RowSpacing="8">
-              <ListBox IsVisible="{Binding !AggregateResultsVisible}" ItemsSource="{Binding Cards}" SelectedItem="{Binding SelectedCard}" Background="Transparent">
-                <ListBox.ItemTemplate><DataTemplate x:DataType="vm:MediaCard">
-                  <Border Padding="12" Margin="0,4" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="8">
-                    <Grid ColumnDefinitions="72,*" ColumnSpacing="12"><Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="4" Height="100" ClipToBounds="True"><Image Source="{Binding Poster}" Stretch="UniformToFill" AttachedToVisualTree="PosterAttached" DetachedFromVisualTree="PosterDetached" DataContextChanged="PosterContextChanged" /></Border><StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" /></StackPanel></Grid>
-                  </Border>
+              <ListBox x:Name="PosterGrid" IsVisible="{Binding !AggregateResultsVisible}" ItemsSource="{Binding CardRows}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style><Style Selector="Button.poster.selected"><Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" /></Style></ListBox.Styles>
+                <ListBox.ItemTemplate><DataTemplate x:DataType="vm:MediaCardRow">
+                  <ItemsControl ItemsSource="{Binding Cards}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding Columns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:MediaCard">
+                      <Button Classes="poster" Classes.selected="{Binding IsSelected}" Click="MediaCardClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="6" Margin="3" BorderThickness="2" Background="{DynamicResource CardSurfaceBrush}">
+                        <StackPanel Spacing="6">
+                          <Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="4" Height="190" ClipToBounds="True"><Grid><TextBlock Text="{Binding Title}" TextWrapping="Wrap" Margin="12" VerticalAlignment="Center" HorizontalAlignment="Center" Classes="muted" /><Image Source="{Binding Poster}" Stretch="UniformToFill" AttachedToVisualTree="PosterAttached" DetachedFromVisualTree="PosterDetached" DataContextChanged="PosterContextChanged" /></Grid></Border>
+                          <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" MinHeight="16" />
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                  </ItemsControl>
                 </DataTemplate></ListBox.ItemTemplate>
               </ListBox>
               <ListBox IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchResults}" SelectionChanged="SearchSelectionChanged" Background="Transparent">

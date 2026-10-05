@@ -122,3 +122,9 @@ xsmp3/psmp3 公开分类与专辑均可读，两个首集媒体小范围读取 H
 最终正式桌面产物也以相同严格参数发布，通过偏好/内核模式备份、SQLite、弹幕与真实无窗口 mpv/LibVLC 往返控制诊断：`/private/tmp/vodbox-desktop-dual-engine-aot-build.log`、`/private/tmp/vodbox-desktop-dual-engine-aot-diagnostics.log`。GUI 复验曾在显示非活动时于窗口创建前遇到 Avalonia 原生 RenderTimer `-6661`；临时唤醒显示后最终两个 AOT 窗口探针均以 0 退出，往返探针绘制 44 帧，回退探针解码 100 帧。未修改系统睡眠设置。
 
 受控 MPEG4 样本停止时 LibVLC 仍可能记录 `get_buffer()` / `avcodec_send_packet` 解码器日志；退出码为 0，关闭先停止解码再解绑 drawable，不将日志描述为“无运行时警告”。这些合成样本验收不能替代其他编码与长期运行测试。
+
+## 自适应海报网格本地验收
+
+149 项回归全部通过，新增 1,000 条内容的实际控件虚拟化、分页追加复用、列数重排顺序与选中状态测试。设计器预览保持通过。日志：`/private/tmp/vodbox-poster-grid-tests.log`。
+
+macOS x64 严格 NativeAOT（完整裁剪，编译／ILC 警告作为错误）编译通过。真实主窗口在 1,000 条海报数据下验证 mpv → LibVLC → mpv、暂停位置、静音、弹幕、900／1280 DIP 切换与渲染表面复用；实际海报 Image 控件数介于 1–100，mpv 渲染 44 帧，进程退出 0。日志：`/private/tmp/vodbox-poster-grid-aot-build.log`、`/private/tmp/vodbox-poster-grid-aot-ui.log`。本轮没有运行 GitHub Actions，也未验证 Windows／Linux 真机。

@@ -7,13 +7,26 @@ namespace VodBox.Desktop;
 public sealed partial class MainWindow
 {
     private MainViewModel? _layoutModel;
+    private bool _cardLayoutQueued;
     private void InitializeAdaptiveLayout(MainViewModel model)
     {
-        _layoutModel = model; SizeChanged += LayoutSizeChanged;
+        _layoutModel = model; BrowsePane.SizeChanged += BrowseSizeChanged; SizeChanged += LayoutSizeChanged;
         model.PropertyChanged += LayoutModelChanged;
-        Closed += (_, _) => { SizeChanged -= LayoutSizeChanged; model.PropertyChanged -= LayoutModelChanged; };
+        Closed += (_, _) => { BrowsePane.SizeChanged -= BrowseSizeChanged; SizeChanged -= LayoutSizeChanged; model.PropertyChanged -= LayoutModelChanged; };
         UpdateAdaptiveLayout();
     }
+    private void BrowseSizeChanged(object? sender, SizeChangedEventArgs args)
+    {
+        if (_cardLayoutQueued) return;
+        _cardLayoutQueued = true;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _cardLayoutQueued = false;
+            _layoutModel?.UpdateCardColumns(BrowsePane.Bounds.Width - 24);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+    private void MediaCardClick(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    { if (_layoutModel is not null && sender is Button { DataContext: MediaCard card }) _layoutModel.SelectedCard = card; }
     private void LayoutSizeChanged(object? sender, SizeChangedEventArgs args) => UpdateAdaptiveLayout();
     private void LayoutModelChanged(object? sender, PropertyChangedEventArgs args)
     { if (args.PropertyName == nameof(MainViewModel.ShowPlaybackPage)) UpdateAdaptiveLayout(); }

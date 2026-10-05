@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.VisualTree;
 using VodBox.Core;
 using VodBox.Desktop;
 using VodBox.Playback.LibVlc;
@@ -15,6 +16,7 @@ internal static class DesktopProbe
             { ["vo"] = "libmpv", ["ao"] = "null", ["hwdec"] = "no" }), waitForVideoSurface: true);
             var vlc = new LibVlcEngine(waitForVideoSurface: true); vlc.Initialized += (_, _) => vlc.Player!.Volume = 0; return vlc;
         }) { Volume = 0, AutoNext = false };
+        for (int i = 0; i < 1000; i++) model.Items.Add(new(i.ToString(), $"AOT 海报 {i}"));
         var window = new MainWindow(model, initialize: false);
         window.Opened += async (_, _) =>
         {
@@ -63,10 +65,12 @@ internal static class DesktopProbe
                 await Until(() => window.FindControl<Grid>("BrowsePane")!.IsVisible && !window.FindControl<Grid>("PlaybackPane")!.IsVisible);
                 model.ShowPlaybackPage = true; window.Width = 1280;
                 await Until(() => window.FindControl<Grid>("BrowsePane")!.IsVisible && window.FindControl<Grid>("PlaybackPane")!.IsVisible);
+                int images = window.FindControl<ListBox>("PosterGrid")!.GetVisualDescendants().OfType<Image>().Count();
+                if (images is < 1 or > 100 || model.CardRows.SelectMany(row => row.Cards).Count() != 1000) throw new InvalidOperationException($"Poster virtualization failed: images={images}");
                 if (!ReferenceEquals(renderSurface, window.FindControl<Grid>("VideoContainer")!.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Resize recreated the native renderer.");
                 await model.TogglePauseCommand.ExecuteAsync(null);
                 await Until(() => window.MpvRenderedFrames > previous + 5 && model.Engine.Snapshot.Position.TotalSeconds > 2.7);
-                Console.WriteLine($"MainWindow dual engines: OK | mpv/VLC/mpv, frames={window.MpvRenderedFrames}, pause/position, device mute, surface reuse, settings binding, inline/native-overlay danmaku, narrow/wide layout");
+                Console.WriteLine($"MainWindow dual engines: OK | mpv/VLC/mpv, frames={window.MpvRenderedFrames}, pause/position, device mute, surface reuse, settings binding, inline/native-overlay danmaku, narrow/wide layout, 1000 posters virtualized");
                 window.Close();
             }
             catch (Exception error)
