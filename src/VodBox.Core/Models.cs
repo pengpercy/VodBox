@@ -89,6 +89,7 @@ public sealed record RpcResponse(int ApiVersion, long RequestId, JsonElement Res
 [JsonSerializable(typeof(RpcResponse))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(PortableBackup))]
 [JsonSerializable(typeof(AppPreferences))]
 [JsonSerializable(typeof(List<SavedConfiguration>))]
 public partial class VodBoxJson : JsonSerializerContext;

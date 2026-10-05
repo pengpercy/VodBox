@@ -8,7 +8,7 @@
 
 六个 RID 的本机 Native AOT 编译、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试及全部安装包生成均已通过 [Actions 验证](https://github.com/pengpercy/VodBox/actions/runs/37223401606)（代码提交 7105ef7）。Windows x64/ARM64 生成 ZIP，macOS Intel/Apple Silicon 生成 app/ZIP/DMG，Linux x64/ARM64 生成 deb/rpm/AppImage。打包检查实际依赖文件哈希，macOS 另外验证 ad-hoc 签名与封包后的宿主运行。尚未完成各平台有画面的交互、长时稳定性和全部安装后的真机测试；本地公开直播测试已观察到 VideoToolbox 解码，但未完成全面硬件解码验证。
 
-当前已在首版基线上补充 C# MacCMS HTTP JSON/XML 适配、聚合搜索、配置仓库、偏好持久化、收藏打开、历史重新解析、独立播放列表与连续播放、片头片尾、直播分组/备用地址、gzip XMLTV 缓存和节目表界面；本轮新增功能有 14 项功能测试及本地 AOT 编译验证，继续做跨平台集成验收。海报缓存、分类筛选、浏览器嗅探、解析链、流代理、弹幕及局域网扩展继续实施，逐项状态见 [功能清单](implementation-progress.md)。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定，不能依赖安装目录执行 npm install。
+当前已补充 C# MacCMS HTTP JSON/XML 适配、聚合搜索、配置仓库、偏好、收藏打开、历史重新解析、连续播放、片头片尾、直播恢复与备用重试、XMLTV 缓存、解析链、流代理和浏览器嗅探；后续增加海报缓存与可见加载、年份 / 完结筛选、单源搜索分页、桌面控制、主题、备份 / 合并导入及无窗口 XAML 预览。当前 42 项本地测试通过，macOS x64 严格 Native AOT 编译及实际备份导出导入诊断通过。CI 与真机验收分别记录在 [功能清单](implementation-progress.md)。弹幕、通用筛选元数据、聚合分页和局域网扩展仍需实施。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定。
 
 用户提供的饭太硬地址作为后续测试来源；它返回旧配置，不能直接作为新版配置加载。已提取公开直播列表形成新版测试示例，未导入 Java 插件；网络可达性与实际播放记录见 [播放测试](playback-testing.md)。
 
@@ -87,7 +87,7 @@ MVP 使用新的配置与源契约。源能力检查报告当前运行时是否�
 - DTO：System.Text.Json、版本化 schema、明确字段类型；外部源响应在 Provider 内转换为强类型领域模型。
 - 存储：Microsoft.Data.Sqlite 与显式 migration；第一版无需引入完整 ORM。
 - 网络：HttpClient/SocketHttpHandler，以配置/站点上下文隔离 Cookie、代理、Header 与请求超时。
-- 播放：IPlaybackEngine 隔离业务，LibVLCSharp 桌面绑定与 Avalonia VideoView 承载视频；字幕交给内核，控制和弹幕由 Avalonia 处理。
+- 播放：IPlaybackEngine 隔离业务，LibVLCSharp 与无反射 NativeControlHost 句柄绑定承载视频；字幕交给内核，控制和弹幕由 Avalonia 处理。
 - 本地服务：ASP.NET Core，默认 loopback，局域网访问通过显式设置启用。
 - 插件：独立 PluginHost 进程；QuickJS/Python/Node 分别提供运行时适配器。
 - 日志：结构化日志、轮转文件、请求关联 ID、敏感 Header 和 URL query 脱敏。
@@ -187,7 +187,7 @@ Provider 实例键至少包含配置 ID、站点 key、运行时、插件内容�
 
 1. 创建最小 Avalonia 播放窗口和 URL/文件输入框。
 2. 接入固定版本 LibVLCSharp 桌面包与 Avalonia VideoView，验证播放、暂停、跳转、音量、字幕、音轨和 EOF；不用 UWP 包。原生制品匹配目标 RID。
-3. 为 VideoView.Content 叠层验证遮挡、裁剪、全屏、菜单与弹幕；参考 Screenbox 的 surface 生命周期，重建 Avalonia 实现。
+3. 为原生视频宿主与独立透明窗口叠层验证遮挡、裁剪、全屏、菜单与弹幕；参考 Screenbox 的 surface 生命周期，重建 Avalonia 实现。
 4. 原生内核事件与 UI 更新分开；所有命令按内核要求调度，窗口销毁先解绑事件，再释放 MediaPlayer、Media、LibVLC 和视频 surface。
 5. 优先实测 win-x64、osx-arm64、linux-x64；其余架构在发布前补齐制品和真机验证。
 6. 验证各平台可用硬解与软解回退，以 LibVLC 日志和诊断记录为准。
@@ -230,7 +230,7 @@ Provider 实例键至少包含配置 ID、站点 key、运行时、插件内容�
 4. SQLite 表至少包含 Config、Favorite、PlaybackHistory、LiveFavorite、Settings、SchemaVersion。
 5. 历史/收藏主键包含配置 ID、sourceId、mediaId；历史另外记录lineId 和 episodeId，不能仅按标题匹配。
 6. 播放中约每 10 秒、暂停、换集和退出时保存进度；写入去抖、事务化，故障不阻塞播放。
-7. 无痕模式关闭历史写入和相关持久化；设置导出与数据库备份不包含 Cookie/密钥。
+7. 无痕模式关闭历史写入和相关持久化；便携备份明确提示配置中的凭据可能被包含；不包含浏览器 profile、运行时缓存或独立 Cookie 存储。
 
 验收：切集取消正确；seek 与恢复时间单位正确；数据库升级保留收藏；崩溃后最多丢失一个保存周期的进度。
 
@@ -469,7 +469,7 @@ jobs:
 
 首要决策门槛：
 
-1. LibVLC VideoView 是否在三平台满足控制层/弹幕叠层与性能。
+1. 原生视频宿主是否在三平台满足控制层/弹幕叠层与性能。
 2. 需要实现哪些 C# Provider；QuickJS/Python/Node 新 SDK 的宿主能力是否齐全。
 3. 六架构 LibVLC、QuickJS、Python/Node 及依赖是否有可验证、可分发的制品。
 4. 网页嗅探是按需组件，还是每个安装包默认携带浏览器。

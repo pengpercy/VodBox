@@ -91,6 +91,18 @@ public sealed partial class MainWindow : Window
         if (_viewModel is not null && image.IsAttachedToVisualTree() && image.DataContext is MediaCard card)
         { _posterControls[image] = card; _viewModel.ActivatePoster(card); }
     }
+    private async void ExportBackupClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_viewModel is null) return;
+        var file = await StorageProvider.SaveFilePickerAsync(new() { Title = "导出 VodBox 数据备份", SuggestedFileName = $"VodBox-{DateTime.Now:yyyyMMdd-HHmmss}.vodbox-backup.json", FileTypeChoices = [new("VodBox 数据备份") { Patterns = ["*.vodbox-backup.json"] }] });
+        if (file?.TryGetLocalPath() is { } path) await _viewModel.ExportBackupAsync(path);
+    }
+    private async void ImportBackupClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_viewModel is null) return;
+        var files = await StorageProvider.OpenFilePickerAsync(new() { Title = "选择备份并合并数据", AllowMultiple = false, FileTypeFilter = [new("VodBox 数据备份") { Patterns = ["*.vodbox-backup.json"] }] });
+        if (files.FirstOrDefault()?.TryGetLocalPath() is { } path) await _viewModel.ImportBackupAsync(path);
+    }
     private async void SnapshotClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_viewModel is null) return;

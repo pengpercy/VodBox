@@ -118,6 +118,10 @@
               <ListBox.ItemTemplate><DataTemplate x:DataType="core:FavoriteEntry"><StackPanel Margin="8"><TextBlock Text="{Binding Title}" /><TextBlock Text="{Binding SourceId}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
             </ListBox>
             <ScrollViewer IsVisible="{Binding ShowSettings}"><StackPanel Spacing="16">
+              <TextBlock Text="数据备份" FontWeight="SemiBold" FontSize="18" />
+              <Button Content="导出数据备份" Click="ExportBackupClick" IsEnabled="{Binding !IsBusy}" />
+              <Button Content="导入备份并合并数据" Click="ImportBackupClick" IsEnabled="{Binding !IsBusy}" />
+              <TextBlock Text="备份包括配置、偏好、全部历史和收藏，可能包含配置中的访问凭据。导入保留较新的历史和已有收藏；同名配置及偏好将被替换，先自动保存导入前备份。媒体文件和外部脚本需自行迁移。" TextWrapping="Wrap" Classes="muted" />
               <TextBlock Text="已保存的配置" FontWeight="SemiBold" FontSize="18" />
               <ComboBox ItemsSource="{Binding SavedConfigurations}" SelectedItem="{Binding SelectedSavedConfiguration}" HorizontalAlignment="Stretch">
                 <ComboBox.ItemTemplate><DataTemplate x:DataType="core:SavedConfiguration"><TextBlock Text="{Binding Id}" /></DataTemplate></ComboBox.ItemTemplate>

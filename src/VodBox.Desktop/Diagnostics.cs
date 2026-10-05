@@ -29,6 +29,18 @@ internal static class Diagnostics
                 await configurations.SaveAsync(config, location);
                 if ((await configurations.LoadAsync(config.Id)).Id != config.Id) throw new InvalidDataException("配置快照校验失败。");
                 Console.WriteLine("AOT preferences/configuration: OK");
+                await store.SaveHistoryAsync(new(config.Id, source.Id, "backup-smoke", "main", "备份诊断", "https://example.com/sample.mp4", 1234, DateTimeOffset.UtcNow));
+                await store.SetFavoriteAsync(new(config.Id, source.Id, "backup-smoke", "备份诊断"), true);
+                var backups = new BackupService(store, configurations, preferences);
+                string backupPath = Path.Combine(temp, "backup.json");
+                await backups.ExportAsync(backupPath, new() { Volume = 35, Theme = "Light" });
+                var backup = await backups.ReadAsync(backupPath);
+                var restored = new LibraryStore(Path.Combine(temp, "restored.db"));
+                var restoredPreferences = new PreferencesStore(Path.Combine(temp, "restored-preferences.json"));
+                var restoredConfigurations = new ConfigurationRepository(Path.Combine(temp, "restored-configurations"));
+                await new BackupService(restored, restoredConfigurations, restoredPreferences).ImportAsync(backup);
+                if ((await restored.GetHistoryAsync()).Single().PositionMs != 1234 || (await restored.GetFavoritesAsync()).Count != 1 || (await restoredPreferences.LoadAsync()).Theme != "Light" || (await restoredConfigurations.LoadAsync(config.Id)).Id != config.Id) throw new InvalidDataException("备份还原校验失败。");
+                Console.WriteLine("AOT portable backup/import: OK");
             }
             finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(temp, true); }
             if (args.Contains("--native"))

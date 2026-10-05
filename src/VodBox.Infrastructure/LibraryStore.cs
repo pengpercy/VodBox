@@ -3,7 +3,7 @@ using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-public sealed class LibraryStore : ILibraryStore
+public sealed partial class LibraryStore : ILibraryStore
 {
     private readonly string _connectionString;
     public LibraryStore(string path)
