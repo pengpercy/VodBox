@@ -40,6 +40,13 @@ public interface IPlaybackEngine : IAsyncDisposable
     Task AddSubtitleAsync(string path, CancellationToken cancellationToken);
 }
 
+public interface IPlaybackAdvancedControls
+{
+    Task SetAudioDelayAsync(int milliseconds, CancellationToken cancellationToken);
+    Task SetSubtitleDelayAsync(int milliseconds, CancellationToken cancellationToken);
+    Task TakeSnapshotAsync(string path, CancellationToken cancellationToken);
+}
+
 public interface ILibraryStore
 {
     Task SaveHistoryAsync(HistoryEntry entry, CancellationToken cancellationToken = default);

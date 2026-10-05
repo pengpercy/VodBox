@@ -92,3 +92,15 @@ xsmp3/psmp3 公开分类与专辑均可读，两个首集媒体小范围读取 H
 ## mpv IPlaybackEngine 验收（2026-10-05）
 
 完整 126 项回归、3 项 MpvEngine 专项通过。真实 libmpv JIT 及严格 Native AOT 均通过含 AAC 音轨的 15 秒合成视频：观察位置/时长/暂停/seekable、续播 1.5 秒、暂停精确跳转 2.5 秒、恢复、音轨缓存、音频 120ms / 字幕 -340ms 延迟以及停止/释放。日志 `/private/tmp/vodbox-mpv-engine-native-aot.log`。旧合成样本只有视频轨道，音轨检查失败后使用自生成音视频样本修正，未放宽音轨断言。它是接口/native ABI 验证，不能代替主窗口路由或 GUI 验收；没有运行 Actions。
+
+## 双内核路由验收（2026-10-05）
+
+新增 13 项专项，完整 139 项本地测试通过，编译警告作为错误处理。覆盖一次启动/异步失败回退、固定模式不回退、网络文件限制、旧事件隔离、位置/暂停/音量/倍速/延迟迁移、排队请求取消、切换取消后的停止清理、缺失轨道和异常释放。
+
+`--diagnostics --engine-router-smoke <本地音视频文件>` 使用真实 mpv 与 LibVLC 无窗口内核，验证 mpv → LibVLC → mpv，保留暂停下的 2.5 秒位置、倍速与延迟，恢复播放后停止。mpv 音量读取验证为 35；LibVLC dummy 输出读取为 0，不记为设备音量通过。该测试定位并修复 LibVLC 暂停后 seek 缓冲事件覆盖暂停的问题。
+
+`--diagnostics --engine-router-fallback-smoke <本地媒体文件>` 在独立进程将 `VODBOX_MPV_PATH` 指向不存在的库，验证真实 LibVLC 接管同一媒体与会话。JIT 已验证，无音轨的视频也不会因为恢复延迟偏好而失败。正常切换日志 `/private/tmp/vodbox-router-native-switch-jit.log`，回退日志 `/private/tmp/vodbox-router-native-fallback-jit.log`。
+
+主窗口仍使用 LibVLC。这些诊断不包含主窗口设置、GPU 表面切换、弹幕叠层、字幕轨道迁移、网络浏览/投屏或六 RID 原生包验收，没有运行 Actions。
+
+最终 macOS x64 Native AOT 发布（全裁剪、编译与 ILC 警告作为错误）以及上述两个真实诊断均通过。AOT dummy LibVLC 音量可返回 -1，同样不视为设备音量验证。日志 `/private/tmp/vodbox-router-native-aot-build.log`、`/private/tmp/vodbox-router-native-switch-aot.log`、`/private/tmp/vodbox-router-native-fallback-aot.log`。

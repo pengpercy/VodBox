@@ -4,7 +4,7 @@ using VodBox.Core;
 namespace VodBox.Playback.Mpv;
 
 /// <summary>Lazy native engine with serialized commands and observed state, suitable for the shared coordinator.</summary>
-public sealed class MpvEngine : IPlaybackEngine
+public sealed class MpvEngine : IPlaybackEngine, IPlaybackAdvancedControls
 {
     private readonly Func<IMpvClient> _factory;
     private readonly SemaphoreSlim _commands = new(1, 1);

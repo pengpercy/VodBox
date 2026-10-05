@@ -79,7 +79,7 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
 
-按最新要求继续实现 LibVLC + libmpv 双内核，计划提供自动与手动选择。新增 libmpv 原生绑定、Avalonia OpenGL 实验表面和内核选择策略；macOS x64 的真实 libmpv 控制与 GPU 播放已通过 Native AOT 隔离验证。主窗口切换和双内核原生依赖打包尚未接入，当前主窗口仍使用 LibVLC。详见 [实现记录](docs/danmaku.md)。
+按最新要求继续实现 LibVLC + libmpv 双内核。原生绑定、Avalonia OpenGL 实验表面、统一路由、手动模式与单次自动回退已实现；139 项本地回归通过，macOS x64 已验证真实往返切换。主窗口的设置选择、视频表面切换和双内核原生依赖打包尚未接入，当前主窗口仍使用 LibVLC。详见 [播放内核实现](docs/mpv-engine.md)。
 
 `examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，`csp_BiliGuard` 和其他 Java Spider 尚未移植。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
 

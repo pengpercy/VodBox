@@ -68,6 +68,14 @@ internal static class Diagnostics
                 }
                 finally { File.Delete(wav); }
             }
+            int routerArgument = Array.IndexOf(args, "--engine-router-smoke");
+            bool fallbackOnly = false;
+            if (routerArgument < 0) { routerArgument = Array.IndexOf(args, "--engine-router-fallback-smoke"); fallbackOnly = true; }
+            if (routerArgument >= 0)
+            {
+                if (routerArgument + 1 >= args.Length || !File.Exists(args[routerArgument + 1])) throw new InvalidDataException("内核诊断需要本地音视频样本路径。");
+                await RouterSmokeAsync(args[routerArgument + 1], fallbackOnly);
+            }
             int biliArgument = Array.IndexOf(args, "--bilibili-smoke");
             if (biliArgument >= 0)
             {
@@ -110,6 +118,52 @@ internal static class Diagnostics
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    private static async Task RouterSmokeAsync(string fixture, bool fallbackOnly)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await using var router = new Application.PlaybackEngineRouter(kind => kind == Core.PlaybackEngineKind.Mpv
+            ? new Playback.Mpv.MpvEngine(headless: true) : new LibVlcEngine(headless: true));
+        router.ActiveEngineChanged += (_, choice) => Console.WriteLine($"Playback engine: {choice.Kind} | {choice.Reason}");
+        await router.SetVolumeAsync(.35, deadline.Token); await router.SetRateAsync(1.5, deadline.Token);
+        await router.SetAudioDelayAsync(120, deadline.Token); await router.SetSubtitleDelayAsync(-340, deadline.Token);
+        await router.OpenAsync(new() { Uri = new Uri(Path.GetFullPath(fixture)).AbsoluteUri, StartPositionMs = 1500 }, 20, deadline.Token);
+        await UntilAsync(() => router.Snapshot.State == Core.PlaybackState.Playing && router.Snapshot.Position.TotalSeconds > 1.4);
+        if (fallbackOnly)
+        {
+            if (router.ActiveKind != Core.PlaybackEngineKind.LibVlc) throw new InvalidOperationException("未观察到真实 LibVLC 回退。");
+            Console.WriteLine("Playback router native fallback: OK | unavailable mpv -> LibVLC, same media/session"); return;
+        }
+        if (router.ActiveKind != Core.PlaybackEngineKind.Mpv) throw new InvalidOperationException("自动模式未选择 mpv。");
+        await router.PauseAsync(deadline.Token); await UntilAsync(() => router.Snapshot.State == Core.PlaybackState.Paused);
+        await router.SeekAsync(TimeSpan.FromSeconds(2.5), deadline.Token); await UntilAsync(() => Math.Abs(router.Snapshot.Position.TotalSeconds - 2.5) < .15);
+        await router.ChangeModeAsync(Core.PlaybackEngineMode.LibVlc, deadline.Token);
+        await UntilAsync(() => router.Snapshot.State == Core.PlaybackState.Paused && Math.Abs(router.Snapshot.Position.TotalSeconds - 2.5) < .3);
+        var vlc = (LibVlcEngine)router.ActiveEngine!;
+        Console.WriteLine($"LibVLC headless controls: volume={vlc.Player!.Volume} (dummy output), rate={vlc.Player.Rate}, audioDelay={vlc.Player.AudioDelay}");
+        if (Math.Abs(vlc.Player.Rate - 1.5) > .01 || vlc.Player.AudioDelay != 120000)
+            throw new InvalidOperationException($"LibVLC 切换设置未保留：volume={vlc.Player.Volume}, rate={vlc.Player.Rate}, audioDelay={vlc.Player.AudioDelay}。");
+        await router.ChangeModeAsync(Core.PlaybackEngineMode.Mpv, deadline.Token);
+        await UntilAsync(() => router.Snapshot.State == Core.PlaybackState.Paused && Math.Abs(router.Snapshot.Position.TotalSeconds - 2.5) < .3);
+        var mpv = (Playback.Mpv.MpvEngine)router.ActiveEngine!;
+        if (mpv.Client!.GetDouble("volume") != 35 || mpv.Client.GetDouble("speed") != 1.5 || Math.Abs((mpv.Client.GetDouble("audio-delay") ?? 0) - .12) > .0001)
+            throw new InvalidOperationException("mpv 切换设置未保留。");
+        await router.PlayAsync(deadline.Token); await UntilAsync(() => router.Snapshot.State == Core.PlaybackState.Playing && router.Snapshot.Position.TotalSeconds > 2.7);
+        await router.StopAsync(deadline.Token);
+        Console.WriteLine("Playback router native switch: OK | mpv -> LibVLC -> mpv, position/pause/rate/delays/session; volume native-verified in mpv, VLC device output pending");
+        async Task UntilAsync(Func<bool> condition)
+        {
+            while (!condition())
+            {
+                if (router.Snapshot.State == Core.PlaybackState.Failed) throw new InvalidOperationException(router.Snapshot.Error);
+                try { await Task.Delay(50, deadline.Token); }
+                catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+                {
+                    var native = (router.ActiveEngine as LibVlcEngine)?.Player;
+                    throw new TimeoutException($"内核切换等待超时：kind={router.ActiveKind}, state={router.Snapshot.State}, position={router.Snapshot.Position.TotalSeconds:F3}, vlcTime={native?.Time}, volume={native?.Volume}, rate={native?.Rate}, audioDelay={native?.AudioDelay}。");
+                }
+            }
+        }
     }
     private static async Task AppGetSmokeAsync(HttpClient http, string location, bool decode, int lineIndex, string? mediaId, string? categoryId)
     {

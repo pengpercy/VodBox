@@ -5,7 +5,7 @@ using VlcCore = LibVLCSharp.Shared.Core;
 
 namespace VodBox.Playback.LibVlc;
 
-public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache = false) : IPlaybackEngine
+public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache = false) : IPlaybackEngine, IPlaybackAdvancedControls
 {
     private readonly SemaphoreSlim _commands = new(1, 1);
     private LibVLC? _lib;
@@ -13,6 +13,7 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
     private Media? _media;
     private long _session;
     private long _startPosition;
+    private int _pauseRequested;
     private PlaybackSnapshot _snapshot = new(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false);
     public PlaybackSnapshot Snapshot => Volatile.Read(ref _snapshot);
     public MediaPlayer? Player => _player;
@@ -55,7 +56,13 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         _player.TimeChanged += (_, e) => Update(position: TimeSpan.FromMilliseconds(e.Time));
         _player.LengthChanged += (_, e) => Update(duration: TimeSpan.FromMilliseconds(Math.Max(0, e.Length)));
         _player.SeekableChanged += (_, e) => Update(canSeek: e.Seekable != 0);
-        _player.Buffering += (_, e) => { if (e.Cache < 100) Update(PlaybackState.Buffering); else if (_player.IsPlaying) Update(PlaybackState.Playing); };
+        _player.Buffering += (_, e) =>
+        {
+            // Seek buffering callbacks may arrive after Paused; preserve the requested pause.
+            if (Volatile.Read(ref _pauseRequested) != 0) return;
+            if (e.Cache < 100) Update(PlaybackState.Buffering);
+            else if (_player.IsPlaying) Update(PlaybackState.Playing);
+        };
         Initialized?.Invoke(this, EventArgs.Empty);
     }
     private void Update(PlaybackState? state = null, string? error = null, TimeSpan? position = null, TimeSpan? duration = null, bool? canSeek = null)
@@ -77,6 +84,7 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         Initialize();
         _player!.Stop(); _player.Media = null; _media?.Dispose();
         _session = sessionId;
+        Volatile.Write(ref _pauseRequested, 0);
         Volatile.Write(ref _snapshot, new(PlaybackState.Loading, TimeSpan.Zero, TimeSpan.Zero, false));
         _media = new Media(_lib!, new Uri(request.Uri));
         foreach (var (key, value) in request.Headers)
@@ -93,9 +101,9 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         Interlocked.Exchange(ref _startPosition, request.StartPositionMs);
         if (!_player.Play(_media)) throw new InvalidOperationException("LibVLC 启动播放失败。");
     }, token);
-    public Task PlayAsync(CancellationToken token) => CommandAsync(() => _player?.Play(), token);
-    public Task PauseAsync(CancellationToken token) => CommandAsync(() => _player?.SetPause(true), token);
-    public Task StopAsync(CancellationToken token) => CommandAsync(() => { _player?.Stop(); Interlocked.Exchange(ref _startPosition, 0); }, token);
+    public Task PlayAsync(CancellationToken token) => CommandAsync(() => { Volatile.Write(ref _pauseRequested, 0); _player?.Play(); }, token);
+    public Task PauseAsync(CancellationToken token) => CommandAsync(() => { Volatile.Write(ref _pauseRequested, 1); _player?.SetPause(true); }, token);
+    public Task StopAsync(CancellationToken token) => CommandAsync(() => { _player?.Stop(); Volatile.Write(ref _pauseRequested, 0); Interlocked.Exchange(ref _startPosition, 0); }, token);
     public Task SeekAsync(TimeSpan position, CancellationToken token) => CommandAsync(() =>
     {
         if (_player is not null && _player.IsSeekable) _player.Time = (long)Math.Clamp(position.TotalMilliseconds, 0, Math.Max(0, _player.Length));
