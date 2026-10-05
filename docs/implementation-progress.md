@@ -68,6 +68,8 @@
 
 MacCMS 适配依据公开接口字段独立实现，没有复制上游应用代码；接口参考：[官方 Provide.php](https://github.com/magicblack/maccms10/blob/master/application/api/controller/Provide.php)。不导入旧 TV 配置或 Java 插件。
 
+`csp_*` Spider 尚未实现：这些标识通常对应配置所引用 JAR 内的 Java Spider 类，当前没有 JAR/JVM 加载器，也没有对应站点的 C# 移植。QuickJS、Python、Node 的 VodBox 插件接口可用，不代表可直接运行旧 Spider 或旧 drpy 脚本。后续需要按站点实现 C# 的首页、分类、搜索、详情与播放解析，再接入现有源接口；不需要增加 Java 兼容层。
+
 缓存 / 直播 / 播放控制阶段：[ed2cc55 六 RID 构建与打包全部通过](https://github.com/pengpercy/VodBox/actions/runs/37245948796)，包含 27 项测试。本轮继续增加分页、筛选、可见海报加载及无反射视频句柄控件，37 项本地测试通过，包含真实 XAML 的无窗口预览与主题资源验证；这些测试不验证原生视频画面或 Mica。
 
 备份阶段增加五项集成测试，当前共 42 项测试通过。验证超过 200 条历史完整导出、较新历史保留、已有收藏合并、配置 / 偏好恢复、错误版本及配置身份拒绝、取消数据库事务回滚。
@@ -77,3 +79,7 @@ MacCMS 适配依据公开接口字段独立实现，没有复制上游应用代�
 备份阶段提交 edd68d0：[本轮 CI](https://github.com/pengpercy/VodBox/actions/runs/37250007256)六 RID 的 42 项测试、Native AOT、实际备份导入、LibVLC 解码及三个脚本协议全部通过。六个安装包任务未启动，GitHub 注释原文为“recent account payments have failed or your spending limit needs to be increased”；整轮因而标记失败，不能称安装包验证通过。按用户要求暂停逐批 CI，CI 改为仅 workflow_dispatch 手动触发，继续本地功能开发和验证，后续集中验证。
 
 弹幕阶段：55 项本地测试通过，新增格式 / DTD / 解压限制 / 编码 / 取消 / 自动地址 / 稠密调度 / seek / 延迟 / 设计预览验证。macOS x64 的真实 LibVLC 视频输出、透明附属窗口、随视频移动、暂停和开关验证通过；这是 JIT 隔离测试驱动，不等同于六平台 AOT GUI 验收。CI 保持手动触发，本轮未运行。详见 [弹幕](danmaku.md)。
+
+双内核阶段：根据用户要求保留 LibVLC 与 libmpv，核心选择策略已通过 10 项测试，完整本地测试共 65 项。libmpv C ABI、SafeHandle、事件轮询、OpenGL Render API 和 Avalonia 实验表面已完成，macOS x64 真实 Native AOT 控制与 GPU 渲染隔离测试通过。主窗口仍使用 LibVLC；实际路由/设置切换、失败回退、状态迁移、网络浏览/投屏和六 RID 双内核打包尚未完成。本轮未触发 CI。
+
+窗口外观：主窗口启用 `ExtendClientAreaToDecorationsHint` 与 40 DIP 标题栏高度，使用 Avalonia 12 的 `WindowDecorationProperties.ElementRole=TitleBar` 标记拖动区域，并保留系统窗口按钮。透明标题栏与现有 Mica/Acrylic/Blur 回退共用背景。65 项本地测试与真实 XAML 设计预览通过；跨平台原生按钮/拖动行为仍待真机验收。

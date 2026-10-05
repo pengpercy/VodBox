@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><PublishAot Condition="'$(RuntimeIdentifier)' != ''">true</PublishAot><PublishTrimmed Condition="'$(RuntimeIdentifier)' != ''">true</PublishTrimmed><TrimMode>full</TrimMode></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/VodBox.Desktop/VodBox.Desktop.csproj" AdditionalProperties="PublishAot=true" Condition="'$(RuntimeIdentifier)' != ''" />
+    <ProjectReference Include="../../src/VodBox.Desktop/VodBox.Desktop.csproj" Condition="'$(RuntimeIdentifier)' == ''" />
+  </ItemGroup>
+</Project>

@@ -13,6 +13,7 @@
     <ProjectReference Include="../VodBox.Application/VodBox.Application.csproj" />
     <ProjectReference Include="../VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
     <ProjectReference Include="../VodBox.Playback.LibVlc/VodBox.Playback.LibVlc.csproj" />
+    <ProjectReference Include="../VodBox.Playback.Mpv/VodBox.Playback.Mpv.csproj" />
     <Content Include="../../examples/**" Exclude="../../examples/**/__pycache__/**;../../examples/**/*.pyc" Link="examples/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../plugins/**" Exclude="../../plugins/**/__pycache__/**;../../plugins/**/*.pyc" Link="plugins/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

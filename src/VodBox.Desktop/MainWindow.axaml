@@ -1,7 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core"
+        xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core" xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
         Title="VodBox" Width="1280" Height="850" MinWidth="960" MinHeight="640"
+        ExtendClientAreaToDecorationsHint="True" ExtendClientAreaTitleBarHeightHint="40" WindowDecorations="Full"
         TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
         TransparencyBackgroundFallback="{DynamicResource WindowFallbackBrush}" Background="Transparent">
   <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
@@ -32,7 +33,9 @@
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}" /></Style>
     <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="16" /></Style>
   </Window.Styles>
-  <Grid RowDefinitions="*,Auto" ColumnDefinitions="180,*">
+  <Grid RowDefinitions="40,*">
+    <Border x:Name="WindowTitleBar" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+    <Grid Grid.Row="1" RowDefinitions="*,Auto" ColumnDefinitions="180,*">
     <Border Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
       <DockPanel>
         <StackPanel DockPanel.Dock="Top" Spacing="8">
@@ -194,5 +197,6 @@
         </Grid>
       </StackPanel>
     </Border>
+    </Grid>
   </Grid>
 </Window>

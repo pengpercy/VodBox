@@ -6,7 +6,7 @@
 
 Screenbox 是非常合适的 C# 播放器应用层参考，可以借鉴接口封装、会话管理、队列、轨道、交互和生命周期处理。它本身是 UWP 应用；底层解码由原生 LibVLC 完成，C# 的 LibVLCSharp 是调用层，并不是纯托管 C# 解码器。
 
-已确认采用 **Avalonia + LibVLC + LibVLCSharp**，参考 Screenbox。实施时验证三平台叠层、硬解、网络 Header、字幕与发布；不再计划 mpv 对照原型。内容层保留 C# Provider、QuickJS、Python、Node.js，Java Spider 按需重写为 C#，不做 Java 兼容层，首版不兼容旧配置。
+最初采用 **Avalonia + LibVLC + LibVLCSharp**，参考 Screenbox。根据用户新增要求，现改为保留 LibVLC 与 libmpv 双内核，提供自动/手动选择；最新实施状态见 [重写方案](avalonia-rewrite-plan.md) 与 [mpv/弹幕进展](danmaku.md)。内容层保留 C# Provider、QuickJS、Python、Node.js，Java Spider 按需重写为 C#，不做 Java 兼容层，首版不兼容旧配置。
 
 参考：[项目说明](https://github.com/huynhsontung/Screenbox)、[LibVLCSharp 官方仓库](https://github.com/videolan/libvlcsharp)。
 
@@ -100,7 +100,7 @@ LibVLCSharp 官方提供 Avalonia 控件并列出 Windows/macOS/Linux，但其�
 
 ## 4. 已确定的内核与实施边界
 
-采用 LibVLC + LibVLCSharp，理由是现成 C# API、Avalonia 控件与 Screenbox 的应用层参考。三平台验证围绕该方案展开，不安排双内核实现或 mpv 比较。
+LibVLC + LibVLCSharp 提供现成 C# API 与 Screenbox 的应用层参考。现在并行实现 libmpv 后端，保留 LibVLC 网络浏览/投屏等能力，并验证用户可选择的双内核播放。
 
 保留 IPlaybackEngine 抽象用于隔离应用逻辑与原生对象。验证控制层/弹幕叠层、HTTP Header、字幕、硬解回退、原生制品和六 RID 打包；确有无法解决的渲染问题时再修订设计。
 
@@ -153,7 +153,7 @@ UI 的 VideoSurfaceView 单独绑定内核所需的渲染适配器，Core 不暴
 
 ## 7. 对原计划的具体影响
 
-- 阶段 1 专注 LibVLC 三平台播放与叠层，不安排 mpv 对照；源码阅读仍不等于运行验证。
+- 已完成的阶段 1 使用 LibVLC 三平台播放；新增阶段实现 libmpv 和自动/手动双内核路由。源码阅读仍不等于运行验证。
 - 应用层参考 Screenbox，TV 作为功能参考；内容与配置使用新契约，通过 PlaybackRequest 进入播放器。
 - C# Provider、QuickJS、Python、Node.js 均保留；无 Java/JVM/Dex 兼容层。
 - 对象拆分补上 QueueNavigator、ProgressStore、EngineLifetimeManager、IUiDispatcher 和轨道模型。

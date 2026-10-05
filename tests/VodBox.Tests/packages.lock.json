@@ -378,7 +378,8 @@
           "CommunityToolkit.Mvvm": "[8.4.2, )",
           "VodBox.Application": "[0.1.0, )",
           "VodBox.Infrastructure": "[0.1.0, )",
-          "VodBox.Playback.LibVlc": "[0.1.0, )"
+          "VodBox.Playback.LibVlc": "[0.1.0, )",
+          "VodBox.Playback.Mpv": "[0.1.0, )"
         }
       },
       "vodbox.application": {
@@ -402,6 +403,12 @@
         "type": "Project",
         "dependencies": {
           "LibVLCSharp": "[3.10.1, )",
+          "VodBox.Core": "[0.1.0, )"
+        }
+      },
+      "vodbox.playback.mpv": {
+        "type": "Project",
+        "dependencies": {
           "VodBox.Core": "[0.1.0, )"
         }
       },
