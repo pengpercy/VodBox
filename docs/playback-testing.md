@@ -128,3 +128,9 @@ xsmp3/psmp3 公开分类与专辑均可读，两个首集媒体小范围读取 H
 149 项回归全部通过，新增 1,000 条内容的实际控件虚拟化、分页追加复用、列数重排顺序与选中状态测试。设计器预览保持通过。日志：`/private/tmp/vodbox-poster-grid-tests.log`。
 
 macOS x64 严格 NativeAOT（完整裁剪，编译／ILC 警告作为错误）编译通过。真实主窗口在 1,000 条海报数据下验证 mpv → LibVLC → mpv、暂停位置、静音、弹幕、900／1280 DIP 切换与渲染表面复用；实际海报 Image 控件数介于 1–100，mpv 渲染 44 帧，进程退出 0。日志：`/private/tmp/vodbox-poster-grid-aot-build.log`、`/private/tmp/vodbox-poster-grid-aot-ui.log`。本轮没有运行 GitHub Actions，也未验证 Windows／Linux 真机。
+
+## 详情与分集浏览本地验收
+
+150 项回归全部通过，新增 2,000 集搜索、倒序、无匹配结果、线路替换／清空和实际按钮虚拟化测试。筛选与排序保持原始线路顺序，未创建播放内核。日志：`/private/tmp/vodbox-detail-browser-tests.log`。
+
+macOS x64 严格 NativeAOT 完整裁剪编译通过，未报告编译或 ILC 警告。真实 AOT 主窗口加载 1,000 条海报和 2,000 集，确认搜索第 2000 集、恢复倒序列表、分集按钮虚拟化和原始线路顺序，同时验证 mpv → LibVLC → mpv、暂停位置、静音、弹幕、900／1280 DIP 布局与表面复用，mpv 渲染 44 帧，退出 0。日志：`/private/tmp/vodbox-detail-browser-aot-build.log`、`/private/tmp/vodbox-detail-browser-aot-ui.log`。独立详情页、完整播放视图及其他平台验收仍待完成；本轮未运行 Actions。

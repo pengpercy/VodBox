@@ -72,9 +72,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private double _volume = 80;
     [ObservableProperty] private double _rate = 1;
     [ObservableProperty] private string _timeText = "00:00 / 00:00";
-    [ObservableProperty] private SourceDefinition? _selectedSource;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailSource))] private SourceDefinition? _selectedSource;
     [ObservableProperty] private Category? _selectedCategory;
-    [ObservableProperty] private MediaItem? _selectedItem;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailTitle)), NotifyPropertyChangedFor(nameof(DetailRemarks))] private MediaItem? _selectedItem;
     [ObservableProperty] private PlaybackLine? _selectedLine;
     [ObservableProperty] private MediaTrack? _selectedAudio;
     [ObservableProperty] private MediaTrack? _selectedSubtitle;
@@ -113,7 +113,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _playlist = new(_coordinator, _factory);
         _aggregateSearch = new(_factory);
         _epg = new(_http, AppPaths.CacheDirectory);
-        _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; InitializeLiveRefresh();
+        _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; InitializeEpisodeBrowser(); InitializeLiveRefresh();
         Engine.StateChanged += OnPlaybackState;
         Engine.ActiveEngineChanged += OnActiveEngineChanged;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>

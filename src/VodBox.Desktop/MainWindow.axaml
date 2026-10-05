@@ -186,14 +186,27 @@
             <Button Grid.Column="1" Content="上一集" Command="{Binding PreviousEpisodeCommand}" />
             <Button Grid.Column="2" Content="下一集" Command="{Binding NextEpisodeCommand}" />
           </Grid>
-          <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <ComboBox ItemsSource="{Binding Lines}" SelectedItem="{Binding SelectedLine}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PlaybackLine"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-            <Button Grid.Column="1" Content="收藏 / 取消" Command="{Binding ToggleFavoriteCommand}" />
+          <Border Grid.Row="2" Padding="12" CornerRadius="8" Background="{DynamicResource CardSurfaceBrush}">
+            <StackPanel Spacing="6">
+              <TextBlock Text="{Binding DetailTitle}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding DetailRemarks}" Classes="muted" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBlock Text="{Binding DetailSource}" Classes="muted" VerticalAlignment="Center" /><Button Grid.Column="1" Content="收藏 / 取消" Command="{Binding ToggleFavoriteCommand}" /></Grid>
+            </StackPanel>
+          </Border>
+          <Expander Grid.Row="3" Header="剧情与简介" HorizontalAlignment="Stretch">
+            <ScrollViewer MaxHeight="120"><TextBlock Text="{Binding Description}" TextWrapping="Wrap" Classes="muted" Margin="8" /></ScrollViewer>
+          </Expander>
+          <Grid Grid.Row="4" IsVisible="{Binding !ShowLive}" RowDefinitions="Auto,Auto,*" RowSpacing="8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10"><TextBlock Text="播放线路" VerticalAlignment="Center" /><ComboBox Grid.Column="1" ItemsSource="{Binding Lines}" SelectedItem="{Binding SelectedLine}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PlaybackLine"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding EpisodeSearch}" PlaceholderText="搜索集数或标题" /><ToggleButton Grid.Column="1" Content="倒序" IsChecked="{Binding ReverseEpisodes}" /></Grid>
+            <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="4">
+              <TextBlock Text="{Binding EpisodeCountText}" Classes="muted" FontSize="12" />
+              <ListBox x:Name="EpisodeList" Grid.Row="1" ItemsSource="{Binding VisibleEpisodes}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /></Style></ListBox.Styles>
+                <ListBox.ItemTemplate><DataTemplate x:DataType="core:Episode"><Button Content="{Binding Title}" Click="EpisodeClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,2" /></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
           </Grid>
-          <TextBlock Grid.Row="3" Text="{Binding Description}" TextWrapping="Wrap" MaxHeight="85" Classes="muted" />
-          <ListBox Grid.Row="4" IsVisible="{Binding !ShowLive}" ItemsSource="{Binding Episodes}" SelectionChanged="EpisodeSelectionChanged" Background="Transparent">
-            <ListBox.ItemTemplate><DataTemplate x:DataType="core:Episode"><TextBlock Text="{Binding Title}" Margin="8,4" /></DataTemplate></ListBox.ItemTemplate>
-          </ListBox>
           <Grid Grid.Row="4" IsVisible="{Binding ShowLive}" RowDefinitions="Auto,*" RowSpacing="8">
             <TextBlock Text="{Binding EpgStatus}" Classes="muted" TextWrapping="Wrap" />
             <ListBox Grid.Row="1" ItemsSource="{Binding Programmes}">

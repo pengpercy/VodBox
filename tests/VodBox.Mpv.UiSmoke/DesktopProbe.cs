@@ -17,6 +17,7 @@ internal static class DesktopProbe
             var vlc = new LibVlcEngine(waitForVideoSurface: true); vlc.Initialized += (_, _) => vlc.Player!.Volume = 0; return vlc;
         }) { Volume = 0, AutoNext = false };
         for (int i = 0; i < 1000; i++) model.Items.Add(new(i.ToString(), $"AOT 海报 {i}"));
+        model.SelectedLine = new("probe", "分集验收", Enumerable.Range(1, 2000).Select(i => new Episode(i.ToString(), $"第 {i} 集")).ToArray());
         var window = new MainWindow(model, initialize: false);
         window.Opened += async (_, _) =>
         {
@@ -67,10 +68,17 @@ internal static class DesktopProbe
                 await Until(() => window.FindControl<Grid>("BrowsePane")!.IsVisible && window.FindControl<Grid>("PlaybackPane")!.IsVisible);
                 int images = window.FindControl<ListBox>("PosterGrid")!.GetVisualDescendants().OfType<Image>().Count();
                 if (images is < 1 or > 100 || model.CardRows.SelectMany(row => row.Cards).Count() != 1000) throw new InvalidOperationException($"Poster virtualization failed: images={images}");
+                model.EpisodeSearch = "2000"; model.ReverseEpisodes = true;
+                await Until(() => model.VisibleEpisodes.Count == 1);
+                if (model.VisibleEpisodes[0].Id != "2000") throw new InvalidOperationException("Episode filtering failed.");
+                model.EpisodeSearch = "";
+                await Until(() => window.FindControl<ListBox>("EpisodeList")!.GetVisualDescendants().OfType<Button>().Any());
+                int episodeButtons = window.FindControl<ListBox>("EpisodeList")!.GetVisualDescendants().OfType<Button>().Count();
+                if (episodeButtons > 100 || model.Episodes[0].Id != "1") throw new InvalidOperationException("Episode virtualization/order failed.");
                 if (!ReferenceEquals(renderSurface, window.FindControl<Grid>("VideoContainer")!.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Resize recreated the native renderer.");
                 await model.TogglePauseCommand.ExecuteAsync(null);
                 await Until(() => window.MpvRenderedFrames > previous + 5 && model.Engine.Snapshot.Position.TotalSeconds > 2.7);
-                Console.WriteLine($"MainWindow dual engines: OK | mpv/VLC/mpv, frames={window.MpvRenderedFrames}, pause/position, device mute, surface reuse, settings binding, inline/native-overlay danmaku, narrow/wide layout, 1000 posters virtualized");
+                Console.WriteLine($"MainWindow dual engines: OK | mpv/VLC/mpv, frames={window.MpvRenderedFrames}, pause/position, device mute, surface reuse, settings binding, inline/native-overlay danmaku, narrow/wide layout, 1000 posters / 2000 episodes virtualized, filter/reverse");
                 window.Close();
             }
             catch (Exception error)

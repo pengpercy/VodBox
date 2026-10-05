@@ -125,6 +125,34 @@ public sealed class DesktopPreviewTests
         finally { window.Close(); await model.DisposeAsync(); }
     }
 
+    [AvaloniaFact]
+    public async Task EpisodeSearchAndReversePreserveLineOrderWithoutOpeningPlayback()
+    {
+        var window = new MainWindow(preview: true);
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            var episodes = Enumerable.Range(1, 2000).Select(i => new Episode(i.ToString(), $"第 {i} 集")).ToArray();
+            model.SelectedLine = new("large", "高清线路", episodes);
+            window.Show(); Dispatcher.UIThread.RunJobs();
+            Assert.Equal(2000, model.VisibleEpisodes.Count); Assert.Equal("共 2000 集", model.EpisodeCountText);
+            model.EpisodeSearch = " 19 "; model.ReverseEpisodes = true;
+            var expected = episodes.Where(episode => episode.Title.Contains("19", StringComparison.OrdinalIgnoreCase)).Reverse();
+            Assert.Equal(expected, model.VisibleEpisodes); Assert.Equal(episodes, model.Episodes);
+            Assert.Null(model.Engine.ActiveEngine);
+            model.EpisodeSearch = "不存在"; Assert.Empty(model.VisibleEpisodes);
+            model.EpisodeSearch = ""; Dispatcher.UIThread.RunJobs();
+            Assert.Equal("2000", model.VisibleEpisodes[0].Id);
+            int buttons = window.FindControl<ListBox>("EpisodeList")!.GetVisualDescendants().OfType<Button>().Count();
+            Assert.InRange(buttons, 1, 100);
+            model.SelectedLine = new("other", "另一线路", [new("new", "新集数")]);
+            Dispatcher.UIThread.RunJobs(); Assert.Single(model.VisibleEpisodes); Assert.Equal("new", model.VisibleEpisodes[0].Id);
+            model.SelectedLine = null; Dispatcher.UIThread.RunJobs(); Assert.Empty(model.VisibleEpisodes);
+            Assert.Null(model.Engine.ActiveEngine);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
     [Fact]
     public void PosterVisibilityCancelsOldLoadAndReleasesInactiveCard()
     {

@@ -12,6 +12,7 @@ public sealed class DesignMainViewModel : MainViewModel
         Items.Add(new("1", "探索自然", Remarks: "纪录片 · 4K"));
         Items.Add(new("2", "城市与远方", Remarks: "电影 · 1080p"));
         Items.Add(new("3", "旅途中的声音", Remarks: "音乐 · 无损"));
+        SelectedItem = Items[0];
         Description = "在这里浏览内容源，选择播放线路和集数。此数据仅用于设计器预览。";
         NowPlaying = "探索自然 · 第 1 集"; Status = "设计预览，不启动任何运行时服务。";
         DanmakuComments = [new(718000, "设计预览 · 弹幕", DanmakuMode.Scroll), new(719000, "跟随媒体时间轴", DanmakuMode.Top, 0x60AEFF)];

@@ -149,8 +149,8 @@ public sealed partial class MainWindow : Window
     private void FullscreenClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
     private void SeekPressed(object? sender, PointerPressedEventArgs e) { if (_viewModel is not null) _viewModel.IsScrubbing = true; }
     private async void SeekReleased(object? sender, PointerReleasedEventArgs e) { if (_viewModel is not null) { await _viewModel.SeekAsync(); _viewModel.IsScrubbing = false; } }
-    private async void EpisodeSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    { if (_viewModel is not null && e.AddedItems.OfType<Episode>().FirstOrDefault() is { } episode) await _viewModel.PlayEpisodeCommand.ExecuteAsync(episode); }
+    private async void EpisodeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { if (_viewModel is not null && sender is Button { DataContext: Episode episode }) await _viewModel.PlayEpisodeCommand.ExecuteAsync(episode); }
     private async void LiveSelectionChanged(object? sender, SelectionChangedEventArgs e)
     { if (_viewModel is not null && e.AddedItems.OfType<LiveChannel>().FirstOrDefault() is { } channel) await _viewModel.PlayChannelCommand.ExecuteAsync(channel); }
     private async void HistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
