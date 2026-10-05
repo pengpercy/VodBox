@@ -74,3 +74,5 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 海报缓存、直播恢复、快捷键、延迟、截图与主题操作见 [桌面操作](docs/desktop-controls.md)。
 
 设置页支持导出与合并导入数据备份，范围和恢复规则见 [数据备份](docs/data-backup.md)。
+
+为节约 GitHub Actions 额度，CI 当前仅支持手动触发，代码推送不会自动运行。备份阶段的六 RID 测试与 AOT 诊断通过；安装包任务因账户付款 / 支出限制未启动，详见实现进度。后续功能先在本地开发和验证，再集中执行 CI。

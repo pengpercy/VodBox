@@ -72,3 +72,5 @@ MacCMS 适配依据公开接口字段独立实现，没有复制上游应用代�
 备份阶段增加五项集成测试，当前共 42 项测试通过。验证超过 200 条历史完整导出、较新历史保留、已有收藏合并、配置 / 偏好恢复、错误版本及配置身份拒绝、取消数据库事务回滚。
 
 备份导出 / 导入已加入实际 AOT 诊断，本地 macOS x64 执行通过；无反射视频宿主 / 分页阶段的六 RID 构建均通过，[流水线](https://github.com/pengpercy/VodBox/actions/runs/37249201548)打包结果另行记录。
+
+备份阶段提交 edd68d0：[本轮 CI](https://github.com/pengpercy/VodBox/actions/runs/37250007256)六 RID 的 42 项测试、Native AOT、实际备份导入、LibVLC 解码及三个脚本协议全部通过。六个安装包任务未启动，GitHub 注释原文为“recent account payments have failed or your spending limit needs to be increased”；整轮因而标记失败，不能称安装包验证通过。按用户要求暂停逐批 CI，CI 改为仅 workflow_dispatch 手动触发，继续本地功能开发和验证，后续集中验证。
