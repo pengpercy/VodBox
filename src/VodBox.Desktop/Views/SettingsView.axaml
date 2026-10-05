@@ -5,15 +5,19 @@
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <TabControl x:Name="SettingsTabs">
-    <TabItem Header="通用">
-      <views:SettingsGeneralView />
-    </TabItem>
-    <TabItem Header="播放">
-      <views:SettingsPlaybackView />
-    </TabItem>
-    <TabItem Header="弹幕">
-      <views:SettingsDanmakuView />
-    </TabItem>
-  </TabControl>
+  <Grid RowDefinitions="Auto,*" RowSpacing="12">
+    <Button x:Name="ReturnHomeButton" Content="返回首页" HorizontalAlignment="Left"
+            Command="{Binding NavigateCommand}" CommandParameter="首页" />
+    <TabControl x:Name="SettingsTabs" Grid.Row="1">
+      <TabItem Header="通用">
+        <views:SettingsGeneralView />
+      </TabItem>
+      <TabItem Header="播放">
+        <views:SettingsPlaybackView />
+      </TabItem>
+      <TabItem Header="弹幕">
+        <views:SettingsDanmakuView />
+      </TabItem>
+    </TabControl>
+  </Grid>
 </UserControl>

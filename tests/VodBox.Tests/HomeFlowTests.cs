@@ -84,6 +84,13 @@ public sealed class HomeFlowTests
             Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
             await model.NavigateCommand.ExecuteAsync("设置"); Dispatcher.UIThread.RunJobs();
             Assert.True(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            var returnHome = window.FindControl<VodBox.Desktop.Views.SettingsView>("SettingsPage")!.FindControl<Button>("ReturnHomeButton")!;
+            Assert.True(returnHome.IsEffectivelyVisible);
+            Assert.Same(model.NavigateCommand, returnHome.Command);
+            Assert.Equal("首页", returnHome.CommandParameter);
+            await Assert.IsAssignableFrom<CommunityToolkit.Mvvm.Input.IAsyncRelayCommand>(returnHome.Command).ExecuteAsync(returnHome.CommandParameter);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(model.ShowHome); Assert.False(model.ShowSettings);
         }
         finally { window.Close(); await model.DisposeAsync(); }
     }
