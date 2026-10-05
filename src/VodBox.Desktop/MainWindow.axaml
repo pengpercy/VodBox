@@ -11,8 +11,8 @@
   </Design.DataContext>
   <Grid x:Name="WindowLayout" RowDefinitions="40,*">
     <Border x:Name="WindowTitleBar" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
-    <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*,Auto" ColumnDefinitions="180,*">
-      <Border x:Name="NavigationPane" Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
+    <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*" ColumnDefinitions="180,*">
+      <Border x:Name="NavigationPane" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
         <DockPanel>
           <StackPanel DockPanel.Dock="Top" Spacing="8">
             <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
@@ -59,13 +59,11 @@
             <views:LiveView x:Name="LivePage" IsVisible="{Binding ShowLive}" />
             <views:HistoryView x:Name="HistoryPage" IsVisible="{Binding ShowHistory}" />
             <views:FavoritesView x:Name="FavoritesPage" IsVisible="{Binding ShowFavorites}" />
-            <views:SettingsView x:Name="SettingsPage" IsVisible="{Binding ShowSettings}" />
           </Grid>
           <views:PlaybackView x:Name="PlaybackPane" Grid.Column="1" />
         </Grid>
         <TextBlock x:Name="StatusBar" Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
       </Grid>
-      <views:PlaybackControlsView x:Name="PlaybackControls" Grid.Row="1" Grid.Column="1" IsVisible="{Binding ShowPlaybackPage}" />
     </Grid>
   </Grid>
 </Window>

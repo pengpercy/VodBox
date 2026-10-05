@@ -24,9 +24,9 @@ public partial class MainViewModel
         _initialized = true; await RefreshSavedConfigurationsAsync(); await RefreshRecentHistoryAsync();
         var saved = SavedConfigurations.FirstOrDefault(x => x.Id == preferences.LastConfigId);
         if (saved is not null) { await LoadSavedConfigurationAsync(saved); if (ResumeLiveOnStartup) await ResumeLastLiveAsync(); return; }
-        var legacySnapshot = _legacyConfigPath;
-        if (File.Exists(legacySnapshot)) { ConfigLocation = legacySnapshot; await LoadConfigAsync(); }
-        else { ConfigLocation = ""; HomeRecommendationStatus = "请在设置中配置点播播放源。"; }
+        // Only restore a configuration explicitly selected in saved preferences.
+        // Development snapshots must not become a first-launch playback source.
+        ConfigLocation = ""; HomeRecommendationStatus = "请在设置中配置点播播放源。";
     }
     private AppPreferences CapturePreferences() => new()
     {

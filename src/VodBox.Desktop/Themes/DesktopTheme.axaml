@@ -6,7 +6,7 @@
           <SolidColorBrush x:Key="WindowFallbackBrush" Color="#111317" />
           <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#7016191F" />
           <SolidColorBrush x:Key="CardSurfaceBrush" Color="#B020252E" />
-          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#A01B2028" />
+          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#801B2028" />
           <SolidColorBrush x:Key="MutedForegroundBrush" Color="#9BA4B4" />
           <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#1A1E25" />
         </ResourceDictionary>
@@ -14,7 +14,7 @@
           <SolidColorBrush x:Key="WindowFallbackBrush" Color="#F4F6FA" />
           <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#90EBEFF5" />
           <SolidColorBrush x:Key="CardSurfaceBrush" Color="#C0FFFFFF" />
-          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#B0F0F3F8" />
+          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#90F0F3F8" />
           <SolidColorBrush x:Key="MutedForegroundBrush" Color="#526076" />
           <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#F5F7FA" />
         </ResourceDictionary>

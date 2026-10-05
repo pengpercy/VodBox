@@ -7,16 +7,15 @@
   </Design.DataContext>
   <Grid x:Name="PlaybackLayout" RowDefinitions="2*,Auto,Auto,*" ColumnDefinitions="3*,2*" RowSpacing="12" ColumnSpacing="16">
     <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180" x:Name="VideoFrame">
-      <Grid x:Name="VideoHost">
-        <vm:VlcVideoSurface x:Name="SurfaceControl" />
-        <vm:DanmakuView x:Name="DanmakuControl" IsVisible="False" />
+      <Grid>
+        <Grid x:Name="VideoHost">
+          <vm:VlcVideoSurface x:Name="SurfaceControl" />
+          <vm:DanmakuView x:Name="DanmakuControl" IsVisible="False" />
+        </Grid>
+        <views:PlaybackControlsView x:Name="PlayerControls" VerticalAlignment="Bottom" Margin="12" />
       </Grid>
     </Border>
-    <Grid x:Name="PlaybackHeading" Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Grid.ColumnSpan="2">
-      <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
-      <Button Grid.Column="1" Content="上一集" Command="{Binding PreviousEpisodeCommand}" />
-      <Button Grid.Column="2" Content="下一集" Command="{Binding NextEpisodeCommand}" />
-    </Grid>
+    <TextBlock x:Name="PlaybackHeading" Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
     <Grid x:Name="DetailRegion" Grid.Column="1"><views:DetailSummaryView x:Name="DetailSummary" IsVisible="{Binding !IsLivePlayback}" /></Grid>
     <Grid x:Name="EpisodeRegion" Grid.Row="3" Grid.ColumnSpan="2"><views:EpisodeBrowserView x:Name="EpisodesPanel" IsVisible="{Binding !IsLivePlayback}" />
     <views:ProgrammeView IsVisible="{Binding IsLivePlayback}" /></Grid>

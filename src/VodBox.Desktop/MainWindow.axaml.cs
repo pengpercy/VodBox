@@ -13,6 +13,7 @@ public sealed partial class MainWindow : Window
     private readonly MainViewModel? _viewModel;
     public Views.PlaybackView PlaybackView => PlaybackPane;
     public Views.LibraryView LibraryView => LibraryPage;
+    private Views.PlaybackControlsView PlaybackControls => PlaybackPane.ControlsView;
     private Grid VideoContainer => PlaybackPane.VideoContainer;
     private VlcVideoSurface VideoSurface => PlaybackPane.VideoSurface;
     private DanmakuView DanmakuPreview => PlaybackPane.DanmakuPreview;
@@ -34,13 +35,13 @@ public sealed partial class MainWindow : Window
         {
             // The designer has no desktop compositor; give sample content a readable backdrop.
             var design = new DesignMainViewModel(); DataContext = design; PlaybackPane.ConfigureDesignPreview(design);
-            InitializeAdaptiveLayout(design);
+            InitializeAdaptiveLayout(design); InitializeSettingsWindow(design);
             Closed += (_, _) => DanmakuPreview.Dispose();
             Background = new SolidColorBrush(Color.Parse("#111317"));
             return;
         }
         _viewModel = model ?? new(); DataContext = _viewModel;
-        InitializeAdaptiveLayout(_viewModel);
+        InitializeAdaptiveLayout(_viewModel); InitializeSettingsWindow(_viewModel);
         DanmakuPreview.Attach(_viewModel);
         _danmakuOverlay = new(this, VideoContainer, _viewModel);
         _playbackControlsOverlay = new(this, VideoContainer, PlaybackControls, _viewModel);
@@ -70,7 +71,7 @@ public sealed partial class MainWindow : Window
         Closing += async (_, e) =>
         {
             if (_closing) return;
-            e.Cancel = true; _closing = true;
+            e.Cancel = true; _closing = true; SettingsWindow?.Close();
             try
             {
                 _surfaceLifetime.Cancel(); _viewModel.Engine.ActiveEngineChanged -= EngineChanged;

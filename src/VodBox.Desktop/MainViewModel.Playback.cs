@@ -10,6 +10,9 @@ public sealed record PlaybackEngineChoice(string Name, PlaybackEngineMode Mode);
 
 public partial class MainViewModel
 {
+    public string CurrentTimeText => TimeText.Contains(" / ", StringComparison.Ordinal) ? TimeText[..TimeText.IndexOf(" / ", StringComparison.Ordinal)] : TimeText;
+    public string TotalTimeText => TimeText.Contains(" / ", StringComparison.Ordinal) ? TimeText[(TimeText.IndexOf(" / ", StringComparison.Ordinal) + 3)..] : "00:00";
+
     public IReadOnlyList<PlaybackEngineChoice> PlaybackEngineChoices { get; } =
     [new("自动选择", PlaybackEngineMode.Automatic), new("libmpv", PlaybackEngineMode.Mpv), new("LibVLC", PlaybackEngineMode.LibVlc)];
     [ObservableProperty] private PlaybackEngineChoice _selectedPlaybackEngine = new("自动选择", PlaybackEngineMode.Automatic);

@@ -167,3 +167,9 @@ MSBuild 实际求值确认：Debug（含 RID）PublishAot=false、PublishTrimmed
 171 项本地回归通过，包含 15 个独立视图预览，以及首次启动不加载示例、设置配置成功后返回首页/失败留在设置、推荐与分类搜索隔离、首页全屏返回。旧播放页用例显式进入播放/点播再验证，没有削弱全屏、弹幕、海报或分集断言。
 
 macOS x64 严格 NativeAOT/full trim 发布通过（编译和 ILC 警告作为错误）。真实 AOT 主窗口导航包含新增首页，检查推荐快照、首页可见与侧栏隐藏；随后验证原有设置/直播/历史/收藏/点播与播放页往返、LibVLC/mpv 切换、透明原生叠层、全屏控制/倍速和视频表面复用，渲染 77 帧，进程退出 0。日志：`/private/tmp/vodbox-home-tests.log`、`/private/tmp/vodbox-home-aot-build.log`、`/private/tmp/vodbox-home-aot-ui.log`。本轮没有截图级视觉验收或 Windows/Linux 真机验收，没有运行 GitHub Actions。
+
+### 2026-10-05：独立设置窗口与视频内悬浮控制区
+
+本地完整回归 178 项通过；严格 NativeAOT 发布 osx-x64 UI probe 成功。真实 macOS 窗口验证退出码 0，mpv → VLC → mpv、73 帧视频、窗口及全屏控制区、设置窗口往返、播放倍速保留均通过。日志位于本地 `/private/tmp/vodbox-floating-controls-aot-build.log` 和 `/private/tmp/vodbox-floating-controls-aot-ui.log`。Debug 依赖已重新恢复以保留设计器预览。未运行 GitHub Actions；Windows/Linux 真机验证仍待完成。
+
+真实 Avalonia 控件的离屏渲染输出位于 `artifacts/previews/`，设置窗口包含收紧菜单及贴边滚动区域。播放预览背景是示意渐变，不是原生视频截图；原生视频另由上述集成验证覆盖。应用样式改为显式 StyleInclude 引用，便于 IDE 追踪共享样式类；编辑器诊断列表未通过自动化直接读取。

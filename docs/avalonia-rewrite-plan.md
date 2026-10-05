@@ -8,7 +8,7 @@
 
 六个 RID 的本机 Native AOT 编译、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试及全部安装包生成均已通过 [Actions 验证](https://github.com/pengpercy/VodBox/actions/runs/37223401606)（代码提交 7105ef7）。Windows x64/ARM64 生成 ZIP，macOS Intel/Apple Silicon 生成 app/ZIP/DMG，Linux x64/ARM64 生成 deb/rpm/AppImage。打包检查实际依赖文件哈希，macOS 另外验证 ad-hoc 签名与封包后的宿主运行。尚未完成各平台有画面的交互、长时稳定性和全部安装后的真机测试；本地公开直播测试已观察到 VideoToolbox 解码，但未完成全面硬件解码验证。
 
-当前已补充 C# MacCMS HTTP JSON/XML 适配、聚合搜索、配置仓库、偏好、收藏打开、历史重新解析、连续播放、片头片尾、直播恢复与备用重试、XMLTV 缓存、解析链、流代理和浏览器嗅探；后续增加海报缓存与可见加载、年份 / 完结筛选、单源搜索分页、桌面控制、主题、备份 / 合并导入及无窗口 XAML 预览。当前 171 项本地测试通过，macOS x64 严格 Native AOT 编译及实际备份导出导入诊断通过。CI 与真机验收分别记录在 [功能清单](implementation-progress.md)。弹幕加载、调度、透明叠层和设置已实现并完成 macOS 窗口行为验证；其余平台和全屏叠层待验收，通用筛选元数据、聚合分页和局域网扩展仍需实施。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定。
+当前已补充 C# MacCMS HTTP JSON/XML 适配、聚合搜索、配置仓库、偏好、收藏打开、历史重新解析、连续播放、片头片尾、直播恢复与备用重试、XMLTV 缓存、解析链、流代理和浏览器嗅探；后续增加海报缓存与可见加载、年份 / 完结筛选、单源搜索分页、桌面控制、主题、备份 / 合并导入及无窗口 XAML 预览。当前 178 项本地测试通过，macOS x64 严格 Native AOT 编译及实际备份导出导入诊断通过。CI 与真机验收分别记录在 [功能清单](implementation-progress.md)。弹幕加载、调度、透明叠层和设置已实现并完成 macOS 窗口行为验证；其余平台和全屏叠层待验收，通用筛选元数据、聚合分页和局域网扩展仍需实施。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定。
 
 用户提供的饭太硬地址作为后续测试来源；它返回旧配置，不能直接作为新版配置加载。已提取公开直播列表形成新版测试示例，未导入 Java 插件；网络可达性与实际播放记录见 [播放测试](playback-testing.md)。
 
@@ -22,7 +22,7 @@
 
 - 基础版本锁定 .NET SDK 10.0.401、运行时 10.0.12、Avalonia 12.1.3，均为核对时的最新稳定版。LibVLCSharp 3.10.1 已支持 Avalonia 12。后续升级仍固定具体稳定版本并重新验证 Native AOT。
 - 按用户最新要求保留 **LibVLC + libmpv 双内核**。主窗口已提供自动、固定 libmpv、固定 LibVLC：自动模式点播/直播/本地媒体优先 libmpv，网络文件系统选择 LibVLC；普通播放启动或运行失败可回退一次并提示原因，固定模式不自动切换。macOS x64 的实际主窗口往返切换与两种弹幕已通过 JIT/AOT 验证，六 RID 双内核打包和网络浏览/投屏业务仍待完成。
-- 界面布局也参考 FongMi/TV 的 leanback / mobile 与宽屏资源，只适配 PC 操作。已实现虚拟化海报网格和分集筛选；按 Home／Vod／Type／Video 与设置子页职责拆成 15 个独立视图。浏览与播放独立，播放页内部宽屏视频／详情并列、窄屏上下排列，设置分通用／播放／弹幕；保留 Design.DataContext、Mica 与扩展标题栏。依据和范围见 [PC 布局](desktop-layout.md)。
+- 界面布局也参考 FongMi/TV 的 leanback / mobile 与宽屏资源，只适配 PC 操作。已实现虚拟化海报网格和分集筛选；按 Home／Vod／Type／Video 与设置子页职责拆成 15 个独立视图。浏览与播放独立，播放页内部宽屏视频／详情并列、窄屏上下排列，独立设置窗口以侧栏切换通用／播放／弹幕；保留 Design.DataContext、Mica 与扩展标题栏。依据和范围见 [PC 布局](desktop-layout.md)。
 - 内容源支持 C# Provider、QuickJS、Python、Node.js 四种实现方式。
 - Java Spider 的业务逻辑按需要用 C# Provider 重写；不实现 Java/JVM/Dex 兼容层，不随包分发 JRE。
 - QuickJS-NG 通过项目内薄 C ABI 和 C# LibraryImport 源码生成绑定接入，定义 VodBox 自有宿主 API，避免反射式 CLR 互操作。

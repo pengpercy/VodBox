@@ -35,7 +35,7 @@ dotnet run --project src/VodBox.Desktop
 
 图标资源位于 `src/VodBox.Desktop/Assets/Icons/`；平台尺寸、macOS 透明留白及导出方式见 [资源说明](src/VodBox.Desktop/Assets/Icons/README.md)。
 
-首次运行不自动加载示例：从首页进入「设置」，点击顶部「点播」或「直播」行，加载 VodBox JSON 配置后返回首页；两处目前共用一个配置包。首页推荐与点播分类独立，推送/投屏暂未实现。
+首次运行不自动加载示例：从首页打开独立「设置」窗口，在左侧「通用」中点击「点播」或「直播」行，加载 VodBox JSON 配置后返回首页；两处目前共用一个配置包。首页推荐与点播分类独立，推送/投屏暂未实现。
 
 ## Native AOT 与打包
 
@@ -83,9 +83,9 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
 
-主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。171 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
+主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。178 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
 
-界面参考 FongMi/TV 的页面职责拆成 15 个独立视图：浏览与播放独立，播放页内部宽屏并列、窄屏上下排列；设置分通用／播放／弹幕。海报网格和分集支持虚拟化，保留编译绑定、设计预览、Mica 与扩展标题栏。全屏控制自动隐藏和三平台布局验收仍待完成，见 [PC 布局](docs/desktop-layout.md)。
+界面参考 FongMi/TV 的页面职责拆成 15 个独立视图：浏览与播放独立，播放页内部宽屏并列、窄屏上下排列；独立设置窗口以侧栏切换通用／播放／弹幕。海报网格和分集支持虚拟化，保留编译绑定、设计预览、Mica 与扩展标题栏。全屏控制自动隐藏和三平台布局验收仍待完成，见 [PC 布局](docs/desktop-layout.md)。
 
 libmpv 尚未纳入全部发行包。开发时可通过 `VODBOX_MPV_PATH` 指定本机原生库完整路径；未提供 mpv 时，自动模式会尝试现有 LibVLC。不要将本机 GUI 验收视为三平台安装包验收。
 

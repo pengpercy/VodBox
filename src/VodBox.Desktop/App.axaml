@@ -1,3 +1,3 @@
-<Application xmlns:themes="using:VodBox.Desktop.Themes" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.App" RequestedThemeVariant="Dark">
-  <Application.Styles><FluentTheme /><themes:DesktopTheme /></Application.Styles>
+<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.App" RequestedThemeVariant="Dark">
+  <Application.Styles><FluentTheme /><StyleInclude Source="avares://VodBox/Themes/DesktopTheme.axaml" /></Application.Styles>
 </Application>

@@ -73,7 +73,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private double _duration;
     [ObservableProperty] private double _volume = 80;
     [ObservableProperty] private double _rate = 1;
-    [ObservableProperty] private string _timeText = "00:00 / 00:00";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CurrentTimeText)), NotifyPropertyChangedFor(nameof(TotalTimeText))] private string _timeText = "00:00 / 00:00";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailSource)), NotifyPropertyChangedFor(nameof(HomeTitle)), NotifyPropertyChangedFor(nameof(VodSourceSummary))] private SourceDefinition? _selectedSource;
     [ObservableProperty] private Category? _selectedCategory;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailTitle)), NotifyPropertyChangedFor(nameof(DetailRemarks))] private MediaItem? _selectedItem;
@@ -100,7 +100,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _epgStatus = "选择频道查看节目表。";
     public bool IsScrubbing { get; set; }
 
-    private readonly string _legacyConfigPath;
     public MainViewModel(bool designMode = false, Func<PlaybackEngineKind, IPlaybackEngine>? engineFactory = null, string? configurationDirectory = null)
     {
         _designMode = designMode;
@@ -112,7 +111,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         var host = Path.Combine(AppLayout.PluginHostDirectory, OperatingSystem.IsWindows() ? "VodBox.PluginHost.exe" : "VodBox.PluginHost");
         _factory = new(_http, host, AppLayout.AssetsDirectory);
         var configurationRoot = configurationDirectory ?? AppPaths.ConfigurationDirectory;
-        _legacyConfigPath = Path.Combine(configurationDirectory ?? AppPaths.DataDirectory, "config.json");
         _configurations = new(Path.Combine(configurationRoot, "configurations"));
         _preferencesStore = new(Path.Combine(configurationRoot, "preferences.json"));
         _playlist = new(_coordinator, _factory);
@@ -207,10 +205,16 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         bool exists = (await _store.GetFavoritesAsync()).Any(x => x.ConfigId == entry.ConfigId && x.SourceId == entry.SourceId && x.MediaId == entry.MediaId);
         await _store.SetFavoriteAsync(entry, !exists); Status = exists ? "已取消收藏。" : "已加入收藏。";
     });
+    public event EventHandler? SettingsRequested;
+
     [RelayCommand] private Task NavigateAsync(string page) => RunAsync(async () =>
     {
+        if (page == "设置")
+        {
+            ShowSettings = true; SettingsRequested?.Invoke(this, EventArgs.Empty); return;
+        }
         ShowPlaybackPage = false;
-        ShowHome = page == "首页"; ShowLibrary = page is "发现" or "点播" or "搜索"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = page == "设置"; PageTitle = page;
+        ShowHome = page == "首页"; ShowLibrary = page is "发现" or "点播" or "搜索"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = false; PageTitle = page;
         if (ShowHome) await RefreshRecentHistoryAsync();
         if (ShowLibrary && Items.Count == 0 && _provider is not null) await BrowseAsync();
         if (ShowHistory) { History.Clear(); foreach (var entry in await _store.GetHistoryAsync()) History.Add(entry); }

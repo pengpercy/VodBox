@@ -1,83 +1,112 @@
-<UserControl
-    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:core="using:VodBox.Core" x:Class="VodBox.Desktop.Views.PlaybackControlsView" x:DataType="vm:MainViewModel"
-    x:CompileBindings="True">
-  <Design.DataContext>
-    <vm:DesignMainViewModel />
-  </Design.DataContext>
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:core="using:VodBox.Core" x:Class="VodBox.Desktop.Views.PlaybackControlsView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
+  <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
   <UserControl.Styles>
-    <Style Selector="Button.playerIcon">
-      <Setter Property="Width" Value="36" /><Setter Property="Height" Value="36" />
-      <Setter Property="MinWidth" Value="0" /><Setter Property="Padding" Value="8" />
-      <Setter Property="Margin" Value="0" /><Setter Property="VerticalAlignment" Value="Center" /><Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" /><Setter Property="CornerRadius" Value="18" />
+    <Style Selector="Slider#SeekSlider /template/ Thumb">
+      <Setter Property="Width" Value="16" /><Setter Property="Height" Value="16" />
+      <Setter Property="MinWidth" Value="0" /><Setter Property="MinHeight" Value="0" />
+      <Setter Property="Template"><ControlTemplate><Grid Background="Transparent"><Ellipse x:Name="SeekDot" Width="8" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" Fill="{DynamicResource SystemControlHighlightAccentBrush}" /></Grid></ControlTemplate></Setter>
     </Style>
-    <Style Selector="Button.playerIcon:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#30FFFFFF" />
+    <Style Selector="Slider#SeekSlider /template/ Thumb /template/ Ellipse#SeekDot">
+      <Setter Property="RenderTransform"><ScaleTransform ScaleX="1" ScaleY="1" /></Setter>
+    </Style>
+    <Style Selector="Slider#SeekSlider /template/ Thumb:pointerover /template/ Ellipse#SeekDot">
+      <Setter Property="RenderTransform"><ScaleTransform ScaleX="1.5" ScaleY="1.5" /></Setter>
+    </Style>
+    <Style Selector="Button.playerIcon">
+      <Setter Property="Width" Value="32" /><Setter Property="Height" Value="32" />
+      <Setter Property="MinWidth" Value="0" /><Setter Property="Padding" Value="7" />
+      <Setter Property="Margin" Value="0" /><Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Button.playerIcon:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#30FFFFFF" /></Style>
+    <Style Selector="Button.playerText">
+      <Setter Property="Height" Value="32" /><Setter Property="MinWidth" Value="0" /><Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" /><Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" /><Setter Property="CornerRadius" Value="6" />
     </Style>
   </UserControl.Styles>
   <ThemeVariantScope x:Name="ControlsTheme">
-  <Border x:Name="ControlsBackground" Background="{DynamicResource PlayerControlsSurfaceBrush}" Padding="16,8">
-    <StackPanel Spacing="4">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-        <Slider x:Name="SeekSlider" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" PointerPressed="SeekPressed" PointerReleased="SeekReleased" />
-        <TextBlock Grid.Column="1" Text="{Binding TimeText}" VerticalAlignment="Center" Classes="muted" />
-      </Grid>
-      <Grid x:Name="TransportRow" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" Height="36">
-        <Button Grid.Column="8" x:Name="FullscreenButton" Classes="playerIcon" Click="FullscreenClick" ToolTip.Tip="全屏 / 窗口 (F11)" AutomationProperties.Name="全屏 / 窗口">
-          <Path x:Name="FullscreenIcon" Data="M0,6 V0 H6 M12,0 H18 V6 M18,12 V18 H12 M6,18 H0 V12" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.8" />
-        </Button>
-        <Button x:Name="PauseButton" Classes="playerIcon" Command="{Binding TogglePauseCommand}" ToolTip.Tip="暂停 / 继续 (空格)" AutomationProperties.Name="暂停 / 继续">
-          <Grid Width="18" Height="18">
-            <Path x:Name="PauseIcon" Data="M3,0 H7 V18 H3 Z M11,0 H15 V18 H11 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" IsVisible="{Binding IsActivelyPlaying}" />
-            <Path x:Name="PlayIcon" Data="M3,0 L17,9 L3,18 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" IsVisible="{Binding !IsActivelyPlaying}" />
-          </Grid>
-        </Button>
-        <Button Grid.Column="1" Classes="playerIcon" Command="{Binding StopCommand}" ToolTip.Tip="停止" AutomationProperties.Name="停止">
-          <Path Data="M2,2 H16 V16 H2 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-        </Button>
-        <Button Grid.Column="2" Classes="playerIcon" Click="AddSubtitleClick" ToolTip.Tip="添加字幕" AutomationProperties.Name="添加字幕">
-          <Path Data="M0,2 H18 V16 H0 Z M3,7 H7 M10,7 H15 M3,11 H11 M14,11 H15" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" />
-        </Button>
-        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Path Width="18" Height="18" VerticalAlignment="Center" Data="M0,6 H4 L9,1 V17 L4,12 H0 Z M12,5 Q17,9 12,13" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}" StrokeThickness="1.5" ToolTip.Tip="音量" />
-          <Slider Width="80" VerticalAlignment="Center" AutomationProperties.Name="音量" Minimum="0" Maximum="100" Value="{Binding Volume}" />
-        </StackPanel>
-          <Button Grid.Column="5" x:Name="RateButton" Height="36" VerticalAlignment="Center" Content="{Binding Rate, StringFormat='{}{0:0.##}×'}" MinWidth="0" Padding="8,4" Background="Transparent" BorderThickness="0" ToolTip.Tip="播放倍速">
-            <Button.Flyout>
-              <Flyout Placement="Top">
-                <StackPanel Spacing="8" Width="200">
-                  <TextBlock Text="播放倍速" FontWeight="SemiBold" />
-                  <WrapPanel>
-                    <Button Content="0.5×" Tag="0.5" Click="RatePresetClick" />
-                    <Button Content="1×" Tag="1" Click="RatePresetClick" />
-                    <Button Content="1.25×" Tag="1.25" Click="RatePresetClick" />
-                    <Button Content="1.5×" Tag="1.5" Click="RatePresetClick" />
-                    <Button Content="2×" Tag="2" Click="RatePresetClick" />
-                    <Button Content="3×" Tag="3" Click="RatePresetClick" />
-                  </WrapPanel>
-                  <Slider x:Name="PlaybackRate" Minimum="0.25" Maximum="4" TickFrequency="0.25" IsSnapToTickEnabled="True" Value="{Binding Rate}" />
-                  <TextBlock Text="{Binding Rate, StringFormat='当前：{0:0.##}×'}" HorizontalAlignment="Center" />
-                </StackPanel>
-              </Flyout>
-            </Button.Flyout>
+    <Border x:Name="ControlsBackground" Background="{DynamicResource PlayerControlsSurfaceBrush}" CornerRadius="6" Padding="12,8">
+      <StackPanel Spacing="4">
+        <Slider x:Name="SeekSlider" Height="32" MinHeight="0" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" PointerPressed="SeekPressed" PointerReleased="SeekReleased" />
+        <Grid x:Name="TransportRow" ColumnDefinitions="*,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6" Height="32">
+          <TextBlock x:Name="MediaTitle" HorizontalAlignment="Left" Text="{Binding NowPlaying}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="12" />
+          <StackPanel x:Name="PlaybackCluster" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CurrentTimeText}" Width="56" TextAlignment="Right" FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <Button Classes="playerIcon" Command="{Binding PreviousEpisodeCommand}" ToolTip.Tip="上一集" AutomationProperties.Name="上一集">
+              <Path Data="M2,1 V17 M17,1 L5,9 L17,17 Z" Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" />
+            </Button>
+            <Button x:Name="PauseButton" Classes="playerIcon" Command="{Binding TogglePauseCommand}" ToolTip.Tip="暂停 / 继续 (空格)" AutomationProperties.Name="暂停 / 继续">
+              <Grid Width="18" Height="18">
+                <Path x:Name="PauseIcon" Data="M3,0 H7 V18 H3 Z M11,0 H15 V18 H11 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" IsVisible="{Binding IsActivelyPlaying}" />
+                <Path x:Name="PlayIcon" Data="M3,0 L17,9 L3,18 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" IsVisible="{Binding !IsActivelyPlaying}" />
+              </Grid>
+            </Button>
+            <Button Classes="playerIcon" Command="{Binding NextEpisodeCommand}" ToolTip.Tip="下一集" AutomationProperties.Name="下一集">
+              <Path Data="M16,1 V17 M1,1 L13,9 L1,17 Z" Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" />
+            </Button>
+            <TextBlock Text="{Binding TotalTimeText}" Width="56" TextAlignment="Left" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Grid.Column="3" x:Name="VolumeButton" Classes="playerText" ToolTip.Tip="音量" AutomationProperties.Name="音量">
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <Path Width="18" Height="18" VerticalAlignment="Center" Data="M0,6 H4 L9,1 V17 L4,12 H0 Z M12,5 Q17,9 12,13" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" />
+              <TextBlock x:Name="VolumePercent" Text="{Binding Volume, StringFormat='{}{0:0}%'}" FontSize="11" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button.Flyout><Flyout Placement="Top"><StackPanel Width="180" Spacing="8">
+              <TextBlock Text="音量" FontWeight="SemiBold" />
+              <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" AutomationProperties.Name="音量" />
+              <Button Content="静音 / 恢复" Click="MuteClick" />
+            </StackPanel></Flyout></Button.Flyout>
           </Button>
-        <ComboBox Grid.Column="6" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" PlaceholderText="音轨" MinWidth="80" MaxWidth="120" Height="36" VerticalAlignment="Center">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="core:MediaTrack">
-              <TextBlock Text="{Binding Name}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <ComboBox Grid.Column="7" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitle}" PlaceholderText="字幕" MinWidth="80" MaxWidth="120" Height="36" VerticalAlignment="Center">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="core:MediaTrack">
-              <TextBlock Text="{Binding Name}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-      </Grid>
-    </StackPanel>
-  </Border>
+          <Button Grid.Column="4" x:Name="RateButton" Classes="playerText" Width="40" FontSize="12" Content="{Binding Rate, StringFormat='{}{0:0.##}×'}" ToolTip.Tip="播放倍速">
+            <Button.Flyout><Flyout Placement="Top"><StackPanel Spacing="8" Width="200">
+              <TextBlock Text="播放倍速" FontWeight="SemiBold" />
+              <WrapPanel>
+                <Button Content="0.5×" Tag="0.5" Click="RatePresetClick" /><Button Content="1×" Tag="1" Click="RatePresetClick" />
+                <Button Content="1.25×" Tag="1.25" Click="RatePresetClick" /><Button Content="1.5×" Tag="1.5" Click="RatePresetClick" />
+                <Button Content="2×" Tag="2" Click="RatePresetClick" /><Button Content="3×" Tag="3" Click="RatePresetClick" />
+              </WrapPanel>
+              <Slider x:Name="PlaybackRate" Minimum="0.25" Maximum="4" TickFrequency="0.25" IsSnapToTickEnabled="True" Value="{Binding Rate}" />
+              <TextBlock Text="{Binding Rate, StringFormat='当前：{0:0.##}×'}" HorizontalAlignment="Center" />
+            </StackPanel></Flyout></Button.Flyout>
+          </Button>
+          <Button Grid.Column="5" x:Name="AudioButton" Classes="playerIcon" ToolTip.Tip="音轨" AutomationProperties.Name="音轨">
+            <Path Data="M4,3 H14 V9 H17 L9,17 L1,9 H4 Z" Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" />
+            <Button.Flyout><Flyout Placement="Top"><StackPanel Width="240" Spacing="8">
+              <TextBlock Text="音轨" FontWeight="SemiBold" />
+              <ListBox ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" MaxHeight="200">
+                <ListBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel></Flyout></Button.Flyout>
+          </Button>
+          <Button Grid.Column="6" x:Name="SubtitleButton" Classes="playerIcon" ToolTip.Tip="字幕" AutomationProperties.Name="字幕">
+            <Path Data="M0,2 H18 V16 H0 Z M3,7 H7 M10,7 H15 M3,11 H11 M14,11 H15" Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" />
+            <Button.Flyout><Flyout Placement="Top"><StackPanel Width="240" Spacing="8">
+              <StackPanel x:Name="CompactMediaOptions" IsVisible="False" Spacing="8">
+                <TextBlock Text="音轨" FontWeight="SemiBold" />
+                <ListBox ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" MaxHeight="160">
+                  <ListBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /></DataTemplate></ListBox.ItemTemplate>
+                </ListBox>
+                <Button x:Name="CompactRateOption" Content="播放倍速" Click="CompactRateClick" />
+                <Button Content="停止播放" Command="{Binding StopCommand}" />
+              </StackPanel>
+              <TextBlock Text="字幕" FontWeight="SemiBold" />
+              <ListBox ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitle}" MaxHeight="200">
+                <ListBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+              <Button Content="添加字幕文件" Click="AddSubtitleClick" />
+            </StackPanel></Flyout></Button.Flyout>
+          </Button>
+          <Button Grid.Column="7" x:Name="StopButton" Classes="playerIcon" Command="{Binding StopCommand}" ToolTip.Tip="停止" AutomationProperties.Name="停止">
+            <Path Data="M3,3 H15 V15 H3 Z" Width="18" Height="18" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+          </Button>
+          <Button Grid.Column="8" x:Name="FullscreenButton" Classes="playerIcon" Click="FullscreenClick" ToolTip.Tip="全屏 / 窗口 (F11)" AutomationProperties.Name="全屏 / 窗口">
+            <Path x:Name="FullscreenIcon" Data="M0,6 V0 H6 M12,0 H18 V6 M18,12 V18 H12 M6,18 H0 V12" Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.8" />
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
   </ThemeVariantScope>
 </UserControl>

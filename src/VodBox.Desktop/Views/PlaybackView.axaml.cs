@@ -4,6 +4,7 @@ namespace VodBox.Desktop.Views;
 
 public sealed partial class PlaybackView : UserControl
 {
+    public PlaybackControlsView ControlsView => PlayerControls;
     public PlaybackView()
     {
         InitializeComponent();

@@ -66,23 +66,26 @@ internal static class DesktopProbe
                 if (!surface.IsVisible || !ReferenceEquals(surface.MediaPlayer, vlc.Player)) throw new InvalidOperationException("VLC surface not attached.");
                 await Until(() => vlc.Player!.Volume == 0);
                 await Until(() => window.ActiveDanmakuCount > 0);
-                SetRate(window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!, 1.25);
+                await Until(() => desktop.Windows.Any(candidate => candidate.IsVisible && candidate.Content is VodBox.Desktop.Views.PlaybackControlsView));
+                var vlcControls = desktop.Windows.Single(candidate => candidate.IsVisible && candidate.Content is VodBox.Desktop.Views.PlaybackControlsView);
+                SetRate((VodBox.Desktop.Views.PlaybackControlsView)vlcControls.Content!, 1.25);
                 await Until(() => Math.Abs(vlc.Player.Rate - 1.25) < .01);
                 stage = "vlc-fullscreen-controls";
                 window.ToggleFullscreen();
-                await Until(() => window.Bounds.Width > 1500 && !window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!.IsVisible);
+                await Until(() => window.Bounds.Width > 1500 && !window.PlaybackView.ControlsView.IsVisible);
                 var overlay = ((Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)Avalonia.Application.Current!.ApplicationLifetime!).Windows
                     .Single(candidate => candidate.IsVisible && candidate.Content is VodBox.Desktop.Views.PlaybackControlsView);
                 SetRate((VodBox.Desktop.Views.PlaybackControlsView)overlay.Content!, 1.25);
                 await Until(() => Math.Abs(vlc.Player.Rate - 1.25) < .01);
                 await Task.Delay(1200); // Allow the macOS fullscreen Space animation to settle.
                 window.ToggleFullscreen();
-                await Until(() => window.Bounds.Width < 1500 && !overlay.IsVisible);
+                await Until(() => window.Bounds.Width < 1500 && overlay.IsVisible);
                 await Task.Delay(1200);
                 stage = "vlc-navigation";
                 await model.NavigateCommand.ExecuteAsync("设置");
-                window.FindControl<VodBox.Desktop.Views.SettingsView>("SettingsPage")!.ShowPlaybackSettings();
+                window.SettingsWindow!.SettingsView.ShowPlaybackSettings();
                 await Until(() => window.ActiveDanmakuCount == 0);
+                window.SettingsWindow!.Close();
                 model.ShowPlaybackPage = true;
                 await Until(() => window.ActiveDanmakuCount > 0);
                 if (!ReferenceEquals(surface.MediaPlayer, vlc.Player)) throw new InvalidOperationException("Navigation recreated VLC drawable.");
@@ -118,6 +121,13 @@ internal static class DesktopProbe
                 foreach (string page in new[] { "首页", "设置", "直播", "历史", "收藏", "点播" })
                 {
                     await model.NavigateCommand.ExecuteAsync(page);
+                    if (page == "设置")
+                    {
+                        if (window.SettingsWindow?.IsVisible != true || !model.ShowPlaybackPage) throw new InvalidOperationException("Settings window changed the playback page.");
+                        window.SettingsWindow.Close();
+                        if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Settings recreated mpv renderer.");
+                        continue;
+                    }
                     await Until(() => !window.PlaybackView.IsEffectivelyVisible);
                     if (page == "首页" && (!window.FindControl<VodBox.Desktop.Views.HomeView>("HomePage")!.IsEffectivelyVisible || window.FindControl<Border>("NavigationPane")!.IsVisible || model.HomeCards.Count != 12)) throw new InvalidOperationException("Home layout or recommendation snapshot failed.");
                     model.ShowPlaybackPage = true;
@@ -129,21 +139,24 @@ internal static class DesktopProbe
                 window.ToggleFullscreen();
                 await Until(() => window.WindowState == WindowState.FullScreen && window.Bounds.Width > 1400 && window.PlaybackView.VideoContainer.Bounds.Width > 1400 && Math.Abs(window.PlaybackView.VideoContainer.Bounds.Height - window.Bounds.Height) < 2);
                 Console.WriteLine($"Fullscreen actual client={window.Bounds}, renderScale={window.RenderScaling}, screen={window.Screens.ScreenFromWindow(window)?.Bounds}");
-                var fullscreenControls = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!;
+                var fullscreenControls = window.PlaybackView.ControlsView;
                 var background = fullscreenControls.FindControl<Border>("ControlsBackground")!;
                 var row = fullscreenControls.FindControl<Grid>("TransportRow")!;
-                if (background.Background is not Avalonia.Media.ISolidColorBrush { Color.A: 0 }) throw new InvalidOperationException("Fullscreen controls have an opaque background.");
+                if (background.Background is not Avalonia.Media.ISolidColorBrush { Color.A: > 0 and < 255 }) throw new InvalidOperationException("Floating controls do not have a translucent background.");
                 var controlsOrigin = fullscreenControls.TranslatePoint(default, window.PlaybackView.VideoContainer);
-                if (controlsOrigin is null || controlsOrigin.Value.Y >= window.PlaybackView.VideoContainer.Bounds.Height || Math.Abs(controlsOrigin.Value.Y + fullscreenControls.Bounds.Height - window.PlaybackView.VideoContainer.Bounds.Height) > 2)
+                if (controlsOrigin is null || controlsOrigin.Value.Y >= window.PlaybackView.VideoContainer.Bounds.Height || Math.Abs(controlsOrigin.Value.Y + fullscreenControls.Bounds.Height + 12 - window.PlaybackView.VideoContainer.Bounds.Height) > 2)
                     throw new InvalidOperationException("Controls do not overlay the video bottom.");
-                foreach (var control in row.Children)
+                var playButton = fullscreenControls.FindControl<Button>("PauseButton")!;
+                var playCenter = playButton.TranslatePoint(new Avalonia.Point(playButton.Bounds.Width / 2, playButton.Bounds.Height / 2), row);
+                if (playCenter is null || Math.Abs(playCenter.Value.X - row.Bounds.Width / 2) > 1) throw new InvalidOperationException("Play button is not centered over the video.");
+                foreach (var control in row.Children.Where(child => child.IsVisible))
                 {
                     var center = control.TranslatePoint(new Avalonia.Point(0, control.Bounds.Height / 2), row);
                     if (center is null || Math.Abs(center.Value.Y - row.Bounds.Height / 2) > 1) throw new InvalidOperationException("Playback controls are not horizontally aligned.");
                 }
                 await Until(() => !window.FindControl<Border>("NavigationPane")!.IsVisible && window.PlaybackView.VideoContainer.Bounds.Width > 900);
                 if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Fullscreen recreated mpv renderer.");
-                SetRate(window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!, 1.5);
+                SetRate(window.PlaybackView.ControlsView, 1.5);
                 await Until(() => Math.Abs(((MpvEngine)model.Engine.ActiveEngine!).Client!.GetDouble("speed").GetValueOrDefault() - 1.5) < .01);
                 await Task.Delay(1200);
                 window.ToggleFullscreen();

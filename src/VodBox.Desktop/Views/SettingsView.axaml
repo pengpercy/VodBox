@@ -1,23 +1,48 @@
-<UserControl
-    xmlns="https://github.com/avaloniaui" xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel"
-    x:CompileBindings="True">
-  <Design.DataContext>
-    <vm:DesignMainViewModel />
-  </Design.DataContext>
-  <Grid RowDefinitions="Auto,*" RowSpacing="12">
-    <Button x:Name="ReturnHomeButton" Content="返回首页" HorizontalAlignment="Left"
-            Command="{Binding NavigateCommand}" CommandParameter="首页" />
-    <TabControl x:Name="SettingsTabs" Grid.Row="1">
-      <TabItem Header="通用">
-        <views:SettingsGeneralView />
-      </TabItem>
-      <TabItem Header="播放">
-        <views:SettingsPlaybackView />
-      </TabItem>
-      <TabItem Header="弹幕">
-        <views:SettingsDanmakuView />
-      </TabItem>
-    </TabControl>
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.Views.SettingsView"
+             x:DataType="vm:MainViewModel" x:CompileBindings="True">
+  <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
+  <UserControl.Styles>
+    <Style Selector="ListBox.settingsMenu ListBoxItem">
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="Margin" Value="0,0,0,3" />
+      <Setter Property="MinHeight" Value="36" /><Setter Property="Height" Value="36" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FocusAdorner">
+        <Template><Border Classes="settingsMenuFocus" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}" IsHitTestVisible="False" /></Template>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.settingsMenu ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="ListBox.settingsMenu ListBoxItem /template/ Border#PART_LayoutRoot">
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="ListBox.settingsMenu ListBoxItem:selected">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </UserControl.Styles>
+  <Grid ColumnDefinitions="160,*">
+    <Border x:Name="SidebarBackground" Background="{DynamicResource SidebarSurfaceBrush}" Padding="12,60,12,20">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="设置" FontSize="24" FontWeight="SemiBold" Margin="8,0,0,20" />
+        <TextBlock DockPanel.Dock="Bottom" Text="偏好更改即时生效" Classes="muted" FontSize="11" Margin="8,16,0,0" TextWrapping="Wrap" />
+        <ListBox x:Name="SettingsMenu" Classes="settingsMenu" SelectionChanged="MenuSelectionChanged" SelectedIndex="0" Background="Transparent" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBoxItem Content="通用" />
+          <ListBoxItem Content="播放" />
+          <ListBoxItem Content="弹幕" />
+        </ListBox>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Column="1" Margin="0,40,0,0" RowDefinitions="Auto,*" RowSpacing="12">
+      <TextBlock x:Name="SectionTitle" Text="通用设置" Margin="24,20,24,0" FontSize="22" FontWeight="SemiBold" />
+      <Grid Grid.Row="1">
+        <views:SettingsGeneralView x:Name="GeneralPage" />
+        <views:SettingsPlaybackView x:Name="PlaybackPage" IsVisible="False" />
+        <views:SettingsDanmakuView x:Name="DanmakuPage" IsVisible="False" />
+      </Grid>
+    </Grid>
   </Grid>
 </UserControl>

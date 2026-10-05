@@ -56,9 +56,9 @@ public sealed class DesktopPreviewTests
             Assert.Equal(3, viewModel.PlaybackEngineChoices.Count);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "探索自然");
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "你的媒体，随处播放");
-            viewModel.ShowLibrary = false; viewModel.ShowSettings = true; viewModel.ShowPlaybackPage = false;
-            window.FindControl<VodBox.Desktop.Views.SettingsView>("SettingsPage")!.ShowPlaybackSettings(); Dispatcher.UIThread.RunJobs();
-            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "播放内核");
+            await viewModel.NavigateCommand.ExecuteAsync("设置");
+            window.SettingsWindow!.SettingsView.ShowPlaybackSettings(); Dispatcher.UIThread.RunJobs();
+            Assert.Contains(window.SettingsWindow.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "播放内核");
             viewModel.SelectedPlaybackEngine = viewModel.PlaybackEngineChoices[2];
             Assert.Equal(PlaybackEngineMode.LibVlc, viewModel.Engine.Mode); Assert.Null(viewModel.Engine.ActiveEngine);
         }
@@ -234,11 +234,66 @@ public sealed class DesktopPreviewTests
             var summary = playback.FindControl<Grid>("DetailRegion")!;
             Assert.Equal(0, Grid.GetRow(summary)); Assert.Equal(1, Grid.GetColumn(summary));
             await model.NavigateCommand.ExecuteAsync("设置"); Dispatcher.UIThread.RunJobs();
-            Assert.False(model.ShowPlaybackPage); Assert.False(playback.IsVisible); Assert.Equal("设置", model.WorkspaceTitle);
+            Assert.True(model.ShowPlaybackPage); Assert.True(playback.IsVisible); Assert.True(window.SettingsWindow!.IsVisible);
+            window.SettingsWindow.Close();
+            await model.NavigateCommand.ExecuteAsync("点播"); Dispatcher.UIThread.RunJobs();
+            Assert.False(model.ShowPlaybackPage); Assert.False(playback.IsVisible);
             model.ShowPlaybackPage = true; window.Width = 900; Dispatcher.UIThread.RunJobs();
             Assert.Equal(2, Grid.GetRow(summary)); Assert.Equal(0, Grid.GetColumn(summary));
             Assert.Same(video, playback.VideoContainer); Assert.Equal("影片与播放", model.WorkspaceTitle);
             Assert.Null(model.Engine.ActiveEngine);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(900)]
+    [InlineData(1064)]
+    [InlineData(1280)]
+    [InlineData(1600)]
+    public async Task WindowedControlsFloatWithinVideoInsteadOfReservingWindowSpace(int width)
+    {
+        var window = new MainWindow(preview: true) { Width = width };
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            model.ShowPlaybackPage = true; window.Show(); Dispatcher.UIThread.RunJobs();
+            var controls = window.PlaybackView.ControlsView;
+            var video = window.PlaybackView.VideoContainer;
+            var origin = controls.TranslatePoint(default, video)!.Value;
+            Assert.InRange(origin.X, 11, 13);
+            Assert.InRange(origin.Y + controls.Bounds.Height, video.Bounds.Height - 13, video.Bounds.Height - 11);
+            Assert.InRange(controls.Bounds.Width, video.Bounds.Width - 25, video.Bounds.Width - 23);
+            var background = controls.FindControl<Border>("ControlsBackground")!;
+            Assert.InRange(Assert.IsAssignableFrom<ISolidColorBrush>(background.Background).Color.A, (byte)1, (byte)254);
+            Assert.Equal(new CornerRadius(6), background.CornerRadius);
+            Assert.Empty(controls.GetVisualDescendants().OfType<ComboBox>());
+            var seek = controls.FindControl<Slider>("SeekSlider")!;
+            var thumb = seek.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Thumb>().Single();
+            var dot = thumb.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single();
+            Assert.Equal(8, dot.Width); Assert.Equal(8, dot.Height);
+            Assert.Equal(1, Assert.IsType<ScaleTransform>(dot.RenderTransform).ScaleX);
+            window.MouseMove(thumb.TranslatePoint(new Point(thumb.Bounds.Width / 2, thumb.Bounds.Height / 2), window)!.Value);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1.5, Assert.IsType<ScaleTransform>(dot.RenderTransform).ScaleX);
+            window.MouseMove(new Point(0, 0)); Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1, Assert.IsType<ScaleTransform>(dot.RenderTransform).ScaleX);
+            var rateButton = controls.FindControl<Button>("RateButton")!;
+            if (rateButton.IsVisible)
+            {
+                var label = rateButton.GetVisualDescendants().OfType<TextBlock>().Single(text => Equals(text.Text, rateButton.Content));
+                Assert.InRange(label.TranslatePoint(new Point(0, label.Bounds.Height / 2), rateButton)!.Value.Y, 15, 17);
+            }
+
+            Assert.Single(window.FindControl<Grid>("AppShell")!.RowDefinitions);
+            var row = controls.FindControl<Grid>("TransportRow")!;
+            var play = controls.FindControl<Button>("PauseButton")!;
+            Assert.InRange(play.TranslatePoint(new Point(play.Bounds.Width / 2, play.Bounds.Height / 2), row)!.Value.X, row.Bounds.Width / 2 - 1, row.Bounds.Width / 2 + 1);
+            var cluster = controls.FindControl<StackPanel>("PlaybackCluster")!;
+            var clusterRight = cluster.TranslatePoint(new Point(cluster.Bounds.Width, 0), row)!.Value.X;
+            Assert.All(row.Children.Where(child => child.IsVisible && Grid.GetColumn(child) >= 3), child =>
+                Assert.True(child.TranslatePoint(default, row)!.Value.X >= clusterRight + 2, "Auxiliary controls overlap the centered playback group."));
+            Assert.All(row.Children.Where(child => child.IsVisible), child => Assert.InRange(child.TranslatePoint(new Point(0, child.Bounds.Height / 2), row)!.Value.Y, row.Bounds.Height / 2 - 1, row.Bounds.Height / 2 + 1));
         }
         finally { window.Close(); await model.DisposeAsync(); }
     }
@@ -261,27 +316,30 @@ public sealed class DesktopPreviewTests
             Assert.Equal(WindowState.FullScreen, window.WindowState);
             Assert.True(model.ShowPlaybackPage);
             Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
-            var rateButton = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!.FindControl<Button>("RateButton")!;
+            var rateButton = window.PlaybackView.ControlsView.FindControl<Button>("RateButton")!;
             rateButton.Flyout!.ShowAt(rateButton); Dispatcher.UIThread.RunJobs();
             var preset = ((Control)((Flyout)rateButton.Flyout).Content!).GetVisualDescendants().OfType<Button>().Single(button => Equals(button.Tag, "2"));
             preset.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(2, model.Rate); Assert.Equal("2×", rateButton.Content);
             rateButton.Flyout.ShowAt(rateButton); Dispatcher.UIThread.RunJobs();
-            var rate = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!.FindControl<Slider>("PlaybackRate")!;
+            var rate = window.PlaybackView.ControlsView.FindControl<Slider>("PlaybackRate")!;
             rate.Value = 1.5; Assert.Equal(1.5, model.Rate);
             Assert.Equal("1.5×", rateButton.Content); rateButton.Flyout.Hide();
-            var controls = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!;
+            var controls = window.PlaybackView.ControlsView;
             Assert.Equal(0, Grid.GetRow(controls));
             var row = controls.FindControl<Grid>("TransportRow")!;
-            Assert.All(row.Children, child => Assert.InRange(child.TranslatePoint(new Point(0, child.Bounds.Height / 2), row)!.Value.Y, row.Bounds.Height / 2 - 1, row.Bounds.Height / 2 + 1));
+            var play = controls.FindControl<Button>("PauseButton")!;
+            Assert.InRange(play.TranslatePoint(new Point(play.Bounds.Width / 2, play.Bounds.Height / 2), row)!.Value.X, row.Bounds.Width / 2 - 1, row.Bounds.Width / 2 + 1);
+            Assert.All(row.Children.Where(child => child.IsVisible), child => Assert.InRange(child.TranslatePoint(new Point(0, child.Bounds.Height / 2), row)!.Value.Y, row.Bounds.Height / 2 - 1, row.Bounds.Height / 2 + 1));
             model.PlayerState = PlaybackState.Playing;
             Assert.True(controls.FindControl<Avalonia.Controls.Shapes.Path>("PauseIcon")!.IsVisible);
             Assert.False(controls.FindControl<Avalonia.Controls.Shapes.Path>("PlayIcon")!.IsVisible);
             model.PlayerState = PlaybackState.Paused;
             Assert.True(controls.FindControl<Avalonia.Controls.Shapes.Path>("PlayIcon")!.IsVisible);
             Assert.Equal(Avalonia.Layout.VerticalAlignment.Bottom, controls.VerticalAlignment);
-            Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(controls.FindControl<Border>("ControlsBackground")!.Background).Color);
-            Assert.Equal(0, window.FindControl<Grid>("AppShell")!.RowDefinitions[1].Height.Value);
+            Assert.InRange(Assert.IsAssignableFrom<ISolidColorBrush>(controls.FindControl<Border>("ControlsBackground")!.Background).Color.A, (byte)1, (byte)254);
+            Assert.Contains(window.PlaybackView.FindControl<Border>("VideoFrame")!, controls.GetVisualAncestors());
+            Assert.Single(window.FindControl<Grid>("AppShell")!.RowDefinitions);
             Assert.False(window.PlaybackView.FindControl<Grid>("DetailRegion")!.IsVisible);
             Assert.Same(video, window.PlaybackView.VideoContainer);
             var exitButton = controls.FindControl<Button>("FullscreenButton")!;
@@ -289,7 +347,7 @@ public sealed class DesktopPreviewTests
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(WindowState.Normal, window.WindowState);
             Assert.Equal(playback, model.ShowPlaybackPage); Assert.Equal(1.5, model.Rate);
-            Assert.Equal(1, Grid.GetRow(controls));
+            Assert.Equal(0, Grid.GetRow(controls));
             Assert.NotEqual(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(controls.FindControl<Border>("ControlsBackground")!.Background).Color);
             Assert.True(window.FindControl<Border>("NavigationPane")!.IsVisible);
             Assert.True(window.PlaybackView.FindControl<Grid>("DetailRegion")!.IsVisible);

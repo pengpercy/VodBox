@@ -44,9 +44,6 @@ public sealed partial class MainWindow
         Workspace.RowSpacing = fullscreen || home ? 0 : 16;
         PlaybackPane.SetFullscreenPresentation(fullscreen);
         PlaybackControls.SetFullscreenPresentation(fullscreen);
-        AppShell.RowDefinitions[1].Height = fullscreen ? new(0) : GridLength.Auto;
-        Grid.SetRow(PlaybackControls, fullscreen ? 0 : 1);
-        PlaybackControls.VerticalAlignment = fullscreen ? Avalonia.Layout.VerticalAlignment.Bottom : Avalonia.Layout.VerticalAlignment.Stretch;
         _playbackControlsOverlay?.Update();
         bool compact = (Bounds.Width > 0 ? Bounds.Width : Width) < 1180;
         AppShell.ColumnDefinitions[0].Width = new(fullscreen || home ? 0 : compact ? 132 : 180);

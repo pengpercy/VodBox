@@ -5,8 +5,8 @@
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <ScrollViewer>
-    <StackPanel Spacing="16" Margin="0,12">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="16" Margin="24,12,24,20">
       <Button Click="ConfigureSourceClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="16,12">
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Text="点播" /><TextBlock Grid.Column="1" Text="{Binding VodSourceSummary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" /></Grid>
       </Button>

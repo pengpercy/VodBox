@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Controls.Primitives;
+using Avalonia.VisualTree;
 using VodBox.Core;
 
 namespace VodBox.Desktop.Views;
@@ -12,17 +14,41 @@ public sealed partial class PlaybackControlsView : UserControl
     public void SetFullscreenPresentation(bool fullscreen)
     {
         FullscreenIcon.Data = fullscreen ? CollapseIcon : ExpandIcon;
-        if (fullscreen) ControlsTheme.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark; else ControlsTheme.ClearValue(ThemeVariantScope.RequestedThemeVariantProperty);
-        if (fullscreen) ControlsBackground.Background = Avalonia.Media.Brushes.Transparent;
-        else ControlsBackground.Bind(Border.BackgroundProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("PlayerControlsSurfaceBrush"));
     }
     private MainViewModel? Model => DataContext as MainViewModel;
-    public PlaybackControlsView() => InitializeComponent();
+    public PlaybackControlsView()
+    {
+        InitializeComponent();
+        SizeChanged += (_, _) => UpdateTransportLayout();
+        SeekSlider.TemplateApplied += (_, _) =>
+        {
+            foreach (var thumb in SeekSlider.GetVisualDescendants().OfType<Thumb>())
+            { thumb.Width = 16; thumb.Height = 16; thumb.MinWidth = 0; thumb.MinHeight = 0; }
+        };
+    }
+    private void UpdateTransportLayout()
+    {
+        bool wide = Bounds.Width >= 900;
+        Grid.SetColumn(PlaybackCluster, 0);
+        Grid.SetColumnSpan(PlaybackCluster, 9);
+        PlaybackCluster.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+        TransportRow.ColumnSpacing = wide ? 6 : 4;
+        MediaTitle.MaxWidth = Math.Max(0, (Bounds.Width - 24 - 250) / 2 - 12);
+        AudioButton.IsVisible = wide; StopButton.IsVisible = wide;
+        CompactMediaOptions.IsVisible = !wide;
+        VolumePercent.IsVisible = Bounds.Width >= 680;
+        RateButton.IsVisible = Bounds.Width >= 560;
+        CompactRateOption.IsVisible = !RateButton.IsVisible;
+        ToolTip.SetTip(SubtitleButton, wide ? "字幕" : "音轨 / 字幕");
+    }
+    private void CompactRateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    { SubtitleButton.Flyout?.Hide(); RateButton.Flyout?.ShowAt(SubtitleButton); }
     private void RatePresetClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Model is not null && sender is Button { Tag: string value } && double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double rate))
         { Model.Rate = rate; RateButton.Flyout?.Hide(); }
     }
+    private void MuteClick(object? sender, Avalonia.Interactivity.RoutedEventArgs args) => Model?.ToggleMute();
     private Task<string?> PickAsync(string title) => ViewFilePicker.PickAsync(this, title);
     private async void AddSubtitleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     { if (Model is not null && await PickAsync("打开字幕") is { } path) await Model.AddSubtitleAsync(path); }

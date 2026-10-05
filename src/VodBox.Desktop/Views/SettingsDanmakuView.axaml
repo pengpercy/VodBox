@@ -4,8 +4,8 @@
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <ScrollViewer>
-    <StackPanel Spacing="16" Margin="0,12">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="16" Margin="24,12,24,20">
       <TextBlock Text="弹幕" FontWeight="SemiBold" FontSize="18" />
       <ToggleSwitch Content="显示弹幕" IsChecked="{Binding DanmakuEnabled}" />
       <TextBox Text="{Binding DanmakuLocation}" PlaceholderText="XML / JSON 弹幕地址或本地路径" />

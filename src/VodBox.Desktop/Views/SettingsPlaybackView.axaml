@@ -4,8 +4,8 @@
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <ScrollViewer>
-    <StackPanel Spacing="16" Margin="0,12">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="16" Margin="24,12,24,20">
       <TextBlock Text="播放内核" FontWeight="SemiBold" FontSize="18" />
       <ComboBox ItemsSource="{Binding PlaybackEngineChoices}" SelectedItem="{Binding SelectedPlaybackEngine}" HorizontalAlignment="Stretch">
         <ComboBox.ItemTemplate>
