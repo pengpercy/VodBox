@@ -178,6 +178,7 @@ public partial class MainViewModel
         {
             var detail = await provider.GetDetailAsync(item.Id, cancellation.Token);
             cancellation.Token.ThrowIfCancellationRequested(); if (!ReferenceEquals(provider, _provider)) return;
+            ShowPlaybackPage = true;
             _detail = detail; _settingDetail = true;
             try { SelectedItem = detail.Item; } finally { _settingDetail = false; }
             Description = detail.Description; Lines.Clear(); foreach (var line in detail.PlaybackLines) Lines.Add(line); SelectedLine = Lines.FirstOrDefault();
@@ -191,7 +192,7 @@ public partial class MainViewModel
         await EnsureStoredConfigurationAsync(configId);
         var source = _config.Sources.FirstOrDefault(x => x.Id == sourceId) ?? throw new InvalidDataException("记录所属内容源已被移除。");
         await SelectSourceAsync(source); await DetailAsync(new(mediaId, ""));
-        await NavigateAsync("发现"); SchedulePreferencesSave();
+        await NavigateAsync("发现"); ShowPlaybackPage = true; SchedulePreferencesSave();
     }
     private async Task EnsureStoredConfigurationAsync(string configId)
     {

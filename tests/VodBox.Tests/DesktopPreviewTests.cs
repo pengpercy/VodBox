@@ -25,8 +25,8 @@ public sealed class DesktopPreviewTests
     [AvaloniaTheory]
     [InlineData(900, false, true, false)]
     [InlineData(900, true, false, true)]
-    [InlineData(1280, false, true, true)]
-    [InlineData(1600, true, true, true)]
+    [InlineData(1280, false, true, false)]
+    [InlineData(1600, true, false, true)]
     public async Task DesktopLayoutAdaptsBrowsingAndPlaybackWithoutRecreatingVideoContainer(int width, bool playback, bool browseVisible, bool playbackVisible)
     {
         var window = new MainWindow(preview: true) { Width = width };
@@ -35,10 +35,10 @@ public sealed class DesktopPreviewTests
         {
             window.Show(); model.ShowPlaybackPage = playback; Dispatcher.UIThread.RunJobs();
             Assert.Equal(browseVisible, window.FindControl<Grid>("BrowsePane")!.IsVisible);
-            Assert.Equal(playbackVisible, window.FindControl<Grid>("PlaybackPane")!.IsVisible);
-            var container = window.FindControl<Grid>("VideoContainer")!;
+            Assert.Equal(playbackVisible, window.FindControl<VodBox.Desktop.Views.PlaybackView>("PlaybackPane")!.IsVisible);
+            var container = window.PlaybackView.VideoContainer!;
             model.ShowPlaybackPage = !playback; Dispatcher.UIThread.RunJobs();
-            Assert.Same(container, window.FindControl<Grid>("VideoContainer")); Assert.Null(model.Engine.ActiveEngine);
+            Assert.Same(container, window.PlaybackView.VideoContainer); Assert.Null(model.Engine.ActiveEngine);
         }
         finally { window.Close(); await model.DisposeAsync(); }
     }
@@ -56,7 +56,8 @@ public sealed class DesktopPreviewTests
             Assert.Equal(3, viewModel.PlaybackEngineChoices.Count);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "探索自然");
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "你的媒体，随处播放");
-            viewModel.ShowLibrary = false; viewModel.ShowSettings = true; Dispatcher.UIThread.RunJobs();
+            viewModel.ShowLibrary = false; viewModel.ShowSettings = true; viewModel.ShowPlaybackPage = false;
+            window.FindControl<VodBox.Desktop.Views.SettingsView>("SettingsPage")!.ShowPlaybackSettings(); Dispatcher.UIThread.RunJobs();
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "播放内核");
             viewModel.SelectedPlaybackEngine = viewModel.PlaybackEngineChoices[2];
             Assert.Equal(PlaybackEngineMode.LibVlc, viewModel.Engine.Mode); Assert.Null(viewModel.Engine.ActiveEngine);
@@ -88,7 +89,7 @@ public sealed class DesktopPreviewTests
         try
         {
             window.Show(); Dispatcher.UIThread.RunJobs();
-            var view = window.FindControl<DanmakuView>("DanmakuPreview")!; view.RefreshFrame();
+            var view = window.PlaybackView.DanmakuPreview!; view.RefreshFrame();
             Assert.True(view.ActiveCount > 0); Assert.Null(model.Engine.ActiveEngine);
             model.DanmakuEnabled = false; Assert.Equal(0, view.ActiveCount);
             model.DanmakuEnabled = true; Assert.True(view.ActiveCount > 0);
@@ -117,7 +118,8 @@ public sealed class DesktopPreviewTests
             Assert.Equal(model.Cards, model.CardRows.SelectMany(row => row.Cards));
             Assert.All(model.CardRows, row => Assert.InRange(row.Cards.Count, 1, model.CardColumns));
             Dispatcher.UIThread.RunJobs();
-            var images = window.FindControl<ListBox>("PosterGrid")!.GetVisualDescendants().OfType<Image>().Count();
+            model.ShowPlaybackPage = false; Dispatcher.UIThread.RunJobs();
+            var images = window.LibraryView.FindControl<ListBox>("PosterGrid")!.GetVisualDescendants().OfType<Image>().Count();
             Assert.InRange(images, 1, 100);
             model.SelectedCard = model.Cards[0]; Assert.False(selected.IsSelected);
             model.Items.Clear(); Assert.Empty(model.CardRows); Assert.Null(model.SelectedCard);
@@ -143,11 +145,91 @@ public sealed class DesktopPreviewTests
             model.EpisodeSearch = "不存在"; Assert.Empty(model.VisibleEpisodes);
             model.EpisodeSearch = ""; Dispatcher.UIThread.RunJobs();
             Assert.Equal("2000", model.VisibleEpisodes[0].Id);
-            int buttons = window.FindControl<ListBox>("EpisodeList")!.GetVisualDescendants().OfType<Button>().Count();
+            int buttons = window.PlaybackView.EpisodeBrowser.FindControl<ListBox>("EpisodeList")!.GetVisualDescendants().OfType<Button>().Count();
             Assert.InRange(buttons, 1, 100);
             model.SelectedLine = new("other", "另一线路", [new("new", "新集数")]);
             Dispatcher.UIThread.RunJobs(); Assert.Single(model.VisibleEpisodes); Assert.Equal("new", model.VisibleEpisodes[0].Id);
             model.SelectedLine = null; Dispatcher.UIThread.RunJobs(); Assert.Empty(model.VisibleEpisodes);
+            Assert.Null(model.Engine.ActiveEngine);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData("library")]
+    [InlineData("live")]
+    [InlineData("history")]
+    [InlineData("favorites")]
+    [InlineData("settings")]
+    [InlineData("playback")]
+    [InlineData("controls")]
+    [InlineData("summary")]
+    [InlineData("episodes")]
+    [InlineData("programmes")]
+    [InlineData("general-settings")]
+    [InlineData("playback-settings")]
+    [InlineData("danmaku-settings")]
+    public async Task ExtractedViewsRenderIndependentlyWithSharedPreviewState(string page)
+    {
+        var model = new DesignMainViewModel();
+        UserControl view = page switch
+        {
+            "library" => new VodBox.Desktop.Views.LibraryView(),
+            "live" => new VodBox.Desktop.Views.LiveView(),
+            "history" => new VodBox.Desktop.Views.HistoryView(),
+            "favorites" => new VodBox.Desktop.Views.FavoritesView(),
+            "settings" => new VodBox.Desktop.Views.SettingsView(),
+            "playback" => new VodBox.Desktop.Views.PlaybackView(),
+            "summary" => new VodBox.Desktop.Views.DetailSummaryView(),
+            "episodes" => new VodBox.Desktop.Views.EpisodeBrowserView(),
+            "programmes" => new VodBox.Desktop.Views.ProgrammeView(),
+            "general-settings" => new VodBox.Desktop.Views.SettingsGeneralView(),
+            "playback-settings" => new VodBox.Desktop.Views.SettingsPlaybackView(),
+            "danmaku-settings" => new VodBox.Desktop.Views.SettingsDanmakuView(),
+            _ => new VodBox.Desktop.Views.PlaybackControlsView()
+        };
+        view.DataContext = model;
+        if (view is VodBox.Desktop.Views.PlaybackView playback) playback.ConfigureDesignPreview(model);
+        var window = new Window { Content = view, Width = 900, Height = 640 };
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs();
+            Assert.Same(model, view.DataContext); Assert.Null(model.Engine.ActiveEngine);
+            if (view is VodBox.Desktop.Views.LibraryView)
+            {
+                Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "探索自然");
+                var cardButton = view.GetVisualDescendants().OfType<Button>().First(button => button.DataContext is MediaCard);
+                cardButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Assert.Same(cardButton.DataContext, model.SelectedCard);
+                window.Width = 1280; Dispatcher.UIThread.RunJobs(); Assert.True(model.CardColumns >= 5);
+            }
+            if (view is VodBox.Desktop.Views.PlaybackView playbackView) Assert.True(playbackView.DanmakuPreview.ActiveCount > 0);
+        }
+        finally
+        {
+            window.Close();
+            if (view is VodBox.Desktop.Views.PlaybackView playbackView) playbackView.DanmakuPreview.Dispose();
+            await model.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task PlaybackPageUsesWideVideoDetailsLayoutAndRetainsSurfaceAcrossNavigation()
+    {
+        var window = new MainWindow(preview: true) { Width = 1600 };
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs();
+            var playback = window.PlaybackView;
+            var video = playback.VideoContainer;
+            var summary = playback.FindControl<VodBox.Desktop.Views.DetailSummaryView>("DetailSummary")!;
+            Assert.Equal(0, Grid.GetRow(summary)); Assert.Equal(1, Grid.GetColumn(summary));
+            await model.NavigateCommand.ExecuteAsync("设置"); Dispatcher.UIThread.RunJobs();
+            Assert.False(model.ShowPlaybackPage); Assert.False(playback.IsVisible); Assert.Equal("设置", model.WorkspaceTitle);
+            model.ShowPlaybackPage = true; window.Width = 900; Dispatcher.UIThread.RunJobs();
+            Assert.Equal(2, Grid.GetRow(summary)); Assert.Equal(0, Grid.GetColumn(summary));
+            Assert.Same(video, playback.VideoContainer); Assert.Equal("影片与播放", model.WorkspaceTitle);
             Assert.Null(model.Engine.ActiveEngine);
         }
         finally { window.Close(); await model.DisposeAsync(); }

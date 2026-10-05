@@ -1,0 +1,39 @@
+<Styles x:Class="VodBox.Desktop.Themes.DesktopTheme" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="WindowFallbackBrush" Color="#111317" />
+          <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#7016191F" />
+          <SolidColorBrush x:Key="CardSurfaceBrush" Color="#B020252E" />
+          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#A01B2028" />
+          <SolidColorBrush x:Key="MutedForegroundBrush" Color="#9BA4B4" />
+          <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#1A1E25" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="WindowFallbackBrush" Color="#F4F6FA" />
+          <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#90EBEFF5" />
+          <SolidColorBrush x:Key="CardSurfaceBrush" Color="#C0FFFFFF" />
+          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#B0F0F3F8" />
+          <SolidColorBrush x:Key="MutedForegroundBrush" Color="#526076" />
+          <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#F5F7FA" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+  <Style Selector="Button.nav">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Padding" Value="18,12" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}" />
+  </Style>
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+</Styles>

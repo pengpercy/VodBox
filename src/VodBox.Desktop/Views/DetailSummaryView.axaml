@@ -1,0 +1,22 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="VodBox.Desktop.Views.DetailSummaryView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
+  <Border Background="{DynamicResource CardSurfaceBrush}" Padding="12" CornerRadius="8">
+    <StackPanel Spacing="8">
+      <TextBlock Text="{Binding DetailTitle}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+      <TextBlock Text="{Binding DetailRemarks}" Classes="muted" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBlock Text="{Binding DetailSource}" Classes="muted" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="收藏 / 取消" Command="{Binding ToggleFavoriteCommand}" />
+      </Grid>
+      <Expander Header="剧情与简介" HorizontalAlignment="Stretch">
+        <ScrollViewer MaxHeight="120">
+          <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Classes="muted" Margin="8" />
+        </ScrollViewer>
+      </Expander>
+    </StackPanel>
+  </Border>
+</UserControl>

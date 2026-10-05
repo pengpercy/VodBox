@@ -9,11 +9,21 @@
 - [列表／网格切换](https://github.com/FongMi/TV/blob/c616c0aa3613e87529791587a9f71b78c278c991/app/src/mobile/java/com/fongmi/android/tv/ui/fragment/TypeFragment.java)：根据风格选择 LinearLayoutManager 或 GridLayoutManager，列数由 Product 决定。
 - [宽屏视频布局](https://github.com/FongMi/TV/blob/c616c0aa3613e87529791587a9f71b78c278c991/app/src/mobile/res/layout-sw600dp/activity_video.xml)：独立视频区域，以及旁边的名称、信息和播放内容。
 
-## 已落地的第一阶段
+## 页面与组件职责
 
 保留 PC 侧边导航、鼠标与键盘操作、Design.DataContext、编译绑定、扩展标题栏和 Mica／透明效果。分类改成可水平滚动的导航，播放器底部控制按可用宽度换行。
 
-窗口最小宽度降至 800 DIP。宽度至少 1180 DIP 时浏览和播放详情并列；更窄时分为浏览页与播放详情页，通过顶部按钮切换。选择内容或打开媒体自动显示播放详情，返回浏览保留播放会话。断点使用 Avalonia DIP，根据 PC 内容需求确定，没有照搬 Android 的 600dp 数字。
+窗口最小宽度为 800 DIP。浏览与播放详情使用独立页面区域；导航到发现、直播、历史、收藏或设置会回到相应浏览页，打开媒体或详情则显示播放页。返回浏览保留播放会话。播放页内部宽度至少 900 DIP 时视频与详情并列，更窄时上下排列。主窗口宽度低于 1180 DIP 时收紧侧边导航和边距。断点按 PC 内容需求确定，没有照搬 Android 的 600dp。
+
+继续核对同一版本的 `HomeActivity`、`VodFragment`、`TypeFragment`、`VideoActivity` 和设置布局后，将页面容器、分类内容、独立播放页与设置子页分开。参考源码：
+
+- [HomeActivity 页面管理](https://github.com/FongMi/TV/blob/c616c0aa3613e87529791587a9f71b78c278c991/app/src/mobile/java/com/fongmi/android/tv/ui/activity/HomeActivity.java)及 [首页容器布局](https://github.com/FongMi/TV/blob/c616c0aa3613e87529791587a9f71b78c278c991/app/src/mobile/res/layout/activity_home.xml)。
+- [VodFragment 分类入口](https://github.com/FongMi/TV/blob/c616c0aa3613e87529791587a9f71b78c278c991/app/src/mobile/java/com/fongmi/android/tv/ui/fragment/VodFragment.java)和 [TypeFragment 列表布局](https://github.com/FongMi/TV/blob/c616c0aa3613e87529791587a9f71b78c278c991/app/src/mobile/res/layout/fragment_type.xml)；列表选片进入 VideoActivity。
+- 宽屏视频布局通过 include 复用 widget、control 和 progress；播放器设置、弹幕设置另有独立 Fragment／Activity。VodBox 借鉴职责与组合方式，保留 Avalonia 的 PC 交互及常驻原生表面。
+
+`MainWindow.axaml` 现在只组织窗口外壳、导航、页面区域和公共地址入口。`Views/` 中分别是 Library、Live、History、Favorites、Settings、Playback 和 PlaybackControls；Playback 组合 DetailSummary、EpisodeBrowser、Programme，Settings 组合 General、Playback、Danmaku 三个设置子页。共有 13 个独立视图，每个都有 Design.DataContext 和编译绑定。海报生命周期与列数计算归 LibraryView，选集事件归 EpisodeBrowserView，拖动进度和添加字幕归 PlaybackControlsView，文件选择归对应设置子页。共享主题放在 `Themes/DesktopTheme.axaml`。
+
+目前页面共享 MainViewModel 的状态和应用服务，未声称已经拥有各自独立的 ViewModel。页面由明确类型静态组合，不依赖反射式 ViewLocator，也不会因导航重建原生播放器。
 
 布局变化只修改列宽与可见性，不重建视频容器或原生播放器；切换视频内核也保留各自的实例。mpv 的弹幕在同一 UI 树绘制，LibVLC 使用透明附属窗口处理原生视频遮挡。
 
@@ -23,8 +33,8 @@
 
 详情区已增加影片标题、备注、来源和可展开的滚动简介；播放线路与分集集中在下方。分集支持标题搜索、倒序和筛选数量提示，筛选不改变原始线路顺序，点击按钮才播放。批量填充结束后统一筛选，避免逐集追加时反复生成整个列表；分集控件仍虚拟化。
 
-独立详情页、专门的播放视图和全屏控制显示仍待继续完善。
+独立播放页已落地；全屏专用控制显示、进一步细分页面状态模型及完整三平台布局仍待完善。
 
 随后验证 800／900／1280／1600 DIP、不同缩放率、鼠标／键盘导航及 Windows／Linux 真机。macOS 本地验证不能替代其他平台验收；没有运行 Actions。
 
-已有 4 项设计布局测试，新增 1,000 条内容的网格虚拟化、分页追加与选择重排测试；macOS x64 实际 AOT 主窗口也验证了播放中切换 900／1280 DIP、返回浏览／恢复播放页、保持原渲染表面和弹幕，未重建原生内核。整体回归 150 项，详细日志见 [播放验收](playback-testing.md)。
+已有 13 项独立视图预览、4 项不同宽度页面切换、内部宽窄布局与导航测试，以及 1,000 条内容的网格虚拟化、分页追加与选择重排测试；macOS x64 实际 AOT 主窗口也验证了播放中切换 900／1280 DIP、返回浏览／恢复播放页、保持原渲染表面和弹幕，未重建原生内核。整体回归 164 项，详细日志见 [播放验收](playback-testing.md)。

@@ -134,3 +134,15 @@ macOS x64 严格 NativeAOT（完整裁剪，编译／ILC 警告作为错误）�
 150 项回归全部通过，新增 2,000 集搜索、倒序、无匹配结果、线路替换／清空和实际按钮虚拟化测试。筛选与排序保持原始线路顺序，未创建播放内核。日志：`/private/tmp/vodbox-detail-browser-tests.log`。
 
 macOS x64 严格 NativeAOT 完整裁剪编译通过，未报告编译或 ILC 警告。真实 AOT 主窗口加载 1,000 条海报和 2,000 集，确认搜索第 2000 集、恢复倒序列表、分集按钮虚拟化和原始线路顺序，同时验证 mpv → LibVLC → mpv、暂停位置、静音、弹幕、900／1280 DIP 布局与表面复用，mpv 渲染 44 帧，退出 0。日志：`/private/tmp/vodbox-detail-browser-aot-build.log`、`/private/tmp/vodbox-detail-browser-aot-ui.log`。独立详情页、完整播放视图及其他平台验收仍待完成；本轮未运行 Actions。
+
+## 页面职责拆分与独立播放页验收
+
+按 FongMi/TV 的 Home／Vod／Type／Video 和设置子页职责重新整理，而非仅移动原有 XAML。主窗口保留外壳与原生生命周期，13 个视图分别承载页面／组件，均有 Design.DataContext 与编译绑定；通用、播放、弹幕设置独立。浏览和播放页面分离，播放页内部宽屏视频／详情并列、窄屏上下排列，直播播放状态与当前浏览导航分离。
+
+164 项回归通过，包括 13 项独立视图预览、海报点击与自适应列数、设置导航、视频容器复用、播放页内部宽窄布局，以及既有海报／分集虚拟化测试。日志：`/private/tmp/vodbox-view-split-tests.log`。
+
+共享主题使用强类型 DesktopTheme 编译 XAML，未使用 C# 动态 StyleInclude 或反射 ViewLocator。macOS x64 严格 NativeAOT 完整裁剪编译通过，最终日志没有编译／ILC 警告。真实 JIT／AOT 主窗口验证 mpv → LibVLC → mpv、暂停位置、静音、两种弹幕、900／1280 DIP、所有导航页切换、VLC 叠层随页面隐藏／恢复和原生表面复用；1,000 条海报与 2,000 集的首次布局和虚拟化验证通过。JIT 渲染 40 帧、AOT 渲染 43 帧，均退出 0。
+
+AOT 缺失 mpv 自动回退也通过，LibVLC 解码 98 帧，原生视频／弹幕和自动模式正常，退出 0；关闭 MPEG4 测试片段仍有前述 avcodec 停止日志，未宣称此日志已消除。日志：`/private/tmp/vodbox-view-split-ui-jit.log`、`/private/tmp/vodbox-view-split-aot-build.log`、`/private/tmp/vodbox-view-split-aot-ui.log`、`/private/tmp/vodbox-view-split-aot-fallback.log`。
+
+本轮未运行 GitHub Actions；Windows／Linux 真机和完整全屏控制仍待验收。页面当前共享 MainViewModel 与应用服务，进一步拆分页面状态模型仍待继续。

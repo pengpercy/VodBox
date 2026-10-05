@@ -1,0 +1,40 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:VodBox.Core" x:Class="VodBox.Desktop.Views.PlaybackControlsView" x:DataType="vm:MainViewModel"
+    x:CompileBindings="True">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
+  <Border Background="{DynamicResource PlayerControlsSurfaceBrush}" Padding="24,16">
+    <StackPanel Spacing="10">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <Slider x:Name="SeekSlider" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" PointerPressed="SeekPressed" PointerReleased="SeekReleased" />
+        <TextBlock Grid.Column="1" Text="{Binding TimeText}" VerticalAlignment="Center" Classes="muted" />
+      </Grid>
+      <WrapPanel Orientation="Horizontal">
+        <Button Content="暂停 / 继续" Command="{Binding TogglePauseCommand}" />
+        <Button Grid.Column="1" Content="停止" Command="{Binding StopCommand}" />
+        <Button Grid.Column="2" Content="添加字幕" Click="AddSubtitleClick" />
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <TextBlock Text="音量" VerticalAlignment="Center" />
+          <Slider Width="100" Minimum="0" Maximum="100" Value="{Binding Volume}" />
+          <NumericUpDown Width="88" Minimum="0.25" Maximum="4" Increment="0.25" Value="{Binding Rate}" FormatString="0.00x" />
+        </StackPanel>
+        <ComboBox Grid.Column="4" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" PlaceholderText="音轨" MaxWidth="130">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="core:MediaTrack">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <ComboBox Grid.Column="5" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitle}" PlaceholderText="字幕" MaxWidth="130">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="core:MediaTrack">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </WrapPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

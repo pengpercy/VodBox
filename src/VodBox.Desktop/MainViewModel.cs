@@ -58,14 +58,16 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _status = "添加配置，或打开本地媒体开始播放。";
     [ObservableProperty] private string _nowPlaying = "尚未播放";
     [ObservableProperty] private string _description = "选择内容查看详情和播放线路。";
-    [ObservableProperty] private string _pageTitle = "发现";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(WorkspaceTitle))] private string _pageTitle = "发现";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _showLibrary = true;
     [ObservableProperty] private bool _showLive;
     [ObservableProperty] private bool _showHistory;
     [ObservableProperty] private bool _showFavorites;
     [ObservableProperty] private bool _showSettings;
-    [ObservableProperty] private bool _showPlaybackPage;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(WorkspaceTitle))] private bool _showPlaybackPage;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(WorkspaceTitle))] private bool _isLivePlayback;
+    public string WorkspaceTitle => ShowPlaybackPage ? (IsLivePlayback ? "直播播放" : "影片与播放") : PageTitle;
     [ObservableProperty] private bool _incognito;
     [ObservableProperty] private double _position;
     [ObservableProperty] private double _duration;
@@ -121,6 +123,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             ClearDanmaku();
             if (!string.IsNullOrWhiteSpace(request.DanmakuUri)) _ = LoadDanmakuAsync(request.DanmakuUri);
             NowPlaying = request.Title;
+            IsLivePlayback = request.IsLive;
             ShowPlaybackPage = true;
             SelectedAudio = null; SelectedSubtitle = null;
             _tracksEngine = null;
@@ -203,6 +206,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     });
     [RelayCommand] private Task NavigateAsync(string page) => RunAsync(async () =>
     {
+        ShowPlaybackPage = false;
         ShowLibrary = page == "发现"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = page == "设置"; PageTitle = page;
         if (ShowHistory) { History.Clear(); foreach (var entry in await _store.GetHistoryAsync()) History.Add(entry); }
         if (ShowFavorites) { Favorites.Clear(); foreach (var entry in await _store.GetFavoritesAsync()) Favorites.Add(entry); }

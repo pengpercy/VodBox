@@ -1,0 +1,24 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:VodBox.Core" x:Class="VodBox.Desktop.Views.HistoryView" x:DataType="vm:MainViewModel"
+    x:CompileBindings="True">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
+  <Grid RowDefinitions="Auto,*" RowSpacing="8">
+    <Button Content="清空全部历史" Command="{Binding ClearHistoryCommand}" HorizontalAlignment="Right" />
+    <ListBox Grid.Row="1" ItemsSource="{Binding History}" SelectionChanged="HistorySelectionChanged">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="core:HistoryEntry">
+          <Grid Margin="8" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding UpdatedAt}" Classes="muted" FontSize="11" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="删除" Click="DeleteHistoryClick" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Grid>
+</UserControl>

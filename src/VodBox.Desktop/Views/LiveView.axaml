@@ -1,0 +1,30 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:VodBox.Core" x:Class="VodBox.Desktop.Views.LiveView" x:DataType="vm:MainViewModel"
+    x:CompileBindings="True">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
+  <Grid RowDefinitions="Auto,*" RowSpacing="12">
+    <StackPanel Spacing="8">
+      <ComboBox ItemsSource="{Binding LiveGroups}" SelectedItem="{Binding SelectedLiveGroup}" HorizontalAlignment="Stretch" />
+      <TextBox Text="{Binding LiveSearch}" PlaceholderText="搜索直播频道" />
+      <ToggleSwitch Content="只看收藏频道" IsChecked="{Binding OnlyFavoriteChannels}" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="收藏当前频道" Command="{Binding ToggleLiveFavoriteCommand}" />
+        <Button Content="上次频道" Command="{Binding ResumeLastLiveCommand}" />
+      </StackPanel>
+      <Button Content="切换备用地址" Command="{Binding NextLiveMirrorCommand}" />
+    </StackPanel>
+    <ListBox ItemsSource="{Binding Channels}" SelectionChanged="LiveSelectionChanged" Grid.Row="1">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="core:LiveChannel">
+          <StackPanel Margin="8" Spacing="4">
+            <TextBlock Text="{Binding Name}" FontSize="16" />
+            <TextBlock Text="{Binding Group}" Classes="muted" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Grid>
+</UserControl>

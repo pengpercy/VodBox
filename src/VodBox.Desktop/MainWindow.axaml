@@ -1,233 +1,69 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core" xmlns:chrome="using:Avalonia.Controls.Chrome"
-        x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
-        Title="VodBox" Width="1280" Height="850" MinWidth="800" MinHeight="640"
-        ExtendClientAreaToDecorationsHint="True" ExtendClientAreaTitleBarHeightHint="40" WindowDecorations="Full"
-        TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
-        TransparencyBackgroundFallback="{DynamicResource WindowFallbackBrush}" Background="Transparent">
-  <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
-  <Window.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="WindowFallbackBrush" Color="#111317" />
-          <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#7016191F" />
-          <SolidColorBrush x:Key="CardSurfaceBrush" Color="#B020252E" />
-          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#A01B2028" />
-          <SolidColorBrush x:Key="MutedForegroundBrush" Color="#9BA4B4" />
-          <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#1A1E25" />
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="WindowFallbackBrush" Color="#F4F6FA" />
-          <SolidColorBrush x:Key="SidebarSurfaceBrush" Color="#90EBEFF5" />
-          <SolidColorBrush x:Key="CardSurfaceBrush" Color="#C0FFFFFF" />
-          <SolidColorBrush x:Key="PlayerControlsSurfaceBrush" Color="#B0F0F3F8" />
-          <SolidColorBrush x:Key="MutedForegroundBrush" Color="#526076" />
-          <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#F5F7FA" />
-        </ResourceDictionary>
-      </ResourceDictionary.ThemeDictionaries>
-    </ResourceDictionary>
-  </Window.Resources>
-  <Window.Styles>
-    <Style Selector="Button.nav"><Setter Property="HorizontalAlignment" Value="Stretch" /><Setter Property="HorizontalContentAlignment" Value="Left" /><Setter Property="Padding" Value="18,12" /><Setter Property="Background" Value="Transparent" /><Setter Property="CornerRadius" Value="8" /></Style>
-    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}" /></Style>
-    <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="16" /></Style>
-  </Window.Styles>
+<Window
+    xmlns:core="using:VodBox.Core" xmlns="https://github.com/avaloniaui" xmlns:chrome="using:Avalonia.Controls.Chrome"
+    xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
+    Title="VodBox" Width="1280" Height="850"
+    MinWidth="800" MinHeight="640" ExtendClientAreaToDecorationsHint="True"
+    ExtendClientAreaTitleBarHeightHint="40" WindowDecorations="Full" TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
+    TransparencyBackgroundFallback="{DynamicResource WindowFallbackBrush}" Background="Transparent">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
   <Grid RowDefinitions="40,*">
     <Border x:Name="WindowTitleBar" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
     <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*,Auto" ColumnDefinitions="180,*">
-    <Border x:Name="NavigationPane" Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
-      <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Spacing="8">
-          <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
-          <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" TextWrapping="Wrap" />
-          <Button Content="发现" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="发现" />
-          <Button Content="直播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="直播" />
-          <Button Content="历史" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="历史" />
-          <Button Content="收藏" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="收藏" />
-          <Separator Margin="0,12" />
-          <Button Content="设置" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="设置" />
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Spacing="12">
-          <ToggleSwitch Content="无痕播放" IsChecked="{Binding Incognito}" FontSize="12" />
-          <TextBlock Text="0.1.0 · 双播放内核" Classes="muted" FontSize="11" Margin="8,0" TextWrapping="Wrap" />
-        </StackPanel>
-      </DockPanel>
-    </Border>
-    <Grid x:Name="Workspace" Grid.Column="1" Margin="24,24,24,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-        <TextBlock Text="{Binding PageTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-          <Button x:Name="BrowsePageButton" Content="返回浏览" Click="BrowsePageClick" IsVisible="False" />
-          <Button x:Name="PlaybackPageButton" Content="播放与详情" Click="PlaybackPageClick" IsVisible="False" />
-          <Button Content="打开媒体" Click="OpenFileClick" />
-          <Button Content="全屏" Click="FullscreenClick" />
-        </StackPanel>
-      </Grid>
-      <Grid Grid.Row="1" ColumnDefinitions="*,180,Auto" ColumnSpacing="8">
-        <TextBox Text="{Binding Url}" PlaceholderText="粘贴媒体 URL，或打开本地文件" />
-        <ComboBox Grid.Column="1" ItemsSource="{Binding Resolvers}" SelectedItem="{Binding SelectedResolver}">
-          <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ResolverDefinition"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
-        </ComboBox>
-        <Button Grid.Column="2" Content="播放地址" Command="{Binding OpenUrlCommand}" />
-      </Grid>
-      <Grid x:Name="ContentWorkspace" Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
-        <Grid x:Name="BrowsePane" RowDefinitions="Auto,*" RowSpacing="12">
-          <StackPanel IsVisible="{Binding ShowLibrary}" Spacing="10">
-            <Grid ColumnDefinitions="*" ColumnSpacing="8">
-              <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" HorizontalAlignment="Stretch">
-                <ComboBox.ItemTemplate><DataTemplate x:DataType="core:SourceDefinition"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
-              </ComboBox>
-            </Grid>
-            <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-              <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ListBox.ItemsPanel>
-              <ListBox.ItemTemplate><DataTemplate x:DataType="core:Category"><TextBlock Text="{Binding Name}" Margin="12,6" /></DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
-            <Grid IsVisible="{Binding HasLibraryFilters}" ColumnDefinitions="*,*" ColumnSpacing="8">
-              <ComboBox ItemsSource="{Binding YearChoices}" SelectedItem="{Binding SelectedYear}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-              <ComboBox Grid.Column="1" ItemsSource="{Binding CompletionChoices}" SelectedItem="{Binding SelectedCompletion}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Text="{Binding SearchText}" PlaceholderText="搜索内容" /><Button Grid.Column="1" Content="当前源" Command="{Binding SearchCommand}" /><Button Grid.Column="2" Content="全源搜索" Command="{Binding SearchAllCommand}" /></Grid>
+      <Border x:Name="NavigationPane" Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="8">
+            <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
+            <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" TextWrapping="Wrap" />
+            <Button Content="发现" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="发现" />
+            <Button Content="直播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="直播" />
+            <Button Content="历史" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="历史" />
+            <Button Content="收藏" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="收藏" />
+            <Separator Margin="0,12" />
+            <Button Content="设置" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="设置" />
           </StackPanel>
-          <StackPanel IsVisible="{Binding ShowLive}" Spacing="8">
-            <ComboBox ItemsSource="{Binding LiveGroups}" SelectedItem="{Binding SelectedLiveGroup}" HorizontalAlignment="Stretch" />
-            <TextBox Text="{Binding LiveSearch}" PlaceholderText="搜索直播频道" />
-            <ToggleSwitch Content="只看收藏频道" IsChecked="{Binding OnlyFavoriteChannels}" />
-            <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="收藏当前频道" Command="{Binding ToggleLiveFavoriteCommand}" /><Button Content="上次频道" Command="{Binding ResumeLastLiveCommand}" /></StackPanel>
-            <Button Content="切换备用地址" Command="{Binding NextLiveMirrorCommand}" />
+          <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Spacing="12">
+            <ToggleSwitch Content="无痕播放" IsChecked="{Binding Incognito}" FontSize="12" />
+            <TextBlock Text="0.1.0 · 双播放内核" Classes="muted" FontSize="11" Margin="8,0" TextWrapping="Wrap" />
           </StackPanel>
-          <Grid Grid.Row="1">
-            <Grid IsVisible="{Binding ShowLibrary}" RowDefinitions="*,Auto,Auto" RowSpacing="8">
-              <ListBox x:Name="PosterGrid" IsVisible="{Binding !AggregateResultsVisible}" ItemsSource="{Binding CardRows}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style><Style Selector="Button.poster.selected"><Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" /></Style></ListBox.Styles>
-                <ListBox.ItemTemplate><DataTemplate x:DataType="vm:MediaCardRow">
-                  <ItemsControl ItemsSource="{Binding Cards}">
-                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding Columns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:MediaCard">
-                      <Button Classes="poster" Classes.selected="{Binding IsSelected}" Click="MediaCardClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="6" Margin="3" BorderThickness="2" Background="{DynamicResource CardSurfaceBrush}">
-                        <StackPanel Spacing="6">
-                          <Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="4" Height="190" ClipToBounds="True"><Grid><TextBlock Text="{Binding Title}" TextWrapping="Wrap" Margin="12" VerticalAlignment="Center" HorizontalAlignment="Center" Classes="muted" /><Image Source="{Binding Poster}" Stretch="UniformToFill" AttachedToVisualTree="PosterAttached" DetachedFromVisualTree="PosterDetached" DataContextChanged="PosterContextChanged" /></Grid></Border>
-                          <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Text="{Binding Remarks}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" MinHeight="16" />
-                        </StackPanel>
-                      </Button>
-                    </DataTemplate></ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </DataTemplate></ListBox.ItemTemplate>
-              </ListBox>
-              <ListBox IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchResults}" SelectionChanged="SearchSelectionChanged" Background="Transparent">
-                <ListBox.ItemTemplate><DataTemplate x:DataType="core:SearchHit"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding SourceName}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
-              </ListBox>
-              <ItemsControl Grid.Row="1" IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchErrors}" MaxHeight="70" />
-              <Button Grid.Row="2" IsVisible="{Binding !AggregateResultsVisible}" Content="加载更多" Command="{Binding LoadMoreCommand}" HorizontalAlignment="Center" />
-            </Grid>
-            <ListBox IsVisible="{Binding ShowLive}" ItemsSource="{Binding Channels}" SelectionChanged="LiveSelectionChanged">
-              <ListBox.ItemTemplate><DataTemplate x:DataType="core:LiveChannel"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Name}" FontSize="16" /><TextBlock Text="{Binding Group}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
-            <Grid IsVisible="{Binding ShowHistory}" RowDefinitions="Auto,*" RowSpacing="8">
-              <Button Content="清空全部历史" Command="{Binding ClearHistoryCommand}" HorizontalAlignment="Right" />
-              <ListBox Grid.Row="1" ItemsSource="{Binding History}" SelectionChanged="HistorySelectionChanged">
-                <ListBox.ItemTemplate><DataTemplate x:DataType="core:HistoryEntry"><Grid Margin="8" ColumnDefinitions="*,Auto"><StackPanel Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding UpdatedAt}" Classes="muted" FontSize="11" /></StackPanel><Button Grid.Column="1" Content="删除" Click="DeleteHistoryClick" /></Grid></DataTemplate></ListBox.ItemTemplate>
-              </ListBox>
-            </Grid>
-            <ListBox IsVisible="{Binding ShowFavorites}" ItemsSource="{Binding Favorites}" SelectionChanged="FavoriteSelectionChanged">
-              <ListBox.ItemTemplate><DataTemplate x:DataType="core:FavoriteEntry"><StackPanel Margin="8"><TextBlock Text="{Binding Title}" /><TextBlock Text="{Binding SourceId}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
-            <ScrollViewer IsVisible="{Binding ShowSettings}"><StackPanel Spacing="16">
-              <TextBlock Text="播放内核" FontWeight="SemiBold" FontSize="18" />
-              <ComboBox ItemsSource="{Binding PlaybackEngineChoices}" SelectedItem="{Binding SelectedPlaybackEngine}" HorizontalAlignment="Stretch">
-                <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:PlaybackEngineChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding ActiveEngineText}" TextWrapping="Wrap" Classes="muted" />
-              <TextBlock Text="数据备份" FontWeight="SemiBold" FontSize="18" />
-              <Button Content="导出数据备份" Click="ExportBackupClick" IsEnabled="{Binding !IsBusy}" />
-              <Button Content="导入备份并合并数据" Click="ImportBackupClick" IsEnabled="{Binding !IsBusy}" />
-              <TextBlock Text="备份包括配置、偏好、全部历史和收藏，可能包含配置中的访问凭据。导入保留较新的历史和已有收藏；同名配置及偏好将被替换，先自动保存导入前备份。媒体文件和外部脚本需自行迁移。" TextWrapping="Wrap" Classes="muted" />
-              <TextBlock Text="已保存的配置" FontWeight="SemiBold" FontSize="18" />
-              <ComboBox ItemsSource="{Binding SavedConfigurations}" SelectedItem="{Binding SelectedSavedConfiguration}" HorizontalAlignment="Stretch">
-                <ComboBox.ItemTemplate><DataTemplate x:DataType="core:SavedConfiguration"><TextBlock Text="{Binding Id}" /></DataTemplate></ComboBox.ItemTemplate>
-              </ComboBox>
-              <Button Content="切换到保存的配置" Command="{Binding LoadSavedConfigurationCommand}" CommandParameter="{Binding SelectedSavedConfiguration}" />
-              <Button Content="移除保存的配置" Command="{Binding RemoveSavedConfigurationCommand}" CommandParameter="{Binding SelectedSavedConfiguration}" />
-              <ToggleSwitch Content="直播自动切换备用线路" IsChecked="{Binding AutoLiveFallback}" />
-              <ToggleSwitch Content="启动时恢复上次直播频道" IsChecked="{Binding ResumeLiveOnStartup}" />
-              <TextBlock Text="界面主题" /><ComboBox ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" />
-              <TextBlock Text="弹幕" FontWeight="SemiBold" FontSize="18" />
-              <ToggleSwitch Content="显示弹幕" IsChecked="{Binding DanmakuEnabled}" />
-              <TextBox Text="{Binding DanmakuLocation}" PlaceholderText="XML / JSON 弹幕地址或本地路径" />
-              <Button Content="加载弹幕地址" Command="{Binding LoadDanmakuUrlCommand}" />
-              <Button Content="打开弹幕文件" Click="OpenDanmakuClick" />
-              <TextBlock Text="{Binding DanmakuStatus}" TextWrapping="Wrap" Classes="muted" />
-              <TextBlock Text="弹幕字号" /><Slider Minimum="16" Maximum="48" Value="{Binding DanmakuFontSize}" />
-              <TextBlock Text="弹幕不透明度" /><Slider Minimum="0.1" Maximum="1" Value="{Binding DanmakuOpacity}" />
-              <TextBlock Text="滚动弹幕覆盖比例" /><Slider Minimum="0.25" Maximum="1" Value="{Binding DanmakuCoverage}" />
-              <TextBlock Text="弹幕延迟（毫秒，正值推迟）" /><NumericUpDown Minimum="-60000" Maximum="60000" Increment="500" Value="{Binding DanmakuDelayMs}" />
-              <TextBlock Text="播放偏好" FontWeight="SemiBold" FontSize="18" />
-              <ToggleSwitch Content="自动播放下一集" IsChecked="{Binding AutoNext}" />
-              <ToggleSwitch Content="从上次进度继续" IsChecked="{Binding ResumePlayback}" />
-              <TextBlock Text="跳过片头（秒）" /><NumericUpDown Minimum="0" Maximum="600" Increment="5" Value="{Binding SkipIntroSeconds}" />
-              <TextBlock Text="跳过片尾（秒，自动下一集时生效）" /><NumericUpDown Minimum="0" Maximum="600" Increment="5" Value="{Binding SkipOutroSeconds}" />
-              <TextBlock Text="音频延迟（毫秒，正值推迟音频）" /><NumericUpDown Minimum="-10000" Maximum="10000" Increment="50" Value="{Binding AudioDelayMs}" />
-              <TextBlock Text="字幕延迟（毫秒，正值推迟字幕）" /><NumericUpDown Minimum="-10000" Maximum="10000" Increment="50" Value="{Binding SubtitleDelayMs}" />
-              <Button Content="保存视频截图" Click="SnapshotClick" />
-              <TextBlock Text="内容配置" FontWeight="SemiBold" FontSize="18" /><TextBox Text="{Binding ConfigLocation}" PlaceholderText="VodBox JSON 配置路径或 URL" />
-              <Button Content="加载配置" Command="{Binding LoadConfigCommand}" /><Button Content="从文件选择配置" Click="OpenConfigClick" />
-              <TextBlock Text="支持 C#、QuickJS、Python 与 Node.js 内容源。旧 TV 配置暂不支持。" TextWrapping="Wrap" Classes="muted" />
-              <TextBlock Text="快捷键：空格 暂停/继续；左右 ±10 秒；上下 音量；M 静音；F11 全屏；Esc 退出全屏；PageUp / PageDown 上下集；Ctrl / ⌘ + O 打开文件。" Classes="muted" TextWrapping="Wrap" />
-            </StackPanel></ScrollViewer>
-          </Grid>
+        </DockPanel>
+      </Border>
+      <Grid x:Name="Workspace" Grid.Column="1" Margin="24,24,24,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+          <TextBlock Text="{Binding WorkspaceTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <Button x:Name="BrowsePageButton" Content="返回浏览" Click="BrowsePageClick" IsVisible="False" />
+            <Button x:Name="PlaybackPageButton" Content="播放与详情" Click="PlaybackPageClick" IsVisible="False" />
+            <Button Content="打开媒体" Click="OpenFileClick" />
+            <Button Content="全屏" Click="FullscreenClick" />
+          </StackPanel>
         </Grid>
-        <Grid x:Name="PlaybackPane" Grid.Column="1" RowDefinitions="2*,Auto,Auto,Auto,*" RowSpacing="12">
-          <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180">
-            <Grid x:Name="VideoContainer"><vm:VlcVideoSurface x:Name="VideoSurface" /><vm:DanmakuView x:Name="DanmakuPreview" IsVisible="False" /></Grid>
-          </Border>
-          <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-            <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
-            <Button Grid.Column="1" Content="上一集" Command="{Binding PreviousEpisodeCommand}" />
-            <Button Grid.Column="2" Content="下一集" Command="{Binding NextEpisodeCommand}" />
-          </Grid>
-          <Border Grid.Row="2" Padding="12" CornerRadius="8" Background="{DynamicResource CardSurfaceBrush}">
-            <StackPanel Spacing="6">
-              <TextBlock Text="{Binding DetailTitle}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="{Binding DetailRemarks}" Classes="muted" TextWrapping="Wrap" />
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBlock Text="{Binding DetailSource}" Classes="muted" VerticalAlignment="Center" /><Button Grid.Column="1" Content="收藏 / 取消" Command="{Binding ToggleFavoriteCommand}" /></Grid>
-            </StackPanel>
-          </Border>
-          <Expander Grid.Row="3" Header="剧情与简介" HorizontalAlignment="Stretch">
-            <ScrollViewer MaxHeight="120"><TextBlock Text="{Binding Description}" TextWrapping="Wrap" Classes="muted" Margin="8" /></ScrollViewer>
-          </Expander>
-          <Grid Grid.Row="4" IsVisible="{Binding !ShowLive}" RowDefinitions="Auto,Auto,*" RowSpacing="8">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10"><TextBlock Text="播放线路" VerticalAlignment="Center" /><ComboBox Grid.Column="1" ItemsSource="{Binding Lines}" SelectedItem="{Binding SelectedLine}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PlaybackLine"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></Grid>
-            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding EpisodeSearch}" PlaceholderText="搜索集数或标题" /><ToggleButton Grid.Column="1" Content="倒序" IsChecked="{Binding ReverseEpisodes}" /></Grid>
-            <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="4">
-              <TextBlock Text="{Binding EpisodeCountText}" Classes="muted" FontSize="12" />
-              <ListBox x:Name="EpisodeList" Grid.Row="1" ItemsSource="{Binding VisibleEpisodes}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /></Style></ListBox.Styles>
-                <ListBox.ItemTemplate><DataTemplate x:DataType="core:Episode"><Button Content="{Binding Title}" Click="EpisodeClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,2" /></DataTemplate></ListBox.ItemTemplate>
-              </ListBox>
-            </Grid>
-          </Grid>
-          <Grid Grid.Row="4" IsVisible="{Binding ShowLive}" RowDefinitions="Auto,*" RowSpacing="8">
-            <TextBlock Text="{Binding EpgStatus}" Classes="muted" TextWrapping="Wrap" />
-            <ListBox Grid.Row="1" ItemsSource="{Binding Programmes}">
-              <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProgrammeRow"><StackPanel Margin="8" Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding Time}" Classes="muted" FontSize="12" /><TextBlock Text="正在播出" IsVisible="{Binding IsCurrent}" Foreground="#60AEFF" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
-          </Grid>
+        <Grid Grid.Row="1" ColumnDefinitions="*,180,Auto" ColumnSpacing="8">
+          <TextBox Text="{Binding Url}" PlaceholderText="粘贴媒体 URL，或打开本地文件" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding Resolvers}" SelectedItem="{Binding SelectedResolver}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="core:ResolverDefinition">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Grid.Column="2" Content="播放地址" Command="{Binding OpenUrlCommand}" />
         </Grid>
+        <Grid x:Name="ContentWorkspace" Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
+          <Grid x:Name="BrowsePane">
+            <views:LibraryView x:Name="LibraryPage" IsVisible="{Binding ShowLibrary}" />
+            <views:LiveView x:Name="LivePage" IsVisible="{Binding ShowLive}" />
+            <views:HistoryView x:Name="HistoryPage" IsVisible="{Binding ShowHistory}" />
+            <views:FavoritesView x:Name="FavoritesPage" IsVisible="{Binding ShowFavorites}" />
+            <views:SettingsView x:Name="SettingsPage" IsVisible="{Binding ShowSettings}" />
+          </Grid>
+          <views:PlaybackView x:Name="PlaybackPane" Grid.Column="1" />
+        </Grid>
+        <TextBlock Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
       </Grid>
-      <TextBlock Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
-    </Grid>
-    <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource PlayerControlsSurfaceBrush}" Padding="24,16">
-      <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><Slider x:Name="SeekSlider" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" PointerPressed="SeekPressed" PointerReleased="SeekReleased" /><TextBlock Grid.Column="1" Text="{Binding TimeText}" VerticalAlignment="Center" Classes="muted" /></Grid>
-        <WrapPanel Orientation="Horizontal">
-          <Button Content="暂停 / 继续" Command="{Binding TogglePauseCommand}" /><Button Grid.Column="1" Content="停止" Command="{Binding StopCommand}" /><Button Grid.Column="2" Content="添加字幕" Click="AddSubtitleClick" />
-          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right"><TextBlock Text="音量" VerticalAlignment="Center" /><Slider Width="100" Minimum="0" Maximum="100" Value="{Binding Volume}" /><NumericUpDown Width="88" Minimum="0.25" Maximum="4" Increment="0.25" Value="{Binding Rate}" FormatString="0.00x" /></StackPanel>
-          <ComboBox Grid.Column="4" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" PlaceholderText="音轨" MaxWidth="130"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-          <ComboBox Grid.Column="5" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitle}" PlaceholderText="字幕" MaxWidth="130"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-        </WrapPanel>
-      </StackPanel>
-    </Border>
+      <views:PlaybackControlsView Grid.Row="1" Grid.Column="1" IsVisible="{Binding ShowPlaybackPage}" />
     </Grid>
   </Grid>
 </Window>

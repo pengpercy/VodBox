@@ -1,0 +1,21 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="VodBox.Desktop.Views.ProgrammeView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
+  <Grid RowDefinitions="Auto,*" RowSpacing="8">
+    <TextBlock Text="{Binding EpgStatus}" Classes="muted" TextWrapping="Wrap" />
+    <ListBox Grid.Row="1" ItemsSource="{Binding Programmes}">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:ProgrammeRow">
+          <StackPanel Margin="8" Spacing="4">
+            <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Time}" Classes="muted" FontSize="12" />
+            <TextBlock Text="正在播出" IsVisible="{Binding IsCurrent}" Foreground="#60AEFF" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Grid>
+</UserControl>

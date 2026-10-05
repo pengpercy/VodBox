@@ -79,9 +79,9 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
 
-主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。150 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
+主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。164 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
 
-界面开始参考 FongMi/TV 的分类导航和宽屏布局，已增加横向分类、控制栏换行以及窄窗口浏览／播放详情切换，保留设计预览与 Mica。海报网格和独立详情页仍在后续改造范围，见 [PC 布局](docs/desktop-layout.md)。
+界面参考 FongMi/TV 的页面职责拆成 13 个独立视图：浏览与播放独立，播放页内部宽屏并列、窄屏上下排列；设置分通用／播放／弹幕。海报网格和分集支持虚拟化，保留编译绑定、设计预览、Mica 与扩展标题栏。全屏专用控制和三平台布局验收仍待完成，见 [PC 布局](docs/desktop-layout.md)。
 
 libmpv 尚未纳入全部发行包。开发时可通过 `VODBOX_MPV_PATH` 指定本机原生库完整路径；未提供 mpv 时，自动模式会尝试现有 LibVLC。不要将本机 GUI 验收视为三平台安装包验收。
 

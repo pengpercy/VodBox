@@ -1,0 +1,19 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui" xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel"
+    x:CompileBindings="True">
+  <Design.DataContext>
+    <vm:DesignMainViewModel />
+  </Design.DataContext>
+  <TabControl x:Name="SettingsTabs">
+    <TabItem Header="通用">
+      <views:SettingsGeneralView />
+    </TabItem>
+    <TabItem Header="播放">
+      <views:SettingsPlaybackView />
+    </TabItem>
+    <TabItem Header="弹幕">
+      <views:SettingsDanmakuView />
+    </TabItem>
+  </TabControl>
+</UserControl>

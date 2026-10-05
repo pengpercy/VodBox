@@ -11,9 +11,13 @@ namespace VodBox.Desktop;
 public sealed partial class MainWindow : Window
 {
     private readonly MainViewModel? _viewModel;
+    public Views.PlaybackView PlaybackView => PlaybackPane;
+    public Views.LibraryView LibraryView => LibraryPage;
+    private Grid VideoContainer => PlaybackPane.VideoContainer;
+    private VlcVideoSurface VideoSurface => PlaybackPane.VideoSurface;
+    private DanmakuView DanmakuPreview => PlaybackPane.DanmakuPreview;
     private bool _closing;
     private readonly DanmakuOverlay? _danmakuOverlay;
-    private readonly Dictionary<Image, MediaCard> _posterControls = [];
     public MainWindow() : this(preview: false) { }
     public MainWindow(bool preview) : this(preview, null, true) { }
     public MainWindow(MainViewModel model, bool initialize = true) : this(false, model, initialize) { }
@@ -23,9 +27,9 @@ public sealed partial class MainWindow : Window
         if (Design.IsDesignMode || preview)
         {
             // The designer has no desktop compositor; give sample content a readable backdrop.
-            var design = new DesignMainViewModel(); DataContext = design; VideoSurface.IsVisible = false;
+            var design = new DesignMainViewModel(); DataContext = design; PlaybackPane.ConfigureDesignPreview(design);
             InitializeAdaptiveLayout(design);
-            DanmakuPreview.IsVisible = true; DanmakuPreview.Attach(design, preview: true); Closed += (_, _) => DanmakuPreview.Dispose();
+            Closed += (_, _) => DanmakuPreview.Dispose();
             Background = new SolidColorBrush(Color.Parse("#111317"));
             return;
         }
@@ -99,42 +103,7 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
         };
     }
-    private void PosterAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e) => PosterContextChanged(sender, EventArgs.Empty);
-    private void PosterDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
-    { if (sender is Image image && _posterControls.Remove(image, out var previous)) MainViewModel.ReleasePoster(previous); }
-    private void PosterContextChanged(object? sender, EventArgs e)
-    {
-        if (sender is not Image image) return;
-        if (_posterControls.Remove(image, out var previous)) MainViewModel.ReleasePoster(previous);
-        if (_viewModel is not null && image.IsAttachedToVisualTree() && image.DataContext is MediaCard card)
-        { _posterControls[image] = card; _viewModel.ActivatePoster(card); }
-    }
-    private async void OpenDanmakuClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (_viewModel is not null && await PickAsync("打开 XML / JSON 弹幕") is { } path) await _viewModel.LoadDanmakuAsync(path); }
-    private async void ExportBackupClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_viewModel is null) return;
-        var file = await StorageProvider.SaveFilePickerAsync(new() { Title = "导出 VodBox 数据备份", SuggestedFileName = $"VodBox-{DateTime.Now:yyyyMMdd-HHmmss}.vodbox-backup.json", FileTypeChoices = [new("VodBox 数据备份") { Patterns = ["*.vodbox-backup.json"] }] });
-        if (file?.TryGetLocalPath() is { } path) await _viewModel.ExportBackupAsync(path);
-    }
-    private async void ImportBackupClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_viewModel is null) return;
-        var files = await StorageProvider.OpenFilePickerAsync(new() { Title = "选择备份并合并数据", AllowMultiple = false, FileTypeFilter = [new("VodBox 数据备份") { Patterns = ["*.vodbox-backup.json"] }] });
-        if (files.FirstOrDefault()?.TryGetLocalPath() is { } path) await _viewModel.ImportBackupAsync(path);
-    }
-    private async void SnapshotClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_viewModel is null) return;
-        var file = await StorageProvider.SaveFilePickerAsync(new() { Title = "保存视频截图", SuggestedFileName = $"VodBox-{DateTime.Now:yyyyMMdd-HHmmss}.png", DefaultExtension = "png", FileTypeChoices = [new("PNG 图片") { Patterns = ["*.png"] }] });
-        if (file?.TryGetLocalPath() is { } path) await _viewModel.TakeSnapshotAsync(path);
-    }
-    private async void DeleteHistoryClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (_viewModel is not null && sender is Button { DataContext: HistoryEntry entry }) { e.Handled = true; await _viewModel.DeleteHistoryAsync(entry); } }
-    private async void FavoriteSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    { if (_viewModel is not null && e.AddedItems.Count > 0 && e.AddedItems[0] is FavoriteEntry entry) await _viewModel.OpenFavoriteCommand.ExecuteAsync(entry); }
-    private async void SearchSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    { if (_viewModel is not null && e.AddedItems.Count > 0 && e.AddedItems[0] is SearchHit hit) await _viewModel.OpenSearchResultCommand.ExecuteAsync(hit); }
+
     private async Task<string?> PickAsync(string title)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new() { Title = title, AllowMultiple = false });
@@ -142,17 +111,7 @@ public sealed partial class MainWindow : Window
     }
     private async void OpenFileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     { if (_viewModel is not null && await PickAsync("打开媒体") is { } path) await _viewModel.OpenFileAsync(path); }
-    private async void OpenConfigClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (_viewModel is not null && await PickAsync("打开 VodBox 配置") is { } path) { _viewModel.ConfigLocation = path; await _viewModel.LoadConfigCommand.ExecuteAsync(null); } }
-    private async void AddSubtitleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (_viewModel is not null && await PickAsync("打开字幕") is { } path) await _viewModel.AddSubtitleAsync(path); }
+
     private void FullscreenClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
-    private void SeekPressed(object? sender, PointerPressedEventArgs e) { if (_viewModel is not null) _viewModel.IsScrubbing = true; }
-    private async void SeekReleased(object? sender, PointerReleasedEventArgs e) { if (_viewModel is not null) { await _viewModel.SeekAsync(); _viewModel.IsScrubbing = false; } }
-    private async void EpisodeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (_viewModel is not null && sender is Button { DataContext: Episode episode }) await _viewModel.PlayEpisodeCommand.ExecuteAsync(episode); }
-    private async void LiveSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    { if (_viewModel is not null && e.AddedItems.OfType<LiveChannel>().FirstOrDefault() is { } channel) await _viewModel.PlayChannelCommand.ExecuteAsync(channel); }
-    private async void HistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
-    { if (_viewModel is not null && e.AddedItems.OfType<HistoryEntry>().FirstOrDefault() is { } entry) await _viewModel.ResumeHistoryCommand.ExecuteAsync(entry); }
+
 }
