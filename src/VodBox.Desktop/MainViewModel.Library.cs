@@ -49,7 +49,7 @@ public partial class MainViewModel
     private async Task ApplyConfigAsync(VodBoxConfig config, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        _aggregateCancellation?.Cancel(); _playlist.Clear(); await _coordinator.StopAsync();
+        _aggregateCancellation?.Cancel(); _playlist.Clear(); _playingChannel = null; await _coordinator.StopAsync();
         _config = config; _resolution.Configure(config);
         Resolvers.Clear(); Resolvers.Add(new() { Id = "_direct", Name = "直接播放", Kind = ResolutionKind.Direct });
         Resolvers.Add(new() { Id = "_browser", Name = "网页嗅探", Kind = ResolutionKind.Browser });
@@ -70,10 +70,10 @@ public partial class MainViewModel
                 foreach (var channel in LiveParser.Parse(text))
                     _allChannels.Add(channel with { LiveSourceId = live.Id, Uris = channel.Uris.Select(x => new Uri(uri, x).AbsoluteUri).ToList() });
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { failures.Add($"{live.Name}: {ex.Message}"); }
+            catch (Exception ex) when (ex is not OperationCanceledException || !token.IsCancellationRequested) { failures.Add($"{live.Name}: {ex.Message}"); }
         }
         foreach (var group in _allChannels.Select(x => x.Group).Distinct()) LiveGroups.Add(group);
-        SelectedLiveGroup = "全部"; FilterChannels();
+        SelectedLiveGroup = "全部"; await RefreshLiveFavoritesAsync();
         Status = $"已加载 {Sources.Count} 个内容源、{_allChannels.Count} 个直播频道。" + (failures.Count > 0 ? " 未加载：" + string.Join("；", failures) : "");
     }
     private static async Task<byte[]> BoundedLiveAsync(Stream stream, CancellationToken token)
@@ -180,16 +180,24 @@ public partial class MainViewModel
     { Episodes.Clear(); if (value is not null) foreach (var episode in value.Episodes) Episodes.Add(episode); }
     private async Task OpenStoredItemAsync(string configId, string sourceId, string mediaId)
     {
+        await EnsureStoredConfigurationAsync(configId);
+        var source = _config.Sources.FirstOrDefault(x => x.Id == sourceId) ?? throw new InvalidDataException("记录所属内容源已被移除。");
+        await SelectSourceAsync(source); await DetailAsync(new(mediaId, ""));
+        await NavigateAsync("发现"); SchedulePreferencesSave();
+    }
+    private async Task EnsureStoredConfigurationAsync(string configId)
+    {
         if (_config.Id != configId)
         {
             var saved = (await _configurations.ListAsync(_lifetime.Token)).FirstOrDefault(x => x.Id == configId)
                 ?? throw new InvalidDataException("记录所属配置已被删除，请重新导入。");
             ConfigLocation = saved.Location; await ApplyConfigAsync(await _configurations.LoadAsync(configId, _lifetime.Token), _lifetime.Token);
         }
-        var source = _config.Sources.FirstOrDefault(x => x.Id == sourceId) ?? throw new InvalidDataException("记录所属内容源已被移除。");
-        await SelectSourceAsync(source); await DetailAsync(new(mediaId, ""));
-        await NavigateAsync("发现"); SchedulePreferencesSave();
     }
     [RelayCommand] private Task OpenFavoriteAsync(FavoriteEntry? favorite) => RunAsync(async () =>
-    { if (favorite is not null) await OpenStoredItemAsync(favorite.ConfigId, favorite.SourceId, favorite.MediaId); });
+    {
+        if (favorite is null) return;
+        if (favorite.SourceId.StartsWith("live/", StringComparison.Ordinal)) await OpenStoredLiveAsync(favorite.ConfigId, favorite.SourceId[5..], favorite.MediaId, null);
+        else await OpenStoredItemAsync(favorite.ConfigId, favorite.SourceId, favorite.MediaId);
+    });
 }

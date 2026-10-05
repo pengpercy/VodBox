@@ -53,6 +53,18 @@ public sealed class LibraryStore : ILibraryStore
         while (reader.Read()) entries.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetInt64(6), DateTimeOffset.Parse(reader.GetString(7)), (ResolutionKind)reader.GetInt32(8), reader.IsDBNull(9) ? null : reader.GetString(9)));
         return Task.FromResult<IReadOnlyList<HistoryEntry>>(entries);
     }
+    public Task DeleteHistoryAsync(HistoryEntry? entry, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var connection = Open(); using var command = connection.CreateCommand();
+        command.CommandText = entry is null ? "DELETE FROM history" : "DELETE FROM history WHERE config=$c AND source=$s AND media=$m AND episode=$e";
+        if (entry is not null)
+        {
+            command.Parameters.AddWithValue("$c", entry.ConfigId); command.Parameters.AddWithValue("$s", entry.SourceId);
+            command.Parameters.AddWithValue("$m", entry.MediaId); command.Parameters.AddWithValue("$e", entry.EpisodeId);
+        }
+        command.ExecuteNonQuery(); return Task.CompletedTask;
+    }
     public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -42,6 +42,7 @@ public sealed class PlaylistTests
     {
         public Task SaveHistoryAsync(HistoryEntry entry, CancellationToken token = default) => Task.CompletedTask;
         public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<HistoryEntry>>([]);
+        public Task DeleteHistoryAsync(HistoryEntry? entry, CancellationToken token = default) => Task.CompletedTask;
         public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken token = default) => Task.CompletedTask;
         public Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<FavoriteEntry>>([]);
     }

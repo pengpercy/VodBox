@@ -4,6 +4,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 using VodBox.Core;
 
 namespace VodBox.Infrastructure;
@@ -121,12 +123,11 @@ public sealed partial class MediaProxy : IAsyncDisposable
                 string mime = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
                 bool hls = mime.Contains("mpegurl", StringComparison.OrdinalIgnoreCase) || final.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);
                 bool dash = mime.Contains("dash+xml", StringComparison.OrdinalIgnoreCase) || final.AbsolutePath.EndsWith(".mpd", StringComparison.OrdinalIgnoreCase);
-                if (dash) { await ErrorAsync(stream, 501); return; } // DASH templates require a dedicated route model.
                 byte[]? rewritten = null;
-                if (first[0] == "GET" && response.IsSuccessStatusCode && hls)
+                if (first[0] == "GET" && response.IsSuccessStatusCode && (hls || dash))
                 {
                     var bytes = await BoundedContent.ReadAsync(body, 8 * 1024 * 1024, _shutdown.Token);
-                    rewritten = Encoding.UTF8.GetBytes(RewriteHls(TextEncoding.Decode(bytes), final, route[2], session));
+                    rewritten = hls ? Encoding.UTF8.GetBytes(RewriteHls(TextEncoding.Decode(bytes), final, route[2], session)) : RewriteDash(bytes, final, route[2], session);
                 }
                 var headers = new StringBuilder($"HTTP/1.1 {(int)response.StatusCode} {response.ReasonPhrase}\r\nConnection: close\r\nContent-Type: {mime}\r\n");
                 if (response.Headers.Location is { } location) headers.Append("Location: ").Append(Map(route[2], session, new Uri(target, location))).Append("\r\n");
@@ -155,6 +156,82 @@ public sealed partial class MediaProxy : IAsyncDisposable
         if (!line.StartsWith('#')) return Map(id, session, new Uri(origin, line.Trim()));
         return PlaylistUri().Replace(line, match => "URI=\"" + Map(id, session, new Uri(origin, match.Groups[1].Value)) + "\"");
     }));
+    private byte[] RewriteDash(byte[] content, Uri origin, string id, Session session)
+    {
+        using var input = new MemoryStream(content);
+        using var reader = XmlReader.Create(input, new() { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 8 * 1024 * 1024 });
+        var document = XDocument.Load(reader); var root = document.Root ?? throw new InvalidDataException("DASH 清单为空。");
+        var ns = root.Name.Namespace;
+        long copiedCharacters = 0;
+        var costs = new Dictionary<XElement, int>();
+        foreach (var representation in root.Descendants(ns + "Representation"))
+        {
+            XElement? merged = null;
+            foreach (var owner in representation.Ancestors().Reverse().Append(representation))
+            {
+                var segment = owner.Elements().FirstOrDefault(x => x.Name.Namespace == ns && x.Name.LocalName is "SegmentTemplate" or "SegmentList" or "SegmentBase");
+                if (segment is null) continue;
+                // Timeline inheritance needs no copying; materialize URI attributes at the representation's BaseURL.
+                bool attributesOnly = owner != representation && segment.Name.LocalName == "SegmentTemplate";
+                if (!attributesOnly)
+                {
+                    if (!costs.TryGetValue(segment, out int cost)) costs[segment] = cost = segment.ToString(SaveOptions.DisableFormatting).Length;
+                    copiedCharacters += cost;
+                    if (copiedCharacters > 16 * 1024 * 1024) throw new InvalidDataException("DASH 继承清单展开超过限制。");
+                }
+                var copy = attributesOnly ? new XElement(segment.Name, segment.Attributes(), segment.Elements().Where(x => x.Name.LocalName != "SegmentTimeline").Select(x => new XElement(x))) : new XElement(segment);
+                if (attributesOnly) { copiedCharacters += copy.ToString(SaveOptions.DisableFormatting).Length; if (copiedCharacters > 16 * 1024 * 1024) throw new InvalidDataException("DASH 继承清单展开超过限制。"); }
+                if (merged is null || merged.Name != copy.Name) merged = copy;
+                else
+                {
+                    foreach (var attribute in copy.Attributes()) merged.SetAttributeValue(attribute.Name, attribute.Value);
+                    foreach (var group in copy.Elements().GroupBy(x => x.Name))
+                    { merged.Elements(group.Key).Remove(); merged.Add(group.Select(x => new XElement(x))); }
+                }
+            }
+            if (merged is not null)
+            {
+                representation.Elements().Where(x => x.Name.Namespace == ns && x.Name.LocalName is "SegmentTemplate" or "SegmentList" or "SegmentBase").Remove();
+                representation.Add(merged);
+            }
+        }
+        void Rewrite(XElement element, Uri inherited)
+        {
+            var bases = element.Elements(ns + "BaseURL").ToArray();
+            // DASH permits multiple alternatives. Templates use the first; BaseURL-only streams retain alternatives.
+            Uri current = bases.Length == 0 ? inherited : new Uri(inherited, bases[0].Value.Trim());
+            foreach (var baseUrl in bases)
+            {
+                var target = new Uri(inherited, baseUrl.Value.Trim());
+                baseUrl.Value = Map(id, session, target, target.AbsolutePath.EndsWith('/'));
+            }
+            string[] attributes = element.Name.LocalName switch
+            {
+                "SegmentTemplate" => ["media", "initialization", "index"],
+                "SegmentURL" => ["media", "index"],
+                "Initialization" or "RepresentationIndex" => ["sourceURL"],
+                _ => []
+            };
+            foreach (string attribute in attributes)
+            {
+                if (element.Attribute(attribute) is not { } value) continue;
+                var target = new Uri(current, value.Value);
+                // Keep $Number$, $Time$ and $RepresentationID$ visible for the DASH demuxer.
+                // Map only the static directory so substituted segment names reach the upstream URI.
+                string path = target.AbsolutePath;
+                int template = path.IndexOf('$');
+                int slash = template < 0 ? path.LastIndexOf('/') : path.LastIndexOf('/', template);
+                var directory = new UriBuilder(target) { Path = path[..(slash + 1)], Query = "", Fragment = "" }.Uri;
+                value.Value = Map(id, session, directory, true) + path[(slash + 1)..] + target.Query;
+            }
+            if (element.Name == ns + "Location") element.Value = Map(id, session, new Uri(inherited, element.Value.Trim()));
+            foreach (var child in element.Elements().Where(x => x.Name != ns + "BaseURL")) Rewrite(child, current);
+        }
+        bool hasRootBase = root.Element(ns + "BaseURL") is not null;
+        Rewrite(root, origin);
+        if (!hasRootBase) root.AddFirst(new XElement(ns + "BaseURL", Map(id, session, new Uri(origin, "."), true)));
+        using var output = new MemoryStream(); document.Save(output); return output.ToArray();
+    }
     private static bool SameOrigin(Uri first, Uri second) => first.Scheme == second.Scheme && first.Host == second.Host && first.Port == second.Port;
     private static async Task<string> ReadHeaderAsync(NetworkStream stream, CancellationToken token)
     {

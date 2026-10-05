@@ -110,6 +110,33 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         if (kind == TrackKind.Audio) _player.SetAudioTrack(int.Parse(trackId)); else _player.SetSpu(int.Parse(trackId));
     }, token);
     public Task AddSubtitleAsync(string path, CancellationToken token) => CommandAsync(() => _player?.AddSlave(MediaSlaveType.Subtitle, new Uri(Path.GetFullPath(path)).AbsoluteUri, true), token);
+    public Task SetAudioDelayAsync(int milliseconds, CancellationToken token) => CommandAsync(() =>
+    { if (_player is not null && !_player.SetAudioDelay(milliseconds * 1000L)) throw new InvalidOperationException("当前音轨无法设置延迟。"); }, token);
+    public Task SetSubtitleDelayAsync(int milliseconds, CancellationToken token) => CommandAsync(() =>
+    { if (_player is not null && !_player.SetSpuDelay(milliseconds * 1000L)) throw new InvalidOperationException("当前字幕无法设置延迟。"); }, token);
+    public async Task TakeSnapshotAsync(string path, CancellationToken token)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        MediaPlayer? player = null;
+        EventHandler<MediaPlayerSnapshotTakenEventArgs> handler = (_, e) =>
+        { if (string.Equals(e.Filename, path, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)) completion.TrySetResult(); };
+        try
+        {
+            await CommandAsync(() =>
+            {
+                player = _player ?? throw new InvalidOperationException("请先播放视频。");
+                player.SnapshotTaken += handler;
+                if (!player.TakeSnapshot(0, path, 0, 0)) throw new InvalidOperationException("当前视频无法截图。");
+            }, token);
+            await completion.Task.WaitAsync(TimeSpan.FromSeconds(8), token);
+            if (!File.Exists(path) || new FileInfo(path).Length == 0) throw new IOException("截图文件没有写入。");
+        }
+        finally
+        {
+            try { await CommandAsync(() => { if (player is not null && ReferenceEquals(player, _player)) player.SnapshotTaken -= handler; }, CancellationToken.None); }
+            catch (ObjectDisposedException) { }
+        }
+    }
     public async ValueTask DisposeAsync()
     {
         await CommandAsync(() => { _player?.Stop(); _player?.Dispose(); _media?.Dispose(); _lib?.Dispose(); _player = null; }, CancellationToken.None);

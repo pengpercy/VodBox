@@ -2,16 +2,23 @@ namespace VodBox.Core;
 
 public sealed record AppPreferences
 {
-    public string? LastConfigId { get; init; }
-    public string? LastSourceId { get; init; }
-    public double Volume { get; init; } = 80;
-    public double Rate { get; init; } = 1;
-    public bool AutoNext { get; init; } = true;
-    public bool ResumePlayback { get; init; } = true;
-    public int SkipIntroSeconds { get; init; }
-    public int SkipOutroSeconds { get; init; }
-    public string Theme { get; init; } = "Dark";
-    public bool LargeScreen { get; init; }
+    public string? LastConfigId { get; set; }
+    public string? LastSourceId { get; set; }
+    public double Volume { get; set; } = 80;
+    public double Rate { get; set; } = 1;
+    public bool AutoNext { get; set; } = true;
+    public bool ResumePlayback { get; set; } = true;
+    public int SkipIntroSeconds { get; set; }
+    public int SkipOutroSeconds { get; set; }
+    public string Theme { get; set; } = "Dark";
+    public int AudioDelayMs { get; set; }
+    public int SubtitleDelayMs { get; set; }
+    public string? LastLiveConfigId { get; set; }
+    public string? LastLiveSourceId { get; set; }
+    public string? LastLiveChannelId { get; set; }
+    public bool AutoLiveFallback { get; set; } = true;
+    public bool ResumeLiveOnStartup { get; set; }
+    public bool LargeScreen { get; set; }
 }
 
 public sealed record SavedConfiguration(string Id, string Location, DateTimeOffset ImportedAt);

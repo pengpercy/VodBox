@@ -40,6 +40,7 @@ public interface ILibraryStore
 {
     Task SaveHistoryAsync(HistoryEntry entry, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(CancellationToken cancellationToken = default);
+    Task DeleteHistoryAsync(HistoryEntry? entry, CancellationToken cancellationToken = default);
     Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(CancellationToken cancellationToken = default);
 }

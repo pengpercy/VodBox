@@ -34,8 +34,8 @@ public sealed class PlaybackResolutionService(HttpClient http) : IPlaybackResolv
 
     private PlaybackRequest Finish(PlaybackRequest request)
     {
-        if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "file"))
-            throw new InvalidDataException("解析结果必须是 HTTP、HTTPS 或本地文件地址。");
+        if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "file" or "rtsp" or "rtsps" or "rtmp" or "rtmps" or "udp" or "rtp" or "mms" or "mmsh" or "smb" or "srt"))
+            throw new InvalidDataException("解析结果不是受支持的媒体传输地址。");
         return uri.Scheme is "http" or "https" && request.Headers.Keys.Any(key => !key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase) && !key.Equals("Referer", StringComparison.OrdinalIgnoreCase))
             ? _proxy.Register(request) : request;
     }

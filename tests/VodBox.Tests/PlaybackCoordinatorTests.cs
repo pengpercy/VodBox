@@ -25,7 +25,7 @@ public sealed class PlaybackCoordinatorTests
     }
 
     [Fact]
-    public async Task IncognitoAndLiveDoNotPersistHistory()
+    public async Task IncognitoSkipsHistoryAndLiveStoresChannelWithoutSeekPosition()
     {
         var engine = new FakeEngine(); var store = new FakeStore();
         await using var coordinator = new PlaybackCoordinator(engine, store);
@@ -39,9 +39,11 @@ public sealed class PlaybackCoordinatorTests
         Assert.Equal(30000, Assert.Single(store.History).PositionMs);
         await coordinator.PlayAsync(_ => Task.FromResult(new PlaybackRequest { Uri = "https://example.com/live", IsLive = true }), "config");
         store.History.Clear();
-        engine.Snapshot = engine.Snapshot with { Position = TimeSpan.FromMinutes(1) };
+        engine.Snapshot = engine.Snapshot with { Position = TimeSpan.FromMinutes(1), State = PlaybackState.Playing };
         await coordinator.SaveProgressAsync();
-        Assert.Empty(store.History);
+        Assert.Equal(0, Assert.Single(store.History).PositionMs);
+        Assert.Equal("https://example.com/live", store.History[0].Uri);
+        store.History.Clear(); coordinator.Incognito = true; await coordinator.SaveProgressAsync(); Assert.Empty(store.History);
     }
 
     private sealed class FakeStore : ILibraryStore
@@ -49,6 +51,7 @@ public sealed class PlaybackCoordinatorTests
         public List<HistoryEntry> History { get; } = [];
         public Task SaveHistoryAsync(HistoryEntry entry, CancellationToken cancellationToken = default) { History.Add(entry); return Task.CompletedTask; }
         public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<HistoryEntry>>(History);
+        public Task DeleteHistoryAsync(HistoryEntry? entry, CancellationToken token = default) => Task.CompletedTask;
         public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FavoriteEntry>>([]);
     }

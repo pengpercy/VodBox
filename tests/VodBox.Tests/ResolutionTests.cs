@@ -12,6 +12,14 @@ namespace VodBox.Tests;
 public sealed class ResolutionTests
 {
     [Fact]
+    public async Task DirectStreamingTransportPassesThroughWithoutHttpProxy()
+    {
+        using var http = new HttpClient(); await using var resolver = new PlaybackResolutionService(http);
+        var result = await resolver.ResolveAsync(new() { Uri = "rtsp://media.example/live" }, default);
+        Assert.Equal("rtsp://media.example/live", result.Uri);
+    }
+
+    [Fact]
     public void SourceGeneratedConfigurationKeepsOptionalDefaults()
     {
         var config = JsonSerializer.Deserialize("{\"resolvers\":[{\"id\":\"p\",\"name\":\"parser\",\"entry\":\"https://example.com/?url={url}\"}]}", VodBoxJson.Default.VodBoxConfig)!;

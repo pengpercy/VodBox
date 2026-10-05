@@ -44,9 +44,12 @@ public sealed class ConfigLoader(HttpClient http)
         }
         foreach (var resolver in config.Resolvers)
             if (resolver.NextResolverId is not null && !resolverIds.Contains(resolver.NextResolverId)) throw new InvalidDataException("解析器链引用了不存在的解析器。");
+        var liveIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var live in config.LiveSources)
+            if (string.IsNullOrWhiteSpace(live.Id) || !liveIds.Add(live.Id) || string.IsNullOrWhiteSpace(live.Uri)) throw new InvalidDataException("直播源 ID 为空 / 重复，或入口为空。");
         foreach (var source in config.Sources)
         {
-            if (string.IsNullOrWhiteSpace(source.Id) || !ids.Add(source.Id))
+            if (string.IsNullOrWhiteSpace(source.Id) || source.Id.StartsWith("live/", StringComparison.Ordinal) || !ids.Add(source.Id))
                 throw new InvalidDataException($"内容源 id 为空或重复：{source.Id}");
             if (!Enum.IsDefined(source.Runtime)) throw new InvalidDataException("未知源运行时。");
             if (string.IsNullOrWhiteSpace(source.Name)) throw new InvalidDataException("内容源 name 不能为空。");
