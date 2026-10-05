@@ -73,3 +73,10 @@ VodBox --diagnostics --bilibili-smoke BV1WSHL66EdZ --native
 macOS JIT 实际 VideoToolbox H.264 解码至 3.40 秒，视频 216 块、音频 387 块，日志 `/private/tmp/vodbox-appget-gugu-fixed-media-jit.log`。最终严格 Native AOT 发布通过，日志 `/private/tmp/vodbox-appget-parser-final-aot.log`；`artifacts/appget-parser-aot/VodBox` 同一视频解码至 3.16 秒，视频 200 块、音频 367 块，日志 `/private/tmp/vodbox-appget-gugu-parser-native-aot.log`。
 
 蔬菜以新参数复核仍返回 code=0 / 空 data；一碗媒体线路和首发初始化未通过项仍保留。显式 Qiji V122 参考发现文件遇到 TLS 错误，未进行证书绕过；只有 fixture 支持，不能计为四个原 AppGet 条目全部可用。CI 未触发。
+
+
+## App99 BN v2 真实验收（2026-10-05）
+
+双星匿名分类、列表、搜索、详情、解析通过（8 分类、21 列表、5 搜索、9 线路 / 414 集）。JIT LibVLC 使用 VideoToolbox 实际 H.264 解码到 3.38 秒，187 视频块 / 470 音频块。剧圈匿名内容和解析通过（18 分类、21 列表、2 搜索、7 线路），首次媒体返回 403。
+
+112 项本地测试通过，包含 8 项 App99 协议测试；严格 macOS x64 Native AOT 编译及实际 App99 内容/解析通过。动态首条媒体 403；固定视频 1026210 首线路 404，未记录为 AOT 解码通过。固定视频 1052399 JIT 首线路也 404。真实媒体可用性与原生协议通过分别记录，不能由一次成功推断全部线路可用。新版示例只保留占位参数，真实配置、解密内容与签名数据不入库，未触发 CI。更多范围见 [App99 Spider](app99-spider.md)。

@@ -76,15 +76,18 @@ internal static class Diagnostics
                 await BilibiliSmokeAsync(http, mediaId, args.Contains("--native"));
             }
             int appGetArgument = Array.IndexOf(args, "--appget-smoke");
+            if (appGetArgument < 0) appGetArgument = Array.IndexOf(args, "--app99-smoke");
             if (appGetArgument >= 0)
             {
                 if (appGetArgument + 1 >= args.Length || args[appGetArgument + 1].StartsWith("--", StringComparison.Ordinal))
-                    throw new InvalidDataException("--appget-smoke 需要新版配置文件路径。");
+                    throw new InvalidDataException("Spider smoke 需要新版配置文件路径。");
                 int lineArgument = Array.IndexOf(args, "--appget-line");
+                if (lineArgument < 0) lineArgument = Array.IndexOf(args, "--app99-line");
                 int line = 0;
                 if (lineArgument >= 0 && (lineArgument + 1 >= args.Length || !int.TryParse(args[lineArgument + 1], out line) || line < 0))
                     throw new InvalidDataException("--appget-line 需要从 0 开始的线路编号。");
                 int mediaArgument = Array.IndexOf(args, "--appget-media");
+                if (mediaArgument < 0) mediaArgument = Array.IndexOf(args, "--app99-media");
                 string? mediaId = null;
                 if (mediaArgument >= 0)
                 {
@@ -92,31 +95,41 @@ internal static class Diagnostics
                         throw new InvalidDataException("--appget-media 需要视频编号。");
                     mediaId = args[mediaArgument + 1];
                 }
-                await AppGetSmokeAsync(http, args[appGetArgument + 1], args.Contains("--native"), line, mediaId);
+                int categoryArgument = Array.IndexOf(args, "--spider-category");
+                string? categoryId = null;
+                if (categoryArgument >= 0)
+                {
+                    if (categoryArgument + 1 >= args.Length || args[categoryArgument + 1].StartsWith("--", StringComparison.Ordinal))
+                        throw new InvalidDataException("--spider-category 需要分类编号。");
+                    categoryId = args[categoryArgument + 1];
+                }
+                await AppGetSmokeAsync(http, args[appGetArgument + 1], args.Contains("--native"), line, mediaId, categoryId);
             }
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
-    private static async Task AppGetSmokeAsync(HttpClient http, string location, bool decode, int lineIndex, string? mediaId)
+    private static async Task AppGetSmokeAsync(HttpClient http, string location, bool decode, int lineIndex, string? mediaId, string? categoryId)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         var config = await new ConfigLoader(http).LoadAsync(location, deadline.Token);
         foreach (var source in config.Sources)
         {
+            string label = source.Provider is "app99" or "csp_App99" ? "App99" : "AppGet";
             await using var provider = new ProviderFactory(http, "unused", "unused").Create(source);
             var categories = await provider.GetCategoriesAsync(deadline.Token);
-            var category = categories.FirstOrDefault() ?? throw new InvalidDataException("AppGet 没有可用分类。");
+            var category = (categoryId is null ? categories.FirstOrDefault() : categories.FirstOrDefault(x => x.Id == categoryId))
+                ?? throw new InvalidDataException($"{label} 没有所选分类。");
             var page = await provider.GetItemsAsync(category.Id, null, deadline.Token);
-            var item = page.Items.FirstOrDefault() ?? throw new InvalidDataException("AppGet 分类没有内容。");
+            var item = page.Items.FirstOrDefault() ?? throw new InvalidDataException($"{label} 分类没有内容。");
             var search = await provider.SearchAsync(item.Title, deadline.Token);
-            if (search.Items.Count == 0) throw new InvalidDataException("AppGet 搜索没有返回内容。");
+            if (search.Items.Count == 0) throw new InvalidDataException($"{label} 搜索没有返回内容。");
             var detail = await provider.GetDetailAsync(mediaId ?? item.Id, deadline.Token);
-            Console.WriteLine($"C# AppGet catalog: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
+            Console.WriteLine($"C# {label} catalog: OK | source={source.Id}, category={category.Id}, media={detail.Item.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
             if (lineIndex >= detail.PlaybackLines.Count) throw new InvalidDataException("AppGet 所选线路不存在。");
             var episode = detail.PlaybackLines[lineIndex].Episodes.FirstOrDefault() ?? throw new InvalidDataException("AppGet 视频没有可用分集。");
             var request = await provider.ResolvePlaybackAsync(detail.Item.Id, episode.Id, deadline.Token);
-            Console.WriteLine($"C# AppGet Spider: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
+            Console.WriteLine($"C# {label} Spider: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
             if (!decode) continue;
             await using var engine = new LibVlcEngine(headless: true);
             await engine.OpenAsync(request, 2, deadline.Token);
@@ -126,7 +139,7 @@ internal static class Diagnostics
                 if (engine.Snapshot.State == Core.PlaybackState.Failed) throw new InvalidOperationException(engine.Snapshot.Error);
                 await Task.Delay(100, deadline.Token);
             }
-            Console.WriteLine($"AppGet LibVLC decode: OK | source={source.Id}, position={engine.Snapshot.Position.TotalSeconds:F2}s, decodedVideo={media.Statistics.DecodedVideo}, decodedAudio={media.Statistics.DecodedAudio}");
+            Console.WriteLine($"{label} LibVLC decode: OK | source={source.Id}, position={engine.Snapshot.Position.TotalSeconds:F2}s, decodedVideo={media.Statistics.DecodedVideo}, decodedAudio={media.Statistics.DecodedAudio}");
             await engine.StopAsync(default);
         }
     }

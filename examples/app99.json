@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "app99-example",
+  "sources": [
+    {
+      "id": "app99",
+      "name": "App99 BN v2（请填写站点参数）",
+      "runtime": "csharp",
+      "provider": "app99",
+      "entry": "https://api.example.com/app/bn",
+      "options": {
+        "protocol": "bn-v2",
+        "appkey": "replace-with-site-appkey",
+        "name": "replace-with-app-name",
+        "versionName": "2.0.0",
+        "buildSignature": "replace-with-build-signature",
+        "apiVersion": "0b4328287a5d953e",
+        "userAgent": "Mozilla/5.0"
+      }
+    }
+  ],
+  "liveSources": [],
+  "resolvers": []
+}

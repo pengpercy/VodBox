@@ -12,6 +12,8 @@
 
 用户提供的饭太硬地址作为后续测试来源；它返回旧配置，不能直接作为新版配置加载。已提取公开直播列表形成新版测试示例，未导入 Java 插件；网络可达性与实际播放记录见 [播放测试](playback-testing.md)。
 
+最新 Spider 进展：Bilibili、AppGet V119 / 显式 Qiji V122 与 App99 BN v2 已原生 C# 接入。112 项本地测试通过，App99 双星 JIT 实际解码通过；参考协议不等同于原 Java/Guard 入口全部覆盖。Python/Node 保留，继续不引入 Java 兼容层。详细范围见 [App99 Spider](app99-spider.md) 与功能清单。
+
 ## 1. 结论与范围
 
 可以使用 Avalonia 重写为 macOS / Windows / Linux 桌面应用。采用 .NET 10 LTS、Avalonia、MVVM、SQLite，以及参考 Screenbox 的 LibVLC + LibVLCSharp 播放方案。详细播放器设计见 [Screenbox 专项分析](screenbox-playback-analysis.md)。
