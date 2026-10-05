@@ -80,3 +80,19 @@ python3 build/analyze-spiders.py \
 显式注册 `app99` / `csp_App99`，保留入口 `/app/bn` 前缀，以原生 C# 实现 AES-256-CBC、匿名签名、zlib 加密响应、分类/筛选/分页/搜索、多线路和外部 JSON 解析。公开参考只用于核对协议，未运行或复制 Python 文件；不依赖 Java 或 Python 来实现本适配。8 项专项测试、112 项完整回归通过。
 
 宝盒双星实际返回 8 类、21 项列表、5 项搜索、9 条线路 / 414 集，LibVLC JIT 解码至 3.38 秒（187 视频 / 470 音频块）。剧圈返回 18 类、21 项列表、2 项搜索、7 条线路，内容及地址解析通过。`csp_App99Guard` 尚未核实，不能把三个候选条目全计为已覆盖。详见 [协议和验收范围](app99-spider.md)。
+
+
+## AppDrama / AppYd 入口核查
+
+2026-10-05：宝盒 AppDrama 天堂、橘汁均未直接填写 host，而由 site JSON 的 domain 发现地址。两个发现入口 HTTP 200，按声明 commonKey 生成匿名 publicParams 后，真实分类接口 `/api/v3/drama/getCategory?orderBy=type_id` 分别返回 code=200、9 类 / 7 类。尚未验证分页、详情或播放。
+
+[固定提交的 AppDrama 参考](https://github.com/5q68fs6b86-netizen/CatVodSpider-maintainable/blob/3ac7e6ea46339e6cfdf94dec4ff8e2e573638802/app/src/main/java/com/github/catvod/spider/AppDrama.java) 表明内容阶段还需 RSA 公钥协商、AES 和 protobuf。但是同提交 ApiResult/Drama/SecureRequest 等 protobuf 类均为返回空值的占位实现，没有 wire 字段定义，不能作为真实协议实现或验收依据。精确 SecureRequestProto 搜索未找到完整定义；唯一相关 Python 搜索结果只是配置文本。当前不注册 `csp_AppDrama`，也不增加功能完成项。真实发现响应、匿名分类与参考仅保留本机临时目录。
+
+AppYd 按名称搜索得到无关结果，精确 AppYd.java 文件搜索为空，尚无充分接口依据。继续核查同频 XBPQ 的两个音频内容站点；它们已有公开 HTML 规则，先验证可达性，不能将整个 XBPQ 规则引擎算作已经兼容。
+
+
+## 当前批次收尾与播放内核优先级
+
+宝盒两个 XBPQ 音频条目对应 xsmp3/psmp3 的公开页面。独立 C# `audio-site` 显式实现 `audio-zblog-v1` 分类分页、专辑分集和直接音频，不读取旧规则，不代表整个 XBPQ 引擎兼容。两个站点的分类与专辑均 HTTP 200，媒体 audio/mpeg；相声 JIT 解码 3.03 秒 / 317 音频块，评书 JIT 解码 3.21 秒 / 332 音频块。公开搜索 POST 跳至 search.php 后 301 回首页，明确不支持搜索，不把首页内容当搜索结果。详见 [音频 Spider](audio-site-spider.md)。
+
+用户最新调整：当前高频批次验证收尾后先继续双播放内核，随后再扩大 Spider 适配。不能据此宣称两个配置大多数条目已经覆盖；AppDrama 字段定义、AppYd、Guard 和其余入口仍留在待核查清单。

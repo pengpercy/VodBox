@@ -77,6 +77,7 @@ internal static class Diagnostics
             }
             int appGetArgument = Array.IndexOf(args, "--appget-smoke");
             if (appGetArgument < 0) appGetArgument = Array.IndexOf(args, "--app99-smoke");
+            if (appGetArgument < 0) appGetArgument = Array.IndexOf(args, "--audio-site-smoke");
             if (appGetArgument >= 0)
             {
                 if (appGetArgument + 1 >= args.Length || args[appGetArgument + 1].StartsWith("--", StringComparison.Ordinal))
@@ -88,6 +89,7 @@ internal static class Diagnostics
                     throw new InvalidDataException("--appget-line 需要从 0 开始的线路编号。");
                 int mediaArgument = Array.IndexOf(args, "--appget-media");
                 if (mediaArgument < 0) mediaArgument = Array.IndexOf(args, "--app99-media");
+                if (mediaArgument < 0) mediaArgument = Array.IndexOf(args, "--spider-media");
                 string? mediaId = null;
                 if (mediaArgument >= 0)
                 {
@@ -115,15 +117,17 @@ internal static class Diagnostics
         var config = await new ConfigLoader(http).LoadAsync(location, deadline.Token);
         foreach (var source in config.Sources)
         {
-            string label = source.Provider is "app99" or "csp_App99" ? "App99" : "AppGet";
+            bool audioOnly = source.Provider is "audio-site" or "csp_XBPQ";
+            string label = audioOnly ? "AudioSite" : source.Provider is "app99" or "csp_App99" ? "App99" : "AppGet";
             await using var provider = new ProviderFactory(http, "unused", "unused").Create(source);
             var categories = await provider.GetCategoriesAsync(deadline.Token);
             var category = (categoryId is null ? categories.FirstOrDefault() : categories.FirstOrDefault(x => x.Id == categoryId))
                 ?? throw new InvalidDataException($"{label} 没有所选分类。");
             var page = await provider.GetItemsAsync(category.Id, null, deadline.Token);
             var item = page.Items.FirstOrDefault() ?? throw new InvalidDataException($"{label} 分类没有内容。");
-            var search = await provider.SearchAsync(item.Title, deadline.Token);
-            if (search.Items.Count == 0) throw new InvalidDataException($"{label} 搜索没有返回内容。");
+            var search = audioOnly ? new Core.MediaPage([]) : await provider.SearchAsync(item.Title, deadline.Token);
+            if (audioOnly) Console.WriteLine("AudioSite search: unsupported | upstream search redirects to home");
+            else if (search.Items.Count == 0) throw new InvalidDataException($"{label} 搜索没有返回内容。");
             var detail = await provider.GetDetailAsync(mediaId ?? item.Id, deadline.Token);
             Console.WriteLine($"C# {label} catalog: OK | source={source.Id}, category={category.Id}, media={detail.Item.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
             if (lineIndex >= detail.PlaybackLines.Count) throw new InvalidDataException("AppGet 所选线路不存在。");
@@ -134,7 +138,7 @@ internal static class Diagnostics
             await using var engine = new LibVlcEngine(headless: true);
             await engine.OpenAsync(request, 2, deadline.Token);
             using var media = engine.Player!.Media!;
-            while (engine.Snapshot.Position.TotalSeconds < 3 || engine.Player.VideoTrack < 0 || media.Statistics.DecodedVideo == 0)
+            while (engine.Snapshot.Position.TotalSeconds < 3 || (audioOnly ? media.Statistics.DecodedAudio == 0 : engine.Player.VideoTrack < 0 || media.Statistics.DecodedVideo == 0))
             {
                 if (engine.Snapshot.State == Core.PlaybackState.Failed) throw new InvalidOperationException(engine.Snapshot.Error);
                 await Task.Delay(100, deadline.Token);

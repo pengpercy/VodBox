@@ -84,6 +84,7 @@ public sealed class ProviderFactory(HttpClient http, string pluginHostPath, stri
         ProviderRuntime.Csharp when source.Provider is "bilibili" or "csp_Bili" => new BilibiliProvider(source),
         ProviderRuntime.Csharp when source.Provider is "appget" or "csp_AppGet" => new AppGetProvider(source),
         ProviderRuntime.Csharp when source.Provider is "app99" or "csp_App99" => new App99Provider(source),
+        ProviderRuntime.Csharp when source.Provider is "audio-site" or "csp_XBPQ" => new AudioSiteProvider(source),
         ProviderRuntime.Csharp => throw new NotSupportedException($"尚未注册 C# Provider：{source.Provider}"),
         _ => new ScriptProvider(source, pluginHostPath, assetsDirectory)
         };

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "audio-sites",
+  "sources": [
+    {
+      "id": "xiangsheng",
+      "name": "相声随身听",
+      "runtime": "csharp",
+      "provider": "audio-site",
+      "entry": "https://www.xsmp3.com",
+      "options": {
+        "protocol": "audio-zblog-v1"
+      }
+    },
+    {
+      "id": "pingshu",
+      "name": "评书随身听",
+      "runtime": "csharp",
+      "provider": "audio-site",
+      "entry": "https://www.psmp3.com",
+      "options": {
+        "protocol": "audio-zblog-v1"
+      }
+    }
+  ],
+  "liveSources": [],
+  "resolvers": []
+}
