@@ -14,6 +14,7 @@ public interface IContentProvider : IAsyncDisposable
 {
     string SourceId { get; }
     Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken);
+    Task<MediaPage> GetHomeAsync(CancellationToken cancellationToken) => GetItemsAsync(null, null, cancellationToken);
     Task<MediaPage> GetItemsAsync(string? categoryId, string? cursor, CancellationToken cancellationToken);
     Task<MediaPage> GetItemsFilteredAsync(string? categoryId, string? cursor, IReadOnlyDictionary<string, string> filters, CancellationToken cancellationToken) =>
         filters.Count == 0 ? GetItemsAsync(categoryId, cursor, cancellationToken) : throw new NotSupportedException("此内容源尚未实现筛选。");

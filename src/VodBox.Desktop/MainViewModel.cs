@@ -58,9 +58,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _status = "添加配置，或打开本地媒体开始播放。";
     [ObservableProperty] private string _nowPlaying = "尚未播放";
     [ObservableProperty] private string _description = "选择内容查看详情和播放线路。";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(WorkspaceTitle))] private string _pageTitle = "发现";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(WorkspaceTitle))] private string _pageTitle = "首页";
     [ObservableProperty] private bool _isBusy;
-    [ObservableProperty] private bool _showLibrary = true;
+    [ObservableProperty] private bool _showLibrary;
     [ObservableProperty] private bool _showLive;
     [ObservableProperty] private bool _showHistory;
     [ObservableProperty] private bool _showFavorites;
@@ -74,7 +74,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private double _volume = 80;
     [ObservableProperty] private double _rate = 1;
     [ObservableProperty] private string _timeText = "00:00 / 00:00";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailSource))] private SourceDefinition? _selectedSource;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailSource)), NotifyPropertyChangedFor(nameof(HomeTitle)), NotifyPropertyChangedFor(nameof(VodSourceSummary))] private SourceDefinition? _selectedSource;
     [ObservableProperty] private Category? _selectedCategory;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(DetailTitle)), NotifyPropertyChangedFor(nameof(DetailRemarks))] private MediaItem? _selectedItem;
     [ObservableProperty] private PlaybackLine? _selectedLine;
@@ -100,7 +100,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _epgStatus = "选择频道查看节目表。";
     public bool IsScrubbing { get; set; }
 
-    public MainViewModel(bool designMode = false, Func<PlaybackEngineKind, IPlaybackEngine>? engineFactory = null)
+    private readonly string _legacyConfigPath;
+    public MainViewModel(bool designMode = false, Func<PlaybackEngineKind, IPlaybackEngine>? engineFactory = null, string? configurationDirectory = null)
     {
         _designMode = designMode;
         Engine = new(engineFactory ?? (kind => kind == PlaybackEngineKind.Mpv ? new MpvEngine(waitForVideoSurface: true) : new LibVlcEngine(waitForVideoSurface: true)));
@@ -110,12 +111,14 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _coordinator = new(Engine, _store, _resolution);
         var host = Path.Combine(AppLayout.PluginHostDirectory, OperatingSystem.IsWindows() ? "VodBox.PluginHost.exe" : "VodBox.PluginHost");
         _factory = new(_http, host, AppLayout.AssetsDirectory);
-        _configurations = new(Path.Combine(AppPaths.ConfigurationDirectory, "configurations"));
-        _preferencesStore = new(Path.Combine(AppPaths.ConfigurationDirectory, "preferences.json"));
+        var configurationRoot = configurationDirectory ?? AppPaths.ConfigurationDirectory;
+        _legacyConfigPath = Path.Combine(configurationDirectory ?? AppPaths.DataDirectory, "config.json");
+        _configurations = new(Path.Combine(configurationRoot, "configurations"));
+        _preferencesStore = new(Path.Combine(configurationRoot, "preferences.json"));
         _playlist = new(_coordinator, _factory);
         _aggregateSearch = new(_factory);
         _epg = new(_http, AppPaths.CacheDirectory);
-        _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; InitializeEpisodeBrowser(); InitializeLiveRefresh();
+        _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; Sources.CollectionChanged += (_, _) => NotifyHomeConfiguration(); InitializeEpisodeBrowser(); InitializeLiveRefresh();
         Engine.StateChanged += OnPlaybackState;
         Engine.ActiveEngineChanged += OnActiveEngineChanged;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>
@@ -172,7 +175,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     public Task SeekAsync() => RunAsync(() => Engine.SeekAsync(TimeSpan.FromMilliseconds(Position), default), false);
     partial void OnVolumeChanged(double value) { _ = RunAsync(() => Engine.SetVolumeAsync(value / 100, default), false); SchedulePreferencesSave(); }
     partial void OnRateChanged(double value) { _ = RunAsync(() => Engine.SetRateAsync(value, default), false); SchedulePreferencesSave(); }
-    partial void OnIncognitoChanged(bool value) => _coordinator.Incognito = value;
+    partial void OnIncognitoChanged(bool value) { _coordinator.Incognito = value; _ = RunAsync(RefreshRecentHistoryAsync, false); }
     partial void OnSelectedAudioChanged(MediaTrack? value) { if (value is not null) _ = RunAsync(() => Engine.SelectTrackAsync(TrackKind.Audio, value.Id, default)); }
     partial void OnSelectedSubtitleChanged(MediaTrack? value) { if (value is not null) _ = RunAsync(() => Engine.SelectTrackAsync(TrackKind.Subtitle, value.Id, default)); }
     public Task AddSubtitleAsync(string path) => RunAsync(() => Engine.AddSubtitleAsync(path, default));
@@ -207,7 +210,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand] private Task NavigateAsync(string page) => RunAsync(async () =>
     {
         ShowPlaybackPage = false;
-        ShowLibrary = page == "发现"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = page == "设置"; PageTitle = page;
+        ShowHome = page == "首页"; ShowLibrary = page is "发现" or "点播" or "搜索"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = page == "设置"; PageTitle = page;
+        if (ShowHome) await RefreshRecentHistoryAsync();
+        if (ShowLibrary && Items.Count == 0 && _provider is not null) await BrowseAsync();
         if (ShowHistory) { History.Clear(); foreach (var entry in await _store.GetHistoryAsync()) History.Add(entry); }
         if (ShowFavorites) { Favorites.Clear(); foreach (var entry in await _store.GetFavoritesAsync()) Favorites.Add(entry); }
     });
@@ -241,7 +246,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         try { if (_provider is not null) await _provider.DisposeAsync(); }
         finally { _sourceGate.Release(); }
         await _coordinator.DisposeAsync(); await _resolution.DisposeAsync();
-        await Task.WhenAll(_danmakuTasks); await Task.WhenAll(_posterTasks); foreach (var card in Cards) card.Dispose(); _posters.Dispose(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
+        await Task.WhenAll(_danmakuTasks); await Task.WhenAll(_posterTasks); foreach (var card in Cards) card.Dispose(); foreach (var card in HomeCards) card.Dispose(); _posters.Dispose(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
     }
 
 }

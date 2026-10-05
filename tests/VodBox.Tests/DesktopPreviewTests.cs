@@ -86,6 +86,7 @@ public sealed class DesktopPreviewTests
     {
         var window = new MainWindow(preview: true);
         var model = (DesignMainViewModel)window.DataContext!;
+        model.ShowPlaybackPage = true;
         try
         {
             window.Show(); Dispatcher.UIThread.RunJobs();
@@ -104,6 +105,7 @@ public sealed class DesktopPreviewTests
     {
         var window = new MainWindow(preview: true) { Width = 1280 };
         var model = (DesignMainViewModel)window.DataContext!;
+        await model.NavigateCommand.ExecuteAsync("点播");
         try
         {
             model.Items.Clear();
@@ -132,6 +134,7 @@ public sealed class DesktopPreviewTests
     {
         var window = new MainWindow(preview: true);
         var model = (DesignMainViewModel)window.DataContext!;
+        model.ShowPlaybackPage = true;
         try
         {
             var episodes = Enumerable.Range(1, 2000).Select(i => new Episode(i.ToString(), $"第 {i} 集")).ToArray();
@@ -156,6 +159,8 @@ public sealed class DesktopPreviewTests
     }
 
     [AvaloniaTheory]
+    [InlineData("home")]
+    [InlineData("source-settings")]
     [InlineData("library")]
     [InlineData("live")]
     [InlineData("history")]
@@ -174,6 +179,8 @@ public sealed class DesktopPreviewTests
         var model = new DesignMainViewModel();
         UserControl view = page switch
         {
+            "home" => new VodBox.Desktop.Views.HomeView(),
+            "source-settings" => new VodBox.Desktop.Views.SourceConfigurationView(),
             "library" => new VodBox.Desktop.Views.LibraryView(),
             "live" => new VodBox.Desktop.Views.LiveView(),
             "history" => new VodBox.Desktop.Views.HistoryView(),
@@ -218,6 +225,7 @@ public sealed class DesktopPreviewTests
     {
         var window = new MainWindow(preview: true) { Width = 1600 };
         var model = (DesignMainViewModel)window.DataContext!;
+        model.ShowPlaybackPage = true;
         try
         {
             window.Show(); Dispatcher.UIThread.RunJobs();
@@ -242,6 +250,7 @@ public sealed class DesktopPreviewTests
     {
         var window = new MainWindow(preview: true);
         var model = (DesignMainViewModel)window.DataContext!;
+        await model.NavigateCommand.ExecuteAsync("点播");
         try
         {
             model.ShowPlaybackPage = playback; window.Show(); Dispatcher.UIThread.RunJobs();

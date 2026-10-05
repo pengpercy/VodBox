@@ -160,3 +160,10 @@ MSBuild 实际求值确认：Debug（含 RID）PublishAot=false、PublishTrimmed
 图标已验证 ICO 内置七种尺寸、ICNS 包含 1024 画布、Linux 九种 PNG 尺寸、macOS alpha 边界为 (100,100)-(924,924)。模拟打包调用验证图标进入 Contents/Resources、CFBundleIconFile 正确且进入依赖清单；签名/DMG/Windows/Linux 完整包生成没有在本轮重复执行。所有图标资源位于 desktop/Assets/Icons，仅 256px PNG 嵌入 Avalonia 窗口资源。未运行 GitHub Actions。
 
 最终 macOS x64 NativeAOT（完整裁剪，编译/ILC 警告作为错误）编译成功；真实 AOT 主窗口通过以上全屏叠放、透明度、单行中心线、原生倍速及表面复用检查，渲染 80 帧，退出 0。日志：`/private/tmp/vodbox-fullscreen-aot-build.log`、`/private/tmp/vodbox-fullscreen-aot-ui.log`。尝试按该进程的 CGWindow ID 截取窗口，系统返回 `could not create image from window`，未得到截图；本轮验收为窗口几何/属性与原生状态检查，不能替代截图级视觉和三平台人工验收。
+
+
+## 首页和配置流程修正验证（2026-10-05）
+
+171 项本地回归通过，包含 15 个独立视图预览，以及首次启动不加载示例、设置配置成功后返回首页/失败留在设置、推荐与分类搜索隔离、首页全屏返回。旧播放页用例显式进入播放/点播再验证，没有削弱全屏、弹幕、海报或分集断言。
+
+macOS x64 严格 NativeAOT/full trim 发布通过（编译和 ILC 警告作为错误）。真实 AOT 主窗口导航包含新增首页，检查推荐快照、首页可见与侧栏隐藏；随后验证原有设置/直播/历史/收藏/点播与播放页往返、LibVLC/mpv 切换、透明原生叠层、全屏控制/倍速和视频表面复用，渲染 77 帧，进程退出 0。日志：`/private/tmp/vodbox-home-tests.log`、`/private/tmp/vodbox-home-aot-build.log`、`/private/tmp/vodbox-home-aot-ui.log`。本轮没有截图级视觉验收或 Windows/Linux 真机验收，没有运行 GitHub Actions。

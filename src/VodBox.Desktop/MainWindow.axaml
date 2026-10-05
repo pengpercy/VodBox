@@ -17,7 +17,8 @@
           <StackPanel DockPanel.Dock="Top" Spacing="8">
             <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
             <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" TextWrapping="Wrap" />
-            <Button Content="发现" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="发现" />
+            <Button Content="首页" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="首页" />
+            <Button Content="点播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="点播" />
             <Button Content="直播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="直播" />
             <Button Content="历史" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="历史" />
             <Button Content="收藏" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="收藏" />
@@ -34,7 +35,7 @@
         <Grid x:Name="WorkspaceHeader" ColumnDefinitions="*,Auto" ColumnSpacing="12">
           <TextBlock Text="{Binding WorkspaceTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-            <Button x:Name="BrowsePageButton" Content="返回浏览" Click="BrowsePageClick" IsVisible="False" />
+            <Button x:Name="BrowsePageButton" Content="{Binding BrowseReturnLabel}" Click="BrowsePageClick" IsVisible="False" />
             <Button x:Name="PlaybackPageButton" Content="播放与详情" Click="PlaybackPageClick" IsVisible="False" />
             <Button Content="打开媒体" Click="OpenFileClick" />
             <Button Content="全屏" Click="FullscreenClick" />
@@ -53,6 +54,7 @@
         </Grid>
         <Grid x:Name="ContentWorkspace" Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
           <Grid x:Name="BrowsePane">
+            <views:HomeView x:Name="HomePage" IsVisible="{Binding ShowHome}" />
             <views:LibraryView x:Name="LibraryPage" IsVisible="{Binding ShowLibrary}" />
             <views:LiveView x:Name="LivePage" IsVisible="{Binding ShowLive}" />
             <views:HistoryView x:Name="HistoryPage" IsVisible="{Binding ShowHistory}" />

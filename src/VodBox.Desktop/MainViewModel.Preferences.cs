@@ -21,12 +21,12 @@ public partial class MainViewModel
         Theme = preferences.Theme; ApplyTheme(); _preferredSourceId = preferences.LastSourceId;
         _lastLiveConfigId = preferences.LastLiveConfigId; _lastLiveSourceId = preferences.LastLiveSourceId; _lastLiveChannelId = preferences.LastLiveChannelId;
         AutoLiveFallback = preferences.AutoLiveFallback; ResumeLiveOnStartup = preferences.ResumeLiveOnStartup;
-        _initialized = true; await RefreshSavedConfigurationsAsync();
+        _initialized = true; await RefreshSavedConfigurationsAsync(); await RefreshRecentHistoryAsync();
         var saved = SavedConfigurations.FirstOrDefault(x => x.Id == preferences.LastConfigId);
         if (saved is not null) { await LoadSavedConfigurationAsync(saved); if (ResumeLiveOnStartup) await ResumeLastLiveAsync(); return; }
-        var legacySnapshot = Path.Combine(Infrastructure.AppPaths.DataDirectory, "config.json");
-        ConfigLocation = File.Exists(legacySnapshot) ? legacySnapshot : Path.Combine(Core.AppLayout.AssetsDirectory, "examples", "vodbox.json");
-        if (File.Exists(ConfigLocation)) await LoadConfigAsync();
+        var legacySnapshot = _legacyConfigPath;
+        if (File.Exists(legacySnapshot)) { ConfigLocation = legacySnapshot; await LoadConfigAsync(); }
+        else { ConfigLocation = ""; HomeRecommendationStatus = "请在设置中配置点播播放源。"; }
     }
     private AppPreferences CapturePreferences() => new()
     {

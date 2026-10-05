@@ -27,20 +27,21 @@ public sealed partial class MainWindow
     }
     private void LayoutSizeChanged(object? sender, SizeChangedEventArgs args) => UpdateAdaptiveLayout();
     private void LayoutModelChanged(object? sender, PropertyChangedEventArgs args)
-    { if (args.PropertyName == nameof(MainViewModel.ShowPlaybackPage)) UpdateAdaptiveLayout(); }
+    { if (args.PropertyName is nameof(MainViewModel.ShowPlaybackPage) or nameof(MainViewModel.ShowHome)) UpdateAdaptiveLayout(); }
     private void UpdateAdaptiveLayout()
     {
         bool fullscreen = _fullscreenActive;
+        bool home = _layoutModel?.ShowHome == true && _layoutModel.ShowPlaybackPage == false;
         WindowLayout.RowDefinitions[0].Height = new(fullscreen ? 0 : 40);
         WindowTitleBar.IsVisible = !fullscreen;
-        NavigationPane.IsVisible = !fullscreen;
-        WorkspaceHeader.IsVisible = !fullscreen;
-        AddressBar.IsVisible = !fullscreen;
-        StatusBar.IsVisible = !fullscreen;
-        Workspace.RowDefinitions[0].Height = fullscreen ? new(0) : GridLength.Auto;
-        Workspace.RowDefinitions[1].Height = fullscreen ? new(0) : GridLength.Auto;
-        Workspace.RowDefinitions[3].Height = fullscreen ? new(0) : GridLength.Auto;
-        Workspace.RowSpacing = fullscreen ? 0 : 16;
+        NavigationPane.IsVisible = !fullscreen && !home;
+        WorkspaceHeader.IsVisible = !fullscreen && !home;
+        AddressBar.IsVisible = !fullscreen && _layoutModel?.ShowPlaybackPage == true;
+        StatusBar.IsVisible = !fullscreen && !home;
+        Workspace.RowDefinitions[0].Height = fullscreen || home ? new(0) : GridLength.Auto;
+        Workspace.RowDefinitions[1].Height = !AddressBar.IsVisible ? new(0) : GridLength.Auto;
+        Workspace.RowDefinitions[3].Height = fullscreen || home ? new(0) : GridLength.Auto;
+        Workspace.RowSpacing = fullscreen || home ? 0 : 16;
         PlaybackPane.SetFullscreenPresentation(fullscreen);
         PlaybackControls.SetFullscreenPresentation(fullscreen);
         AppShell.RowDefinitions[1].Height = fullscreen ? new(0) : GridLength.Auto;
@@ -48,7 +49,7 @@ public sealed partial class MainWindow
         PlaybackControls.VerticalAlignment = fullscreen ? Avalonia.Layout.VerticalAlignment.Bottom : Avalonia.Layout.VerticalAlignment.Stretch;
         _playbackControlsOverlay?.Update();
         bool compact = (Bounds.Width > 0 ? Bounds.Width : Width) < 1180;
-        AppShell.ColumnDefinitions[0].Width = new(fullscreen ? 0 : compact ? 132 : 180);
+        AppShell.ColumnDefinitions[0].Width = new(fullscreen || home ? 0 : compact ? 132 : 180);
         NavigationPane.Padding = new Thickness(compact ? 8 : 16, 28);
         Workspace.Margin = fullscreen ? new Thickness(0) : compact ? new Thickness(16, 20, 16, 12) : new Thickness(24, 24, 24, 16);
         bool playback = _layoutModel?.ShowPlaybackPage == true;

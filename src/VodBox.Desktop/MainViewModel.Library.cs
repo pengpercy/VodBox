@@ -12,6 +12,8 @@ public partial class MainViewModel
     private Task _sourceTask = Task.CompletedTask;
     private bool _settingDetail, _disposed;
 
+    public int ConfigurationLoadVersion { get; private set; }
+
     [RelayCommand] private Task LoadConfigAsync() => RunAsync(async () =>
     {
         _configCancellation?.Cancel();
@@ -24,6 +26,8 @@ public partial class MainViewModel
             await _configurations.SaveAsync(config, location, cancellation.Token);
             await ApplyConfigAsync(config, cancellation.Token);
             await RefreshSavedConfigurationsAsync();
+            await NavigateAsync("首页");
+            ConfigurationLoadVersion++;
             SchedulePreferencesSave();
         }
         finally { if (ReferenceEquals(_configCancellation, cancellation)) _configCancellation = null; }
@@ -39,6 +43,7 @@ public partial class MainViewModel
         _configCancellation?.Cancel();
         ConfigLocation = saved.Location;
         await ApplyConfigAsync(await _configurations.LoadAsync(saved.Id, _lifetime.Token), _lifetime.Token);
+        await NavigateAsync("首页");
         SchedulePreferencesSave();
     });
     [RelayCommand] private Task RemoveSavedConfigurationAsync(SavedConfiguration? saved) => RunAsync(async () =>
@@ -50,7 +55,7 @@ public partial class MainViewModel
     {
         token.ThrowIfCancellationRequested();
         _aggregateCancellation?.Cancel(); _playlist.Clear(); _playingChannel = null; await _coordinator.StopAsync();
-        _config = config; _resolution.Configure(config);
+        _config = config; _resolution.Configure(config); NotifyHomeConfiguration();
         Resolvers.Clear(); Resolvers.Add(new() { Id = "_direct", Name = "直接播放", Kind = ResolutionKind.Direct });
         Resolvers.Add(new() { Id = "_browser", Name = "网页嗅探", Kind = ResolutionKind.Browser });
         foreach (var resolver in config.Resolvers ?? []) Resolvers.Add(resolver); SelectedResolver = Resolvers[0]; SelectedSource = null; await _sourceTask;
@@ -96,12 +101,14 @@ public partial class MainViewModel
             cancellation.Token.ThrowIfCancellationRequested();
             if (_disposed || !ReferenceEquals(source, SelectedSource)) return;
             SelectedCategory = null; SelectedItem = null; _detail = null; _nextCursor = null;
+            SetHomeRecommendations([]); HomeRecommendationStatus = "请在设置中配置点播播放源。";
             Categories.Clear(); Items.Clear(); Lines.Clear(); Episodes.Clear(); Description = "选择内容查看详情和播放线路。";
             ConfigureLibraryFilters(source);
             if (source is null) return;
             var provider = _factory.Create(source); _provider = provider;
             var categories = await provider.GetCategoriesAsync(cancellation.Token);
             cancellation.Token.ThrowIfCancellationRequested();
+            await LoadHomeRecommendationsAsync(provider, cancellation.Token);
             Categories.Add(new("", "全部")); foreach (var category in categories) Categories.Add(category);
             SelectedCategory = Categories.First(); SchedulePreferencesSave();
         }
@@ -116,7 +123,7 @@ public partial class MainViewModel
     private string? _activeSearchQuery;
     private int _queryEpoch;
     private IReadOnlyDictionary<string, string> _activeBrowseFilters = new Dictionary<string, string>();
-    partial void OnSelectedCategoryChanged(Category? value) { if (value is not null) _ = BrowseAsync(); }
+    partial void OnSelectedCategoryChanged(Category? value) { if (value is not null && ShowLibrary && !ShowHome) _ = BrowseAsync(); }
     [RelayCommand] private Task BrowseAsync() => QueryAsync(false);
     [RelayCommand] private Task SearchAsync() => QueryAsync(true);
     private Task QueryAsync(bool search) => RunAsync(async () =>

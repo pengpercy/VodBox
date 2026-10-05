@@ -94,6 +94,7 @@ public sealed class ProviderFactory(HttpClient http, string pluginHostPath, stri
     {
         public string SourceId => inner.SourceId;
         public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken token) => inner.GetCategoriesAsync(token);
+        public Task<MediaPage> GetHomeAsync(CancellationToken token) => inner.GetHomeAsync(token);
         public Task<MediaPage> GetItemsAsync(string? category, string? cursor, CancellationToken token) => inner.GetItemsAsync(category, cursor, token);
         public Task<MediaPage> GetItemsFilteredAsync(string? category, string? cursor, IReadOnlyDictionary<string, string> filters, CancellationToken token) => inner.GetItemsFilteredAsync(category, cursor, filters, token);
         public Task<MediaPage> SearchAsync(string query, CancellationToken token) => inner.SearchAsync(query, token);

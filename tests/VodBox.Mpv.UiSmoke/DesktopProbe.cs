@@ -25,6 +25,7 @@ internal static class DesktopProbe
             var vlc = new LibVlcEngine(waitForVideoSurface: true); vlc.Initialized += (_, _) => vlc.Player!.Volume = 0; return vlc;
         }) { Volume = 0, AutoNext = false };
         for (int i = 0; i < 1000; i++) model.Items.Add(new(i.ToString(), $"AOT 海报 {i}"));
+        model.SetHomeRecommendations(model.Items.Take(12));
         model.SelectedLine = new("probe", "分集验收", Enumerable.Range(1, 2000).Select(i => new Episode(i.ToString(), $"第 {i} 集")).ToArray());
         var window = new MainWindow(model, initialize: false);
         window.Opened += async (_, _) =>
@@ -114,10 +115,11 @@ internal static class DesktopProbe
                 if (episodeButtons > 100 || model.Episodes[0].Id != "1") throw new InvalidOperationException("Episode virtualization/order failed.");
                 if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer!.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Resize recreated the native renderer.");
                 stage = "page-navigation";
-                foreach (string page in new[] { "设置", "直播", "历史", "收藏", "发现" })
+                foreach (string page in new[] { "首页", "设置", "直播", "历史", "收藏", "点播" })
                 {
                     await model.NavigateCommand.ExecuteAsync(page);
                     await Until(() => !window.PlaybackView.IsEffectivelyVisible);
+                    if (page == "首页" && (!window.FindControl<VodBox.Desktop.Views.HomeView>("HomePage")!.IsEffectivelyVisible || window.FindControl<Border>("NavigationPane")!.IsVisible || model.HomeCards.Count != 12)) throw new InvalidOperationException("Home layout or recommendation snapshot failed.");
                     model.ShowPlaybackPage = true;
                     await Until(() => window.PlaybackView.IsEffectivelyVisible);
                     if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Page navigation recreated mpv renderer.");

@@ -7,6 +7,14 @@
   </Design.DataContext>
   <ScrollViewer>
     <StackPanel Spacing="16" Margin="0,12">
+      <Button Click="ConfigureSourceClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="16,12">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Text="点播" /><TextBlock Grid.Column="1" Text="{Binding VodSourceSummary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" /></Grid>
+      </Button>
+      <Button Click="ConfigureSourceClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="16,12">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Text="直播" /><TextBlock Grid.Column="1" Text="{Binding LiveSourceSummary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" /></Grid>
+      </Button>
+      <Button Content="播放设置" Click="PlaybackSettingsClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12" />
+      <ToggleSwitch Content="无痕模式" IsChecked="{Binding Incognito}" />
       <TextBlock Text="数据备份" FontWeight="SemiBold" FontSize="18" />
       <Button Content="导出数据备份" Click="ExportBackupClick" IsEnabled="{Binding !IsBusy}" />
       <Button Content="导入备份并合并数据" Click="ImportBackupClick" IsEnabled="{Binding !IsBusy}" />
@@ -25,11 +33,6 @@
       <ToggleSwitch Content="启动时恢复上次直播频道" IsChecked="{Binding ResumeLiveOnStartup}" />
       <TextBlock Text="界面主题" />
       <ComboBox ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" />
-      <TextBlock Text="内容配置" FontWeight="SemiBold" FontSize="18" />
-      <TextBox Text="{Binding ConfigLocation}" PlaceholderText="VodBox JSON 配置路径或 URL" />
-      <Button Content="加载配置" Command="{Binding LoadConfigCommand}" />
-      <Button Content="从文件选择配置" Click="OpenConfigClick" />
-      <TextBlock Text="支持 C#、QuickJS、Python 与 Node.js 内容源。旧 TV 配置暂不支持。" TextWrapping="Wrap" Classes="muted" />
       <TextBlock Text="快捷键：空格 暂停/继续；左右 ±10 秒；上下 音量；M 静音；F11 全屏；Esc 退出全屏；PageUp / PageDown 上下集；Ctrl / ⌘ + O 打开文件。" Classes="muted" TextWrapping="Wrap" />
     </StackPanel>
   </ScrollViewer>

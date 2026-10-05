@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 
 namespace VodBox.Desktop.Views;
 
@@ -20,6 +21,13 @@ public sealed partial class SettingsGeneralView : UserControl
         var files = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFilePickerAsync(new() { Title = "选择备份并合并数据", AllowMultiple = false, FileTypeFilter = [new("VodBox 数据备份") { Patterns = ["*.vodbox-backup.json"] }] });
         if (files.FirstOrDefault()?.TryGetLocalPath() is { } path) await Model.ImportBackupAsync(path);
     }
-    private async void OpenConfigClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (Model is not null && await PickAsync("打开 VodBox 配置") is { } path) { Model.ConfigLocation = path; await Model.LoadConfigCommand.ExecuteAsync(null); } }
+    private async void ConfigureSourceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Model is null || TopLevel.GetTopLevel(this) is not Window owner) return;
+        var dialog = new Window { Title = "播放源配置", Width = 560, Height = 340, MinWidth = 480, MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, DataContext = Model, Content = new SourceConfigurationView() };
+        await dialog.ShowDialog(owner);
+    }
+    private void PlaybackSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { this.GetVisualAncestors().OfType<SettingsView>().FirstOrDefault()?.ShowPlaybackSettings(); }
 }
