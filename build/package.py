@@ -32,12 +32,13 @@ def package(rid, source, output, version):
             original = contents / "MacOS" / name
             if original.exists(): shutil.move(str(original), resources / name)
         shutil.move(str(contents / "MacOS/native"), resources / "native")
+        shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/vodbox.icns", contents / "Resources/vodbox.icns")
         (contents / "Helpers").mkdir()
         shutil.move(str(contents / "MacOS/plugin-host"), contents / "Helpers/plugin-host")
         with (contents / "Info.plist").open("wb") as file:
             plistlib.dump({"CFBundleName": "VodBox", "CFBundleDisplayName": "VodBox", "CFBundleIdentifier": "app.vodbox.desktop",
                           "CFBundleExecutable": "VodBox", "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version,
-                          "CFBundleVersion": version, "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "12.0"}, file)
+                          "CFBundleVersion": version, "CFBundleIconFile": "vodbox.icns", "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "12.0"}, file)
         identity = os.environ.get("CODESIGN_IDENTITY") or "-"
         macho = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca")
         for file in sorted(contents.rglob("*"), key=lambda x: len(x.parts), reverse=True):
@@ -75,8 +76,9 @@ def package(rid, source, output, version):
             desktop_dir = stage / "usr/share/applications"; desktop_dir.mkdir(parents=True)
             desktop = "[Desktop Entry]\nType=Application\nName=VodBox\nExec=vodbox\nIcon=vodbox\nCategories=AudioVideo;Player;\nTerminal=false\n"
             (desktop_dir / "vodbox.desktop").write_text(desktop)
-            icons = stage / "usr/share/icons/hicolor/scalable/apps"; icons.mkdir(parents=True)
-            shutil.copy2(ROOT / "build/vodbox.svg", icons / "vodbox.svg")
+            for size in (16, 24, 32, 48, 64, 128, 256, 512, 1024):
+                icons = stage / f"usr/share/icons/hicolor/{size}x{size}/apps"; icons.mkdir(parents=True)
+                shutil.copy2(ROOT / f"src/VodBox.Desktop/Assets/Icons/linux/{size}/vodbox.png", icons / "vodbox.png")
             deb_arch = "arm64" if rid.endswith("arm64") else "amd64"
             control = stage / "DEBIAN"; control.mkdir()
             (control / "control").write_text(f"Package: vodbox\nVersion: {version}\nArchitecture: {deb_arch}\nMaintainer: VodBox contributors\nDepends: libc6 (>= 2.35), libx11-6, fontconfig\nDescription: Cross-platform media player and content provider host\n")
@@ -91,7 +93,7 @@ def package(rid, source, output, version):
             (appdir / "AppRun").write_text('#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$base/usr/lib/vodbox/VodBox" "$@"\n')
             (appdir / "AppRun").chmod(0o755)
             (appdir / "vodbox.desktop").write_text(desktop.replace("Exec=vodbox", "Exec=AppRun"))
-            shutil.copy2(ROOT / "build/vodbox.svg", appdir / "vodbox.svg")
+            shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/linux/256/vodbox.png", appdir / "vodbox.png")
             tools = json.loads((ROOT / "build/appimage-assets.json").read_text())[rpm_arch]
             tool = download(tools["tool"]); tool.chmod(0o755)
             runtime = download(tools["runtime"])

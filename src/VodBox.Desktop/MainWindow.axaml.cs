@@ -18,12 +18,18 @@ public sealed partial class MainWindow : Window
     private DanmakuView DanmakuPreview => PlaybackPane.DanmakuPreview;
     private bool _closing;
     private readonly DanmakuOverlay? _danmakuOverlay;
+    private readonly PlaybackControlsOverlay? _playbackControlsOverlay;
     public MainWindow() : this(preview: false) { }
     public MainWindow(bool preview) : this(preview, null, true) { }
     public MainWindow(MainViewModel model, bool initialize = true) : this(false, model, initialize) { }
     private MainWindow(bool preview, MainViewModel? model, bool initialize)
     {
         InitializeComponent();
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Key.Escape && WindowState == WindowState.FullScreen) { ToggleFullscreen(); e.Handled = true; }
+            else if (e.Key == Key.F11 && e.KeyModifiers == KeyModifiers.None) { FullscreenClick(this, e); e.Handled = true; }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         if (Design.IsDesignMode || preview)
         {
             // The designer has no desktop compositor; give sample content a readable backdrop.
@@ -37,6 +43,7 @@ public sealed partial class MainWindow : Window
         InitializeAdaptiveLayout(_viewModel);
         DanmakuPreview.Attach(_viewModel);
         _danmakuOverlay = new(this, VideoContainer, _viewModel);
+        _playbackControlsOverlay = new(this, VideoContainer, PlaybackControls, _viewModel);
         _viewModel.Engine.ActiveEngineChanged += EngineChanged;
         VideoSurface.DrawableReady += (_, _) =>
         {
@@ -74,7 +81,7 @@ public sealed partial class MainWindow : Window
                 }
                 // Save progress and stop decoding before invalidating native drawables.
                 await _viewModel.StopCommand.ExecuteAsync(null);
-                _danmakuOverlay?.Dispose(); DanmakuPreview.Dispose(); VideoSurface.MediaPlayer = null;
+                _playbackControlsOverlay?.Dispose(); _danmakuOverlay?.Dispose(); DanmakuPreview.Dispose(); VideoSurface.MediaPlayer = null;
                 if (_mpvSurface is not null) VideoContainer.Children.Remove(_mpvSurface);
                 await _viewModel.DisposeAsync();
             }
@@ -83,7 +90,7 @@ public sealed partial class MainWindow : Window
         };
         KeyDown += async (_, e) =>
         {
-            if (e.Key == Key.Escape) { WindowState = WindowState.Normal; e.Handled = true; return; }
+            if (e.Handled) return;
             if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0 && e.Key == Key.O)
             { if (await PickAsync("打开媒体") is { } path) await _viewModel.OpenFileAsync(path); e.Handled = true; return; }
             if (e.KeyModifiers != KeyModifiers.None || e.Source is Avalonia.Visual visual && visual.GetVisualAncestors().Prepend(visual).Any(x => x is TextBox or ComboBox or Slider or NumericUpDown or Button)) return;
@@ -95,7 +102,6 @@ public sealed partial class MainWindow : Window
                 case Key.Up: _viewModel.Volume = Math.Min(100, _viewModel.Volume + 5); break;
                 case Key.Down: _viewModel.Volume = Math.Max(0, _viewModel.Volume - 5); break;
                 case Key.M: _viewModel.ToggleMute(); break;
-                case Key.F11: WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen; break;
                 case Key.PageDown: await _viewModel.NextEpisodeCommand.ExecuteAsync(null); break;
                 case Key.PageUp: await _viewModel.PreviousEpisodeCommand.ExecuteAsync(null); break;
                 default: return;
@@ -112,6 +118,13 @@ public sealed partial class MainWindow : Window
     private async void OpenFileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     { if (_viewModel is not null && await PickAsync("打开媒体") is { } path) await _viewModel.OpenFileAsync(path); }
 
-    private void FullscreenClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
+    private WindowState _windowBeforeFullscreen = WindowState.Normal;
+    public void ToggleFullscreen()
+    {
+        if (IsVisible) Activate();
+        if (WindowState == WindowState.FullScreen) WindowState = _windowBeforeFullscreen;
+        else { _windowBeforeFullscreen = WindowState; WindowState = WindowState.FullScreen; }
+    }
+    private void FullscreenClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ToggleFullscreen();
 
 }

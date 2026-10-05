@@ -46,6 +46,7 @@ public sealed partial class MainWindow
         }
         // Reuse the render context across switches: a client supports only one render context.
         if (_mpvSurface is not null) _mpvSurface.IsVisible = !isVlc;
+        _playbackControlsOverlay?.Update();
         if (!isVlc && _mpvError is { } error) _viewModel?.Engine.ReportSurfaceFailure(engine, error);
     }
     private async Task WatchRendererAsync(MpvEngine engine)

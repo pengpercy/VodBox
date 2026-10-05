@@ -223,13 +223,67 @@ public sealed class DesktopPreviewTests
             window.Show(); Dispatcher.UIThread.RunJobs();
             var playback = window.PlaybackView;
             var video = playback.VideoContainer;
-            var summary = playback.FindControl<VodBox.Desktop.Views.DetailSummaryView>("DetailSummary")!;
+            var summary = playback.FindControl<Grid>("DetailRegion")!;
             Assert.Equal(0, Grid.GetRow(summary)); Assert.Equal(1, Grid.GetColumn(summary));
             await model.NavigateCommand.ExecuteAsync("设置"); Dispatcher.UIThread.RunJobs();
             Assert.False(model.ShowPlaybackPage); Assert.False(playback.IsVisible); Assert.Equal("设置", model.WorkspaceTitle);
             model.ShowPlaybackPage = true; window.Width = 900; Dispatcher.UIThread.RunJobs();
             Assert.Equal(2, Grid.GetRow(summary)); Assert.Equal(0, Grid.GetColumn(summary));
             Assert.Same(video, playback.VideoContainer); Assert.Equal("影片与播放", model.WorkspaceTitle);
+            Assert.Null(model.Engine.ActiveEngine);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FullscreenKeepsVideoSurfaceAndRestoresPreviousPage(bool playback)
+    {
+        var window = new MainWindow(preview: true);
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            model.ShowPlaybackPage = playback; window.Show(); Dispatcher.UIThread.RunJobs();
+            var video = window.PlaybackView.VideoContainer;
+            var fullscreenButton = window.GetVisualDescendants().OfType<Button>().First(button => Equals(button.Content, "全屏"));
+            fullscreenButton.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.F11 });
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(WindowState.FullScreen, window.WindowState);
+            Assert.True(model.ShowPlaybackPage);
+            Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            var rateButton = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!.FindControl<Button>("RateButton")!;
+            rateButton.Flyout!.ShowAt(rateButton); Dispatcher.UIThread.RunJobs();
+            var preset = ((Control)((Flyout)rateButton.Flyout).Content!).GetVisualDescendants().OfType<Button>().Single(button => Equals(button.Tag, "2"));
+            preset.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(2, model.Rate); Assert.Equal("2×", rateButton.Content);
+            rateButton.Flyout.ShowAt(rateButton); Dispatcher.UIThread.RunJobs();
+            var rate = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!.FindControl<Slider>("PlaybackRate")!;
+            rate.Value = 1.5; Assert.Equal(1.5, model.Rate);
+            Assert.Equal("1.5×", rateButton.Content); rateButton.Flyout.Hide();
+            var controls = window.FindControl<VodBox.Desktop.Views.PlaybackControlsView>("PlaybackControls")!;
+            Assert.Equal(0, Grid.GetRow(controls));
+            var row = controls.FindControl<Grid>("TransportRow")!;
+            Assert.All(row.Children, child => Assert.InRange(child.TranslatePoint(new Point(0, child.Bounds.Height / 2), row)!.Value.Y, row.Bounds.Height / 2 - 1, row.Bounds.Height / 2 + 1));
+            model.PlayerState = PlaybackState.Playing;
+            Assert.True(controls.FindControl<Avalonia.Controls.Shapes.Path>("PauseIcon")!.IsVisible);
+            Assert.False(controls.FindControl<Avalonia.Controls.Shapes.Path>("PlayIcon")!.IsVisible);
+            model.PlayerState = PlaybackState.Paused;
+            Assert.True(controls.FindControl<Avalonia.Controls.Shapes.Path>("PlayIcon")!.IsVisible);
+            Assert.Equal(Avalonia.Layout.VerticalAlignment.Bottom, controls.VerticalAlignment);
+            Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(controls.FindControl<Border>("ControlsBackground")!.Background).Color);
+            Assert.Equal(0, window.FindControl<Grid>("AppShell")!.RowDefinitions[1].Height.Value);
+            Assert.False(window.PlaybackView.FindControl<Grid>("DetailRegion")!.IsVisible);
+            Assert.Same(video, window.PlaybackView.VideoContainer);
+            var exitButton = controls.FindControl<Button>("FullscreenButton")!;
+            exitButton.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(WindowState.Normal, window.WindowState);
+            Assert.Equal(playback, model.ShowPlaybackPage); Assert.Equal(1.5, model.Rate);
+            Assert.Equal(1, Grid.GetRow(controls));
+            Assert.NotEqual(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(controls.FindControl<Border>("ControlsBackground")!.Background).Color);
+            Assert.True(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            Assert.True(window.PlaybackView.FindControl<Grid>("DetailRegion")!.IsVisible);
             Assert.Null(model.Engine.ActiveEngine);
         }
         finally { window.Close(); await model.DisposeAsync(); }

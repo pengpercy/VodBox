@@ -7,7 +7,8 @@ namespace VodBox.Desktop;
 
 public partial class MainViewModel
 {
-    [ObservableProperty] private PlaybackState _playerState;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsActivelyPlaying))] private PlaybackState _playerState;
+    public bool IsActivelyPlaying => PlayerState is PlaybackState.Playing or PlaybackState.Buffering;
     [ObservableProperty] private bool _danmakuEnabled = true;
     [ObservableProperty] private double _danmakuFontSize = 24;
     [ObservableProperty] private double _danmakuOpacity = .85;

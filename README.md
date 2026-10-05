@@ -29,9 +29,11 @@ dotnet run --project src/VodBox.Desktop
 
 本机若已由 Codex 将 SDK 放入项目 `.cache/dotnet`，可用 `.cache/dotnet/dotnet` 替代上述 `dotnet`。项目级 NuGet.Config 继承系统包源/代理，使用华为镜像和 nuget.org 映射；CI 使用 `build/NuGet.ci.config`，避免依赖本机镜像或代理。
 
-设计预览打开 `src/VodBox.Desktop/MainWindow.axaml`。设计数据不访问 SQLite、网络、脚本或原生播放器。设计器使用深色实色底板；系统级材质需运行应用查看。
+设计预览使用 Debug 配置，打开 `src/VodBox.Desktop/MainWindow.axaml`。Debug 明确关闭 AOT/裁剪，启用调试器及设计器所需的 JSON 反射开关；业务序列化仍使用源码生成。Release 指定 RID 发布默认启用 AOT/full trim；传入 `-p:DisableAOT=true` 可临时关闭 AOT 和裁剪以诊断托管运行。设计数据不访问 SQLite、网络、脚本或原生播放器。设计器使用深色实色底板；系统级材质需运行应用查看。
 
 开发运行播放前需安装 VLC 3.x，或配置 `VODBOX_VLC_PATH` 为原生库目录。打包产物携带播放器与三种脚本运行时；开发目录中的 QuickJS 宿主需按下列步骤构建并复制到桌面输出的 `plugin-host` 子目录。Python/Node 开发模式可使用系统运行时或 `VODBOX_PYTHON` / `VODBOX_NODE` 指定路径。
+
+图标资源位于 `src/VodBox.Desktop/Assets/Icons/`；平台尺寸、macOS 透明留白及导出方式见 [资源说明](src/VodBox.Desktop/Assets/Icons/README.md)。
 
 ## Native AOT 与打包
 
@@ -79,9 +81,9 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
 
-主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。164 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
+主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。166 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
 
-界面参考 FongMi/TV 的页面职责拆成 13 个独立视图：浏览与播放独立，播放页内部宽屏并列、窄屏上下排列；设置分通用／播放／弹幕。海报网格和分集支持虚拟化，保留编译绑定、设计预览、Mica 与扩展标题栏。全屏专用控制和三平台布局验收仍待完成，见 [PC 布局](docs/desktop-layout.md)。
+界面参考 FongMi/TV 的页面职责拆成 13 个独立视图：浏览与播放独立，播放页内部宽屏并列、窄屏上下排列；设置分通用／播放／弹幕。海报网格和分集支持虚拟化，保留编译绑定、设计预览、Mica 与扩展标题栏。全屏控制自动隐藏和三平台布局验收仍待完成，见 [PC 布局](docs/desktop-layout.md)。
 
 libmpv 尚未纳入全部发行包。开发时可通过 `VODBOX_MPV_PATH` 指定本机原生库完整路径；未提供 mpv 时，自动模式会尝试现有 LibVLC。不要将本机 GUI 验收视为三平台安装包验收。
 

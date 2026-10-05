@@ -1,12 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <ApplicationIcon>Assets/Icons/vodbox.ico</ApplicationIcon>
     <OutputType>WinExe</OutputType><AssemblyName>VodBox</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <PublishAot Condition="'$(RuntimeIdentifier)' != ''">true</PublishAot>
-    <PublishTrimmed Condition="'$(RuntimeIdentifier)' != ''">true</PublishTrimmed><TrimMode>full</TrimMode>
-    <OptimizationPreference>Speed</OptimizationPreference><InvariantGlobalization>false</InvariantGlobalization>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <!-- Debug keeps the designer on managed, untrimmed assemblies, even with an explicit RID. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <PublishAot>false</PublishAot><PublishTrimmed>false</PublishTrimmed>
+    <DebuggerSupport>true</DebuggerSupport>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+  <!-- Release publishing enables AOT when targeting a RID; ordinary no-RID builds remain managed. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' != 'true'">
+    <TrimMode>full</TrimMode><OptimizationPreference>Speed</OptimizationPreference>
+    <StripSymbols>true</StripSymbols>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' != 'true' and '$(RuntimeIdentifier)' != ''">
+    <PublishAot>true</PublishAot>
+    <PublishTrimmed>true</PublishTrimmed>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' == 'true'">
+    <PublishAot>false</PublishAot><PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>
+    <AvaloniaResource Include="Assets/Icons/linux/256/vodbox.png" />
     <PackageReference Include="Avalonia" /><PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" /><PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />

@@ -12,13 +12,13 @@
         <vm:DanmakuView x:Name="DanmakuControl" IsVisible="False" />
       </Grid>
     </Border>
-    <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Grid.ColumnSpan="2">
+    <Grid x:Name="PlaybackHeading" Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Grid.ColumnSpan="2">
       <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
       <Button Grid.Column="1" Content="上一集" Command="{Binding PreviousEpisodeCommand}" />
       <Button Grid.Column="2" Content="下一集" Command="{Binding NextEpisodeCommand}" />
     </Grid>
-    <views:DetailSummaryView x:Name="DetailSummary" Grid.Column="1" IsVisible="{Binding !IsLivePlayback}" />
-    <views:EpisodeBrowserView x:Name="EpisodesPanel" Grid.Row="3" Grid.ColumnSpan="2" IsVisible="{Binding !IsLivePlayback}" />
-    <views:ProgrammeView Grid.Row="3" Grid.ColumnSpan="2" IsVisible="{Binding IsLivePlayback}" />
+    <Grid x:Name="DetailRegion" Grid.Column="1"><views:DetailSummaryView x:Name="DetailSummary" IsVisible="{Binding !IsLivePlayback}" /></Grid>
+    <Grid x:Name="EpisodeRegion" Grid.Row="3" Grid.ColumnSpan="2"><views:EpisodeBrowserView x:Name="EpisodesPanel" IsVisible="{Binding !IsLivePlayback}" />
+    <views:ProgrammeView IsVisible="{Binding IsLivePlayback}" /></Grid>
   </Grid>
 </UserControl>

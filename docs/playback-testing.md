@@ -146,3 +146,17 @@ macOS x64 严格 NativeAOT 完整裁剪编译通过，未报告编译或 ILC 警
 AOT 缺失 mpv 自动回退也通过，LibVLC 解码 98 帧，原生视频／弹幕和自动模式正常，退出 0；关闭 MPEG4 测试片段仍有前述 avcodec 停止日志，未宣称此日志已消除。日志：`/private/tmp/vodbox-view-split-ui-jit.log`、`/private/tmp/vodbox-view-split-aot-build.log`、`/private/tmp/vodbox-view-split-aot-ui.log`、`/private/tmp/vodbox-view-split-aot-fallback.log`。
 
 本轮未运行 GitHub Actions；Windows／Linux 真机和完整全屏控制仍待验收。页面当前共享 MainViewModel 与应用服务，进一步拆分页面状态模型仍待继续。
+
+## 全屏悬浮控制与平台图标（2026-10-05）
+
+166 项本地回归通过。全屏测试从浏览/播放两种起点进入，检查原视频容器复用、导航/详情隐藏、底栏透明、底栏不再占独立行、所有操作控件中心线一致；实际点击 2× 预设、打开精细滑块调到 1.5×、检查播放/暂停图标状态，再通过拥有焦点的图标按钮发出 Esc，恢复原页面并保留倍速。每个页面仍有 Design.DataContext，预览不启动原生内核。
+
+macOS x64 JIT 真实窗口验证通过，mpv 渲染 78 帧、进程退出 0。LibVLC 的全屏控制使用独立透明窗口，倍速弹层调节到 1.25× 后原生 Player.Rate 一致；mpv 全屏确认客户区/视频都是 1920×1200 DIP、缩放率 2，透明底栏与视频底部重叠、单行控件中心一致，原生 speed 到 1.5×，退出保留倍速与渲染表面。
+
+探针曾把这里的屏幕逻辑尺寸再次除以 RenderScaling，误判全屏大小；已改为检查视频填满实际客户区，并记录屏幕与客户区。macOS 切换动画完成前连续切换也曾产生 `not in fullscreen state`，探针增加动画等待，切换入口恢复主窗口焦点。最终 JIT 记录未出现该日志，但不据此宣称其他平台/多屏动画均已完成验收。日志：`/private/tmp/vodbox-fullscreen-tests.log`、`/private/tmp/vodbox-fullscreen-jit-ui.log`。
+
+MSBuild 实际求值确认：Debug（含 RID）PublishAot=false、PublishTrimmed=false、DebuggerSupport=true、JsonSerializerIsReflectionEnabledByDefault=true；Release RID 为 AOT/full trim、JSON 反射默认关闭；DisableAOT=true 时关闭 AOT 与裁剪。条件集中在 PropertyGroup，避免 Rider 对属性级 Condition 的提示。原生 UI 探针仅在 Release RID 时向桌面引用传递 AOT 属性，避免 SDK 的自包含可执行项目引用不匹配，也不强制 Debug 设计器进入 AOT。
+
+图标已验证 ICO 内置七种尺寸、ICNS 包含 1024 画布、Linux 九种 PNG 尺寸、macOS alpha 边界为 (100,100)-(924,924)。模拟打包调用验证图标进入 Contents/Resources、CFBundleIconFile 正确且进入依赖清单；签名/DMG/Windows/Linux 完整包生成没有在本轮重复执行。所有图标资源位于 desktop/Assets/Icons，仅 256px PNG 嵌入 Avalonia 窗口资源。未运行 GitHub Actions。
+
+最终 macOS x64 NativeAOT（完整裁剪，编译/ILC 警告作为错误）编译成功；真实 AOT 主窗口通过以上全屏叠放、透明度、单行中心线、原生倍速及表面复用检查，渲染 80 帧，退出 0。日志：`/private/tmp/vodbox-fullscreen-aot-build.log`、`/private/tmp/vodbox-fullscreen-aot-ui.log`。尝试按该进程的 CGWindow ID 截取窗口，系统返回 `could not create image from window`，未得到截图；本轮验收为窗口几何/属性与原生状态检查，不能替代截图级视觉和三平台人工验收。
