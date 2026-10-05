@@ -44,3 +44,11 @@ VodBox --diagnostics --bilibili-smoke BV1WSHL66EdZ --native
 ```
 
 删除 `--native` 可只检查内容接口与弹幕。开发运行需要 `VODBOX_VLC_PATH`，随包产物使用已有原生依赖。当前只支持单段音画合一公开投稿；DASH、多段、番剧、账号、原片单配置和 `csp_BiliGuard` 尚未实现，不能将上述成功等同于两个旧源的全部 Bili 条目可用。
+
+### 原生固定片单验证（2026-10-05）
+
+`options.categories[].videos` 接入 BV/av 固定片单，每页 20 项、四路 worker、整页 20 秒期限，保持配置顺序并复用详情缓存。新增九个测试用例，完整本地回归为 87 项通过；覆盖跨页、缓存、取消、失效内容及配置限制。
+
+显式 `-p:RuntimeIdentifier=osx-x64` 选择已提交的 RID 锁文件后，严格发布（`TreatWarningsAsErrors=true`、`IlcTreatWarningsAsErrors=true`）通过。产物 `artifacts/bilibili-playlist-aot/VodBox` 真实网络诊断返回分类 5、热门 20、搜索 20、片单 1、分集 1、弹幕 1200；LibVLC VideoToolbox H.264 解码至 3.40 秒，视频 217 块、音频 421 块。日志 `/private/tmp/vodbox-bilibili-playlist-native.log`。
+
+首次 JIT 网络诊断遇到搜索响应缺失 `result` 数组，明确报错退出；未把不完整响应当成功或新增无限重试。对应日志 `/private/tmp/vodbox-bilibili-playlist-jit.log`。单次有限复核通过同一网络、片单、弹幕和实际解码链路，日志 `/private/tmp/vodbox-bilibili-playlist-jit-repeat.log`。公开 API 有即时响应差异，网络诊断仍为手动检查，不作为每次 CI 的必跑项。本轮没有触发 GitHub Actions。

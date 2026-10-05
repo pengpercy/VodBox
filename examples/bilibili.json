@@ -11,7 +11,8 @@
         "categories": [
           { "id": "technology", "name": "科技", "query": "科技" },
           { "id": "documentary", "name": "纪录片", "query": "纪录片" },
-          { "id": "programming", "name": "编程", "query": "Avalonia" }
+          { "id": "programming", "name": "编程", "query": "Avalonia" },
+          { "id": "playlist-demo", "name": "片单示例", "videos": ["BV1WSHL66EdZ"] }
         ]
       }
     }

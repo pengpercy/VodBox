@@ -21,12 +21,12 @@ public sealed class BilibiliProvider : IContentProvider
     private readonly SemaphoreSlim _requests = new(4, 4);
     private readonly SemaphoreSlim _searchInitialization = new(1, 1);
     private readonly ConcurrentDictionary<string, CachedDetail> _details = new(StringComparer.Ordinal);
-    private readonly IReadOnlyList<SearchCategory> _categories;
+    private readonly IReadOnlyList<ConfiguredCategory> _categories;
     private readonly string? _cookie;
     private SearchSession? _searchSession;
     private bool _disposed;
     public string SourceId { get; }
-    private sealed record SearchCategory(Category Category, string Query);
+    private sealed record ConfiguredCategory(Category Category, string? Query, IReadOnlyList<string>? Videos);
     private sealed record CachedDetail(MediaDetail Detail, DateTimeOffset Expires);
     private sealed record SearchSession(string Key, string Cookie, DateTimeOffset Expires);
 
@@ -39,7 +39,7 @@ public sealed class BilibiliProvider : IContentProvider
         _cookie = source.Options.TryGetValue("cookie", out var cookie) ? cookie.GetString() : null;
         if (_cookie is { Length: > 32768 } || _cookie?.IndexOfAny(['\r', '\n', '\0']) >= 0)
             throw new InvalidDataException("哔哩哔哩 Cookie 无效。");
-        var categories = new List<SearchCategory>();
+        var categories = new List<ConfiguredCategory>();
         if (source.Options.TryGetValue("categories", out var configured))
         {
             if (configured.ValueKind != JsonValueKind.Array || configured.GetArrayLength() > 100)
@@ -48,9 +48,35 @@ public sealed class BilibiliProvider : IContentProvider
             foreach (var item in configured.EnumerateArray())
             {
                 string id = Text(item, "id"), name = Text(item, "name"), query = Text(item, "query");
-                if (string.IsNullOrWhiteSpace(id) || id.Length > 128 || !ids.Add(id) || string.IsNullOrWhiteSpace(name) || name.Length > 128 || string.IsNullOrWhiteSpace(query) || query.Length > 256)
-                    throw new InvalidDataException("哔哩哔哩分类的 id/name/query 为空、重复或过长。");
-                categories.Add(new(new(id, name), query));
+                if (string.IsNullOrWhiteSpace(id) || id.Length > 128 || !ids.Add(id) || string.IsNullOrWhiteSpace(name) || name.Length > 128)
+                    throw new InvalidDataException("哔哩哔哩分类的 id/name 为空、重复或过长。");
+                bool hasQuery = item.TryGetProperty("query", out var queryValue);
+                bool hasVideos = item.TryGetProperty("videos", out var videos);
+                if (hasQuery == hasVideos)
+                    throw new InvalidDataException("哔哩哔哩分类必须且只能配置 query 或 videos。");
+                if (hasQuery)
+                {
+                    if (queryValue.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(query) || query.Length > 256)
+                        throw new InvalidDataException("哔哩哔哩分类 query 为空或过长。");
+                    categories.Add(new(new(id, name), query, null));
+                }
+                else
+                {
+                    if (videos.ValueKind != JsonValueKind.Array || videos.GetArrayLength() is < 1 or > 2000)
+                        throw new InvalidDataException("哔哩哔哩片单 videos 必须是 1 到 2000 项的数组。");
+                    var videoIds = new List<string>();
+                    var unique = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var video in videos.EnumerateArray())
+                    {
+                        if (video.ValueKind != JsonValueKind.String)
+                            throw new InvalidDataException("哔哩哔哩片单视频必须是 BV 或 av 号字符串。");
+                        string videoId = video.GetString()!;
+                        _ = MediaParameters(videoId);
+                        if (!unique.Add(videoId)) throw new InvalidDataException("哔哩哔哩片单视频标识重复。");
+                        videoIds.Add(videoId);
+                    }
+                    categories.Add(new(new(id, name), null, videoIds));
+                }
             }
         }
         _categories = categories;
@@ -68,7 +94,9 @@ public sealed class BilibiliProvider : IContentProvider
         {
             var category = _categories.FirstOrDefault(x => x.Category.Id == categoryId)
                 ?? throw new InvalidDataException("未知的哔哩哔哩分类。");
-            return await SearchPageAsync(category.Query, cursor, token).ConfigureAwait(false);
+            return category.Videos is { } videos
+                ? await CuratedPageAsync(videos, cursor, token).ConfigureAwait(false)
+                : await SearchPageAsync(category.Query!, cursor, token).ConfigureAwait(false);
         }
         int page = PageNumber(cursor);
         using var document = await FetchAsync("x/web-interface/popular", new() { ["pn"] = Number(page), ["ps"] = "20" }, token).ConfigureAwait(false);
@@ -76,6 +104,26 @@ public sealed class BilibiliProvider : IContentProvider
         var items = ReadItems(data, "list");
         bool more = data.TryGetProperty("no_more", out var noMore) && noMore.ValueKind == JsonValueKind.False;
         return new(items, more && items.Count > 0 && page < 1000 ? Number(page + 1) : null);
+    }
+
+    private async Task<MediaPage> CuratedPageAsync(IReadOnlyList<string> videos, string? cursor, CancellationToken token)
+    {
+        ThrowIfDisposed(); token.ThrowIfCancellationRequested();
+        int page = PageNumber(cursor), offset = (page - 1) * 20;
+        if (offset >= videos.Count) return new([]);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
+        // A small worker pool avoids scheduling every entry and preserves the configured order.
+        var items = new MediaItem[Math.Min(20, videos.Count - offset)];
+        // Inaccessible entries fail the page; never silently shift a partial playlist.
+        await Parallel.ForEachAsync(Enumerable.Range(0, items.Length), new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 4, CancellationToken = deadline.Token
+        }, async (index, cancellation) =>
+        {
+            items[index] = (await GetDetailAsync(videos[offset + index], cancellation).ConfigureAwait(false)).Item;
+        }).ConfigureAwait(false);
+        return new(items, offset + items.Length < videos.Count ? Number(page + 1) : null);
     }
 
     public Task<MediaPage> SearchAsync(string query, CancellationToken token) => SearchPageAsync(query, null, token);

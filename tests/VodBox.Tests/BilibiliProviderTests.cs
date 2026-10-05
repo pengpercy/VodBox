@@ -9,6 +9,86 @@ namespace VodBox.Tests;
 public sealed class BilibiliProviderTests
 {
     private const string Bvid = "BV1WSHL66EdZ";
+    private static SourceDefinition PlaylistSource(string categories) => new()
+    {
+        Id = "playlist", Name = "Playlist", Provider = "bilibili",
+        Options = new() { ["categories"] = JsonDocument.Parse(categories).RootElement.Clone() }
+    };
+
+    [Fact]
+    public async Task CuratedPlaylistPreservesOrderPagesAndCachesDetailsWithFourWorkers()
+    {
+        string ids = string.Join(',', Enumerable.Range(1, 25).Select(x => $"\"av{x}\""));
+        var handler = new PlaylistRoutes(); using var http = new HttpClient(handler);
+        await using var provider = new BilibiliProvider(PlaylistSource("[{\"id\":\"lessons\",\"name\":\"课程\",\"videos\":[" + ids + "]}]"), http);
+        var first = await provider.GetItemsAsync("lessons", null, default);
+        Assert.Equal(Enumerable.Range(1, 20).Select(x => $"av{x}"), first.Items.Select(x => x.Id));
+        Assert.Equal("2", first.NextCursor); Assert.InRange(handler.MaximumActive, 2, 4);
+        var second = await provider.GetItemsAsync("lessons", first.NextCursor, default);
+        Assert.Equal(Enumerable.Range(21, 5).Select(x => $"av{x}"), second.Items.Select(x => x.Id));
+        Assert.Null(second.NextCursor);
+        Assert.Empty((await provider.GetItemsAsync("lessons", "3", default)).Items);
+        await provider.GetItemsAsync("lessons", null, default);
+        Assert.Equal(25, handler.Requests);
+        Assert.Equal("Video 1", first.Items[0].Title);
+    }
+
+    [Theory]
+    [InlineData("{\"query\":\"x\",\"videos\":[\"av1\"]}")]
+    [InlineData("{}")]
+    [InlineData("{\"videos\":[]}")]
+    [InlineData("{\"videos\":[\"av1\",\"av1\"]}")]
+    [InlineData("{\"videos\":[123]}")]
+    [InlineData("{\"videos\":[\"https://example.com\"]}")]
+    [InlineData("{\"query\":null}")]
+    public void InvalidPlaylistConfigurationFailsBeforeNetwork(string fields)
+    {
+        string body = fields[1..^1];
+        string category = "[{\"id\":\"lessons\",\"name\":\"课程\"" + (body.Length == 0 ? "" : "," + body) + "}]";
+        Assert.Throws<InvalidDataException>(() => new BilibiliProvider(PlaylistSource(category)));
+    }
+
+    [Fact]
+    public async Task CuratedPlaylistCancelsWorkersAndDoesNotSilentlySkipInaccessibleVideos()
+    {
+        var handler = new PlaylistRoutes { Block = true }; using var http = new HttpClient(handler);
+        await using var provider = new BilibiliProvider(PlaylistSource("[{\"id\":\"lessons\",\"name\":\"课程\",\"videos\":[\"av1\",\"av2\"]}]"), http);
+        using var cancellation = new CancellationTokenSource();
+        var page = provider.GetItemsAsync("lessons", null, cancellation.Token);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5)); cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await page);
+        Assert.Equal(0, handler.Active);
+        handler.Block = false; handler.Fail = true;
+        await Assert.ThrowsAsync<InvalidDataException>(() => provider.GetItemsAsync("lessons", null, default));
+        Assert.Equal(0, handler.Active);
+        handler.Fail = false;
+        Assert.Equal(2, (await provider.GetItemsAsync("lessons", null, default)).Items.Count);
+    }
+
+    private sealed class PlaylistRoutes : HttpMessageHandler
+    {
+        public int Requests, Active, MaximumActive;
+        public bool Block, Fail;
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            Assert.Equal("/x/web-interface/view", request.RequestUri!.AbsolutePath);
+            int aid = int.Parse(request.RequestUri.Query.Split('=')[1]);
+            Interlocked.Increment(ref Requests);
+            int active = Interlocked.Increment(ref Active);
+            int maximum;
+            do { maximum = Volatile.Read(ref MaximumActive); }
+            while (maximum < active && Interlocked.CompareExchange(ref MaximumActive, active, maximum) != maximum);
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Block ? Timeout.Infinite : 30 + (aid % 4) * 10, token);
+                return Json(Fail ? "{\"code\":-404,\"message\":\"not available\"}" :
+                    "{\"code\":0,\"data\":{\"aid\":" + aid + ",\"bvid\":\"" + Bvid + "\",\"title\":\"Video " + aid + "\",\"pages\":[{\"cid\":" + aid + ",\"part\":\"Main\"}]}}");
+            }
+            finally { Interlocked.Decrement(ref Active); }
+        }
+    }
     private static SourceDefinition Source() => new()
     {
         Id = "bili", Name = "Bilibili", Provider = "bilibili",

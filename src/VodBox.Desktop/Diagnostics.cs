@@ -87,12 +87,15 @@ internal static class Diagnostics
         var categories = await provider.GetCategoriesAsync(deadline.Token);
         var popular = await provider.GetItemsAsync("popular", null, deadline.Token);
         var search = await provider.SearchAsync("Avalonia", deadline.Token);
+        var playlist = await provider.GetItemsAsync("playlist-demo", null, deadline.Token);
+        if (playlist.Items.Count != 1 || playlist.Items[0].Id != "BV1WSHL66EdZ" || playlist.NextCursor is not null)
+            throw new InvalidDataException("哔哩哔哩片单未保持配置顺序和身份。");
         if (popular.Items.Count == 0 || search.Items.Count == 0) throw new InvalidDataException("哔哩哔哩列表或搜索没有返回内容。");
         var detail = await provider.GetDetailAsync(mediaId, deadline.Token);
         string episodeId = detail.PlaybackLines.First().Episodes.First().Id;
         var request = await provider.ResolvePlaybackAsync(mediaId, episodeId, deadline.Token);
         var comments = await new DanmakuLoader(http).LoadAsync(request.DanmakuUri!, deadline.Token);
-        Console.WriteLine($"C# Bilibili Spider: OK | categories={categories.Count}, popular={popular.Items.Count}, search={search.Items.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}, danmaku={comments.Count}");
+        Console.WriteLine($"C# Bilibili Spider: OK | categories={categories.Count}, popular={popular.Items.Count}, search={search.Items.Count}, playlist={playlist.Items.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}, danmaku={comments.Count}");
         if (!decode) return;
         await using var engine = new LibVlcEngine(headless: true);
         await engine.OpenAsync(request, 2, deadline.Token);

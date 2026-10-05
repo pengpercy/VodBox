@@ -26,13 +26,35 @@
 
 `BilibiliProvider` 已接入 `ProviderFactory`，显式注册 `bilibili` / `csp_Bili`。示例 [bilibili.json](../examples/bilibili.json) 使用新版配置，不自动导入两个旧配置的完整站点定义，不加载 JAR。
 
-基础适配包含热门、关键词分类、搜索分页、详情、分集、实时播放地址和 cid 对应的 XML 弹幕。请求全程异步、最多四路，支持取消和超时。WBI 参数和正常访客会话只在内存缓存六小时；详情最多缓存 128 项/十分钟，播放地址每次刷新。可选 Cookie 仅发往固定官方 API，不传给媒体 CDN；默认传输不跟随重定向。
+基础适配包含热门、关键词分类、原生固定 BV/av 片单分类、搜索分页、详情、分集、实时播放地址和 cid 对应的 XML 弹幕。请求全程异步、最多四路，支持取消和超时。WBI 参数和正常访客会话只在内存缓存六小时；详情最多缓存 128 项/十分钟，播放地址每次刷新。可选 Cookie 仅发往固定官方 API，不传给媒体 CDN；默认传输不跟随重定向。
 
 首版使用 `qn=16` 的单段音画合一媒体，不误把多段第一段当完整影片。DASH/多段拼接、番剧、账号登录、原有 Bili 片单 JSON/筛选参数和 `csp_BiliGuard` 行为仍需实现。不能声称宝盒九项或饭太硬七项已经全部可用。
 
-本地 78 项测试通过；macOS x64 JIT 和 Native AOT 均实际取得热门 20 项、搜索 20 项、一集视频及 1200 条弹幕，以 VideoToolbox 解码 H.264：位置 3.40 秒、视频 217 个块、音频 421 个块。测试视频 `BV1WSHL66EdZ`，仅代表这条链路，不代表全部内容、GUI 或全部平台。日志 `/private/tmp/vodbox-bilibili-native-aot-network.log`，更多记录见 [播放测试](playback-testing.md)。
+本地 87 项测试通过；macOS x64 JIT 和 Native AOT 均实际取得热门 20 项、搜索 20 项、一集视频及 1200 条弹幕，以 VideoToolbox 解码 H.264：位置 3.40 秒、视频 217 个块、音频 421 个块。测试视频 `BV1WSHL66EdZ`，仅代表这条链路，不代表全部内容、GUI 或全部平台。日志 `/private/tmp/vodbox-bilibili-native-aot-network.log`，更多记录见 [播放测试](playback-testing.md)。
 
 后续按此频率继续源适配，双内核切换排在这批 Spider 之后。保留 libmpv 底层工作，不增加 Java 兼容层，不触发 GitHub Actions。
+
+## 原生片单分类
+
+新版配置的 `options.categories` 每项只能包含 `query` 或 `videos` 之一。`videos` 为 1–2000 个不重复的 BV/av 号字符串，例如：
+
+```json
+{ "id": "lessons", "name": "课程片单", "videos": ["BV1WSHL66EdZ", "av170001"] }
+```
+
+片单按配置顺序展示，每页 20 项，通过详情 API 补齐标题、封面和分集。最多四个 worker，整页 20 秒期限；缓存复用现有十分钟详情缓存。不可访问的视频令该页失败，不静默跳过或改变页内顺序；调用方取消会终止并等待所有 worker 退出。片单不是平台收藏夹/合集 API，也不读取旧插件 ext JSON；固定片单的搜索仍使用站点全局公开投稿搜索。
+
+本地 fixture 验证 25 项跨页顺序、尾页、详情复用、四路上限、取消后槽位回收、失效条目和配置拒绝。`examples/bilibili.json` 含单视频片单，网络诊断会同时读取并校验身份。
+
+## AppGet 入口核查
+
+2026-10-05 只读核查宝盒四个配置入口。两个 `.txt` 发现地址返回 HTTP 200 和短文本 HTTP 服务入口；另外两项分别返回咕咕番 HTML 与苹果 CMS 介绍页。首页可访问不能证明 AppGet API 可用。配置中已声明 V119、V122 以及未声明版本的变体，后续需要核对真实接口路径、签名和响应加解密，不能用一个猜测协议注册所有 `csp_AppGet`。
+
+此次未下载/执行 JAR，未发送配置中的密钥，也未新增 AppGet 支持标记。原始响应仅保留在本机临时目录。
+
+找到可核对的公开 [AppGet Python 协议参考](https://github.com/Hululu007/drpy-node/blob/295f2b7047e14122d542a7736cb931e81abcf85c/spider/py/AppGet.py)，固定提交 `295f2b7047e14122d542a7736cb931e81abcf85c`。其中采用表单 POST、时间戳 AES-CBC/PKCS7 签名、Base64 加密 data 响应，以及 `getappapi.index/initV119` 和 `qijiappapi.index/initV120` 两组路径。仅作为协议核对线索，未运行或复制该脚本，不视为已证实用户源中 V122 或另一个 JAR 变体的协议。
+
+下一步先以原生配置显式指定版本/路径和密钥，独立实现受限异步传输与加解密 fixture，再针对四个真实站点逐项验收分类、分页、搜索、详情、解析和实际解码；验证码/登录响应需明确上报，不能用返回首页或空数组代替可用结果。
 
 ## 复现统计
 

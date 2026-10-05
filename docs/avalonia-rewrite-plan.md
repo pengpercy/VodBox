@@ -484,4 +484,4 @@ TV 仓库标示 GPL-3.0。重写语言本身不会消除复制或改编代码的
 
 ## 用户测试源与 Spider 排期更新
 
-两个用户源的统计共 98 个条目（94 个 Java Spider、4 个 drpy），精确 Java 入口 69 个。按频率先完善 `csp_Bili` 9 次 / `csp_BiliGuard` 7 次的哔哩哔哩相关适配，随后 `csp_AppGet` 4 次、App99 候选家族和其他重复内容入口。Guard 不自动合并，不等于已覆盖。详见 [移植优先级](spider-migration-priority.md)。当前公开投稿基础适配已接入并在 macOS JIT/Native AOT 实际播放、弹幕验证通过，本地 78 项测试通过；旧片单/Guard/DASH/账号待补。双内核主窗口切换排在这批 Spider 之后，CI 继续手动集中验证。
+两个用户源的统计共 98 个条目（94 个 Java Spider、4 个 drpy），精确 Java 入口 69 个。按频率先完善 `csp_Bili` 9 次 / `csp_BiliGuard` 7 次的哔哩哔哩相关适配，随后 `csp_AppGet` 4 次、App99 候选家族和其他重复内容入口。Guard 不自动合并，不等于已覆盖。详见 [移植优先级](spider-migration-priority.md)。当前公开投稿基础适配已接入并在 macOS JIT/Native AOT 实际播放、弹幕验证通过，已新增原生 BV/av 片单分类（20 项分页、四路并发、详情缓存、整页取消），本地 87 项测试通过；旧片单配置/Guard/DASH/账号待补。双内核主窗口切换排在这批 Spider 之后，CI 继续手动集中验证。
