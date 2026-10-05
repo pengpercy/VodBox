@@ -22,7 +22,7 @@ public sealed class BackupTests
             await source.SetFavoriteAsync(new("fixture", "local", "favorite", "Favorite"), true);
             var service = new BackupService(source, configs, preferences);
             string file = Path.Combine(root, "portable.json");
-            await service.ExportAsync(file, new() { Theme = "Light", Volume = 42 });
+            await service.ExportAsync(file, new() { Theme = "Light", Volume = 42, PlaybackEngineMode = PlaybackEngineMode.LibVlc });
             var backup = await service.ReadAsync(file); Assert.Equal(205, backup.Library.History.Count);
             var target = new LibraryStore(Path.Combine(root, "target.db"));
             await target.SaveHistoryAsync(new("fixture", "local", "movie0", "", "Newer", "https://example.com/new.mp4", 999, now.AddDays(1).ToOffset(TimeSpan.FromHours(8))));
@@ -34,6 +34,7 @@ public sealed class BackupTests
             Assert.Equal(999, snapshot.History.Single(x => x.MediaId == "movie0").PositionMs);
             Assert.Equal("fixture", (await importedConfigs.LoadAsync("fixture")).Id);
             Assert.Equal("Light", (await importedPreferences.LoadAsync()).Theme);
+            Assert.Equal(PlaybackEngineMode.LibVlc, (await importedPreferences.LoadAsync()).PlaybackEngineMode);
         }
         finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -46,6 +47,8 @@ public sealed class BackupTests
             var store = new LibraryStore(Path.Combine(root, "library.db")); var configs = new ConfigurationRepository(Path.Combine(root, "configs"));
             var service = new BackupService(store, configs, new(Path.Combine(root, "preferences.json")));
             var invalid = new PortableBackup { Configurations = [new(new("wrong", "fixture.json", DateTimeOffset.UtcNow), new() { Id = "right" })] };
+            await Assert.ThrowsAsync<InvalidDataException>(() => service.ImportAsync(invalid)); Assert.Empty(await configs.ListAsync());
+            invalid = new() { Preferences = new() { PlaybackEngineMode = (PlaybackEngineMode)99 } };
             await Assert.ThrowsAsync<InvalidDataException>(() => service.ImportAsync(invalid)); Assert.Empty(await configs.ListAsync());
             string file = Path.Combine(root, "ordinary.json"); await File.WriteAllTextAsync(file, "{}");
             await Assert.ThrowsAsync<InvalidDataException>(() => service.ReadAsync(file));

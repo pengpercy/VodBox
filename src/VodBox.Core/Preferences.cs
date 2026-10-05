@@ -6,6 +6,7 @@ public sealed record AppPreferences
     public string? LastSourceId { get; set; }
     public double Volume { get; set; } = 80;
     public double Rate { get; set; } = 1;
+    public PlaybackEngineMode PlaybackEngineMode { get; set; } = PlaybackEngineMode.Automatic;
     public bool AutoNext { get; set; } = true;
     public bool ResumePlayback { get; set; } = true;
     public int SkipIntroSeconds { get; set; }

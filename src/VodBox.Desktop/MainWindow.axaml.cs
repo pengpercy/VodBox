@@ -15,28 +15,29 @@ public sealed partial class MainWindow : Window
     private readonly DanmakuOverlay? _danmakuOverlay;
     private readonly Dictionary<Image, MediaCard> _posterControls = [];
     public MainWindow() : this(preview: false) { }
-    public MainWindow(bool preview)
+    public MainWindow(bool preview) : this(preview, null, true) { }
+    public MainWindow(MainViewModel model, bool initialize = true) : this(false, model, initialize) { }
+    private MainWindow(bool preview, MainViewModel? model, bool initialize)
     {
         InitializeComponent();
         if (Design.IsDesignMode || preview)
         {
             // The designer has no desktop compositor; give sample content a readable backdrop.
             var design = new DesignMainViewModel(); DataContext = design; VideoSurface.IsVisible = false;
+            InitializeAdaptiveLayout(design);
             DanmakuPreview.IsVisible = true; DanmakuPreview.Attach(design, preview: true); Closed += (_, _) => DanmakuPreview.Dispose();
             Background = new SolidColorBrush(Color.Parse("#111317"));
             return;
         }
-        _viewModel = new(); DataContext = _viewModel;
-        _danmakuOverlay = new(this, VideoSurface, _viewModel);
-        _viewModel.Engine.Initialized += (_, _) => Dispatcher.UIThread.Invoke(() =>
+        _viewModel = model ?? new(); DataContext = _viewModel;
+        InitializeAdaptiveLayout(_viewModel);
+        DanmakuPreview.Attach(_viewModel);
+        _danmakuOverlay = new(this, VideoContainer, _viewModel);
+        _viewModel.Engine.ActiveEngineChanged += EngineChanged;
+        VideoSurface.DrawableReady += (_, _) =>
         {
-            VideoSurface.MediaPlayer = _viewModel.Engine.Player;
-            if (_viewModel.Engine.Player is { } player)
-            {
-                player.Volume = (int)_viewModel.Volume;
-                player.SetRate((float)_viewModel.Rate);
-            }
-        });
+            if (_viewModel.Engine.ActiveEngine is VodBox.Playback.LibVlc.LibVlcEngine vlc && ReferenceEquals(vlc.Player, VideoSurface.MediaPlayer)) vlc.NotifyVideoSurfaceReady();
+        };
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
         { e.DragEffects = e.DataTransfer.Contains(DataFormat.File) || e.DataTransfer.Contains(DataFormat.Text) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; });
@@ -54,13 +55,27 @@ public sealed partial class MainWindow : Window
             else if (e.DataTransfer.TryGetText() is { } text && Uri.TryCreate(text.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
             { _viewModel.Url = uri.AbsoluteUri; await _viewModel.OpenUrlCommand.ExecuteAsync(null); }
         });
-        Opened += async (_, _) => await _viewModel.InitializeAsync();
+        if (initialize) Opened += async (_, _) => await _viewModel.InitializeAsync();
         Closing += async (_, e) =>
         {
             if (_closing) return;
             e.Cancel = true; _closing = true;
-            try { _danmakuOverlay?.Dispose(); DanmakuPreview.Dispose(); VideoSurface.MediaPlayer = null; await _viewModel.DisposeAsync(); }
-            finally { Close(); }
+            try
+            {
+                _surfaceLifetime.Cancel(); _viewModel.Engine.ActiveEngineChanged -= EngineChanged;
+                foreach (var engine in _observedEngines)
+                {
+                    if (engine is VodBox.Playback.LibVlc.LibVlcEngine vlc) vlc.Initialized -= NativeInitialized;
+                    if (engine is VodBox.Playback.Mpv.MpvEngine mpv) mpv.Initialized -= NativeInitialized;
+                }
+                // Save progress and stop decoding before invalidating native drawables.
+                await _viewModel.StopCommand.ExecuteAsync(null);
+                _danmakuOverlay?.Dispose(); DanmakuPreview.Dispose(); VideoSurface.MediaPlayer = null;
+                if (_mpvSurface is not null) VideoContainer.Children.Remove(_mpvSurface);
+                await _viewModel.DisposeAsync();
+            }
+            catch (Exception error) { Console.Error.WriteLine(error); }
+            finally { _surfaceLifetime.Dispose(); Close(); }
         };
         KeyDown += async (_, e) =>
         {

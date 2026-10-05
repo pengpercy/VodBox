@@ -48,7 +48,7 @@ public sealed class FeatureTests
             Assert.Equal(config.Sources[0].Entry, Assert.Single((await repository.LoadAsync(config.Id)).Sources).Entry);
             Assert.Equal("https://api.example/config.json", Assert.Single(await repository.ListAsync()).Location);
             var preferences = new PreferencesStore(Path.Combine(directory, "preferences.json"));
-            var expected = new AppPreferences { LastConfigId = config.Id, Volume = 35, AutoNext = false, SkipIntroSeconds = 15 };
+            var expected = new AppPreferences { LastConfigId = config.Id, Volume = 35, AutoNext = false, SkipIntroSeconds = 15, PlaybackEngineMode = PlaybackEngineMode.Mpv };
             await preferences.SaveAsync(expected); Assert.Equal(expected, await preferences.LoadAsync());
             await repository.RemoveAsync(config.Id); Assert.Empty(await repository.ListAsync());
         }

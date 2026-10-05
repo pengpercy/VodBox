@@ -5,8 +5,10 @@ using VlcCore = LibVLCSharp.Shared.Core;
 
 namespace VodBox.Playback.LibVlc;
 
-public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache = false) : IPlaybackEngine, IPlaybackAdvancedControls
+public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache = false, bool waitForVideoSurface = false) : IPlaybackEngine, IPlaybackAdvancedControls
 {
+    private readonly TaskCompletionSource _videoSurfaceReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public void NotifyVideoSurfaceReady() => _videoSurfaceReady.TrySetResult();
     private readonly SemaphoreSlim _commands = new(1, 1);
     private LibVLC? _lib;
     private MediaPlayer? _player;
@@ -14,6 +16,7 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
     private long _session;
     private long _startPosition;
     private int _pauseRequested;
+    private int _volumeRequested = 80;
     private PlaybackSnapshot _snapshot = new(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false);
     public PlaybackSnapshot Snapshot => Volatile.Read(ref _snapshot);
     public MediaPlayer? Player => _player;
@@ -56,6 +59,8 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         _player.TimeChanged += (_, e) => Update(position: TimeSpan.FromMilliseconds(e.Time));
         _player.LengthChanged += (_, e) => Update(duration: TimeSpan.FromMilliseconds(Math.Max(0, e.Length)));
         _player.SeekableChanged += (_, e) => Update(canSeek: e.Seekable != 0);
+        // Playing can precede creation of the audio output, which otherwise loses an early mute.
+        _player.AudioDevice += (_, _) => _ = RestoreVolumeAsync();
         _player.Buffering += (_, e) =>
         {
             // Seek buffering callbacks may arrive after Paused; preserve the requested pause.
@@ -64,6 +69,11 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
             else if (_player.IsPlaying) Update(PlaybackState.Playing);
         };
         Initialized?.Invoke(this, EventArgs.Empty);
+    }
+    private async Task RestoreVolumeAsync()
+    {
+        try { await CommandAsync(() => { if (_player is not null) _player.Volume = Volatile.Read(ref _volumeRequested); }, CancellationToken.None); }
+        catch (ObjectDisposedException) { }
     }
     private void Update(PlaybackState? state = null, string? error = null, TimeSpan? position = null, TimeSpan? duration = null, bool? canSeek = null)
     {
@@ -79,7 +89,14 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         try { token.ThrowIfCancellationRequested(); await Task.Run(action, CancellationToken.None); }
         finally { _commands.Release(); }
     }
-    public Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken token) => CommandAsync(() =>
+    public async Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken token)
+    {
+        if (waitForVideoSurface)
+        {
+            await CommandAsync(Initialize, token).ConfigureAwait(false);
+            await _videoSurfaceReady.Task.WaitAsync(TimeSpan.FromSeconds(8), token).ConfigureAwait(false);
+        }
+        await CommandAsync(() =>
     {
         Initialize();
         _player!.Stop(); _player.Media = null; _media?.Dispose();
@@ -100,16 +117,37 @@ public sealed class LibVlcEngine(bool headless = false, bool rebuildPluginCache 
         foreach (var subtitle in request.Subtitles) _media.AddSlave(MediaSlaveType.Subtitle, 1, subtitle.Uri);
         Interlocked.Exchange(ref _startPosition, request.StartPositionMs);
         if (!_player.Play(_media)) throw new InvalidOperationException("LibVLC 启动播放失败。");
-    }, token);
+        }, token).ConfigureAwait(false);
+    }
     public Task PlayAsync(CancellationToken token) => CommandAsync(() => { Volatile.Write(ref _pauseRequested, 0); _player?.Play(); }, token);
-    public Task PauseAsync(CancellationToken token) => CommandAsync(() => { Volatile.Write(ref _pauseRequested, 1); _player?.SetPause(true); }, token);
+    public async Task PauseAsync(CancellationToken token)
+    {
+        if (waitForVideoSurface && !headless)
+        {
+            // During startup, pausing before outputs exist can leave a black frame and no audio device.
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
+            while (System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds < 1)
+            {
+                bool ready = false;
+                await CommandAsync(() => ready = _player is null || !_player.IsPlaying ||
+                    ((_player.AudioTrack < 0 || _player.Volume >= 0) && (_player.VideoTrack < 0 || _player.VoutCount > 0)), token).ConfigureAwait(false);
+                if (ready) break;
+                await Task.Delay(20, token).ConfigureAwait(false);
+            }
+        }
+        await CommandAsync(() => { Volatile.Write(ref _pauseRequested, 1); _player?.SetPause(true); }, token).ConfigureAwait(false);
+    }
     public Task StopAsync(CancellationToken token) => CommandAsync(() => { _player?.Stop(); Volatile.Write(ref _pauseRequested, 0); Interlocked.Exchange(ref _startPosition, 0); }, token);
     public Task SeekAsync(TimeSpan position, CancellationToken token) => CommandAsync(() =>
     {
         if (_player is not null && _player.IsSeekable) _player.Time = (long)Math.Clamp(position.TotalMilliseconds, 0, Math.Max(0, _player.Length));
     }, token);
     public Task SetRateAsync(double rate, CancellationToken token) => CommandAsync(() => _player?.SetRate((float)Math.Clamp(rate, .25, 4)), token);
-    public Task SetVolumeAsync(double volume, CancellationToken token) => CommandAsync(() => { if (_player is not null) _player.Volume = (int)Math.Clamp(volume * 100, 0, 100); }, token);
+    public Task SetVolumeAsync(double volume, CancellationToken token) => CommandAsync(() =>
+    {
+        Volatile.Write(ref _volumeRequested, (int)Math.Clamp(double.IsFinite(volume) ? volume * 100 : 80, 0, 100));
+        if (_player is not null) _player.Volume = Volatile.Read(ref _volumeRequested);
+    }, token);
     public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) => _player is null ? [] :
         (kind == TrackKind.Audio ? _player.AudioTrackDescription : _player.SpuDescription).Select(x => new MediaTrack(x.Id.ToString(), x.Name, kind)).ToList();
     public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken token) => CommandAsync(() =>

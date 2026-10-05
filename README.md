@@ -1,6 +1,6 @@
 # VodBox
 
-使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、LibVLC 播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑可通过 C# Provider 实现，不包含 JVM/Dex 兼容层；暂不兼容旧 TV 配置。
+使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、libmpv / LibVLC 双播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑可通过 C# Provider 实现，不包含 JVM/Dex 兼容层；暂不兼容旧 TV 配置。
 
 当前工程是首版实现，不是 FongMi/TV 全功能移植。方案与分阶段范围见 [实现方案](docs/avalonia-rewrite-plan.md)，逐项进度与未完成任务见 [功能清单](docs/implementation-progress.md)。
 
@@ -79,7 +79,11 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
 
-按最新要求继续实现 LibVLC + libmpv 双内核。原生绑定、Avalonia OpenGL 实验表面、统一路由、手动模式与单次自动回退已实现；139 项本地回归通过，macOS x64 已验证真实往返切换。主窗口的设置选择、视频表面切换和双内核原生依赖打包尚未接入，当前主窗口仍使用 LibVLC。详见 [播放内核实现](docs/mpv-engine.md)。
+主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。148 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
+
+界面开始参考 FongMi/TV 的分类导航和宽屏布局，已增加横向分类、控制栏换行以及窄窗口浏览／播放详情切换，保留设计预览与 Mica。海报网格和独立详情页仍在后续改造范围，见 [PC 布局](docs/desktop-layout.md)。
+
+libmpv 尚未纳入全部发行包。开发时可通过 `VODBOX_MPV_PATH` 指定本机原生库完整路径；未提供 mpv 时，自动模式会尝试现有 LibVLC。不要将本机 GUI 验收视为三平台安装包验收。
 
 `examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，`csp_BiliGuard` 和其他 Java Spider 尚未移植。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
 

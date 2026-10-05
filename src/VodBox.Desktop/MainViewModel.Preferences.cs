@@ -10,6 +10,9 @@ public partial class MainViewModel
     public async Task InitializeAsync()
     {
         var preferences = await _preferencesStore.LoadAsync(_lifetime.Token);
+        var engineChoice = PlaybackEngineChoices.FirstOrDefault(x => x.Mode == preferences.PlaybackEngineMode) ?? PlaybackEngineChoices[0];
+        await Engine.ChangeModeAsync(engineChoice.Mode, _lifetime.Token);
+        SelectedPlaybackEngine = engineChoice;
         Volume = Math.Clamp(preferences.Volume, 0, 100); Rate = Math.Clamp(preferences.Rate, .25, 4);
         AutoNext = preferences.AutoNext; ResumePlayback = preferences.ResumePlayback;
         SkipIntroSeconds = Math.Clamp(preferences.SkipIntroSeconds, 0, 600); SkipOutroSeconds = Math.Clamp(preferences.SkipOutroSeconds, 0, 600);
@@ -29,6 +32,7 @@ public partial class MainViewModel
     {
         DanmakuEnabled = DanmakuEnabled, DanmakuFontSize = DanmakuFontSize, DanmakuOpacity = DanmakuOpacity, DanmakuCoverage = DanmakuCoverage, DanmakuDelayMs = DanmakuDelayMs,
         LastConfigId = _config.Id, LastSourceId = SelectedSource?.Id, Volume = Volume, Rate = Rate,
+        PlaybackEngineMode = SelectedPlaybackEngine.Mode,
         AutoNext = AutoNext, ResumePlayback = ResumePlayback, SkipIntroSeconds = SkipIntroSeconds, SkipOutroSeconds = SkipOutroSeconds, Theme = Theme, LastLiveConfigId = _lastLiveConfigId, LastLiveSourceId = _lastLiveSourceId, LastLiveChannelId = _lastLiveChannelId, AutoLiveFallback = AutoLiveFallback, ResumeLiveOnStartup = ResumeLiveOnStartup, AudioDelayMs = AudioDelayMs, SubtitleDelayMs = SubtitleDelayMs
     };
     private void SchedulePreferencesSave()

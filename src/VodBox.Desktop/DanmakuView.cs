@@ -41,6 +41,11 @@ public sealed class DanmakuView : Control, IDisposable
         _viewModel = viewModel; _preview = preview; _configured = null;
         viewModel.PropertyChanged += ModelChanged; RefreshFrame();
     }
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsVisibleProperty) RefreshFrame();
+    }
     private void ModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainViewModel.DanmakuComments) or nameof(MainViewModel.DanmakuEnabled) or nameof(MainViewModel.DanmakuFontSize) or nameof(MainViewModel.DanmakuCoverage) or nameof(MainViewModel.DanmakuOpacity) or nameof(MainViewModel.DanmakuDelayMs) or nameof(MainViewModel.Position) or nameof(MainViewModel.PlayerState) or nameof(MainViewModel.NowPlaying)) RefreshFrame();
@@ -64,7 +69,7 @@ public sealed class DanmakuView : Control, IDisposable
         { _samplePosition = position; _sampleAt = now; _sampleState = snapshot.State; }
         if (snapshot.State == PlaybackState.Playing)
             position += (long)(Math.Min(500, Stopwatch.GetElapsedTime(_sampleAt, now).TotalMilliseconds) * model.Rate);
-        var comments = model.DanmakuEnabled && position >= model.DanmakuDelayMs && snapshot.State is PlaybackState.Playing or PlaybackState.Paused or PlaybackState.Buffering ? model.DanmakuComments : Array.Empty<DanmakuComment>();
+        var comments = (_preview || IsEffectivelyVisible) && model.DanmakuEnabled && position >= model.DanmakuDelayMs && snapshot.State is PlaybackState.Playing or PlaybackState.Paused or PlaybackState.Buffering ? model.DanmakuComments : Array.Empty<DanmakuComment>();
         double font = Math.Clamp(model.DanmakuFontSize, 16, 48), coverage = Math.Clamp(model.DanmakuCoverage, .25, 1);
         if (!ReferenceEquals(_configured, comments) || _configuredSize != Bounds.Size || _font != font || _coverage != coverage)
         {

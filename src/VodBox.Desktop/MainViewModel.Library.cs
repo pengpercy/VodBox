@@ -168,7 +168,7 @@ public partial class MainViewModel
         if (hit is null) return; _aggregateCancellation?.Cancel();
         await SelectSourceAsync(hit.Source); AggregateResultsVisible = false; await DetailAsync(hit.Item);
     });
-    partial void OnSelectedItemChanged(MediaItem? value) { if (!_settingDetail && value is not null) _ = RunAsync(() => DetailAsync(value)); }
+    partial void OnSelectedItemChanged(MediaItem? value) { if (!_settingDetail && value is not null) { ShowPlaybackPage = true; _ = RunAsync(() => DetailAsync(value)); } }
     private async Task DetailAsync(MediaItem item)
     {
         var provider = _provider; if (provider is null) return;

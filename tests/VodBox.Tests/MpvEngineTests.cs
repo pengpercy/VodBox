@@ -9,6 +9,28 @@ namespace VodBox.Tests;
 public sealed class MpvEngineTests
 {
     [Fact]
+    public async Task VideoSurfaceHandshakePreventsPrematureLoadAndAllowsCancelledRetry()
+    {
+        var client = new Client(); await using var engine = new MpvEngine(factory: () => client, waitForVideoSurface: true);
+        var initialized = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.Initialized += (_, _) => initialized.TrySetResult();
+        using var cancellation = new CancellationTokenSource();
+        var opening = engine.OpenAsync(new() { Uri = "https://media.example/video" }, 1, cancellation.Token);
+        await initialized.Task.WaitAsync(TimeSpan.FromSeconds(5)); Assert.Equal(0, client.Loads); Assert.False(opening.IsCompleted);
+        cancellation.Cancel(); await Assert.ThrowsAnyAsync<OperationCanceledException>(() => opening); Assert.Equal(0, client.Loads);
+        engine.NotifyVideoSurfaceReady(); await engine.OpenAsync(new() { Uri = "https://media.example/video" }, 2, default);
+        Assert.Equal(1, client.Loads); await Until(() => engine.Snapshot.State == PlaybackState.Playing);
+    }
+
+    [Fact]
+    public async Task VideoSurfaceFailureUnblocksOpenWithoutLoadingMedia()
+    {
+        var client = new Client(); await using var engine = new MpvEngine(factory: () => client, waitForVideoSurface: true);
+        engine.Initialized += (_, _) => engine.NotifyVideoSurfaceFailure(new NotSupportedException("No OpenGL"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => engine.OpenAsync(new() { Uri = "https://media.example/video" }, 1, default));
+        Assert.Equal(0, client.Loads);
+    }
+    [Fact]
     public async Task LazyEngineObservesStateTracksAndControlsWithoutLoadingNativeLibrary()
     {
         var client = new Client(); int initialized = 0; await using var engine = new MpvEngine(factory: () => { initialized++; return client; });
@@ -68,7 +90,7 @@ public sealed class MpvEngineTests
         public ConcurrentQueue<MpvEvent> Events { get; } = new();
         public ConcurrentDictionary<string, string> Properties { get; } = new();
         public List<string> Observed { get; } = [];
-        public int Disposals;
+        public int Disposals, Loads;
         public void Command(params string[] args)
         {
             switch (args[0])
@@ -78,6 +100,7 @@ public sealed class MpvEngineTests
                     if (args[1] == "pause") Events.Enqueue(new(22, 0, 3, PropertyName: "pause", PropertyFlag: args[2] == "yes"));
                     break;
                 case "loadfile":
+                    Interlocked.Increment(ref Loads);
                     Events.Enqueue(new(8, 0, 0)); Events.Enqueue(new(22, 0, 2, PropertyName: "duration", PropertyDouble: 10));
                     Events.Enqueue(new(22, 0, 4, PropertyName: "seekable", PropertyFlag: true));
                     Events.Enqueue(new(22, 0, 1, PropertyName: "time-pos", PropertyDouble: 0)); break;

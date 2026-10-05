@@ -16,6 +16,7 @@ public sealed class DanmakuOverlay : IDisposable
     private readonly Window _window;
     private readonly DanmakuView _view = new();
     private bool _disposed, _unsupported;
+    public int ActiveCount => _window.IsVisible ? _view.ActiveCount : 0;
     public DanmakuOverlay(Window owner, Control surface, MainViewModel model)
     {
         _owner = owner; _surface = surface; _model = model;
@@ -37,13 +38,13 @@ public sealed class DanmakuOverlay : IDisposable
     private void OwnerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     { if (e.Property == Window.WindowStateProperty || e.Property == Visual.IsVisibleProperty) Update(); }
     private void ModelChanged(object? sender, PropertyChangedEventArgs e)
-    { if (e.PropertyName is nameof(MainViewModel.DanmakuEnabled) or nameof(MainViewModel.DanmakuComments) or nameof(MainViewModel.Position) or nameof(MainViewModel.PlayerState) or nameof(MainViewModel.NowPlaying)) Update(); }
+    { if (e.PropertyName is nameof(MainViewModel.DanmakuEnabled) or nameof(MainViewModel.DanmakuComments) or nameof(MainViewModel.Position) or nameof(MainViewModel.PlayerState) or nameof(MainViewModel.NowPlaying) or nameof(MainViewModel.ActiveEngineText)) Update(); }
     public void Update()
     {
         if (_disposed || _unsupported) return;
         var state = _model.Engine.Snapshot.State;
         bool visible = _owner.IsVisible && _owner.WindowState != WindowState.Minimized && _surface.IsEffectivelyVisible && _surface.IsAttachedToVisualTree()
-            && _model.DanmakuEnabled && _model.DanmakuComments.Count > 0 && state is PlaybackState.Playing or PlaybackState.Paused or PlaybackState.Buffering;
+            && _model.Engine.ActiveKind == PlaybackEngineKind.LibVlc && _model.DanmakuEnabled && _model.DanmakuComments.Count > 0 && state is PlaybackState.Playing or PlaybackState.Paused or PlaybackState.Buffering;
         if (!visible || _surface.Bounds.Width < 1 || _surface.Bounds.Height < 1) { if (_window.IsVisible) _window.Hide(); return; }
         var position = _surface.PointToScreen(default);
         if (_window.Position != position) _window.Position = position;

@@ -10,6 +10,41 @@ public sealed class PlaybackEngineRouterTests
     private static PlaybackRequest Request(string uri = "https://media.example/video") => new() { Uri = uri, Headers = new() { ["User-Agent"] = "Fixture" } };
 
     [Fact]
+    public async Task RendererFailureDuringOpenSurvivesPlayingEventsAndFallsBackOnce()
+    {
+        var mpv = new Engine(); var vlc = new Engine();
+        await using var router = new PlaybackEngineRouter(kind => kind == PlaybackEngineKind.Mpv ? mpv : vlc);
+        mpv.OnOpen = () => router.ReportSurfaceFailure(mpv, new NotSupportedException("No OpenGL"));
+        await router.OpenAsync(Request(), 7, default);
+        Assert.Equal(PlaybackEngineKind.LibVlc, router.ActiveKind); Assert.Equal(PlaybackState.Playing, router.Snapshot.State);
+        Assert.Equal(1, mpv.Opens); Assert.Equal(1, vlc.Opens);
+        router.ReportSurfaceFailure(mpv, new IOException("Old surface")); Assert.Equal(PlaybackState.Playing, router.Snapshot.State);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RuntimeRendererLossRespectsManualMode(bool automatic)
+    {
+        var mpv = new Engine(); var vlc = new Engine();
+        await using var router = new PlaybackEngineRouter(kind => kind == PlaybackEngineKind.Mpv ? mpv : vlc);
+        if (!automatic) await router.ChangeModeAsync(PlaybackEngineMode.Mpv, default);
+        await router.OpenAsync(Request(), 8, default); mpv.Emit(PlaybackState.Playing, 3);
+        router.ReportSurfaceFailure(mpv, new IOException("GPU context lost"));
+        if (automatic)
+        {
+            await Until(() => router.ActiveKind == PlaybackEngineKind.LibVlc && router.Snapshot.State == PlaybackState.Playing);
+            Assert.Equal(3000, vlc.Request!.StartPositionMs);
+        }
+        else
+        {
+            Assert.Equal(PlaybackState.Failed, router.Snapshot.State); Assert.Equal(0, vlc.Opens);
+            mpv.Emit(PlaybackState.Playing, 4); Assert.Equal(PlaybackState.Failed, router.Snapshot.State);
+            await Until(() => mpv.Stops == 1); Assert.Equal(PlaybackState.Failed, router.Snapshot.State);
+        }
+    }
+
+    [Fact]
     public async Task AutomaticStartupAndRuntimeFailureTryAlternateOnlyOnce()
     {
         var mpv = new Engine { OpenError = new DllNotFoundException("missing mpv") }; var vlc = new Engine();
@@ -47,11 +82,11 @@ public sealed class PlaybackEngineRouterTests
     [Fact]
     public async Task SwitchingPreservesPositionPauseVolumeRateAndDelays()
     {
-        var mpv = new Engine(); var vlc = new Engine(); await using var router = new PlaybackEngineRouter(kind => kind == PlaybackEngineKind.Mpv ? mpv : vlc);
+        var mpv = new Engine(); var vlc = new Engine { PauseAdvance = .4 }; await using var router = new PlaybackEngineRouter(kind => kind == PlaybackEngineKind.Mpv ? mpv : vlc);
         await router.SetVolumeAsync(.42, default); await router.SetRateAsync(1.75, default);
         await router.SetAudioDelayAsync(120, default); await router.SetSubtitleDelayAsync(-340, default);
         await router.OpenAsync(Request(), 9, default); mpv.Emit(PlaybackState.Playing, 5); await router.PauseAsync(default);
-        await router.ChangeModeAsync(PlaybackEngineMode.LibVlc, default); await Until(() => router.Snapshot.State == PlaybackState.Paused);
+        await router.ChangeModeAsync(PlaybackEngineMode.LibVlc, default); await Until(() => router.Snapshot.State == PlaybackState.Paused && router.Snapshot.Position.TotalSeconds == 5);
         Assert.Equal(5000, vlc.Request!.StartPositionMs); Assert.Equal(9, vlc.Session); Assert.Equal(.42, vlc.Volume); Assert.Equal(1.75, vlc.Rate);
         Assert.Equal(120, vlc.AudioDelay); Assert.Equal(-340, vlc.SubtitleDelay); Assert.Equal(1, mpv.Stops);
         mpv.Emit(PlaybackState.Playing, 99); Assert.Equal(PlaybackState.Paused, router.Snapshot.State); Assert.Equal(TimeSpan.FromSeconds(5), router.Snapshot.Position);
@@ -148,10 +183,11 @@ public sealed class PlaybackEngineRouterTests
     private sealed class Engine : IPlaybackEngine, IPlaybackAdvancedControls
     {
         public Exception? OpenError;
+        public Action? OnOpen;
         public bool BlockVolume, ThrowDispose, ThrowTracklessDelay;
         public bool HasTracks = true;
         public int Opens, Stops, Disposals, AudioDelay, SubtitleDelay;
-        public double Volume, Rate;
+        public double Volume, Rate, PauseAdvance;
         public long Session;
         public PlaybackRequest? Request;
         public string? Screenshot;
@@ -162,9 +198,9 @@ public sealed class PlaybackEngineRouterTests
         public void Emit(PlaybackState state, double? position = null, string? error = null)
         { Snapshot = new(state, TimeSpan.FromSeconds(position ?? Snapshot.Position.TotalSeconds), TimeSpan.FromSeconds(15), true, error); StateChanged?.Invoke(this, new(Session, Snapshot)); }
         public Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken token)
-        { Opens++; Request = request; Session = sessionId; if (OpenError is { } error) return Task.FromException(error); Emit(PlaybackState.Playing, request.StartPositionMs / 1000d); return Task.CompletedTask; }
+        { Opens++; Request = request; Session = sessionId; OnOpen?.Invoke(); if (OpenError is { } error) return Task.FromException(error); Emit(PlaybackState.Playing, request.StartPositionMs / 1000d); return Task.CompletedTask; }
         public Task PlayAsync(CancellationToken token) { Emit(PlaybackState.Playing); return Task.CompletedTask; }
-        public Task PauseAsync(CancellationToken token) { Emit(PlaybackState.Paused); return Task.CompletedTask; }
+        public Task PauseAsync(CancellationToken token) { Emit(PlaybackState.Paused, Snapshot.Position.TotalSeconds + PauseAdvance); return Task.CompletedTask; }
         public Task StopAsync(CancellationToken token) { Stops++; Emit(PlaybackState.Idle); return Task.CompletedTask; }
         public Task SeekAsync(TimeSpan position, CancellationToken token) { Emit(Snapshot.State, position.TotalSeconds); return Task.CompletedTask; }
         public Task SetRateAsync(double rate, CancellationToken token) { Rate = rate; return Task.CompletedTask; }

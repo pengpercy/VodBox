@@ -6,6 +6,7 @@ using VodBox.Core;
 using VodBox.Application;
 using VodBox.Infrastructure;
 using VodBox.Playback.LibVlc;
+using VodBox.Playback.Mpv;
 
 namespace VodBox.Desktop;
 
@@ -37,7 +38,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<string> SearchErrors { get; } = [];
     public ObservableCollection<string> LiveGroups { get; } = [];
     public ObservableCollection<ProgrammeRow> Programmes { get; } = [];
-    public LibVlcEngine Engine { get; } = new();
+    public PlaybackEngineRouter Engine { get; }
     public ObservableCollection<ResolverDefinition> Resolvers { get; } = [new() { Id = "_direct", Name = "直接播放", Kind = ResolutionKind.Direct }];
     [ObservableProperty] private ResolverDefinition? _selectedResolver;
     public ObservableCollection<SourceDefinition> Sources { get; } = [];
@@ -64,6 +65,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private bool _showHistory;
     [ObservableProperty] private bool _showFavorites;
     [ObservableProperty] private bool _showSettings;
+    [ObservableProperty] private bool _showPlaybackPage;
     [ObservableProperty] private bool _incognito;
     [ObservableProperty] private double _position;
     [ObservableProperty] private double _duration;
@@ -84,7 +86,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private int _skipOutroSeconds;
     [ObservableProperty] private int _audioDelayMs;
     [ObservableProperty] private int _subtitleDelayMs;
-    private long _delaySession;
     private double _volumeBeforeMute = 80;
     public Task SeekRelativeAsync(int seconds) => RunAsync(() => Engine.SeekAsync(Engine.Snapshot.Position + TimeSpan.FromSeconds(seconds), _lifetime.Token), false);
     public void ToggleMute() { if (Volume > 0) { _volumeBeforeMute = Volume; Volume = 0; } else Volume = _volumeBeforeMute; }
@@ -97,9 +98,10 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _epgStatus = "选择频道查看节目表。";
     public bool IsScrubbing { get; set; }
 
-    public MainViewModel(bool designMode = false)
+    public MainViewModel(bool designMode = false, Func<PlaybackEngineKind, IPlaybackEngine>? engineFactory = null)
     {
         _designMode = designMode;
+        Engine = new(engineFactory ?? (kind => kind == PlaybackEngineKind.Mpv ? new MpvEngine(waitForVideoSurface: true) : new LibVlcEngine(waitForVideoSurface: true)));
         SelectedResolver = Resolvers[0];
         _store = designMode ? new PreviewStore() : new LibraryStore(Path.Combine(AppPaths.DataDirectory, "library.db"));
         _resolution = new(_http);
@@ -113,12 +115,15 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _epg = new(_http, AppPaths.CacheDirectory);
         _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; InitializeLiveRefresh();
         Engine.StateChanged += OnPlaybackState;
+        Engine.ActiveEngineChanged += OnActiveEngineChanged;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>
         {
             ClearDanmaku();
             if (!string.IsNullOrWhiteSpace(request.DanmakuUri)) _ = LoadDanmakuAsync(request.DanmakuUri);
             NowPlaying = request.Title;
+            ShowPlaybackPage = true;
             SelectedAudio = null; SelectedSubtitle = null;
+            _tracksEngine = null;
             AudioTracks.Clear(); SubtitleTracks.Clear();
             Position = 0; Duration = 0;
         });
@@ -204,7 +209,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     });
     private void OnPlaybackState(object? sender, PlaybackEvent e) => Dispatcher.UIThread.Post(() =>
     {
-        if (e.SessionId != _coordinator.SessionId) return;
+        if (_disposed || e.SessionId != _coordinator.SessionId) return;
         PlayerState = e.Snapshot.State;
         ObserveLivePlayback(e);
         if (!IsScrubbing) Position = e.Snapshot.Position.TotalMilliseconds;
@@ -216,22 +221,15 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             && e.Snapshot.Duration.TotalSeconds > SkipOutroSeconds && e.Snapshot.Position.TotalSeconds >= e.Snapshot.Duration.TotalSeconds - SkipOutroSeconds);
         if (AutoNext && advance && _playlist.HasNext && _advanceSession != e.SessionId)
         { _advanceSession = e.SessionId; _ = NextEpisodeAsync(); }
-        if (e.Snapshot.State == PlaybackState.Playing && _delaySession != e.SessionId)
+        if (e.Snapshot.State is PlaybackState.Playing or PlaybackState.Paused)
         {
-            _delaySession = e.SessionId;
-            if (AudioDelayMs != 0) _ = RunAsync(() => Engine.SetAudioDelayAsync(AudioDelayMs, _lifetime.Token), false);
-            if (SubtitleDelayMs != 0) _ = RunAsync(() => Engine.SetSubtitleDelayAsync(SubtitleDelayMs, _lifetime.Token), false);
-        }
-        if (e.Snapshot.State == PlaybackState.Playing && AudioTracks.Count == 0)
-        {
-            foreach (var track in Engine.GetTracks(TrackKind.Audio)) AudioTracks.Add(track);
-            foreach (var track in Engine.GetTracks(TrackKind.Subtitle)) SubtitleTracks.Add(track);
+            RefreshTracks();
         }
     });
     public async ValueTask DisposeAsync()
     {
         ClearDanmaku();
-        _disposed = true; _saveTimer.Stop(); _liveTimer.Stop(); _liveHealthTimer.Stop(); Engine.StateChanged -= OnPlaybackState;
+        _disposed = true; _saveTimer.Stop(); _liveTimer.Stop(); _liveHealthTimer.Stop(); Engine.StateChanged -= OnPlaybackState; Engine.ActiveEngineChanged -= OnActiveEngineChanged;
         _lifetime.Cancel(); _browse?.Cancel(); _aggregateCancellation?.Cancel(); _epgCancellation?.Cancel();
         _preferencesSave?.Cancel(); await _preferencesSaveTask;
         if (!_designMode && _initialized) await _preferencesStore.SaveAsync(CapturePreferences());

@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core" xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
-        Title="VodBox" Width="1280" Height="850" MinWidth="960" MinHeight="640"
+        Title="VodBox" Width="1280" Height="850" MinWidth="800" MinHeight="640"
         ExtendClientAreaToDecorationsHint="True" ExtendClientAreaTitleBarHeightHint="40" WindowDecorations="Full"
         TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
         TransparencyBackgroundFallback="{DynamicResource WindowFallbackBrush}" Background="Transparent">
@@ -35,12 +35,12 @@
   </Window.Styles>
   <Grid RowDefinitions="40,*">
     <Border x:Name="WindowTitleBar" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
-    <Grid Grid.Row="1" RowDefinitions="*,Auto" ColumnDefinitions="180,*">
-    <Border Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
+    <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*,Auto" ColumnDefinitions="180,*">
+    <Border x:Name="NavigationPane" Grid.RowSpan="2" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
       <DockPanel>
         <StackPanel DockPanel.Dock="Top" Spacing="8">
           <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
-          <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" />
+          <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" TextWrapping="Wrap" />
           <Button Content="发现" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="发现" />
           <Button Content="直播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="直播" />
           <Button Content="历史" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="历史" />
@@ -50,14 +50,16 @@
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Spacing="12">
           <ToggleSwitch Content="无痕播放" IsChecked="{Binding Incognito}" FontSize="12" />
-          <TextBlock Text="0.1.0 · LibVLC" Classes="muted" FontSize="11" Margin="8,0" />
+          <TextBlock Text="0.1.0 · 双播放内核" Classes="muted" FontSize="11" Margin="8,0" TextWrapping="Wrap" />
         </StackPanel>
       </DockPanel>
     </Border>
-    <Grid Grid.Column="1" Margin="24,24,24,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+    <Grid x:Name="Workspace" Grid.Column="1" Margin="24,24,24,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <TextBlock Text="{Binding PageTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="BrowsePageButton" Content="返回浏览" Click="BrowsePageClick" IsVisible="False" />
+          <Button x:Name="PlaybackPageButton" Content="播放与详情" Click="PlaybackPageClick" IsVisible="False" />
           <Button Content="打开媒体" Click="OpenFileClick" />
           <Button Content="全屏" Click="FullscreenClick" />
         </StackPanel>
@@ -69,17 +71,18 @@
         </ComboBox>
         <Button Grid.Column="2" Content="播放地址" Command="{Binding OpenUrlCommand}" />
       </Grid>
-      <Grid Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
-        <Grid RowDefinitions="Auto,*" RowSpacing="12">
+      <Grid x:Name="ContentWorkspace" Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
+        <Grid x:Name="BrowsePane" RowDefinitions="Auto,*" RowSpacing="12">
           <StackPanel IsVisible="{Binding ShowLibrary}" Spacing="10">
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Grid ColumnDefinitions="*" ColumnSpacing="8">
               <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" HorizontalAlignment="Stretch">
                 <ComboBox.ItemTemplate><DataTemplate x:DataType="core:SourceDefinition"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
-              <ComboBox Grid.Column="1" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" HorizontalAlignment="Stretch">
-                <ComboBox.ItemTemplate><DataTemplate x:DataType="core:Category"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
-              </ComboBox>
             </Grid>
+            <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+              <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+              <ListBox.ItemTemplate><DataTemplate x:DataType="core:Category"><TextBlock Text="{Binding Name}" Margin="12,6" /></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
             <Grid IsVisible="{Binding HasLibraryFilters}" ColumnDefinitions="*,*" ColumnSpacing="8">
               <ComboBox ItemsSource="{Binding YearChoices}" SelectedItem="{Binding SelectedYear}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
               <ComboBox Grid.Column="1" ItemsSource="{Binding CompletionChoices}" SelectedItem="{Binding SelectedCompletion}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
@@ -121,6 +124,11 @@
               <ListBox.ItemTemplate><DataTemplate x:DataType="core:FavoriteEntry"><StackPanel Margin="8"><TextBlock Text="{Binding Title}" /><TextBlock Text="{Binding SourceId}" Classes="muted" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
             </ListBox>
             <ScrollViewer IsVisible="{Binding ShowSettings}"><StackPanel Spacing="16">
+              <TextBlock Text="播放内核" FontWeight="SemiBold" FontSize="18" />
+              <ComboBox ItemsSource="{Binding PlaybackEngineChoices}" SelectedItem="{Binding SelectedPlaybackEngine}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:PlaybackEngineChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Text="{Binding ActiveEngineText}" TextWrapping="Wrap" Classes="muted" />
               <TextBlock Text="数据备份" FontWeight="SemiBold" FontSize="18" />
               <Button Content="导出数据备份" Click="ExportBackupClick" IsEnabled="{Binding !IsBusy}" />
               <Button Content="导入备份并合并数据" Click="ImportBackupClick" IsEnabled="{Binding !IsBusy}" />
@@ -159,9 +167,9 @@
             </StackPanel></ScrollViewer>
           </Grid>
         </Grid>
-        <Grid Grid.Column="1" RowDefinitions="2*,Auto,Auto,Auto,*" RowSpacing="12">
+        <Grid x:Name="PlaybackPane" Grid.Column="1" RowDefinitions="2*,Auto,Auto,Auto,*" RowSpacing="12">
           <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180">
-            <Grid><vm:VlcVideoSurface x:Name="VideoSurface" /><vm:DanmakuView x:Name="DanmakuPreview" IsVisible="False" /></Grid>
+            <Grid x:Name="VideoContainer"><vm:VlcVideoSurface x:Name="VideoSurface" /><vm:DanmakuView x:Name="DanmakuPreview" IsVisible="False" /></Grid>
           </Border>
           <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
             <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
@@ -189,12 +197,12 @@
     <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource PlayerControlsSurfaceBrush}" Padding="24,16">
       <StackPanel Spacing="10">
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><Slider x:Name="SeekSlider" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" PointerPressed="SeekPressed" PointerReleased="SeekReleased" /><TextBlock Grid.Column="1" Text="{Binding TimeText}" VerticalAlignment="Center" Classes="muted" /></Grid>
-        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="12">
+        <WrapPanel Orientation="Horizontal">
           <Button Content="暂停 / 继续" Command="{Binding TogglePauseCommand}" /><Button Grid.Column="1" Content="停止" Command="{Binding StopCommand}" /><Button Grid.Column="2" Content="添加字幕" Click="AddSubtitleClick" />
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right"><TextBlock Text="音量" VerticalAlignment="Center" /><Slider Width="100" Minimum="0" Maximum="100" Value="{Binding Volume}" /><NumericUpDown Width="88" Minimum="0.25" Maximum="4" Increment="0.25" Value="{Binding Rate}" FormatString="0.00x" /></StackPanel>
           <ComboBox Grid.Column="4" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}" PlaceholderText="音轨" MaxWidth="130"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
           <ComboBox Grid.Column="5" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitle}" PlaceholderText="字幕" MaxWidth="130"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:MediaTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-        </Grid>
+        </WrapPanel>
       </StackPanel>
     </Border>
     </Grid>

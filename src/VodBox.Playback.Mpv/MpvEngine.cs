@@ -7,6 +7,8 @@ namespace VodBox.Playback.Mpv;
 public sealed class MpvEngine : IPlaybackEngine, IPlaybackAdvancedControls
 {
     private readonly Func<IMpvClient> _factory;
+    private readonly bool _waitForVideoSurface;
+    private readonly TaskCompletionSource _videoSurfaceReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim _commands = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
     private IMpvClient? _client;
@@ -24,14 +26,17 @@ public sealed class MpvEngine : IPlaybackEngine, IPlaybackAdvancedControls
     public event EventHandler? Initialized;
     public event EventHandler<PlaybackEvent>? StateChanged;
 
-    public MpvEngine(bool headless = false, Func<IMpvClient>? factory = null)
+    public MpvEngine(bool headless = false, Func<IMpvClient>? factory = null, bool waitForVideoSurface = false)
     {
+        _waitForVideoSurface = waitForVideoSurface;
         _factory = factory ?? (() => new MpvClient(new Dictionary<string, string>
         {
             ["vo"] = headless ? "null" : "libmpv", ["ao"] = headless ? "null" : "auto",
             ["hwdec"] = headless ? "no" : "auto-safe"
         }));
     }
+    public void NotifyVideoSurfaceReady() => _videoSurfaceReady.TrySetResult();
+    public void NotifyVideoSurfaceFailure(Exception error) => _videoSurfaceReady.TrySetException(error);
     private void Initialize()
     {
         if (_client is not null) return;
@@ -55,7 +60,7 @@ public sealed class MpvEngine : IPlaybackEngine, IPlaybackAdvancedControls
         try { Check(); token.ThrowIfCancellationRequested(); await Task.Run(action, CancellationToken.None).ConfigureAwait(false); }
         finally { _commands.Release(); }
     }
-    public Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken token)
+    public async Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "file" or "rtsp" or "rtmp" or "udp" or "rtp"))
@@ -66,7 +71,13 @@ public sealed class MpvEngine : IPlaybackEngine, IPlaybackAdvancedControls
             if (!header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase) && !header.Key.Equals("Referer", StringComparison.OrdinalIgnoreCase))
                 throw new NotSupportedException($"请求头 {header.Key} 需要通过媒体代理传递。");
         }
-        return ExecuteAsync(() =>
+        if (_waitForVideoSurface)
+        {
+            await ExecuteAsync(Initialize, token).ConfigureAwait(false);
+            // libmpv can silently drop video if loadfile precedes render-context creation.
+            await _videoSurfaceReady.Task.WaitAsync(TimeSpan.FromSeconds(8), token).ConfigureAwait(false);
+        }
+        await ExecuteAsync(() =>
         {
             Initialize(); var client = _client!;
             client.Command("stop"); for (int i = 0; i < 256 && client.PollEvent().Id != 0; i++) { }

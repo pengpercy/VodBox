@@ -104,3 +104,21 @@ xsmp3/psmp3 公开分类与专辑均可读，两个首集媒体小范围读取 H
 主窗口仍使用 LibVLC。这些诊断不包含主窗口设置、GPU 表面切换、弹幕叠层、字幕轨道迁移、网络浏览/投屏或六 RID 原生包验收，没有运行 Actions。
 
 最终 macOS x64 Native AOT 发布（全裁剪、编译与 ILC 警告作为错误）以及上述两个真实诊断均通过。AOT dummy LibVLC 音量可返回 -1，同样不视为设备音量验证。日志 `/private/tmp/vodbox-router-native-aot-build.log`、`/private/tmp/vodbox-router-native-switch-aot.log`、`/private/tmp/vodbox-router-native-fallback-aot.log`。
+
+## 主窗口双内核与 PC 布局（2026-10-05）
+
+主窗口设置、偏好、原生视频表面、两种弹幕与布局已接入。新增测试后完整 148 项回归通过，其中 4 项覆盖 900／1280／1600 DIP、浏览／播放页切换及视频容器不重建。普通测试仍不加载原生播放器。
+
+`tests/VodBox.Mpv.UiSmoke` 新增 `--desktop <音视频文件>`，使用实际 MainWindow 与临时内存数据服务，不加载或保存用户配置。JIT / Native AOT 已验证 mpv → LibVLC → mpv、GPU 帧数、2.5 秒暂停位置、LibVLC 输出/解码与设备静音、设置绑定、上下文复用、mpv 内嵌弹幕及 LibVLC 透明窗口弹幕。最终 AOT 探针还在暂停状态切到 900 DIP、返回浏览、恢复播放页并回到 1280 DIP，确认原渲染表面保留且恢复播放。
+
+`--desktop-fallback <音视频文件>` 在独立进程将 `VODBOX_MPV_PATH` 指向不存在的库，JIT/AOT 均观察到真实 LibVLC 接管、可用原生视频表面、解码和弹幕，模式仍为自动。这不是模拟内核测试。
+
+实际测试修复了三个初始化竞争：mpv render context 创建前 loadfile 导致只播放音频；LibVLC drawable 创建前开始播放；Playing 回调后的过早暂停让原生输出尚未创建。现在等待表面就绪，桌面暂停时有界等待输出，音频设备创建后恢复缓存音量，并回到原暂停位置。关闭先保存进度和停止解码，再解绑 drawable 和释放表面。
+
+严格发布使用 `-warnaserror -p:TreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true`、全裁剪和源码生成 JSON，编译无警告。还原复用用户 NuGet 配置，但通过 `--source https://repo.huaweicloud.com/repository/nuget/v3/index.json` 明确单镜像，消除双源中央包管理 NU1507；没有修改系统配置。RID 还原/发布统一用 `-p:RuntimeIdentifier=osx-x64`，不使用会导致锁文件选择时序不同的 `-r`。
+
+日志：`/private/tmp/vodbox-desktop-dual-engine-tests.log`、`/private/tmp/vodbox-desktop-dual-engine-ui-jit.log`、`/private/tmp/vodbox-desktop-dual-engine-ui-aot-build.log`、`/private/tmp/vodbox-desktop-dual-engine-ui-aot.log`、`/private/tmp/vodbox-desktop-dual-engine-ui-fallback-aot.log`。其他平台、长期运行、硬解/HDR、真实多字幕切换及六 RID 双内核原生包未验收，没有运行 Actions。
+
+最终正式桌面产物也以相同严格参数发布，通过偏好/内核模式备份、SQLite、弹幕与真实无窗口 mpv/LibVLC 往返控制诊断：`/private/tmp/vodbox-desktop-dual-engine-aot-build.log`、`/private/tmp/vodbox-desktop-dual-engine-aot-diagnostics.log`。GUI 复验曾在显示非活动时于窗口创建前遇到 Avalonia 原生 RenderTimer `-6661`；临时唤醒显示后最终两个 AOT 窗口探针均以 0 退出，往返探针绘制 44 帧，回退探针解码 100 帧。未修改系统睡眠设置。
+
+受控 MPEG4 样本停止时 LibVLC 仍可能记录 `get_buffer()` / `avcodec_send_packet` 解码器日志；退出码为 0，关闭先停止解码再解绑 drawable，不将日志描述为“无运行时警告”。这些合成样本验收不能替代其他编码与长期运行测试。

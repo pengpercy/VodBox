@@ -23,8 +23,9 @@ internal static class Diagnostics
             {
                 var store = new LibraryStore(Path.Combine(temp, "test.db")); await store.GetHistoryAsync(); Console.WriteLine("SQLite: OK");
                 var preferences = new PreferencesStore(Path.Combine(temp, "preferences.json"));
-                await preferences.SaveAsync(new Core.AppPreferences { Volume = 35, AutoNext = false });
-                if ((await preferences.LoadAsync()).Volume != 35) throw new InvalidDataException("偏好设置校验失败。");
+                await preferences.SaveAsync(new Core.AppPreferences { Volume = 35, AutoNext = false, PlaybackEngineMode = Core.PlaybackEngineMode.Mpv });
+                var loadedPreferences = await preferences.LoadAsync();
+                if (loadedPreferences.Volume != 35 || loadedPreferences.PlaybackEngineMode != Core.PlaybackEngineMode.Mpv) throw new InvalidDataException("偏好设置校验失败。");
                 var configurations = new ConfigurationRepository(Path.Combine(temp, "configurations"));
                 await configurations.SaveAsync(config, location);
                 if ((await configurations.LoadAsync(config.Id)).Id != config.Id) throw new InvalidDataException("配置快照校验失败。");
@@ -33,13 +34,14 @@ internal static class Diagnostics
                 await store.SetFavoriteAsync(new(config.Id, source.Id, "backup-smoke", "备份诊断"), true);
                 var backups = new BackupService(store, configurations, preferences);
                 string backupPath = Path.Combine(temp, "backup.json");
-                await backups.ExportAsync(backupPath, new() { Volume = 35, Theme = "Light" });
+                await backups.ExportAsync(backupPath, new() { Volume = 35, Theme = "Light", PlaybackEngineMode = Core.PlaybackEngineMode.LibVlc });
                 var backup = await backups.ReadAsync(backupPath);
                 var restored = new LibraryStore(Path.Combine(temp, "restored.db"));
                 var restoredPreferences = new PreferencesStore(Path.Combine(temp, "restored-preferences.json"));
                 var restoredConfigurations = new ConfigurationRepository(Path.Combine(temp, "restored-configurations"));
                 await new BackupService(restored, restoredConfigurations, restoredPreferences).ImportAsync(backup);
                 if ((await restored.GetHistoryAsync()).Single().PositionMs != 1234 || (await restored.GetFavoritesAsync()).Count != 1 || (await restoredPreferences.LoadAsync()).Theme != "Light" || (await restoredConfigurations.LoadAsync(config.Id)).Id != config.Id) throw new InvalidDataException("备份还原校验失败。");
+                if ((await restoredPreferences.LoadAsync()).PlaybackEngineMode != Core.PlaybackEngineMode.LibVlc) throw new InvalidDataException("备份内核偏好校验失败。");
                 Console.WriteLine("AOT portable backup/import: OK");
                 var danmaku = new Core.DanmakuDocument { Comments = [new(0, "弹幕诊断", Core.DanmakuMode.Scroll, 0x60AEFF)] };
                 var comments = DanmakuLoader.Parse(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(danmaku, Core.VodBoxJson.Default.DanmakuDocument));

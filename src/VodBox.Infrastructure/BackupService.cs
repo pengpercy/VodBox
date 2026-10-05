@@ -41,6 +41,7 @@ public sealed class BackupService(LibraryStore library, ConfigurationRepository 
         if (backup.Format != "VodBox.Backup" || backup.Version != 1) throw new InvalidDataException("不支持此备份版本。");
         if (backup.Preferences is null || backup.Configurations is null || backup.Library is null || backup.Library.History is null || backup.Library.Favorites is null) throw new InvalidDataException("备份缺少必要字段。");
         if (backup.Configurations.Count > 1024 || backup.Library.History.Count > 100000 || backup.Library.Favorites.Count > 100000) throw new InvalidDataException("备份条目过多。");
+        if (backup.Preferences.PlaybackEngineMode is not (PlaybackEngineMode.Automatic or PlaybackEngineMode.LibVlc or PlaybackEngineMode.Mpv)) throw new InvalidDataException("备份播放内核偏好无效。");
         if (!double.IsFinite(backup.Preferences.DanmakuFontSize) || !double.IsFinite(backup.Preferences.DanmakuOpacity) || !double.IsFinite(backup.Preferences.DanmakuCoverage) || !double.IsFinite(backup.Preferences.Volume) || !double.IsFinite(backup.Preferences.Rate) || backup.Preferences.Theme is not ("Dark" or "Light" or "System")) throw new InvalidDataException("备份偏好无效。");
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in backup.Configurations)

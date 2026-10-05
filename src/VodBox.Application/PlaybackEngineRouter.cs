@@ -33,6 +33,7 @@ public sealed class PlaybackEngineRouter(Func<PlaybackEngineKind, IPlaybackEngin
         public readonly long Session = session, Version = version;
         public readonly PlaybackEngineMode Mode = mode;
         public int Opening = 1, FallbackUsed, ReadySettings, RestorePause = pause ? 1 : 0;
+        public Exception? SurfaceError;
     }
     private bool Current(Binding binding) => ReferenceEquals(Volatile.Read(ref _binding), binding) && binding.Version == Volatile.Read(ref _version) && Volatile.Read(ref _disposed) == 0;
     private void Check() => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
@@ -75,7 +76,10 @@ public sealed class PlaybackEngineRouter(Func<PlaybackEngineKind, IPlaybackEngin
         {
             var binding = Volatile.Read(ref _binding);
             if (binding?.FallbackUsed == 1 || PlaybackEnginePolicy.Fallback(mode, selected.Kind, request.Uri) is not { } alternative)
-            { Publish(session, Snapshot with { State = PlaybackState.Failed, Error = error.Message }); throw; }
+            {
+                if (binding?.SurfaceError is not null) await binding.Engine.StopAsync(CancellationToken.None).ConfigureAwait(false);
+                Publish(session, Snapshot with { State = PlaybackState.Failed, Error = error.Message }); throw;
+            }
             if (binding is not null) Interlocked.Exchange(ref binding.FallbackUsed, 1);
             try { await OpenSelectedLockedAsync(request, session, version, mode, new(alternative, "内核启动失败，自动回退一次：" + error.Message), paused, true, token).ConfigureAwait(false); }
             catch (Exception fallbackError) when (fallbackError is not OperationCanceledException)
@@ -100,6 +104,8 @@ public sealed class PlaybackEngineRouter(Func<PlaybackEngineKind, IPlaybackEngin
             await cached.Engine.OpenAsync(request, session, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             await ApplySettingsAsync(cached.Engine, selected.Kind, token).ConfigureAwait(false);
+            if (Volatile.Read(ref binding.SurfaceError) is { } surfaceError)
+                Publish(session, Snapshot with { State = PlaybackState.Failed, Error = "视频表面初始化失败：" + surfaceError.Message });
         }
         finally { Volatile.Write(ref binding.Opening, 0); }
         return binding;
@@ -108,6 +114,8 @@ public sealed class PlaybackEngineRouter(Func<PlaybackEngineKind, IPlaybackEngin
     {
         var binding = Volatile.Read(ref _binding);
         if (binding is null || !ReferenceEquals(engine, binding.Engine) || args.SessionId != binding.Session || !Current(binding)) return;
+        if (Volatile.Read(ref binding.SurfaceError) is { } surfaceError)
+            args = args with { Snapshot = args.Snapshot with { State = PlaybackState.Failed, Error = "视频表面初始化失败：" + surfaceError.Message } };
         Publish(args.SessionId, args.Snapshot);
         if (args.Snapshot.State == PlaybackState.Playing && Interlocked.Exchange(ref binding.ReadySettings, 1) == 0)
             Background(binding, async () =>
@@ -117,7 +125,12 @@ public sealed class PlaybackEngineRouter(Func<PlaybackEngineKind, IPlaybackEngin
                 {
                     if (!Current(binding)) return;
                     await ApplySettingsAsync(binding.Engine, binding.Kind, _lifetime.Token).ConfigureAwait(false);
-                    if (Interlocked.Exchange(ref binding.RestorePause, 0) == 1 && _paused) await binding.Engine.PauseAsync(_lifetime.Token).ConfigureAwait(false);
+                    if (Interlocked.Exchange(ref binding.RestorePause, 0) == 1 && _paused)
+                    {
+                        await binding.Engine.PauseAsync(_lifetime.Token).ConfigureAwait(false);
+                        if (!binding.Request.IsLive && binding.Request.StartPositionMs > 0)
+                            await binding.Engine.SeekAsync(TimeSpan.FromMilliseconds(binding.Request.StartPositionMs), _lifetime.Token).ConfigureAwait(false);
+                    }
                 }
                 finally { _gate.Release(); }
             });
@@ -136,6 +149,23 @@ public sealed class PlaybackEngineRouter(Func<PlaybackEngineKind, IPlaybackEngin
                 new(alternative, "播放失败，自动回退一次：" + failed.Error), _paused, true, _lifetime.Token).ConfigureAwait(false);
         }
         finally { _gate.Release(); }
+    }
+    public void ReportSurfaceFailure(IPlaybackEngine engine, Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        var binding = Volatile.Read(ref _binding);
+        if (binding is null || !ReferenceEquals(binding.Engine, engine) || !Current(binding)) return;
+        Volatile.Write(ref binding.SurfaceError, error);
+        var failed = Snapshot with { State = PlaybackState.Failed, Error = "视频表面初始化失败：" + error.Message };
+        OnState(engine, new(binding.Session, failed));
+        // During OpenAsync the stored error is checked before the startup fallback decision.
+        if (Volatile.Read(ref binding.Opening) == 0 && PlaybackEnginePolicy.Fallback(Mode, binding.Kind, binding.Request.Uri) is null)
+            Background(binding, async () =>
+            {
+                await _gate.WaitAsync(_lifetime.Token).ConfigureAwait(false);
+                try { if (Current(binding)) await binding.Engine.StopAsync(_lifetime.Token).ConfigureAwait(false); }
+                finally { _gate.Release(); }
+            });
     }
     private async Task ApplySettingsAsync(IPlaybackEngine engine, PlaybackEngineKind kind, CancellationToken token)
     {

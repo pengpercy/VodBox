@@ -6,7 +6,7 @@ using VodBox.Playback.Mpv;
 
 namespace VodBox.Desktop;
 
-// Experimental surface; the shipping MainWindow still uses LibVLC until validation is complete.
+// GPU surface shared by the desktop player and the isolated render probe.
 public sealed class MpvVideoSurface(MpvClient client) : OpenGlControlBase
 {
     private MpvRenderContext? _renderer;

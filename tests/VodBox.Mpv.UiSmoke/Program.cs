@@ -10,16 +10,21 @@ internal static class Program
 {
     public static MpvClient Client = null!;
     public static string FixturePath = "";
+    public static bool DesktopMode;
+    public static bool FallbackMode;
     [STAThread]
     public static int Main(string[] args)
     {
-        if (args.Length != 1 || !File.Exists(args[0])) throw new ArgumentException("Pass a local 640px-wide video fixture of at least four seconds.");
-        FixturePath = Path.GetFullPath(args[0]);
+        FallbackMode = args.Length == 2 && args[0] == "--desktop-fallback";
+        DesktopMode = FallbackMode || (args.Length == 2 && args[0] == "--desktop");
+        var fixture = DesktopMode ? args[1] : args.FirstOrDefault();
+        if (fixture is null || !File.Exists(fixture)) throw new ArgumentException("Pass a local 640px-wide video fixture of at least four seconds; --desktop tests the main window.");
+        FixturePath = Path.GetFullPath(fixture);
         System.Diagnostics.Trace.Listeners.Add(new System.Diagnostics.TextWriterTraceListener(Console.Error));
         System.Diagnostics.Trace.AutoFlush = true;
-        Client = Task.Run(() => new MpvClient(new Dictionary<string,string> { ["vo"] = "libmpv", ["ao"] = "null", ["hwdec"] = "no" })).GetAwaiter().GetResult();
+        if (!DesktopMode) Client = Task.Run(() => new MpvClient(new Dictionary<string,string> { ["vo"] = "libmpv", ["ao"] = "null", ["hwdec"] = "no" })).GetAwaiter().GetResult();
         using var lifetime = Client;
-        return AppBuilder.Configure<ProbeApp>().UsePlatformDetect().With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.OpenGl, AvaloniaNativeRenderingMode.Software] }).WithInterFont().LogToTrace(Avalonia.Logging.LogEventLevel.Information).StartWithClassicDesktopLifetime(args);
+        return AppBuilder.Configure<ProbeApp>().UsePlatformDetect().With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.OpenGl, AvaloniaNativeRenderingMode.Software] }).WithInterFont().LogToTrace(Avalonia.Logging.LogEventLevel.Warning).StartWithClassicDesktopLifetime(args);
     }
 }
 internal sealed class ProbeApp : Application
@@ -29,6 +34,11 @@ internal sealed class ProbeApp : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            if (Program.DesktopMode)
+            {
+                desktop.MainWindow = DesktopProbe.Create(desktop);
+                base.OnFrameworkInitializationCompleted(); return;
+            }
             var surface = new MpvVideoSurface(Program.Client);
             var grid = new Grid { Children = { surface, new TextBlock { Text="VodBox · 视频上方的 Avalonia 控件", Foreground=Brushes.White, Background=Brushes.DarkSlateBlue, HorizontalAlignment=Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment=Avalonia.Layout.VerticalAlignment.Top, FontSize=24 } } };
             var window = new Window { Width=800, Height=480, Content=grid, Title="VodBox mpv render probe" };

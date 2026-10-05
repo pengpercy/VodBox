@@ -22,6 +22,27 @@ public sealed class TestAppBuilder
 
 public sealed class DesktopPreviewTests
 {
+    [AvaloniaTheory]
+    [InlineData(900, false, true, false)]
+    [InlineData(900, true, false, true)]
+    [InlineData(1280, false, true, true)]
+    [InlineData(1600, true, true, true)]
+    public async Task DesktopLayoutAdaptsBrowsingAndPlaybackWithoutRecreatingVideoContainer(int width, bool playback, bool browseVisible, bool playbackVisible)
+    {
+        var window = new MainWindow(preview: true) { Width = width };
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            window.Show(); model.ShowPlaybackPage = playback; Dispatcher.UIThread.RunJobs();
+            Assert.Equal(browseVisible, window.FindControl<Grid>("BrowsePane")!.IsVisible);
+            Assert.Equal(playbackVisible, window.FindControl<Grid>("PlaybackPane")!.IsVisible);
+            var container = window.FindControl<Grid>("VideoContainer")!;
+            model.ShowPlaybackPage = !playback; Dispatcher.UIThread.RunJobs();
+            Assert.Same(container, window.FindControl<Grid>("VideoContainer")); Assert.Null(model.Engine.ActiveEngine);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
     [AvaloniaFact]
     public async Task PreviewBuildsBoundCardsWithoutStartingNativePlayer()
     {
@@ -30,10 +51,15 @@ public sealed class DesktopPreviewTests
         try
         {
             window.Show(); Dispatcher.UIThread.RunJobs();
-            Assert.Equal(3, viewModel.Cards.Count); Assert.Null(viewModel.Engine.Player);
+            Assert.Equal(3, viewModel.Cards.Count); Assert.Null(viewModel.Engine.ActiveEngine);
             Assert.All(viewModel.Cards, card => Assert.False(card.IsActive));
+            Assert.Equal(3, viewModel.PlaybackEngineChoices.Count);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "探索自然");
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "你的媒体，随处播放");
+            viewModel.ShowLibrary = false; viewModel.ShowSettings = true; Dispatcher.UIThread.RunJobs();
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "播放内核");
+            viewModel.SelectedPlaybackEngine = viewModel.PlaybackEngineChoices[2];
+            Assert.Equal(PlaybackEngineMode.LibVlc, viewModel.Engine.Mode); Assert.Null(viewModel.Engine.ActiveEngine);
         }
         finally { window.Close(); await viewModel.DisposeAsync(); }
     }
@@ -63,7 +89,7 @@ public sealed class DesktopPreviewTests
         {
             window.Show(); Dispatcher.UIThread.RunJobs();
             var view = window.FindControl<DanmakuView>("DanmakuPreview")!; view.RefreshFrame();
-            Assert.True(view.ActiveCount > 0); Assert.Null(model.Engine.Player);
+            Assert.True(view.ActiveCount > 0); Assert.Null(model.Engine.ActiveEngine);
             model.DanmakuEnabled = false; Assert.Equal(0, view.ActiveCount);
             model.DanmakuEnabled = true; Assert.True(view.ActiveCount > 0);
             model.DanmakuComments = [new(0, "delay")]; model.Position = 1000; model.DanmakuDelayMs = 2000;

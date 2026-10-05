@@ -12,6 +12,7 @@ public sealed class VlcVideoSurface : NativeControlHost
         AvaloniaProperty.RegisterDirect<VlcVideoSurface, MediaPlayer?>(nameof(MediaPlayer), surface => surface.MediaPlayer, (surface, player) => surface.MediaPlayer = player);
     private MediaPlayer? _player;
     private IPlatformHandle? _drawable;
+    public event EventHandler? DrawableReady;
     public MediaPlayer? MediaPlayer
     {
         get => _player;
@@ -33,7 +34,10 @@ public sealed class VlcVideoSurface : NativeControlHost
         SetDrawable(_player, nint.Zero); _drawable = null; base.DestroyNativeControlCore(control);
     }
     private void AttachPlayer()
-    { if (IsInitialized && _drawable is not null) SetDrawable(_player, _drawable.Handle); }
+    {
+        if (IsInitialized && _drawable is not null && _player is not null)
+        { SetDrawable(_player, _drawable.Handle); DrawableReady?.Invoke(this, EventArgs.Empty); }
+    }
     private static void SetDrawable(MediaPlayer? player, nint drawable)
     {
         if (player is null) return;

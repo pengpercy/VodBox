@@ -38,7 +38,7 @@
 
 libmpv 本身可以用于 Windows、macOS 和 Linux。按 [mpv 嵌入文档](https://mpv.io/manual/stable/#options-wid)，`wid` 明确支持 Windows HWND 与 X11 Window；macOS 与 Wayland 的嵌入不能直接照搬该路径。VodBox 的候选实现应先验证 libmpv render API 与 Avalonia OpenGL 控件的上下文、帧缓冲和更新回调，目标是在 GPU 内完成视频合成并在同一 UI 树绘制弹幕，减少透明附属窗口的限制。不能预先承诺该路径在所有渲染后端都零拷贝。
 
-用户最新要求保留双内核，因此最终产物计划同时携带 LibVLC 与 libmpv，并按需初始化。自动模式以 libmpv 处理普通点播/直播/本地媒体，以 LibVLC 处理网络浏览、投屏和网络文件系统；固定内核时不静默改变选择。实际主窗口仍使用 LibVLC，自动/手动 UI 切换、网络浏览与投屏的产品功能尚未完成，不能把底层内核能力视为应用已有功能。
+用户要求保留双内核，最终产物计划同时携带 LibVLC 与 libmpv，并按需初始化。主窗口已接自动/手动 UI 切换：普通点播/直播/本地媒体优先 mpv，网络文件系统选择 LibVLC，固定模式不静默改选。网络浏览与投屏产品功能、全部原生打包仍待完成，不能把底层能力视为应用已有功能。
 
 本轮新增 `VodBox.Playback.Mpv`：跨平台库定位、UTF-8 argv、SafeHandle 生命周期、事件轮询、OpenGL Render API 与无托管异常越过 C 边界的编译期反向回调。`MpvVideoSurface` 向 Avalonia 帧缓冲绘制，更新通知只设置原子标记；UI 定时检查该标记，避免 native 回调等待 UI 或调用控制 API。原生渲染上下文必须在创建时的 GL 上下文中释放。该表面仍属实验功能，GPU context loss 的恢复尚未实现。
 
@@ -46,7 +46,7 @@ libmpv 本身可以用于 Windows、macOS 和 Linux。按 [mpv 嵌入文档](htt
 
 可复现的原生控制测试驱动在 `tests/VodBox.Mpv.Smoke`，需要设置 `VODBOX_MPV_PATH` 为本机 libmpv 完整路径，并传入至少三秒的本地视频。先 `dotnet publish tests/VodBox.Mpv.Smoke -c Release -r <RID> -o artifacts/mpv-smoke`，再运行对应产物并传入视频路径。该测试不自动进入 Actions，不修改用户配置。
 
-下一阶段：实现 `IPlaybackEngine` 的异步控制与会话事件、音轨/字幕、延迟和截图；接入已单测的 `PlaybackEnginePolicy` 与实际主窗口路由，增加设置选择、启动失败一次回退、切换时的进度/音量/倍率/字幕状态恢复；完成三平台六 RID 原生依赖清单、双内核打包与真机验证。网络浏览与投屏仍需独立应用层开发。
+当前 `IPlaybackEngine`、统一路由、设置选择和主窗口视频表面已实现。mpv 弹幕在同一 UI 树，LibVLC 使用透明附属窗口；macOS x64 JIT/AOT 实际往返切换中两种显示均通过，完整回归 148 项。渲染前先等待上下文/原生 drawable 就绪；GPU context loss 固定模式停止并保持失败，自动模式最多回退一次，尚未实现恢复原 GL 上下文。后续补轨道/追加字幕迁移、三平台六 RID 原生依赖与真机验证，并按 FongMi/TV 继续改造 PC 布局。
 
 仓库内另提供 `tests/VodBox.Mpv.UiSmoke`，可使用相同 publish 命令与 `VODBOX_MPV_PATH` 运行 AOT 视频表面测试；输入 640px 宽、至少四秒的视频，驱动打开短时窗口并自动关闭。无 GPU 初始化时十秒超时，以非零退出码报告失败。这些原生测试需手动执行；65 项常规自动测试包含内核选择策略，但不会启动 GUI 或下载原生库。
 
