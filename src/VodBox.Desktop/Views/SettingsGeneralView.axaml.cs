@@ -24,8 +24,7 @@ public sealed partial class SettingsGeneralView : UserControl
     private async void ConfigureSourceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Model is null || TopLevel.GetTopLevel(this) is not Window owner) return;
-        var dialog = new Window { Title = "播放源配置", Width = 560, Height = 340, MinWidth = 480, MinHeight = 320,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, DataContext = Model, Content = new SourceConfigurationView() };
+        var dialog = new SourceConfigurationWindow(Model);
         await dialog.ShowDialog(owner);
     }
     private void PlaybackSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
