@@ -75,9 +75,52 @@ internal static class Diagnostics
                     ? args[biliArgument + 1] : "BV1WSHL66EdZ";
                 await BilibiliSmokeAsync(http, mediaId, args.Contains("--native"));
             }
+            int appGetArgument = Array.IndexOf(args, "--appget-smoke");
+            if (appGetArgument >= 0)
+            {
+                if (appGetArgument + 1 >= args.Length || args[appGetArgument + 1].StartsWith("--", StringComparison.Ordinal))
+                    throw new InvalidDataException("--appget-smoke 需要新版配置文件路径。");
+                int lineArgument = Array.IndexOf(args, "--appget-line");
+                int line = 0;
+                if (lineArgument >= 0 && (lineArgument + 1 >= args.Length || !int.TryParse(args[lineArgument + 1], out line) || line < 0))
+                    throw new InvalidDataException("--appget-line 需要从 0 开始的线路编号。");
+                await AppGetSmokeAsync(http, args[appGetArgument + 1], args.Contains("--native"), line);
+            }
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    private static async Task AppGetSmokeAsync(HttpClient http, string location, bool decode, int lineIndex)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        var config = await new ConfigLoader(http).LoadAsync(location, deadline.Token);
+        foreach (var source in config.Sources)
+        {
+            await using var provider = new ProviderFactory(http, "unused", "unused").Create(source);
+            var categories = await provider.GetCategoriesAsync(deadline.Token);
+            var category = categories.FirstOrDefault() ?? throw new InvalidDataException("AppGet 没有可用分类。");
+            var page = await provider.GetItemsAsync(category.Id, null, deadline.Token);
+            var item = page.Items.FirstOrDefault() ?? throw new InvalidDataException("AppGet 分类没有内容。");
+            var search = await provider.SearchAsync(item.Title, deadline.Token);
+            if (search.Items.Count == 0) throw new InvalidDataException("AppGet 搜索没有返回内容。");
+            var detail = await provider.GetDetailAsync(item.Id, deadline.Token);
+            Console.WriteLine($"C# AppGet catalog: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
+            if (lineIndex >= detail.PlaybackLines.Count) throw new InvalidDataException("AppGet 所选线路不存在。");
+            var episode = detail.PlaybackLines[lineIndex].Episodes.FirstOrDefault() ?? throw new InvalidDataException("AppGet 视频没有可用分集。");
+            var request = await provider.ResolvePlaybackAsync(item.Id, episode.Id, deadline.Token);
+            Console.WriteLine($"C# AppGet Spider: OK | source={source.Id}, categories={categories.Count}, items={page.Items.Count}, search={search.Items.Count}, lines={detail.PlaybackLines.Count}, episodes={detail.PlaybackLines.Sum(x => x.Episodes.Count)}");
+            if (!decode) continue;
+            await using var engine = new LibVlcEngine(headless: true);
+            await engine.OpenAsync(request, 2, deadline.Token);
+            using var media = engine.Player!.Media!;
+            while (engine.Snapshot.Position.TotalSeconds < 3 || engine.Player.VideoTrack < 0 || media.Statistics.DecodedVideo == 0)
+            {
+                if (engine.Snapshot.State == Core.PlaybackState.Failed) throw new InvalidOperationException(engine.Snapshot.Error);
+                await Task.Delay(100, deadline.Token);
+            }
+            Console.WriteLine($"AppGet LibVLC decode: OK | source={source.Id}, position={engine.Snapshot.Position.TotalSeconds:F2}s, decodedVideo={media.Statistics.DecodedVideo}, decodedAudio={media.Statistics.DecodedAudio}");
+            await engine.StopAsync(default);
+        }
     }
     private static async Task BilibiliSmokeAsync(HttpClient http, string mediaId, bool decode)
     {

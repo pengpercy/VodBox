@@ -176,7 +176,7 @@ public sealed class BilibiliProviderTests
     {
         var factory = new ProviderFactory(new HttpClient(), "unused", "unused");
         Assert.IsType<BilibiliProvider>(factory.Create(new() { Id = "b", Name = "b", Provider = "csp_Bili" }));
-        Assert.Throws<NotSupportedException>(() => factory.Create(new() { Id = "b", Name = "b", Provider = "csp_AppGet" }));
+        Assert.Throws<NotSupportedException>(() => factory.Create(new() { Id = "b", Name = "b", Provider = "csp_App99" }));
         var source = Source() with { Options = new() { ["cookie"] = JsonSerializer.SerializeToElement("bad\r\ncookie", VodBoxJson.Default.String) } };
         Assert.Throws<InvalidDataException>(() => new BilibiliProvider(source));
     }

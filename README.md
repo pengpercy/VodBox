@@ -82,3 +82,5 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 按最新要求继续实现 LibVLC + libmpv 双内核，计划提供自动与手动选择。新增 libmpv 原生绑定、Avalonia OpenGL 实验表面和内核选择策略；macOS x64 的真实 libmpv 控制与 GPU 播放已通过 Native AOT 隔离验证。主窗口切换和双内核原生依赖打包尚未接入，当前主窗口仍使用 LibVLC。详见 [实现记录](docs/danmaku.md)。
 
 `examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，`csp_BiliGuard` 和其他 Java Spider 尚未移植。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
+
+C# AppGet V119 已显式注册 `appget` / `csp_AppGet`，支持分类、分页筛选、搜索、多线路分集和直接媒体/站内解析。示例 `examples/appget.json` 使用占位参数；真实播放与版本限制见 [AppGet Spider](docs/appget-spider.md)，不代表四个原条目均已可播放。

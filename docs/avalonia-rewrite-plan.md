@@ -485,3 +485,8 @@ TV 仓库标示 GPL-3.0。重写语言本身不会消除复制或改编代码的
 ## 用户测试源与 Spider 排期更新
 
 两个用户源的统计共 98 个条目（94 个 Java Spider、4 个 drpy），精确 Java 入口 69 个。按频率先完善 `csp_Bili` 9 次 / `csp_BiliGuard` 7 次的哔哩哔哩相关适配，随后 `csp_AppGet` 4 次、App99 候选家族和其他重复内容入口。Guard 不自动合并，不等于已覆盖。详见 [移植优先级](spider-migration-priority.md)。当前公开投稿基础适配已接入并在 macOS JIT/Native AOT 实际播放、弹幕验证通过，已新增原生 BV/av 片单分类（20 项分页、四路并发、详情缓存、整页取消），本地 87 项测试通过；旧片单配置/Guard/DASH/账号待补。双内核主窗口切换排在这批 Spider 之后，CI 继续手动集中验证。
+
+
+### AppGet V119 接入
+
+已新增原生 C# `AppGetProvider` 并显式注册 `appget` / `csp_AppGet`。配置明确指定 protocol、服务根/发现文件、key 与客户端版本；支持加密分类/推荐、分页筛选、搜索、详情多线路、直接媒体和站内解析，每次播放刷新详情/令牌。最多四路 HTTP，20 秒期限、8 MiB 响应上限，无 JAR、反射或 Python 依赖。本地 95 项回归通过。真实站点初始化三项通过，一碗完成内容到地址解析；媒体解码仍失败，不能计为全部可播放。其他版本、外部解析及认证分别排期。完整配置和边界见 [AppGet Spider](appget-spider.md)。

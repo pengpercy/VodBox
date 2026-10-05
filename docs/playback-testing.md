@@ -52,3 +52,13 @@ VodBox --diagnostics --bilibili-smoke BV1WSHL66EdZ --native
 显式 `-p:RuntimeIdentifier=osx-x64` 选择已提交的 RID 锁文件后，严格发布（`TreatWarningsAsErrors=true`、`IlcTreatWarningsAsErrors=true`）通过。产物 `artifacts/bilibili-playlist-aot/VodBox` 真实网络诊断返回分类 5、热门 20、搜索 20、片单 1、分集 1、弹幕 1200；LibVLC VideoToolbox H.264 解码至 3.40 秒，视频 217 块、音频 421 块。日志 `/private/tmp/vodbox-bilibili-playlist-native.log`。
 
 首次 JIT 网络诊断遇到搜索响应缺失 `result` 数组，明确报错退出；未把不完整响应当成功或新增无限重试。对应日志 `/private/tmp/vodbox-bilibili-playlist-jit.log`。单次有限复核通过同一网络、片单、弹幕和实际解码链路，日志 `/private/tmp/vodbox-bilibili-playlist-jit-repeat.log`。公开 API 有即时响应差异，网络诊断仍为手动检查，不作为每次 CI 的必跑项。本轮没有触发 GitHub Actions。
+
+## C# AppGet V119 验证（2026-10-05）
+
+新增 `AppGetProvider` 的八项 fixture 测试，完整本地回归 95 项通过。使用独立 OpenSSL 密文向量验证 AES 协议，测试加密时间戳头、UTF-8 表单、HTTP 发现隔离、分页、详情/分集、每次刷新解析结果、重定向拒绝和四路取消。日志 `/private/tmp/vodbox-appget-final-tests.log`。
+
+严格 `osx-x64` Native AOT 发布通过，所有编译/ILC 警告作为错误；日志 `/private/tmp/vodbox-appget-desktop-aot.log`。原生产物 `artifacts/appget-desktop-aot/VodBox` 实际取得一碗分类 5、列表 30、搜索 14、线路 12、分集 12，并完成播放地址解析；日志 `/private/tmp/vodbox-appget-yiwan-native-aot.log`。站点内容动态变化，之前检查为 9 条线路，因此不会固定远端列表数作为单元测试断言。
+
+最终 JIT 内容链路：咕咕分类 3/列表 30/搜索 1/线路 1/分集 4；蔬菜分类 7/列表 30/搜索 1/线路 2/分集 2。两项均在 `vodParse` 收到 code=0 与空 data 后明确失败，不将空结果当成功，未尝试绕过验证。日志 `/private/tmp/vodbox-appget-gugu-final-jit.log`、`/private/tmp/vodbox-appget-shucai-final-jit.log`。
+
+一碗首条线路媒体 HTTPS/HLS 连接失败，未产生可验证的视频解码；第二条线路只读检查 TLS 握手超时，未继续重复解码。失败日志 `/private/tmp/vodbox-appget-yiwan-jit.log`；首发初始化只读检查 HTTP 503。AppGet 的真实视频解码尚未通过，不能用初始化、内容接口或地址解析成功代替播放成功。V120/V122、外部解析、账号/验证码仍未实现。真实 key 不提交，示例仅含占位值；本轮不触发 GitHub Actions。

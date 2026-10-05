@@ -82,6 +82,7 @@ public sealed class ProviderFactory(HttpClient http, string pluginHostPath, stri
         ProviderRuntime.Csharp when source.Provider == "maccms-json" => new MacCmsProvider(source, http, false),
         ProviderRuntime.Csharp when source.Provider == "maccms-xml" => new MacCmsProvider(source, http, true),
         ProviderRuntime.Csharp when source.Provider is "bilibili" or "csp_Bili" => new BilibiliProvider(source),
+        ProviderRuntime.Csharp when source.Provider is "appget" or "csp_AppGet" => new AppGetProvider(source),
         ProviderRuntime.Csharp => throw new NotSupportedException($"尚未注册 C# Provider：{source.Provider}"),
         _ => new ScriptProvider(source, pluginHostPath, assetsDirectory)
         };
