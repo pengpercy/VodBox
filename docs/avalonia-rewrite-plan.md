@@ -8,7 +8,7 @@
 
 六个 RID 的本机 Native AOT 编译、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试及全部安装包生成均已通过 [Actions 验证](https://github.com/pengpercy/VodBox/actions/runs/37223401606)（代码提交 7105ef7）。Windows x64/ARM64 生成 ZIP，macOS Intel/Apple Silicon 生成 app/ZIP/DMG，Linux x64/ARM64 生成 deb/rpm/AppImage。打包检查实际依赖文件哈希，macOS 另外验证 ad-hoc 签名与封包后的宿主运行。尚未完成各平台有画面的交互、长时稳定性和全部安装后的真机测试；本地公开直播测试已观察到 VideoToolbox 解码，但未完成全面硬件解码验证。
 
-当前已补充 C# MacCMS HTTP JSON/XML 适配、聚合搜索、配置仓库、偏好、收藏打开、历史重新解析、连续播放、片头片尾、直播恢复与备用重试、XMLTV 缓存、解析链、流代理和浏览器嗅探；后续增加海报缓存与可见加载、年份 / 完结筛选、单源搜索分页、桌面控制、主题、备份 / 合并导入及无窗口 XAML 预览。当前 42 项本地测试通过，macOS x64 严格 Native AOT 编译及实际备份导出导入诊断通过。CI 与真机验收分别记录在 [功能清单](implementation-progress.md)。弹幕、通用筛选元数据、聚合分页和局域网扩展仍需实施。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定。
+当前已补充 C# MacCMS HTTP JSON/XML 适配、聚合搜索、配置仓库、偏好、收藏打开、历史重新解析、连续播放、片头片尾、直播恢复与备用重试、XMLTV 缓存、解析链、流代理和浏览器嗅探；后续增加海报缓存与可见加载、年份 / 完结筛选、单源搜索分页、桌面控制、主题、备份 / 合并导入及无窗口 XAML 预览。当前 55 项本地测试通过，macOS x64 严格 Native AOT 编译及实际备份导出导入诊断通过。CI 与真机验收分别记录在 [功能清单](implementation-progress.md)。弹幕加载、调度、透明叠层和设置已实现并完成 macOS 窗口行为验证；其余平台和全屏叠层待验收，通用筛选元数据、聚合分页和局域网扩展仍需实施。Python/Node 属于随包运行时；Node 排除 npm 和开发头文件，插件所需第三方模块须自行携带并锁定。
 
 用户提供的饭太硬地址作为后续测试来源；它返回旧配置，不能直接作为新版配置加载。已提取公开直播列表形成新版测试示例，未导入 Java 插件；网络可达性与实际播放记录见 [播放测试](playback-testing.md)。
 
@@ -19,7 +19,7 @@
 ### 已确认的项目决策（2026-10-05）
 
 - 基础版本锁定 .NET SDK 10.0.401、运行时 10.0.12、Avalonia 12.1.3，均为核对时的最新稳定版。LibVLCSharp 3.10.1 已支持 Avalonia 12。后续升级仍固定具体稳定版本并重新验证 Native AOT。
-- 播放内核采用 LibVLC + LibVLCSharp，参考 Screenbox 的封装和会话管理；mpv 不再是计划中的对照原型或首版依赖。
+- 当前运行内核为 LibVLC + LibVLCSharp，参考 Screenbox 的封装和会话管理。根据新增 Bili.Copilot 参考，重新纳入 libmpv 跨平台后端候选；其跨平台内核可用，但 WinUI 播放控件不能直接用于 Avalonia。后续先验证 AOT 原生绑定与 Avalonia GPU 合成，再决定是否切换默认内核；当前尚未接入 mpv。
 - 内容源支持 C# Provider、QuickJS、Python、Node.js 四种实现方式。
 - Java Spider 的业务逻辑按需要用 C# Provider 重写；不实现 Java/JVM/Dex 兼容层，不随包分发 JRE。
 - QuickJS-NG 通过项目内薄 C ABI 和 C# LibraryImport 源码生成绑定接入，定义 VodBox 自有宿主 API，避免反射式 CLR 互操作。

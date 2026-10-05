@@ -12,6 +12,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly MainViewModel? _viewModel;
     private bool _closing;
+    private readonly DanmakuOverlay? _danmakuOverlay;
     private readonly Dictionary<Image, MediaCard> _posterControls = [];
     public MainWindow() : this(preview: false) { }
     public MainWindow(bool preview)
@@ -20,11 +21,13 @@ public sealed partial class MainWindow : Window
         if (Design.IsDesignMode || preview)
         {
             // The designer has no desktop compositor; give sample content a readable backdrop.
-            DataContext = new DesignMainViewModel(); VideoSurface.IsVisible = false;
+            var design = new DesignMainViewModel(); DataContext = design; VideoSurface.IsVisible = false;
+            DanmakuPreview.IsVisible = true; DanmakuPreview.Attach(design, preview: true); Closed += (_, _) => DanmakuPreview.Dispose();
             Background = new SolidColorBrush(Color.Parse("#111317"));
             return;
         }
         _viewModel = new(); DataContext = _viewModel;
+        _danmakuOverlay = new(this, VideoSurface, _viewModel);
         _viewModel.Engine.Initialized += (_, _) => Dispatcher.UIThread.Invoke(() =>
         {
             VideoSurface.MediaPlayer = _viewModel.Engine.Player;
@@ -56,7 +59,7 @@ public sealed partial class MainWindow : Window
         {
             if (_closing) return;
             e.Cancel = true; _closing = true;
-            try { VideoSurface.MediaPlayer = null; await _viewModel.DisposeAsync(); }
+            try { _danmakuOverlay?.Dispose(); DanmakuPreview.Dispose(); VideoSurface.MediaPlayer = null; await _viewModel.DisposeAsync(); }
             finally { Close(); }
         };
         KeyDown += async (_, e) =>
@@ -91,6 +94,8 @@ public sealed partial class MainWindow : Window
         if (_viewModel is not null && image.IsAttachedToVisualTree() && image.DataContext is MediaCard card)
         { _posterControls[image] = card; _viewModel.ActivatePoster(card); }
     }
+    private async void OpenDanmakuClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { if (_viewModel is not null && await PickAsync("打开 XML / JSON 弹幕") is { } path) await _viewModel.LoadDanmakuAsync(path); }
     private async void ExportBackupClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_viewModel is null) return;

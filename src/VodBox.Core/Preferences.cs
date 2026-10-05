@@ -18,6 +18,11 @@ public sealed record AppPreferences
     public string? LastLiveChannelId { get; set; }
     public bool AutoLiveFallback { get; set; } = true;
     public bool ResumeLiveOnStartup { get; set; }
+    public bool DanmakuEnabled { get; set; } = true;
+    public double DanmakuFontSize { get; set; } = 24;
+    public double DanmakuOpacity { get; set; } = .85;
+    public double DanmakuCoverage { get; set; } = .5;
+    public int DanmakuDelayMs { get; set; }
     public bool LargeScreen { get; set; }
 }
 

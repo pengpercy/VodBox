@@ -14,6 +14,7 @@ public sealed class DesignMainViewModel : MainViewModel
         Items.Add(new("3", "旅途中的声音", Remarks: "音乐 · 无损"));
         Description = "在这里浏览内容源，选择播放线路和集数。此数据仅用于设计器预览。";
         NowPlaying = "探索自然 · 第 1 集"; Status = "设计预览，不启动任何运行时服务。";
+        DanmakuComments = [new(718000, "设计预览 · 弹幕", DanmakuMode.Scroll), new(719000, "跟随媒体时间轴", DanmakuMode.Top, 0x60AEFF)];
         Duration = 3600000; Position = 720000; TimeText = "00:12:00 / 01:00:00";
         Episodes.Add(new("e1", "第 1 集 · 山野之间")); Episodes.Add(new("e2", "第 2 集 · 海岸之上"));
         Lines.Add(new("main", "高清线路", Episodes.ToList()));

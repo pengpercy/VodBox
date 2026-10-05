@@ -41,6 +41,12 @@ internal static class Diagnostics
                 await new BackupService(restored, restoredConfigurations, restoredPreferences).ImportAsync(backup);
                 if ((await restored.GetHistoryAsync()).Single().PositionMs != 1234 || (await restored.GetFavoritesAsync()).Count != 1 || (await restoredPreferences.LoadAsync()).Theme != "Light" || (await restoredConfigurations.LoadAsync(config.Id)).Id != config.Id) throw new InvalidDataException("备份还原校验失败。");
                 Console.WriteLine("AOT portable backup/import: OK");
+                var danmaku = new Core.DanmakuDocument { Comments = [new(0, "弹幕诊断", Core.DanmakuMode.Scroll, 0x60AEFF)] };
+                var comments = DanmakuLoader.Parse(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(danmaku, Core.VodBoxJson.Default.DanmakuDocument));
+                var timeline = new Core.DanmakuTimeline(); timeline.Configure(comments, 640, 360, 24);
+                if (timeline.Update(1000, _ => 120).Single().Comment.Text != "弹幕诊断") throw new InvalidDataException("弹幕时间轴校验失败。");
+                if (DanmakuLoader.Parse("<i><d p='0,1,25,16777215'>XML</d></i>"u8.ToArray()).Count != 1) throw new InvalidDataException("弹幕 XML 校验失败。");
+                Console.WriteLine("AOT danmaku parse/timeline: OK");
             }
             finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(temp, true); }
             if (args.Contains("--native"))

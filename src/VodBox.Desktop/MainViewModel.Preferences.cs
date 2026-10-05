@@ -14,6 +14,7 @@ public partial class MainViewModel
         AutoNext = preferences.AutoNext; ResumePlayback = preferences.ResumePlayback;
         SkipIntroSeconds = Math.Clamp(preferences.SkipIntroSeconds, 0, 600); SkipOutroSeconds = Math.Clamp(preferences.SkipOutroSeconds, 0, 600);
         AudioDelayMs = Math.Clamp(preferences.AudioDelayMs, -10000, 10000); SubtitleDelayMs = Math.Clamp(preferences.SubtitleDelayMs, -10000, 10000);
+        DanmakuEnabled = preferences.DanmakuEnabled; DanmakuFontSize = Math.Clamp(preferences.DanmakuFontSize, 16, 48); DanmakuOpacity = Math.Clamp(preferences.DanmakuOpacity, .1, 1); DanmakuCoverage = Math.Clamp(preferences.DanmakuCoverage, .25, 1); DanmakuDelayMs = Math.Clamp(preferences.DanmakuDelayMs, -60000, 60000);
         Theme = preferences.Theme; ApplyTheme(); _preferredSourceId = preferences.LastSourceId;
         _lastLiveConfigId = preferences.LastLiveConfigId; _lastLiveSourceId = preferences.LastLiveSourceId; _lastLiveChannelId = preferences.LastLiveChannelId;
         AutoLiveFallback = preferences.AutoLiveFallback; ResumeLiveOnStartup = preferences.ResumeLiveOnStartup;
@@ -26,6 +27,7 @@ public partial class MainViewModel
     }
     private AppPreferences CapturePreferences() => new()
     {
+        DanmakuEnabled = DanmakuEnabled, DanmakuFontSize = DanmakuFontSize, DanmakuOpacity = DanmakuOpacity, DanmakuCoverage = DanmakuCoverage, DanmakuDelayMs = DanmakuDelayMs,
         LastConfigId = _config.Id, LastSourceId = SelectedSource?.Id, Volume = Volume, Rate = Rate,
         AutoNext = AutoNext, ResumePlayback = ResumePlayback, SkipIntroSeconds = SkipIntroSeconds, SkipOutroSeconds = SkipOutroSeconds, Theme = Theme, LastLiveConfigId = _lastLiveConfigId, LastLiveSourceId = _lastLiveSourceId, LastLiveChannelId = _lastLiveChannelId, AutoLiveFallback = AutoLiveFallback, ResumeLiveOnStartup = ResumeLiveOnStartup, AudioDelayMs = AudioDelayMs, SubtitleDelayMs = SubtitleDelayMs
     };

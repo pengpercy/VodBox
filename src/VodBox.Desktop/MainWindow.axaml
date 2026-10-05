@@ -131,6 +131,16 @@
               <ToggleSwitch Content="直播自动切换备用线路" IsChecked="{Binding AutoLiveFallback}" />
               <ToggleSwitch Content="启动时恢复上次直播频道" IsChecked="{Binding ResumeLiveOnStartup}" />
               <TextBlock Text="界面主题" /><ComboBox ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" />
+              <TextBlock Text="弹幕" FontWeight="SemiBold" FontSize="18" />
+              <ToggleSwitch Content="显示弹幕" IsChecked="{Binding DanmakuEnabled}" />
+              <TextBox Text="{Binding DanmakuLocation}" PlaceholderText="XML / JSON 弹幕地址或本地路径" />
+              <Button Content="加载弹幕地址" Command="{Binding LoadDanmakuUrlCommand}" />
+              <Button Content="打开弹幕文件" Click="OpenDanmakuClick" />
+              <TextBlock Text="{Binding DanmakuStatus}" TextWrapping="Wrap" Classes="muted" />
+              <TextBlock Text="弹幕字号" /><Slider Minimum="16" Maximum="48" Value="{Binding DanmakuFontSize}" />
+              <TextBlock Text="弹幕不透明度" /><Slider Minimum="0.1" Maximum="1" Value="{Binding DanmakuOpacity}" />
+              <TextBlock Text="滚动弹幕覆盖比例" /><Slider Minimum="0.25" Maximum="1" Value="{Binding DanmakuCoverage}" />
+              <TextBlock Text="弹幕延迟（毫秒，正值推迟）" /><NumericUpDown Minimum="-60000" Maximum="60000" Increment="500" Value="{Binding DanmakuDelayMs}" />
               <TextBlock Text="播放偏好" FontWeight="SemiBold" FontSize="18" />
               <ToggleSwitch Content="自动播放下一集" IsChecked="{Binding AutoNext}" />
               <ToggleSwitch Content="从上次进度继续" IsChecked="{Binding ResumePlayback}" />
@@ -148,7 +158,7 @@
         </Grid>
         <Grid Grid.Column="1" RowDefinitions="2*,Auto,Auto,Auto,*" RowSpacing="12">
           <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180">
-            <vm:VlcVideoSurface x:Name="VideoSurface" />
+            <Grid><vm:VlcVideoSurface x:Name="VideoSurface" /><vm:DanmakuView x:Name="DanmakuPreview" IsVisible="False" /></Grid>
           </Border>
           <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
             <TextBlock Text="{Binding NowPlaying}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />

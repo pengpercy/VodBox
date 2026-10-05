@@ -54,6 +54,24 @@ public sealed class DesktopPreviewTests
         finally { window.Close(); await ((MainViewModel)window.DataContext!).DisposeAsync(); }
     }
 
+    [AvaloniaFact]
+    public async Task DanmakuPreviewDrawsWithoutNativePlayerAndHonorsToggle()
+    {
+        var window = new MainWindow(preview: true);
+        var model = (DesignMainViewModel)window.DataContext!;
+        try
+        {
+            window.Show(); Dispatcher.UIThread.RunJobs();
+            var view = window.FindControl<DanmakuView>("DanmakuPreview")!; view.RefreshFrame();
+            Assert.True(view.ActiveCount > 0); Assert.Null(model.Engine.Player);
+            model.DanmakuEnabled = false; Assert.Equal(0, view.ActiveCount);
+            model.DanmakuEnabled = true; Assert.True(view.ActiveCount > 0);
+            model.DanmakuComments = [new(0, "delay")]; model.Position = 1000; model.DanmakuDelayMs = 2000;
+            Assert.Equal(0, view.ActiveCount); model.Position = 2500; Assert.True(view.ActiveCount > 0);
+        }
+        finally { window.Close(); await model.DisposeAsync(); }
+    }
+
     [Fact]
     public void PosterVisibilityCancelsOldLoadAndReleasesInactiveCard()
     {

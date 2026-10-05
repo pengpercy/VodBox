@@ -40,6 +40,7 @@ public sealed record MediaTrack(string Id, string Name, TrackKind Kind);
 public sealed record PlaybackRequest
 {
     public required string Uri { get; set; }
+    public string? DanmakuUri { get; set; }
     public string Title { get; set; } = "媒体";
     public ResolutionKind ResolutionKind { get; set; }
     public Dictionary<string, string> Headers { get; set; } = [];
@@ -89,6 +90,7 @@ public sealed record RpcResponse(int ApiVersion, long RequestId, JsonElement Res
 [JsonSerializable(typeof(RpcResponse))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(DanmakuDocument))]
 [JsonSerializable(typeof(PortableBackup))]
 [JsonSerializable(typeof(AppPreferences))]
 [JsonSerializable(typeof(List<SavedConfiguration>))]

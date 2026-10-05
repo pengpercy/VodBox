@@ -6,7 +6,7 @@ namespace VodBox.Infrastructure;
 public sealed record Catalog(IReadOnlyList<Category> Categories, IReadOnlyList<CatalogItem> Items);
 public sealed record CatalogItem(string Id, string Title, string Description, string CategoryId,
     IReadOnlyList<CatalogEpisode> Episodes, string? Poster = null, string? Remarks = null);
-public sealed record CatalogEpisode(string Id, string Title, string Uri);
+public sealed record CatalogEpisode(string Id, string Title, string Uri, string? DanmakuUri = null);
 
 /// <summary>A C# provider for the new VodBox catalog schema, over HTTP or local files.</summary>
 public sealed class CatalogProvider : IContentProvider
@@ -62,7 +62,7 @@ public sealed class CatalogProvider : IContentProvider
     {
         var item = (await GetCatalogAsync(token)).Items.First(x => x.Id == mediaId);
         var episode = item.Episodes.First(x => x.Id == episodeId);
-        return new() { Uri = new Uri(new Uri(_source.Entry!), episode.Uri).ToString(), Title = $"{item.Title} · {episode.Title}", SourceId = SourceId, MediaId = mediaId, EpisodeId = episodeId };
+        return new() { Uri = new Uri(new Uri(_source.Entry!), episode.Uri).ToString(), DanmakuUri = string.IsNullOrWhiteSpace(episode.DanmakuUri) ? null : new Uri(new Uri(_source.Entry!), episode.DanmakuUri).AbsoluteUri, Title = $"{item.Title} · {episode.Title}", SourceId = SourceId, MediaId = mediaId, EpisodeId = episodeId };
     }
     public async ValueTask DisposeAsync()
     {

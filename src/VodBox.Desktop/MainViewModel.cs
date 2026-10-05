@@ -115,6 +115,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         Engine.StateChanged += OnPlaybackState;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>
         {
+            ClearDanmaku();
+            if (!string.IsNullOrWhiteSpace(request.DanmakuUri)) _ = LoadDanmakuAsync(request.DanmakuUri);
             NowPlaying = request.Title;
             SelectedAudio = null; SelectedSubtitle = null;
             AudioTracks.Clear(); SubtitleTracks.Clear();
@@ -203,6 +205,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void OnPlaybackState(object? sender, PlaybackEvent e) => Dispatcher.UIThread.Post(() =>
     {
         if (e.SessionId != _coordinator.SessionId) return;
+        PlayerState = e.Snapshot.State;
         ObserveLivePlayback(e);
         if (!IsScrubbing) Position = e.Snapshot.Position.TotalMilliseconds;
         Duration = e.Snapshot.Duration.TotalMilliseconds;
@@ -227,6 +230,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     });
     public async ValueTask DisposeAsync()
     {
+        ClearDanmaku();
         _disposed = true; _saveTimer.Stop(); _liveTimer.Stop(); _liveHealthTimer.Stop(); Engine.StateChanged -= OnPlaybackState;
         _lifetime.Cancel(); _browse?.Cancel(); _aggregateCancellation?.Cancel(); _epgCancellation?.Cancel();
         _preferencesSave?.Cancel(); await _preferencesSaveTask;
@@ -235,7 +239,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         try { if (_provider is not null) await _provider.DisposeAsync(); }
         finally { _sourceGate.Release(); }
         await _coordinator.DisposeAsync(); await _resolution.DisposeAsync();
-        await Task.WhenAll(_posterTasks); foreach (var card in Cards) card.Dispose(); _posters.Dispose(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
+        await Task.WhenAll(_danmakuTasks); await Task.WhenAll(_posterTasks); foreach (var card in Cards) card.Dispose(); _posters.Dispose(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
     }
 
 }
