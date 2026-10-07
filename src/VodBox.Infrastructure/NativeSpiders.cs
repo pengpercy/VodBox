@@ -33,6 +33,7 @@ public static class NativeSpiders
         new(StringComparer.Ordinal)
         {
             ["虎牙js"] = info => new HuyaSource(info),
+            ["dr_兔小贝"] = info => new TuxiaobeiSource(info),
         };
 
     /// <summary>判断某 api 是否有原生 C# 实现。</summary>
