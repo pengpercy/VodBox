@@ -1,14 +1,16 @@
 using VodBox.Core;
+using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
 
 namespace VodBox.Desktop.Design;
 
 /// <summary>
 /// XAML 设计时预览数据（Design.DataContext 用）。
-/// 纯内存构造，不触网、不访问 SQLite / libmpv / 配置——保证设计器秒开。
+/// 纯内存构造，不触网、不访问 SQLite / libmpv / 配置、不枚举文件系统、不启动计时器——保证设计器秒开。
 /// </summary>
 public static class DesignData
 {
+    /// <summary>共享单例：每个视图都绑定 Main 的同一子 VM；FillX 只在初始化时执行一次，填充后不再变更。</summary>
     public static MainViewModel Main { get; } = CreateMain();
 
     /// <summary>设计器专用入口：以 object 类型公开同一实例，匹配 Design.DataContext 附加属性。</summary>
@@ -16,7 +18,9 @@ public static class DesignData
 
     private static MainViewModel CreateMain()
     {
-        var main = new MainViewModel(DesignAppServices.Create());
+        // 设计时安全路径：空 MpvEngine（永不 P/Invoke）、临时目录 SQLite、Files 停在空根目录。
+        var main = new MainViewModel(AppServices.CreateDesignTime(), designTime: true);
+        FillPlayer(main);
         FillHome(main);
         FillVod(main);
         FillDetail(main);
@@ -25,8 +29,21 @@ public static class DesignData
         FillFavorites(main);
         FillHistory(main);
         FillSettings(main);
-        FillFiles(main);
         return main;
+    }
+
+    private static void FillPlayer(MainViewModel main)
+    {
+        // Player 在设计时构造之后再赋值：保证 Detail/播放相关 XAML 能绑定到非空 VM。
+        var player = new PlayerViewModel(AppServices.CreateDesignTime(), main);
+        player.Title = "庆余年 第二季 · 第03集";
+        player.Visible = true;
+        player.State = PlaybackState.Paused;
+        player.Duration = TimeSpan.FromMinutes(45);
+        player.Position = TimeSpan.FromMinutes(12).Add(TimeSpan.FromSeconds(34));
+        player.Volume = 80;
+        player.Rate = 1.0;
+        main.Player = player;
     }
 
     private static void FillHome(MainViewModel main)
@@ -78,8 +95,8 @@ public static class DesignData
         var channels = new List<LiveChannel>
         {
             new() { Name = "CCTV-1 综合", Group = "央视频道", Number = 1, Logo = "https://live.fanmingming.cn/tv/CCTV1.png", Uris = ["http://iptv.example.com/cctv1.m3u8"] },
-            new() { Name = "CCTV-2 财经", Group = "央视频道", Number = 2, Uris = ["http://iptv.example.com/cctv2.m3u8"] },
-            new() { Name = "CCTV-3 综艺", Group = "央视频道", Number = 3, Uris = ["http://iptv.example.com/cctv3.m3u8"] },
+            new() { Name = "CCTV-2 财经", Group = "央视频道", Number = 2, Logo = "https://live.fanmingming.cn/tv/CCTV2.png", Uris = ["http://iptv.example.com/cctv2.m3u8"] },
+            new() { Name = "CCTV-3 综艺", Group = "央视频道", Number = 3, Logo = "https://live.fanmingming.cn/tv/CCTV3.png", Uris = ["http://iptv.example.com/cctv3.m3u8"] },
             new() { Name = "湖南卫视", Group = "卫视频道", Number = 101, Uris = ["http://iptv.example.com/hntv.m3u8"] },
             new() { Name = "东方卫视", Group = "卫视频道", Number = 102, Uris = ["http://iptv.example.com/dftv.m3u8"] },
         };
@@ -123,11 +140,6 @@ public static class DesignData
         main.Settings.Sites.Add(new SourceInfo { Key = "lzi", Name = "量子资源", Runtime = SourceRuntime.MacCms, Api = "https://cj.lziapi.com/api.php/provide/vod", Type = 0 });
         main.Settings.Sites.Add(new SourceInfo { Key = "fty", Name = "饭太硬", Runtime = SourceRuntime.QuickJs, Api = "https://example.com/spider.js", Type = 3 });
         main.Settings.Message = "设计时预览数据";
-    }
-
-    private static void FillFiles(MainViewModel main)
-    {
-        main.Files.Navigate(AppContext.BaseDirectory);
     }
 
     private static List<MediaItem> Items(int count)

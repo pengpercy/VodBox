@@ -27,10 +27,11 @@ public sealed partial class MainViewModel : ObservableObject
     public HistoryViewModel History { get; }
     public SettingsViewModel Settings { get; }
     public FilesViewModel Files { get; }
-    public PlayerViewModel Player { get; }
+    public PlayerViewModel Player { get; set; }
     public DetailViewModel Detail { get; }
 
-    public MainViewModel(AppServices services)
+    /// <summary>设计时构造：纯内存 VM 图，不枚举文件系统（Files 初始为空目录）、不启动时钟计时器、不挂播放管线（填充发生在设置 Player 之后）。</summary>
+    public MainViewModel(AppServices services, bool designTime)
     {
         _services = services;
         Home = new HomeViewModel(services, this);
@@ -40,22 +41,29 @@ public sealed partial class MainViewModel : ObservableObject
         Favorites = new FavoritesViewModel(services, this);
         History = new HistoryViewModel(services, this);
         Settings = new SettingsViewModel(services, this);
-        Files = new FilesViewModel(services);
-        Player = new PlayerViewModel(services, this);
+        Files = new FilesViewModel(services, designTime);
         Detail = new DetailViewModel(services, this);
-        // 本地文件 → 播放器。只在此处订阅一次（MainViewModel 与应用同生命周期），避免 View 层重复订阅泄漏。
-        Files.PlayRequested += entry => Player.Play(new PlaybackRequest
+        if (!designTime)
         {
-            Uri = new Uri(entry.FullPath).AbsoluteUri, // 转义 file:// URI，libmpv 可直接打开
-            Title = entry.Name,
-            SourceKey = "local",
-            MediaId = entry.FullPath,
-        });
-        UpdateSourceName();
-        var timer = new System.Timers.Timer(1000) { AutoReset = true };
-        timer.Elapsed += (_, _) => Clock = DateTime.Now.ToString("HH:mm");
-        timer.Start();
+            Player = new PlayerViewModel(services, this);
+            // 本地文件 → 播放器。只在此处订阅一次（MainViewModel 与应用同生命周期），避免 View 层重复订阅泄漏。
+            Files.PlayRequested += entry => Player.Play(new PlaybackRequest
+            {
+                Uri = new Uri(entry.FullPath).AbsoluteUri, // 转义 file:// URI，libmpv 可直接打开
+                Title = entry.Name,
+                SourceKey = "local",
+                MediaId = entry.FullPath,
+            });
+            UpdateSourceName();
+            var timer = new System.Timers.Timer(1000) { AutoReset = true };
+            timer.Elapsed += (_, _) => Clock = DateTime.Now.ToString("HH:mm");
+            timer.Start();
+        }
         Clock = DateTime.Now.ToString("HH:mm");
+    }
+
+    public MainViewModel(AppServices services) : this(services, designTime: false)
+    {
     }
 
     public void UpdateSourceName() =>

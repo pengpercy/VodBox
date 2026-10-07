@@ -101,10 +101,14 @@ public sealed partial class FilesViewModel : ObservableObject
     [ObservableProperty] private string _currentPath = "";
     [ObservableProperty] private string _status = "";
 
-    public FilesViewModel(AppServices services)
+    /// <summary>designTime=true：不枚举真实文件系统，停在空根目录（预览器加载快且无副作用）。</summary>
+    public FilesViewModel(AppServices services, bool designTime = false)
     {
         _services = services;
-        Navigate(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        if (!designTime)
+            Navigate(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        else
+            Navigate("");
     }
 
     public void Navigate(string path)

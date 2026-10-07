@@ -33,6 +33,13 @@ public sealed class MpvEngine : IPlaybackEngine
     public event EventHandler? Initialized;
     public event EventHandler<PlaybackEvent>? StateChanged;
 
+    /// <summary>设计时专用：永不 P/Invoke、永不初始化的空引擎（Available=false 自然降级，事件/命令全部空转）。</summary>
+    public static MpvEngine DesignDisabled() => new(factory: DesignUnavailableFactory);
+
+    /// <summary>设计时兜底：任何初始化尝试都失败为「不可用」，绝不触碰 libmpv。</summary>
+    private static IMpvClient DesignUnavailableFactory() =>
+        throw new InvalidOperationException("设计时预览环境没有 libmpv。");
+
     public MpvEngine(bool headless = false, Func<IMpvClient>? factory = null, bool waitForVideoSurface = false)
     {
         _headless = headless;

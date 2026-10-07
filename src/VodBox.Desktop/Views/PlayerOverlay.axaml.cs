@@ -43,7 +43,8 @@ public partial class PlayerOverlay : UserControl
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
-    private PlayerViewModel VM => ((MainViewModel)DataContext!).Player;
+    /// <summary>当前 Player 子 VM；DataContext 未装载（XAML 初始化早期/设计时）时为 null，调用方需判空。</summary>
+    private PlayerViewModel? VM => DataContext is MainViewModel main ? main.Player : null;
 
     private void OnAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e) => TryInstallSurface();
 
@@ -84,17 +85,18 @@ public partial class PlayerOverlay : UserControl
         if (DataContext is MainViewModel main) main.Player.Error = error.Message;
     }
 
-    private void OnTogglePlay(object? sender, RoutedEventArgs e) => VM.TogglePlayPauseCommand.Execute(null);
+    private void OnTogglePlay(object? sender, RoutedEventArgs e) => VM?.TogglePlayPauseCommand.Execute(null);
 
-    private void OnBack10(object? sender, RoutedEventArgs e) => VM.SeekByCommand.Execute(-10d);
-    private void OnForward10(object? sender, RoutedEventArgs e) => VM.SeekByCommand.Execute(10d);
-    private void OnClose(object? sender, RoutedEventArgs e) => VM.CloseCommand.Execute(null);
+    private void OnBack10(object? sender, RoutedEventArgs e) => VM?.SeekByCommand.Execute(-10d);
+    private void OnForward10(object? sender, RoutedEventArgs e) => VM?.SeekByCommand.Execute(10d);
+    private void OnClose(object? sender, RoutedEventArgs e) => VM?.CloseCommand.Execute(null);
 
     private void OnRateChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is ComboBox { SelectedIndex: var index } && VM is { })
+        // XAML 装载期（SelectedIndex="3" 在 EndInit 时触发）DataContext 尚未来得及赋值，直接忽略。
+        if (sender is ComboBox { SelectedIndex: var index } && VM is { } vm)
         {
-            VM.Rate = index switch
+            vm.Rate = index switch
             {
                 0 => 0.5, 1 => 0.75, 2 => 1.0, 3 => 1.25, 4 => 1.5, 5 => 2.0, _ => 1.0,
             };

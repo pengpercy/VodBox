@@ -9,5 +9,6 @@
     <Project Path="tests/VodBox.Tests/VodBox.Tests.csproj" />
     <Project Path="tests/VodBox.Mpv.Smoke/VodBox.Mpv.Smoke.csproj" />
     <Project Path="tests/VodBox.Mpv.UiSmoke/VodBox.Mpv.UiSmoke.csproj" />
+    <Project Path="tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj" />
   </Folder>
 </Solution>
