@@ -225,6 +225,70 @@ public class BilibiliSourceTests
         }
     }
 
+    // ---------- 匿名搜索风控（v_voucher）----------
+
+    /// <summary>
+    /// 实测发现：哔哩哔哩匿名搜索约 1/4 概率返回 <c>code=0</c> 但 data 只有 <c>v_voucher</c>
+    /// （验证码凭证挑战），没有 result 数组。这不是「无结果」，必须重试或明确报错，
+    /// 否则表现为搜索时好时坏且无任何线索。
+    /// </summary>
+    [Fact]
+    public void IsRiskControl_DetectsVoucherChallenge()
+    {
+        using var voucher = System.Text.Json.JsonDocument.Parse("""{"v_voucher":"voucher_abc"}""");
+        Assert.True(BilibiliSource.IsRiskControl(voucher.RootElement));
+
+        using var normal = System.Text.Json.JsonDocument.Parse("""{"result":[],"numResults":0}""");
+        Assert.False(BilibiliSource.IsRiskControl(normal.RootElement));
+
+        // 同时带 result 与 v_voucher 时按正常结果处理，不误判为风控
+        using var both = System.Text.Json.JsonDocument.Parse("""{"result":[],"v_voucher":"x"}""");
+        Assert.False(BilibiliSource.IsRiskControl(both.RootElement));
+    }
+
+    [Fact]
+    public async Task Search_RetriesThroughIntermittentRiskControl()
+    {
+        // 前两次返回风控挑战，第三次放行：验证重试机制而非直接失败
+        int attempts = 0;
+        var handler = new RouteHandler(path =>
+        {
+            switch (path)
+            {
+                case "x/web-interface/nav": return Fixture("nav.json");
+                case "x/frontend/finger/spi": return Fixture("spi.json");
+                case "x/web-interface/wbi/search/type":
+                    return Interlocked.Increment(ref attempts) < 3
+                        ? """{"code":0,"message":"0","ttl":1,"data":{"v_voucher":"voucher_123"}}"""
+                        : """{"code":0,"message":"0","ttl":1,"data":{"numPages":1,"result":[{"bvid":"BV1WSHL66EdZ","title":"<em class=\"keyword\">演唱会</em>","pic":"//i0.hdslb.com/p.jpg","duration":125}]}}""";
+                default: return "{}";
+            }
+        });
+        using var source = Create(handler);
+        var page = await source.SearchAsync("演唱会", 1);
+
+        Assert.Equal(3, attempts);
+        var item = Assert.Single(page.Items);
+        Assert.Equal("演唱会", item.Title); // 高亮标签已清洗
+    }
+
+    [Fact]
+    public async Task Search_ThrowsExplicitErrorWhenRiskControlPersists()
+    {
+        // 始终返回风控挑战：重试耗尽后必须给出可诊断错误，不能伪装成「无结果」
+        var handler = new RouteHandler(path => path switch
+        {
+            "x/web-interface/nav" => Fixture("nav.json"),
+            "x/frontend/finger/spi" => Fixture("spi.json"),
+            "x/web-interface/wbi/search/type" => """{"code":0,"message":"0","ttl":1,"data":{"v_voucher":"voucher_x"}}""",
+            _ => "{}",
+        });
+        using var source = Create(handler);
+        var error = await Assert.ThrowsAsync<NotSupportedException>(() => source.SearchAsync("演唱会", 1));
+        Assert.Contains("风控", error.Message);
+        Assert.Contains("Cookie", error.Message); // 给出可行的处置建议
+    }
+
     // ---------- HTML 标签清洗（标题高亮）----------
 
     [Fact]

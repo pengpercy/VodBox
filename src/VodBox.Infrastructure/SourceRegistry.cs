@@ -51,28 +51,49 @@ public sealed class SourceRegistry : IDisposable
     public IContentSource? Default() => Sources.FirstOrDefault(s => Get(s.Key) is not null) is { } info ? Get(info.Key) : null;
 
     /// <summary>并发聚合搜索全部 searchable 源，结果带站点来源标记。</summary>
-    public async Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>> SearchAllAsync(string query, CancellationToken ct = default)
+    public Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>> SearchAllAsync(string query, CancellationToken ct = default) =>
+        SearchWithFailuresAsync(query, ct).ContinueWith(t => (IReadOnlyList<(SourceInfo, MediaItem)>)t.Result.Results, ct);
+
+    /// <summary>
+    /// 并发聚合搜索，同时返回逐源失败原因。单站失败不影响其他站点，但失败必须可见——
+    /// 静默吞异常会让「搜索结果为 0」与「所有站点都出错」无法区分，排查时无从下手。
+    /// </summary>
+    public async Task<AggregateSearchResult> SearchWithFailuresAsync(string query, CancellationToken ct = default)
     {
-        var results = new ConcurrentBag<(SourceInfo, MediaItem)>();
+        var results = new ConcurrentBag<(SourceInfo Site, MediaItem Item)>();
+        var failures = new ConcurrentBag<(SourceInfo Site, string Error)>();
         var tasks = Sources
-            .Where(s => s.Searchable && s.Runtime is SourceRuntime.MacCms or SourceRuntime.NativeSpider)
+            .Where(s => s.Searchable && Get(s.Key) is not null)
             .Select(async site =>
             {
+                // 逐源独立超时：慢站点不拖累整体，也不因共享 ct 而互相取消
+                using var perSite = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                perSite.CancelAfter(SearchTimeout);
                 try
                 {
-                    var source = Get(site.Key);
-                    if (source is null) return;
-                    var page = await source.SearchAsync(query, 1, ct);
+                    var page = await Get(site.Key)!.SearchAsync(query, 1, perSite.Token);
                     foreach (var item in page.Items) results.Add((site, item));
                 }
-                catch
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
-                    // 单站搜索失败不影响其他站点
+                    failures.Add((site, $"超时（{SearchTimeout.TotalSeconds:0}s）"));
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    failures.Add((site, error.Message));
                 }
             });
         await Task.WhenAll(tasks);
-        return results.ToList();
+        return new AggregateSearchResult(results.ToList(), failures.ToList());
     }
+
+    /// <summary>单站聚合搜索超时（独立于调用方 ct）。</summary>
+    public static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(25);
 
     public void Dispose() => _http.Dispose();
 }
+
+/// <summary>聚合搜索结果：命中条目 + 逐源失败原因。</summary>
+public sealed record AggregateSearchResult(
+    IReadOnlyList<(SourceInfo Site, MediaItem Item)> Results,
+    IReadOnlyList<(SourceInfo Site, string Error)> Failures);

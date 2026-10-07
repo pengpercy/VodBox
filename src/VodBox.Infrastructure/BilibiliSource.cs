@@ -23,6 +23,9 @@ public sealed class BilibiliSource : IResolvingContentSource, IDisposable
 
     private const string PopularCategoryId = "popular";
 
+    /// <summary>匿名搜索风控重试次数（实测约 1/4 概率命中 v_voucher）。</summary>
+    private const int SearchRetries = 3;
+
     private static readonly Uri ApiRoot = new("https://api.bilibili.com/");
     private static readonly Uri Referer = new("https://www.bilibili.com/");
 
@@ -199,9 +202,22 @@ public sealed class BilibiliSource : IResolvingContentSource, IDisposable
             parameters[key] = string.Concat(parameters[key].Where(x => x is not ('!' or '\'' or '(' or ')' or '*')));
         parameters["w_rid"] = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(Query(parameters) + session.Key)));
 
-        using var document = await FetchAsync("x/web-interface/wbi/search/type", parameters, deadline.Token).ConfigureAwait(false);
-        var data = Data(document);
-        var items = ReadItems(data, "result");
+        // 匿名搜索会间歇触发风控：code=0 但 data 只有 v_voucher（验证码凭证挑战）而没有 result。
+        // 实测 8 次中 2 次命中，故有限次重试；仍失败则给出可诊断的明确错误，而不是伪装成「无结果」。
+        JsonDocument? document = null;
+        JsonElement data = default;
+        for (var attempt = 1; attempt <= SearchRetries; attempt++)
+        {
+            document?.Dispose();
+            document = await FetchAsync("x/web-interface/wbi/search/type", parameters, deadline.Token).ConfigureAwait(false);
+            data = Data(document);
+            if (!IsRiskControl(data)) break;
+            if (attempt == SearchRetries)
+                throw new NotSupportedException("哔哩哔哩搜索触发风控验证（v_voucher），已重试仍未放行；请稍后再试或在站点配置中提供登录 Cookie。");
+            await Task.Delay(TimeSpan.FromMilliseconds(300 * attempt), deadline.Token).ConfigureAwait(false);
+        }
+
+        var items = ReadItems(data!, "result");
         int totalPages = (int)Math.Max(1, Integer(data, "numPages"));
         int nextPage = page < totalPages && items.Count > 0 ? page + 1 : page;
         return new MediaPage(items, page, nextPage);
@@ -413,6 +429,16 @@ public sealed class BilibiliSource : IResolvingContentSource, IDisposable
         return root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
             ? data : throw new InvalidDataException("哔哩哔哩 API 没有返回 data。");
     }
+
+    /// <summary>
+    /// 判定响应是否为风控挑战：<c>code=0</c> 但 <c>data</c> 只带 <c>v_voucher</c>（无 result 数组）。
+    /// 这是哔哩哔哩对匿名搜索的间歇性验证要求，不是「无结果」，也不是协议错误。
+    /// </summary>
+    internal static bool IsRiskControl(JsonElement data) =>
+        data.ValueKind == JsonValueKind.Object
+        && data.TryGetProperty("v_voucher", out var voucher)
+        && voucher.ValueKind == JsonValueKind.String
+        && !data.TryGetProperty("result", out _);
 
     private static IReadOnlyList<MediaItem> ReadItems(JsonElement data, string key)
     {

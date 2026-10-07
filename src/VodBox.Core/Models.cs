@@ -55,9 +55,14 @@ public sealed class TvBoxSite
 public sealed class TvBoxParse
 {
     [JsonConverter(typeof(LenientStringConverter))] public string Name { get; set; } = "";
+    [JsonConverter(typeof(LenientStringConverter))] public string Url { get; set; } = "";
     public int Type { get; set; }
-    public string Url { get; set; } = "";
-    public string? Ext { get; set; }
+    /// <summary>
+    /// 解析器扩展：TVBox 里是多态 Object（可能是字符串，也可能是 {"header":...,"flag":[...]} 对象），
+    /// 与 Gson 宽容行为对齐用 JsonElement 承载。宝盒真实配置 17 个 parses 中 11 个 ext 是对象——
+    /// 若声明为 string 会导致整份配置反序列化失败（严格 System.Text.Json 与 Gson 的关键差异）。
+    /// </summary>
+    [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
     public Dictionary<string, string>? Header { get; set; }
     public List<string> Flag { get; set; } = [];
 }
