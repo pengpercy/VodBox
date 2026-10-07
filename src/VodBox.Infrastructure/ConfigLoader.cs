@@ -26,6 +26,28 @@ public sealed class ConfigLoader(DefaultHttp http)
         return ParseBytes(bytes) ?? throw new InvalidDataException($"配置解析失败：{url}");
     }
 
+    /// <summary>
+    /// 抓取一次并自动判别载体形态：优先二进制隐写（JPEG 尾部 base64，如饭太硬），
+    /// 再回退文本形态（明文 JSON / JS 变量包裹）。真实配置 URL 统一走这里。
+    /// </summary>
+    public async Task<TvBoxConfig> LoadAnyAsync(string url, CancellationToken ct = default)
+    {
+        var bytes = await http.GetByteArrayAsync(url, ct: ct);
+        var config = ParseBytes(bytes) ?? Parse(DefaultHttp.Decode(bytes));
+        if (config is null)
+        {
+            // 桌面浏览器 UA 被配置站点的 WAF 拦截时会返回 HTML 挑战页；回落 TVBox 客户端 UA 重试一次
+            bytes = await http.GetByteArrayAsync(url, TvBoxHeaders, ct);
+            config = ParseBytes(bytes) ?? Parse(DefaultHttp.Decode(bytes));
+        }
+        return config ?? throw new InvalidDataException($"配置解析失败：{url}");
+    }
+
+    private static readonly Dictionary<string, string> TvBoxHeaders = new()
+    {
+        ["User-Agent"] = DefaultHttp.TvBoxUserAgent,
+    };
+
     public static TvBoxConfig? Parse(string raw)
     {
         raw = raw.Trim();
@@ -51,7 +73,15 @@ public sealed class ConfigLoader(DefaultHttp http)
     {
         // 找 base64 纯 ASCII 长尾（至少 64 字符连续 base64 字母表）
         var tail = ExtractBase64Tail(bytes);
-        return tail is null ? null : Parse(Encoding.UTF8.GetString(Convert.FromBase64String(tail)));
+        if (tail is null) return null;
+        try
+        {
+            return Parse(Encoding.UTF8.GetString(Convert.FromBase64String(tail)));
+        }
+        catch (FormatException)
+        {
+            return null; // 尾部像 base64 但不是（纯文本 JSON 等），交给文本路径
+        }
     }
 
     private static string? ExtractBase64Tail(byte[] bytes)

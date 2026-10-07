@@ -37,8 +37,9 @@ public sealed partial class PlayerViewModel : ObservableObject
                 Position = evt.Snapshot.Position;
                 Duration = evt.Snapshot.Duration;
                 Error = evt.Snapshot.Error;
+                // 即发即忘：此回调可能在 mpv 事件线程 / UI 线程上，绝不能同步等待 SQLite（会死锁）
                 if (State is PlaybackState.Ended or PlaybackState.Failed)
-                    SaveHistoryAsync().GetAwaiter().GetResult();
+                    _ = SaveHistoryAsync();
             });
         };
         var poll = new System.Timers.Timer(1000) { AutoReset = true };
@@ -85,10 +86,10 @@ public sealed partial class PlayerViewModel : ObservableObject
     public void SeekBy(double seconds) => _ = _services.Player.SeekByAsync(TimeSpan.FromSeconds(seconds));
 
     [RelayCommand]
-    public void Close()
+    public async Task Close()
     {
-        _ = SaveHistoryAsync();
-        _ = _services.Player.StopAsync();
+        await SaveHistoryAsync(); // 关闭前落库，保证最后一次进度不丢
+        await _services.Player.StopAsync();
         Visible = false;
         State = PlaybackState.Idle;
         _current = null;
@@ -97,19 +98,31 @@ public sealed partial class PlayerViewModel : ObservableObject
     partial void OnVolumeChanged(int value) => _ = _services.Player.SetVolumeAsync(value);
     partial void OnRateChanged(double value) => _ = _services.Player.SetRateAsync(value);
 
+    /// <summary>落库观看历史（含线路/选集/海报上下文）。异常在此吞掉，避免存储故障中断播放或崩溃。</summary>
     private async Task SaveHistoryAsync()
     {
-        if (_current is null) return;
-        var entry = new HistoryEntry
+        if (_current is not { } request) return;
+        try
         {
-            SourceKey = _current.SourceKey,
-            SourceName = "本地",
-            MediaId = _current.MediaId,
-            Title = _current.Title,
-            PositionMs = (long)Position.TotalMilliseconds,
-            DurationMs = (long)Duration.TotalMilliseconds,
-            Rate = Rate,
-        };
-        await _services.Store.SaveHistoryAsync(entry);
+            var entry = new HistoryEntry
+            {
+                SourceKey = request.SourceKey,
+                SourceName = string.IsNullOrWhiteSpace(request.SourceName) ? "本地" : request.SourceName,
+                MediaId = request.MediaId,
+                Title = request.Title,
+                Poster = request.Poster,
+                Remarks = request.Remarks,
+                LineId = request.LineId,
+                EpisodeId = request.EpisodeId,
+                PositionMs = (long)Position.TotalMilliseconds,
+                DurationMs = (long)Duration.TotalMilliseconds,
+                Rate = Rate,
+            };
+            await _services.Store.SaveHistoryAsync(entry);
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Debug.WriteLine($"[history] 保存失败：{error.Message}");
+        }
     }
 }

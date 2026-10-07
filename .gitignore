@@ -10,3 +10,4 @@ build/native/
 *.pyc
 .idea/
 **/packages.*.lock.json
+.alma-snapshots

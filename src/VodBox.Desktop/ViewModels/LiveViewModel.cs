@@ -80,6 +80,10 @@ public sealed partial class LiveViewModel : ObservableObject
         {
             Uri = uri,
             Title = channel.Name,
+            // MediaId 用频道地址，否则所有直播频道会挤进历史表同一行（source_key+media_id 是主键）
+            SourceKey = "live",
+            SourceName = "直播",
+            MediaId = uri,
             IsLive = true,
         });
     }

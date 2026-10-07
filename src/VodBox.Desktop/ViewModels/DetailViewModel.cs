@@ -21,7 +21,10 @@ public sealed partial class DetailViewModel : ObservableObject
     [ObservableProperty] private bool _isFavorite;
     private string _sourceKey = "";
     private string _sourceName = "";
-    private string _resumePositionMs = 0L.ToString();
+    // 续播上下文：上次看的是哪条线路的哪一集、看到哪；只有选集对得上才复用位置
+    private string _resumeLineId = "";
+    private string _resumeEpisodeId = "";
+    private long _resumePositionMs;
 
     public DetailViewModel(AppServices services, MainViewModel main)
     {
@@ -50,8 +53,8 @@ public sealed partial class DetailViewModel : ObservableObject
             foreach (var line in Detail.Lines) Lines.Add(line);
             SelectedLine = Lines.FirstOrDefault();
             IsFavorite = await _services.Store.IsFavoriteAsync(sourceKey, item.Id);
-            var history = await _services.Store.FindHistoryAsync(sourceKey, item.Id);
-            _resumePositionMs = history?.PositionMs.ToString() ?? "0";
+            // 历史有记录时连线路/选集一起还原，否则续播位置会套到第一集上
+            ApplyResume(await _services.Store.FindHistoryAsync(sourceKey, item.Id));
         }
         catch (Exception error)
         {
@@ -81,11 +84,8 @@ public sealed partial class DetailViewModel : ObservableObject
             Detail = await source.GetDetailAsync(entry.MediaId);
             Lines.Clear();
             foreach (var line in Detail.Lines) Lines.Add(line);
-            SelectedLine = Lines.FirstOrDefault(l => l.Id == entry.LineId) ?? Lines.FirstOrDefault();
-            SelectedEpisode = SelectedLine?.Episodes.FirstOrDefault(e => e.Id == entry.EpisodeId)
-                              ?? SelectedLine?.Episodes.FirstOrDefault();
+            ApplyResume(entry);
             IsFavorite = await _services.Store.IsFavoriteAsync(entry.SourceKey, entry.MediaId);
-            _resumePositionMs = entry.PositionMs.ToString();
         }
         catch (Exception error)
         {
@@ -97,6 +97,17 @@ public sealed partial class DetailViewModel : ObservableObject
         }
     }
 
+    /// <summary>还原续播上下文（线路 + 选集 + 位置），并记下集号供 <see cref="Play"/> 判断位置能否复用。</summary>
+    private void ApplyResume(HistoryEntry? history)
+    {
+        _resumeLineId = history?.LineId ?? "";
+        _resumeEpisodeId = history?.EpisodeId ?? "";
+        _resumePositionMs = history?.PositionMs ?? 0;
+        if (history is null || Detail is null) return;
+        SelectedLine = Detail.FindLine(history.LineId);
+        SelectedEpisode = Detail.FindEpisode(SelectedLine, history.EpisodeId);
+    }
+
     [RelayCommand]
     private void Play()
     {
@@ -105,15 +116,21 @@ public sealed partial class DetailViewModel : ObservableObject
             _main.StatusMessage = "没有可播放的选集";
             return;
         }
-        var resumeMs = long.TryParse(_resumePositionMs, out var value) ? value : 0;
+        var resumeMs = MediaDetail.ResumePositionApplies(_resumeLineId, _resumeEpisodeId, SelectedLine.Id, SelectedEpisode.Id)
+            ? _resumePositionMs
+            : 0;
         _main.Player.Play(new PlaybackRequest
         {
             Uri = SelectedEpisode.Uri,
             Title = Detail.Item.Title,
             StartPositionMs = resumeMs,
             SourceKey = _sourceKey,
+            SourceName = _sourceName,
             MediaId = Detail.Item.Id,
+            LineId = SelectedLine.Id,
             EpisodeId = SelectedEpisode.Id,
+            Poster = Detail.Item.Poster,
+            Remarks = Detail.Item.Remarks,
         });
     }
 

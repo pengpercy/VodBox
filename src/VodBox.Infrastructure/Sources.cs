@@ -146,7 +146,8 @@ public sealed class LiveSources(DefaultHttp http)
         || url.Contains("m3u", StringComparison.OrdinalIgnoreCase);
 }
 
-/// <summary>M3U 直播列表解析（#EXTINF + group-title + tvg-logo / tvg-id / #EXTVLCOPT）。</summary>
+/// <summary>M3U 直播列表解析（#EXTINF + group-title + tvg-logo / tvg-id）。
+/// 注意：其余 # 指令（如 #EXTVLCOPT / #KODIPROP 的 UA-Referer、catchup 回看属性）目前一律跳过，未解析。</summary>
 public static class M3uParser
 {
     public static bool IsM3u(string text) => text.Contains("#EXTM3U", StringComparison.OrdinalIgnoreCase);

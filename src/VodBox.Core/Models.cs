@@ -111,6 +111,23 @@ public sealed record MediaDetail
     public string? Director { get; init; }
     public string? Actor { get; init; }
     public IReadOnlyList<PlaybackLine> Lines { get; init; } = [];
+
+    /// <summary>按线路 id 查找（历史续播：找不到回退首条线路）。</summary>
+    public PlaybackLine? FindLine(string? lineId) =>
+        Lines.FirstOrDefault(l => l.Id == lineId) ?? Lines.FirstOrDefault();
+
+    /// <summary>按选集 id 在指定线路内查找（找不到回退该线路首集）。</summary>
+    public Episode? FindEpisode(PlaybackLine? line, string? episodeId) =>
+        line?.Episodes.FirstOrDefault(e => e.Id == episodeId) ?? line?.Episodes.FirstOrDefault();
+
+    /// <summary>
+    /// 历史里的续播位置是否适用于当前选集：集号一致才复用，避免把上一集的进度套到别的集上
+    /// （例如从第 8 集切到第 1 集时不能沿用第 8 集的时间戳）。
+    /// 旧记录没存集号（空）时按「未知 = 允许」处理，保持向后兼容。
+    /// </summary>
+    public static bool ResumePositionApplies(string? storedLineId, string? storedEpisodeId, string? lineId, string? episodeId) =>
+        (string.IsNullOrEmpty(storedLineId) || storedLineId == lineId) &&
+        (string.IsNullOrEmpty(storedEpisodeId) || storedEpisodeId == episodeId);
 }
 
 /// <summary>分页结果。</summary>
@@ -125,8 +142,14 @@ public sealed record PlaybackRequest
     public Dictionary<string, string> Headers { get; init; } = [];
     public long StartPositionMs { get; init; }
     public string SourceKey { get; init; } = "local";
+    /// <summary>来源显示名（写历史用）。本地文件为「本地」，点播为站点名。</summary>
+    public string SourceName { get; init; } = "本地";
     public string MediaId { get; init; } = "";
+    /// <summary>线路 id（历史续播时恢复选集上下文）。</summary>
+    public string LineId { get; init; } = "";
     public string EpisodeId { get; init; } = "";
+    public string? Poster { get; init; }
+    public string? Remarks { get; init; }
     public bool IsLive { get; init; }
 }
 

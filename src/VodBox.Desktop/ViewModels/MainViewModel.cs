@@ -43,6 +43,14 @@ public sealed partial class MainViewModel : ObservableObject
         Files = new FilesViewModel(services);
         Player = new PlayerViewModel(services, this);
         Detail = new DetailViewModel(services, this);
+        // 本地文件 → 播放器。只在此处订阅一次（MainViewModel 与应用同生命周期），避免 View 层重复订阅泄漏。
+        Files.PlayRequested += entry => Player.Play(new PlaybackRequest
+        {
+            Uri = new Uri(entry.FullPath).AbsoluteUri, // 转义 file:// URI，libmpv 可直接打开
+            Title = entry.Name,
+            SourceKey = "local",
+            MediaId = entry.FullPath,
+        });
         UpdateSourceName();
         var timer = new System.Timers.Timer(1000) { AutoReset = true };
         timer.Elapsed += (_, _) => Clock = DateTime.Now.ToString("HH:mm");

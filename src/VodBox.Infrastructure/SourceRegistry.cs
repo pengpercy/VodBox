@@ -16,19 +16,13 @@ public sealed class SourceRegistry : IDisposable
     /// <summary>加载 TVBox 配置（URL 或本地路径）并重建源列表。</summary>
     public async Task LoadConfigAsync(string urlOrPath, CancellationToken ct = default)
     {
-        string raw;
-        if (File.Exists(urlOrPath)) raw = await File.ReadAllTextAsync(urlOrPath, ct);
+        TvBoxConfig config;
+        if (File.Exists(urlOrPath))
+            config = ConfigLoader.Parse(await File.ReadAllTextAsync(urlOrPath, ct))
+                     ?? throw new InvalidDataException($"配置解析失败：{urlOrPath}");
         else
-        {
-            var loader = new ConfigLoader(_http);
-            raw = urlOrPath.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) ? "" : "";
-            var config = await loader.LoadAsync(urlOrPath, ct);
-            Sources = ConfigLoader.ToSources(config);
-            Rebuild();
-            return;
-        }
-        var parsed = ConfigLoader.Parse(raw) ?? throw new InvalidDataException($"配置解析失败：{urlOrPath}");
-        Sources = ConfigLoader.ToSources(parsed);
+            config = await new ConfigLoader(_http).LoadAnyAsync(urlOrPath, ct);
+        Sources = ConfigLoader.ToSources(config);
         Rebuild();
     }
 
