@@ -1,18 +1,15 @@
-<UserControl
-    xmlns="https://github.com/avaloniaui" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:core="using:VodBox.Core" x:Class="VodBox.Desktop.Views.FavoritesView" x:DataType="vm:MainViewModel"
-    x:CompileBindings="True">
-  <Design.DataContext>
-    <vm:DesignMainViewModel />
-  </Design.DataContext>
-  <ListBox ItemsSource="{Binding Favorites}" SelectionChanged="FavoriteSelectionChanged">
-    <ListBox.ItemTemplate>
-      <DataTemplate x:DataType="core:FavoriteEntry">
-        <StackPanel Margin="8">
-          <TextBlock Text="{Binding Title}" />
-          <TextBlock Text="{Binding SourceId}" Classes="muted" />
-        </StackPanel>
-      </DataTemplate>
-    </ListBox.ItemTemplate>
-  </ListBox>
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:VodBox.Desktop" xmlns:views="using:VodBox.Desktop.Views" x:Class="VodBox.Desktop.Views.FavoritesView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
+ <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
+ <Grid RowDefinitions="Auto,*" RowSpacing="20">
+  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+   <Button Command="{Binding NavigateCommand}" CommandParameter="首页" ToolTip.Tip="返回首页" Width="40" Height="40" Background="Transparent" BorderThickness="0" Padding="10"><Path Data="M18,2 L8,12 L18,22 M8,12 H28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
+   <TextBlock Grid.Column="1" Text="我的收藏" FontSize="24" VerticalAlignment="Center" />
+   <Button Grid.Column="2" Command="{Binding RefreshFavoritesCommand}" ToolTip.Tip="刷新" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M20,6 A9,9 0 1 0 22,16 M20,0 V6 H14" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
+   <Button Grid.Column="3" Command="{Binding ClearFavoritesCommand}" ToolTip.Tip="清空我的收藏" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M4,6 H20 M8,6 V2 H16 V6 M6,6 V23 H18 V6" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
+  </Grid>
+  <Grid Grid.Row="1">
+   <TextBlock Text="暂无我的收藏" Classes="muted" IsVisible="{Binding !HasFavoriteCards}" />
+   <views:CollectionGridView Items="{Binding FavoriteCards}" />
+  </Grid>
+ </Grid>
 </UserControl>

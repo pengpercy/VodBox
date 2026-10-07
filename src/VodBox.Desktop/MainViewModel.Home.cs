@@ -11,6 +11,9 @@ public partial class MainViewModel
     [ObservableProperty] private string _homeRecommendationStatus = "请在设置中配置点播播放源。";
     public string BrowseReturnLabel => ShowHome ? "返回首页" : "返回浏览";
     public string HomeTitle => SelectedSource?.Name ?? Sources.FirstOrDefault()?.Name ?? "影视";
+    public ObservableCollection<string> ConfigurationWarnings { get; } = [];
+    public bool HasConfigurationWarnings => ConfigurationWarnings.Count > 0;
+    public string ConfigurationImportSummary => HasConfigurationWarnings ? $"此订阅有 {ConfigurationWarnings.Count} 个站点暂未适配，请在设置中查看导入说明。" : "";
     public bool HasConfiguredSources => Sources.Count > 0 || _config.LiveSources.Count > 0;
     public string VodSourceSummary => Sources.Count == 0 ? "未配置" : $"已配置（{Sources.Count} 个站点）";
     public string LiveSourceSummary => _config.LiveSources.Count == 0 ? "未配置" : $"{_config.LiveSources.Count} 个直播源";

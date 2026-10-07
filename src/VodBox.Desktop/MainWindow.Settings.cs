@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using VodBox.Desktop.Views;
 using Avalonia.Controls;
 
 namespace VodBox.Desktop;

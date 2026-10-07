@@ -42,8 +42,8 @@ public sealed class BilibiliProvider : IContentProvider
         var categories = new List<ConfiguredCategory>();
         if (source.Options.TryGetValue("categories", out var configured))
         {
-            if (configured.ValueKind != JsonValueKind.Array || configured.GetArrayLength() > 100)
-                throw new InvalidDataException("哔哩哔哩分类必须是最多 100 项的数组。");
+            if (configured.ValueKind != JsonValueKind.Array || configured.GetArrayLength() > 500)
+                throw new InvalidDataException("哔哩哔哩分类必须是最多 500 项的数组。");
             var ids = new HashSet<string>(StringComparer.Ordinal) { "popular" };
             foreach (var item in configured.EnumerateArray())
             {

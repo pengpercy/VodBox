@@ -5,7 +5,9 @@
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <Grid RowDefinitions="Auto,*" RowSpacing="12">
+  <Grid RowDefinitions="Auto,*" RowSpacing="20">
+    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><Button Command="{Binding NavigateCommand}" CommandParameter="首页" ToolTip.Tip="返回首页" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M18,2 L8,12 L18,22 M8,12 H28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button><TextBlock Grid.Column="1" Text="直播" FontSize="24" VerticalAlignment="Center" /></Grid>
+  <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="12">
     <StackPanel Spacing="8">
       <ComboBox ItemsSource="{Binding LiveGroups}" SelectedItem="{Binding SelectedLiveGroup}" HorizontalAlignment="Stretch" />
       <TextBox Text="{Binding LiveSearch}" PlaceholderText="搜索直播频道" />
@@ -26,5 +28,6 @@
         </DataTemplate>
       </ListBox.ItemTemplate>
     </ListBox>
+  </Grid>
   </Grid>
 </UserControl>

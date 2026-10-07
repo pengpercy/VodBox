@@ -11,15 +11,16 @@
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
+    <Style Selector="Button.homeEntry.current"><Setter Property="BorderThickness" Value="1" /><Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" /></Style>
     <Style Selector="ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="12">
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-      <TextBlock Text="{Binding HomeTitle}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+      <StackPanel Orientation="Horizontal" Spacing="16"><TextBlock Text="{Binding HomeTitle}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /><Button Content="浏览分类" Command="{Binding NavigateCommand}" CommandParameter="发现" IsVisible="{Binding HasConfiguredSources}" /></StackPanel>
       <TextBlock x:Name="Clock" Grid.Column="1" VerticalAlignment="Center" />
     </Grid>
     <WrapPanel Grid.Row="1">
-      <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="点播"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M2,2 H22 V22 H2 Z M9,6 L18,12 L9,18 Z" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="点播" HorizontalAlignment="Center" /></StackPanel></Button>
+      <Button Classes="homeEntry current" Command="{Binding NavigateCommand}" CommandParameter="首页"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M2,2 H22 V22 H2 Z M9,6 L18,12 L9,18 Z" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="点播" HorizontalAlignment="Center" /></StackPanel></Button>
       <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="直播"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M1,5 H17 V19 H1 Z M17,9 L23,5 V19 L17,15" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="直播" HorizontalAlignment="Center" /></StackPanel></Button>
       <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="搜索"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M19,10 A9,9 0 1 1 1,10 A9,9 0 1 1 19,10 M16,17 L23,24" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="搜索" HorizontalAlignment="Center" /></StackPanel></Button>
       <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="收藏"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M12,1 L15,8 L23,9 L17,15 L19,23 L12,19 L5,23 L7,15 L1,9 L9,8 Z" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="收藏" HorizontalAlignment="Center" /></StackPanel></Button>
@@ -41,13 +42,14 @@
     <TextBlock Grid.Row="4" Text="更新推荐" FontSize="19" FontWeight="SemiBold" />
     <Grid Grid.Row="5">
       <StackPanel IsVisible="{Binding !HasHomeRecommendations}" Spacing="12">
+        <TextBlock Text="{Binding ConfigurationImportSummary}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasConfigurationWarnings}" />
         <TextBlock Text="{Binding HomeRecommendationStatus}" Classes="muted" TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasConfiguredSources}">
           <Button Content="前往设置配置播放源" Command="{Binding ConfigureSourcesCommand}" />
           <Button Content="打开本地媒体" Click="OpenLocalClick" />
         </StackPanel>
       </StackPanel>
-      <ListBox x:Name="RecommendationGrid" ItemsSource="{Binding HomeCardRows}" IsVisible="{Binding HasHomeRecommendations}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+      <ListBox x:Name="RecommendationGrid" ItemContainerTheme="{StaticResource PosterRowTheme}" ItemsSource="{Binding HomeCardRows}" IsVisible="{Binding HasHomeRecommendations}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.ItemTemplate><DataTemplate x:DataType="vm:MediaCardRow">
           <ItemsControl ItemsSource="{Binding Cards}">
             <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding Columns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>

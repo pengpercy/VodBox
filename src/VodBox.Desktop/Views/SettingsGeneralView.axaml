@@ -13,6 +13,7 @@
       <Button Click="ConfigureSourceClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="16,12">
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Text="直播" /><TextBlock Grid.Column="1" Text="{Binding LiveSourceSummary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" /></Grid>
       </Button>
+      <Expander Header="导入说明：尚未适配的站点" IsVisible="{Binding HasConfigurationWarnings}" HorizontalAlignment="Stretch"><ScrollViewer MaxHeight="180"><ItemsControl ItemsSource="{Binding ConfigurationWarnings}" /></ScrollViewer></Expander>
       <Button Content="播放设置" Click="PlaybackSettingsClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12" />
       <ToggleSwitch Content="无痕模式" IsChecked="{Binding Incognito}" />
       <TextBlock Text="数据备份" FontWeight="SemiBold" FontSize="18" />

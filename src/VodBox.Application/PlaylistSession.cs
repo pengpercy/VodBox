@@ -22,7 +22,7 @@ public sealed class PlaylistSession(PlaybackCoordinator coordinator, IProviderFa
         await coordinator.PlayAsync(async cancellation =>
         {
             var request = await provider.ResolvePlaybackAsync(detail.Item.Id, episode.Id, cancellation);
-            return request with { SourceId = source.Id, MediaId = detail.Item.Id, EpisodeId = episode.Id,
+            return request with { SourceId = source.Id, MediaId = detail.Item.Id, EpisodeId = episode.Id, Poster = detail.Item.Poster, SourceName = source.Name,
                 StartPositionMs = startPositionMs > 0 ? startPositionMs : request.StartPositionMs };
         }, configId, token);
         if (generation == _generation)

@@ -11,58 +11,20 @@
   </Design.DataContext>
   <Grid x:Name="WindowLayout" RowDefinitions="40,*">
     <Border x:Name="WindowTitleBar" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
-    <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*" ColumnDefinitions="180,*">
-      <Border x:Name="NavigationPane" Background="{DynamicResource SidebarSurfaceBrush}" Padding="16,28">
-        <DockPanel>
-          <StackPanel DockPanel.Dock="Top" Spacing="8">
-            <TextBlock Text="VodBox" FontSize="26" FontWeight="Bold" Margin="16,0,0,24" />
-            <TextBlock Text="你的媒体，随处播放" Classes="muted" FontSize="11" Margin="16,-20,0,24" TextWrapping="Wrap" />
-            <Button Content="首页" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="首页" />
-            <Button Content="点播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="点播" />
-            <Button Content="直播" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="直播" />
-            <Button Content="历史" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="历史" />
-            <Button Content="收藏" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="收藏" />
-            <Separator Margin="0,12" />
-            <Button Content="设置" Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="设置" />
-          </StackPanel>
-          <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Spacing="12">
-            <ToggleSwitch Content="无痕播放" IsChecked="{Binding Incognito}" FontSize="12" />
-            <TextBlock Text="0.1.0 · 双播放内核" Classes="muted" FontSize="11" Margin="8,0" TextWrapping="Wrap" />
-          </StackPanel>
-        </DockPanel>
-      </Border>
-      <Grid x:Name="Workspace" Grid.Column="1" Margin="24,24,24,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
-        <Grid x:Name="WorkspaceHeader" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-          <TextBlock Text="{Binding WorkspaceTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-            <Button x:Name="BrowsePageButton" Content="{Binding BrowseReturnLabel}" Click="BrowsePageClick" IsVisible="False" />
-            <Button x:Name="PlaybackPageButton" Content="播放与详情" Click="PlaybackPageClick" IsVisible="False" />
-            <Button Content="打开媒体" Click="OpenFileClick" />
-            <Button Content="全屏" Click="FullscreenClick" />
-          </StackPanel>
-        </Grid>
-        <Grid x:Name="AddressBar" Grid.Row="1" ColumnDefinitions="*,180,Auto" ColumnSpacing="8">
-          <TextBox Text="{Binding Url}" PlaceholderText="粘贴媒体 URL，或打开本地文件" />
-          <ComboBox Grid.Column="1" ItemsSource="{Binding Resolvers}" SelectedItem="{Binding SelectedResolver}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="core:ResolverDefinition">
-                <TextBlock Text="{Binding Name}" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-          <Button Grid.Column="2" Content="播放地址" Command="{Binding OpenUrlCommand}" />
-        </Grid>
-        <Grid x:Name="ContentWorkspace" Grid.Row="2" ColumnDefinitions="5*,4*" ColumnSpacing="20">
+    <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*">
+      <Grid x:Name="Workspace" Margin="24,24,24,16" RowDefinitions="*,Auto" RowSpacing="12">
+        <Grid x:Name="ContentWorkspace" ColumnDefinitions="*">
           <Grid x:Name="BrowsePane">
             <views:HomeView x:Name="HomePage" IsVisible="{Binding ShowHome}" />
+            <views:SearchView x:Name="SearchPage" IsVisible="{Binding ShowSearch}" />
             <views:LibraryView x:Name="LibraryPage" IsVisible="{Binding ShowLibrary}" />
             <views:LiveView x:Name="LivePage" IsVisible="{Binding ShowLive}" />
             <views:HistoryView x:Name="HistoryPage" IsVisible="{Binding ShowHistory}" />
             <views:FavoritesView x:Name="FavoritesPage" IsVisible="{Binding ShowFavorites}" />
           </Grid>
-          <views:PlaybackView x:Name="PlaybackPane" Grid.Column="1" />
+          <views:PlaybackView x:Name="PlaybackPane" />
         </Grid>
-        <TextBlock x:Name="StatusBar" Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+        <TextBlock x:Name="StatusBar" Grid.Row="1" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
       </Grid>
     </Grid>
   </Grid>

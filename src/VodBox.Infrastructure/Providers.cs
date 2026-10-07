@@ -85,6 +85,11 @@ public sealed class ProviderFactory(HttpClient http, string pluginHostPath, stri
         ProviderRuntime.Csharp when source.Provider is "appget" or "csp_AppGet" => new AppGetProvider(source),
         ProviderRuntime.Csharp when source.Provider is "app99" or "csp_App99" => new App99Provider(source),
         ProviderRuntime.Csharp when source.Provider is "audio-site" or "csp_XBPQ" => new AudioSiteProvider(source),
+        ProviderRuntime.Csharp when source.Provider == "tuxiaobei" => new TuxiaobeiProvider(source, http),
+        ProviderRuntime.Csharp when source.Provider == "huya" => new HuyaProvider(source, http),
+        ProviderRuntime.Csharp when source.Provider == "douyu" => new DouyuProvider(source, http),
+        ProviderRuntime.Csharp when source.Provider == "firstaid" => new FirstAidProvider(source, http),
+        ProviderRuntime.Csharp when source.Provider == "trailers" => new TrailerProvider(source, http),
         ProviderRuntime.Csharp => throw new NotSupportedException($"尚未注册 C# Provider：{source.Provider}"),
         _ => new ScriptProvider(source, pluginHostPath, assetsDirectory)
         };

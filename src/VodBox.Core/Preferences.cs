@@ -24,6 +24,7 @@ public sealed record AppPreferences
     public double DanmakuOpacity { get; set; } = .85;
     public double DanmakuCoverage { get; set; } = .5;
     public int DanmakuDelayMs { get; set; }
+    public List<string> SearchHistory { get; set; } = [];
     public bool LargeScreen { get; set; }
 }
 

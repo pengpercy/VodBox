@@ -1,6 +1,6 @@
 # VodBox
 
-使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、libmpv / LibVLC 双播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑可通过 C# Provider 实现，不包含 JVM/Dex 兼容层；暂不兼容旧 TV 配置。
+使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、libmpv / LibVLC 双播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑通过 C# Provider 实现，不包含 JVM/Dex 兼容层；支持将 TV 订阅中的已适配入口转换为原生配置，其余入口保留导入说明。
 
 当前工程是首版实现，不是 FongMi/TV 全功能移植。方案与分阶段范围见 [实现方案](docs/avalonia-rewrite-plan.md)，逐项进度与未完成任务见 [功能清单](docs/implementation-progress.md)。
 
@@ -89,12 +89,14 @@ QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR
 
 libmpv 尚未纳入全部发行包。开发时可通过 `VODBOX_MPV_PATH` 指定本机原生库完整路径；未提供 mpv 时，自动模式会尝试现有 LibVLC。不要将本机 GUI 验收视为三平台安装包验收。
 
-`examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，`csp_BiliGuard` 和其他 Java Spider 尚未移植。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
+`examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，订阅导入可将 `csp_BiliGuard` 的关键词分类转换到该 Provider，不运行原 Guard 插件。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
 
 C# AppGet（V119 / 显式 Qiji V122）已注册 `appget` / `csp_AppGet`，支持分类、分页筛选、搜索、多线路分集、直接媒体/站内解析和声明式外部 JSON 解析。示例 `examples/appget.json` 使用占位参数；真实播放与版本限制见 [AppGet Spider](docs/appget-spider.md)，不代表四个原条目均已可播放。
 
 C# App99 已注册 `app99` / `csp_App99` 的显式 `bn-v2` 协议，支持匿名分类、分页筛选、搜索、多线路分集和 JSON 解析；双星真实 LibVLC 解码通过。配置示例见 `examples/app99.json`，协议范围与验收见 [App99 Spider](docs/app99-spider.md)。`csp_App99Guard` 尚未接入。
 
 相声/评书音频专辑已接入 C# `audio-site`（显式 `audio-zblog-v1`，亦可用 `csp_XBPQ` 别名），支持两个已核对站点的分类分页、专辑分集和音频播放，不支持通用 XBPQ 规则与站点搜索。见 [示例](examples/audio-sites.json) 和 [音频 Spider](docs/audio-site-spider.md)。
+
+饭太硬的已知兔小贝、虎牙、斗鱼 drpy 入口可自动转换为独立 C# Provider；急救教学与荐影预告片也支持订阅导入。仅识别已核对的入口，不执行下载的规则脚本，不代表通用 drpy/Guard 兼容。斗鱼使用隔离 Chrome/Edge/Chromium 嗅探播放。见 [原生示例](examples/public-sites.json) 和 [本批适配范围](docs/public-site-spiders.md)。
 
 libmpv 已新增可接入 PlaybackCoordinator 的 `MpvEngine`，事件状态、轨道、控制与延迟已通过 macOS JIT/Native AOT 实测；主窗口路由与设置仍在后续接入。详见 [mpv 播放接口](docs/mpv-engine.md)。

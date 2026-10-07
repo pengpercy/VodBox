@@ -67,7 +67,7 @@ public sealed class PlaybackCoordinator(IPlaybackEngine engine, ILibraryStore st
         return store.SaveHistoryAsync(new HistoryEntry(_configId, request.SourceId,
             string.IsNullOrEmpty(request.MediaId) ? request.OriginalUri ?? request.Uri : request.MediaId, request.EpisodeId,
             request.Title, request.OriginalUri ?? request.Uri, completed || request.IsLive ? 0 : (long)snapshot.Position.TotalMilliseconds,
-            DateTimeOffset.UtcNow, request.ResolutionKind, request.ResolverId), cancellationToken);
+            DateTimeOffset.UtcNow, request.ResolutionKind, request.ResolverId, request.Poster, request.SourceName), cancellationToken);
     }
 
     public async Task StopAsync()

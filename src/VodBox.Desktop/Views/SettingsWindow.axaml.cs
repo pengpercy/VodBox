@@ -1,11 +1,11 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace VodBox.Desktop;
+namespace VodBox.Desktop.Views;
 
 public sealed partial class SettingsWindow : Window
 {
-    public Views.SettingsView SettingsView => SettingsPage;
+    public SettingsView SettingsView => SettingsPage;
     public SettingsWindow()
     {
         InitializeComponent();

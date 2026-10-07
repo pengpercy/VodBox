@@ -118,18 +118,36 @@ internal static class DesktopProbe
                 if (episodeButtons > 100 || model.Episodes[0].Id != "1") throw new InvalidOperationException("Episode virtualization/order failed.");
                 if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer!.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Resize recreated the native renderer.");
                 stage = "page-navigation";
-                foreach (string page in new[] { "首页", "设置", "直播", "历史", "收藏", "点播" })
+                foreach (string page in new[] { "首页", "设置", "搜索", "直播", "历史", "收藏", "点播" })
                 {
                     await model.NavigateCommand.ExecuteAsync(page);
                     if (page == "设置")
                     {
                         if (window.SettingsWindow?.IsVisible != true || !model.ShowPlaybackPage) throw new InvalidOperationException("Settings window changed the playback page.");
+                        var sourceDialog = new VodBox.Desktop.Views.SourceConfigurationWindow(model);
+                        sourceDialog.Show(window.SettingsWindow); await Task.Delay(100); sourceDialog.Close();
                         window.SettingsWindow.Close();
                         if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Settings recreated mpv renderer.");
                         continue;
                     }
                     await Until(() => !window.PlaybackView.IsEffectivelyVisible);
-                    if (page == "首页" && (!window.FindControl<VodBox.Desktop.Views.HomeView>("HomePage")!.IsEffectivelyVisible || window.FindControl<Border>("NavigationPane")!.IsVisible || model.HomeCards.Count != 12)) throw new InvalidOperationException("Home layout or recommendation snapshot failed.");
+                    if (page == "首页" && (!window.FindControl<VodBox.Desktop.Views.HomeView>("HomePage")!.IsEffectivelyVisible || window.FindControl<Border>("NavigationPane") is not null || model.HomeCards.Count != 12)) throw new InvalidOperationException("Home layout or recommendation snapshot failed.");
+                    if (page is "搜索" or "历史" or "收藏")
+                    {
+                        if (window.FindControl<Border>("NavigationPane") is not null) throw new InvalidOperationException("Collection/search page retained legacy navigation.");
+                        if (page == "搜索")
+                        {
+                            model.SearchSubmitted = true;
+                            var searchSource = new VodBox.Core.SourceDefinition { Id = "probe-search", Name = "AOT 搜索站点" };
+                            for (int index = 0; index < 1000; index++) model.SearchResults.Add(new(searchSource, new(index.ToString(), $"AOT 搜索 {index}")));
+                            await Task.Delay(100);
+                            var searchPage = window.FindControl<VodBox.Desktop.Views.SearchView>("SearchPage")!;
+                            int visibleCards = searchPage.GetVisualDescendants().OfType<VodBox.Desktop.Views.CollectionCardView>().Count();
+                            if (visibleCards is < 1 or > 100) throw new InvalidOperationException("Search result virtualization failed.");
+                            await model.SearchBackCommand.ExecuteAsync(null);
+                            if (!model.ShowSearch || model.SearchSubmitted) throw new InvalidOperationException("Search back navigation failed.");
+                        }
+                    }
                     model.ShowPlaybackPage = true;
                     await Until(() => window.PlaybackView.IsEffectivelyVisible);
                     if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Page navigation recreated mpv renderer.");
@@ -154,13 +172,13 @@ internal static class DesktopProbe
                     var center = control.TranslatePoint(new Avalonia.Point(0, control.Bounds.Height / 2), row);
                     if (center is null || Math.Abs(center.Value.Y - row.Bounds.Height / 2) > 1) throw new InvalidOperationException("Playback controls are not horizontally aligned.");
                 }
-                await Until(() => !window.FindControl<Border>("NavigationPane")!.IsVisible && window.PlaybackView.VideoContainer.Bounds.Width > 900);
+                await Until(() => window.FindControl<Border>("NavigationPane") is null && window.PlaybackView.VideoContainer.Bounds.Width > 900);
                 if (!ReferenceEquals(renderSurface, window.PlaybackView.VideoContainer.Children.OfType<MpvVideoSurface>().Single())) throw new InvalidOperationException("Fullscreen recreated mpv renderer.");
                 SetRate(window.PlaybackView.ControlsView, 1.5);
                 await Until(() => Math.Abs(((MpvEngine)model.Engine.ActiveEngine!).Client!.GetDouble("speed").GetValueOrDefault() - 1.5) < .01);
                 await Task.Delay(1200);
                 window.ToggleFullscreen();
-                await Until(() => window.FindControl<Border>("NavigationPane")!.IsVisible);
+                await Until(() => window.PlaybackView.FindControl<Grid>("PlayerPageHeader")!.IsVisible);
                 if (model.Rate != 1.5 || Math.Abs(((MpvEngine)model.Engine.ActiveEngine!).Client!.GetDouble("speed").GetValueOrDefault() - 1.5) > .01) throw new InvalidOperationException("Fullscreen rate was not preserved.");
                 stage = "resume";
                 await Until(() => window.MpvRenderedFrames > previous + 5 && model.Engine.Snapshot.Position.TotalSeconds > 2.7);

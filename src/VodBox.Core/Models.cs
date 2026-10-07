@@ -26,6 +26,7 @@ public sealed record VodBoxConfig
     public List<SourceDefinition> Sources { get; set; } = [];
     public List<LiveSourceDefinition> LiveSources { get; set; } = [];
     public List<ResolverDefinition> Resolvers { get; set; } = [];
+    public List<string> ImportWarnings { get; set; } = [];
 }
 
 public sealed record Category(string Id, string Name);
@@ -52,15 +53,17 @@ public sealed record PlaybackRequest
     public bool IsLive { get; set; }
     public string? ResolverId { get; set; }
     public string? OriginalUri { get; set; }
+    public string? Poster { get; set; }
+    public string? SourceName { get; set; }
 }
 
 public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration,
     bool CanSeek, string? Error = null);
 public sealed record PlaybackEvent(long SessionId, PlaybackSnapshot Snapshot);
 public sealed record HistoryEntry(string ConfigId, string SourceId, string MediaId, string EpisodeId,
-    string Title, string Uri, long PositionMs, DateTimeOffset UpdatedAt, ResolutionKind ResolutionKind = ResolutionKind.Direct, string? ResolverId = null);
-public sealed record FavoriteEntry(string ConfigId, string SourceId, string MediaId, string Title);
-public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null, Dictionary<string, string>? EpgMap = null);
+    string Title, string Uri, long PositionMs, DateTimeOffset UpdatedAt, ResolutionKind ResolutionKind = ResolutionKind.Direct, string? ResolverId = null, string? Poster = null, string? SourceName = null);
+public sealed record FavoriteEntry(string ConfigId, string SourceId, string MediaId, string Title, string? Poster = null, string? SourceName = null);
+public sealed record LiveSourceDefinition(string Id, string Name, string Uri, string? Epg = null, Dictionary<string, string>? EpgMap = null, string? UserAgent = null);
 public sealed record LiveChannel(string Id, string Name, string Group, IReadOnlyList<string> Uris,
     string? Logo = null, string? TvgId = null, Dictionary<string, string>? Headers = null, string LiveSourceId = "");
 public sealed record Programme(string ChannelId, string Title, DateTimeOffset Start, DateTimeOffset End);

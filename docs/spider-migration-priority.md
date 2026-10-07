@@ -1,5 +1,7 @@
 # Spider 移植优先级
 
+2026-10-07：承接饭太硬导入时未覆盖的 42 项，新增兔小贝、虎牙、斗鱼、急救教学、荐影预告片五个原生 Provider，并修复明星 MV 129 项分类导入。余下 36 项仍待适配，具体范围、验收和限制见 [本批记录](public-site-spiders.md)。下文早期“Guard 未接入”记录不替代该批次的限定入口映射，也不意味着通用 Guard 已兼容。
+
 2026-10-05 读取 [饭太硬](http://www.饭太硬.net/tv) 与 [宝盒](https://宝盒接口.top) 配置，未下载或执行 JAR。完整逐站点快照见 [spider-inventory.json](spider-inventory.json)，含条目序号、名称、入口和 JAR 声明指纹。
 
 ## 计数口径

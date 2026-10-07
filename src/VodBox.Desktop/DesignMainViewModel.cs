@@ -13,6 +13,12 @@ public sealed class DesignMainViewModel : MainViewModel
         Items.Add(new("2", "城市与远方", Remarks: "电影 · 1080p"));
         Items.Add(new("3", "旅途中的声音", Remarks: "音乐 · 无损"));
         SetHomeRecommendations(Items);
+        SearchHistory.Add("探索自然"); SearchHistory.Add("城市");
+        foreach (var item in Items)
+        {
+            Favorites.Add(new("preview", "preview", item.Id, item.Title, SourceName: "设计预览 · 媒体库"));
+            History.Add(new("preview", "preview", item.Id, "e1", item.Title, "https://example.com/video.mp4", 720000, DateTimeOffset.UtcNow, SourceName: "设计预览 · 媒体库"));
+        }
         HomeRecommendationStatus = "";
         SelectedItem = Items[0];
         ShowPlaybackPage = false;

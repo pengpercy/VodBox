@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace VodBox.Desktop;
+namespace VodBox.Desktop.Views;
 
 public sealed partial class SourceConfigurationWindow : Window
 {

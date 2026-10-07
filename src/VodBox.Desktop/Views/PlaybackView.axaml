@@ -1,11 +1,18 @@
 <UserControl
     xmlns="https://github.com/avaloniaui" xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.Views.PlaybackView" x:DataType="vm:MainViewModel"
+    xmlns:core="using:VodBox.Core" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.Views.PlaybackView" x:DataType="vm:MainViewModel"
     x:CompileBindings="True">
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <Grid x:Name="PlaybackLayout" RowDefinitions="2*,Auto,Auto,*" ColumnDefinitions="3*,2*" RowSpacing="12" ColumnSpacing="16">
+  <Grid x:Name="PlayerPageLayout" RowDefinitions="Auto,*" RowSpacing="16">
+    <Grid x:Name="PlayerPageHeader" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+      <Button Command="{Binding PlaybackBackCommand}" ToolTip.Tip="返回上一页" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M18,2 L8,12 L18,22 M8,12 H28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
+      <TextBlock Grid.Column="1" Text="{Binding DetailTitle}" FontSize="24" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      <Button Grid.Column="2" Content="打开媒体" Click="OpenMediaClick" />
+      <Button Grid.Column="3" Content="打开地址"><Button.Flyout><Flyout><StackPanel Width="360" Spacing="12"><TextBox Text="{Binding Url}" PlaceholderText="媒体地址" /><ComboBox ItemsSource="{Binding Resolvers}" SelectedItem="{Binding SelectedResolver}"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:ResolverDefinition"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox><Button Content="播放" Command="{Binding OpenUrlCommand}" /></StackPanel></Flyout></Button.Flyout></Button>
+    </Grid>
+  <Grid x:Name="PlaybackLayout" Grid.Row="1" RowDefinitions="3*,Auto,Auto,2*" ColumnDefinitions="7*,3*" RowSpacing="12" ColumnSpacing="16">
     <Border Background="Black" CornerRadius="10" ClipToBounds="True" MinHeight="180" x:Name="VideoFrame">
       <Grid>
         <Grid x:Name="VideoHost">
@@ -19,5 +26,6 @@
     <Grid x:Name="DetailRegion" Grid.Column="1"><views:DetailSummaryView x:Name="DetailSummary" IsVisible="{Binding !IsLivePlayback}" /></Grid>
     <Grid x:Name="EpisodeRegion" Grid.Row="3" Grid.ColumnSpan="2"><views:EpisodeBrowserView x:Name="EpisodesPanel" IsVisible="{Binding !IsLivePlayback}" />
     <views:ProgrammeView IsVisible="{Binding IsLivePlayback}" /></Grid>
+  </Grid>
   </Grid>
 </UserControl>

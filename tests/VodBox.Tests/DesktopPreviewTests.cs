@@ -55,7 +55,7 @@ public sealed class DesktopPreviewTests
             Assert.All(viewModel.Cards, card => Assert.False(card.IsActive));
             Assert.Equal(3, viewModel.PlaybackEngineChoices.Count);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "探索自然");
-            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "你的媒体，随处播放");
+            Assert.Null(window.FindControl<Border>("NavigationPane"));
             await viewModel.NavigateCommand.ExecuteAsync("设置");
             window.SettingsWindow!.SettingsView.ShowPlaybackSettings(); Dispatcher.UIThread.RunJobs();
             Assert.Contains(window.SettingsWindow.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "播放内核");
@@ -310,12 +310,11 @@ public sealed class DesktopPreviewTests
         {
             model.ShowPlaybackPage = playback; window.Show(); Dispatcher.UIThread.RunJobs();
             var video = window.PlaybackView.VideoContainer;
-            var fullscreenButton = window.GetVisualDescendants().OfType<Button>().First(button => Equals(button.Content, "全屏"));
-            fullscreenButton.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.F11 });
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.F11 });
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(WindowState.FullScreen, window.WindowState);
             Assert.True(model.ShowPlaybackPage);
-            Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            Assert.Null(window.FindControl<Border>("NavigationPane"));
             var rateButton = window.PlaybackView.ControlsView.FindControl<Button>("RateButton")!;
             rateButton.Flyout!.ShowAt(rateButton); Dispatcher.UIThread.RunJobs();
             var preset = ((Control)((Flyout)rateButton.Flyout).Content!).GetVisualDescendants().OfType<Button>().Single(button => Equals(button.Tag, "2"));
@@ -349,7 +348,7 @@ public sealed class DesktopPreviewTests
             Assert.Equal(playback, model.ShowPlaybackPage); Assert.Equal(1.5, model.Rate);
             Assert.Equal(0, Grid.GetRow(controls));
             Assert.NotEqual(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(controls.FindControl<Border>("ControlsBackground")!.Background).Color);
-            Assert.True(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            Assert.Null(window.FindControl<Border>("NavigationPane"));
             Assert.True(window.PlaybackView.FindControl<Grid>("DetailRegion")!.IsVisible);
             Assert.Null(model.Engine.ActiveEngine);
         }

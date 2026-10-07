@@ -116,7 +116,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _playlist = new(_coordinator, _factory);
         _aggregateSearch = new(_factory);
         _epg = new(_http, AppPaths.CacheDirectory);
-        _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; Sources.CollectionChanged += (_, _) => NotifyHomeConfiguration(); InitializeEpisodeBrowser(); InitializeLiveRefresh();
+        _posters = new(_http, Path.Combine(AppPaths.CacheDirectory, "posters")); Items.CollectionChanged += ItemsChanged; Sources.CollectionChanged += (_, _) => NotifyHomeConfiguration(); InitializeCollectionPages(); InitializeEpisodeBrowser(); InitializeLiveRefresh();
         Engine.StateChanged += OnPlaybackState;
         Engine.ActiveEngineChanged += OnActiveEngineChanged;
         _coordinator.RequestChanged += (_, request) => Dispatcher.UIThread.Post(() =>
@@ -201,7 +201,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand] private Task ToggleFavoriteAsync() => RunAsync(async () =>
     {
         if (SelectedItem is null || SelectedSource is null) return;
-        var entry = new FavoriteEntry(_config.Id, SelectedSource.Id, SelectedItem.Id, SelectedItem.Title);
+        var entry = new FavoriteEntry(_config.Id, SelectedSource.Id, SelectedItem.Id, SelectedItem.Title, SelectedItem.Poster, SelectedSource.Name);
         bool exists = (await _store.GetFavoritesAsync()).Any(x => x.ConfigId == entry.ConfigId && x.SourceId == entry.SourceId && x.MediaId == entry.MediaId);
         await _store.SetFavoriteAsync(entry, !exists); Status = exists ? "已取消收藏。" : "已加入收藏。";
     });
@@ -214,8 +214,10 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             ShowSettings = true; SettingsRequested?.Invoke(this, EventArgs.Empty); return;
         }
         ShowPlaybackPage = false;
-        ShowHome = page == "首页"; ShowLibrary = page is "发现" or "点播" or "搜索"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = false; PageTitle = page;
+        ShowHome = page == "首页"; ShowLibrary = page is "发现" or "点播"; ShowSearch = page == "搜索"; ShowLive = page == "直播"; ShowHistory = page == "历史"; ShowFavorites = page == "收藏"; ShowSettings = false; PageTitle = page;
         if (ShowHome) await RefreshRecentHistoryAsync();
+        if (ShowSearch) { SearchSubmitted = false; RebuildSearchSuggestions(); }
+        if (ShowLibrary) AggregateResultsVisible = false;
         if (ShowLibrary && Items.Count == 0 && _provider is not null) await BrowseAsync();
         if (ShowHistory) { History.Clear(); foreach (var entry in await _store.GetHistoryAsync()) History.Add(entry); }
         if (ShowFavorites) { Favorites.Clear(); foreach (var entry in await _store.GetFavoritesAsync()) Favorites.Add(entry); }
@@ -250,7 +252,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         try { if (_provider is not null) await _provider.DisposeAsync(); }
         finally { _sourceGate.Release(); }
         await _coordinator.DisposeAsync(); await _resolution.DisposeAsync();
-        await Task.WhenAll(_danmakuTasks); await Task.WhenAll(_posterTasks); foreach (var card in Cards) card.Dispose(); foreach (var card in HomeCards) card.Dispose(); _posters.Dispose(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
+        await Task.WhenAll(_danmakuTasks); await Task.WhenAll(_posterTasks); foreach (var card in Cards) card.Dispose(); foreach (var card in HomeCards) card.Dispose(); DisposeCollectionCards(); _posters.Dispose(); _http.Dispose(); _browse?.Dispose(); _preferencesSave?.Dispose(); _lifetime.Dispose();
     }
 
 }

@@ -30,24 +30,29 @@ public sealed partial class PlaybackView : UserControl
     }
     private void UpdatePlaybackLayout()
     {
+        PlayerPageHeader.IsVisible = !_fullscreen;
+        PlayerPageLayout.RowDefinitions[0].Height = _fullscreen ? new(0) : GridLength.Auto;
+        PlayerPageLayout.RowSpacing = _fullscreen ? 0 : 16;
         VideoFrame.CornerRadius = new(_fullscreen ? 0 : 10);
         PlaybackHeading.IsVisible = !_fullscreen;
         DetailRegion.IsVisible = !_fullscreen;
         EpisodeRegion.IsVisible = !_fullscreen;
-        PlaybackLayout.RowDefinitions[0].Height = new(_fullscreen ? 1 : 2, GridUnitType.Star);
+        PlaybackLayout.RowDefinitions[0].Height = new(_fullscreen ? 1 : 3, GridUnitType.Star);
         PlaybackLayout.RowDefinitions[1].Height = _fullscreen ? new(0) : GridLength.Auto;
         PlaybackLayout.RowDefinitions[2].Height = _fullscreen ? new(0) : GridLength.Auto;
-        PlaybackLayout.RowDefinitions[3].Height = _fullscreen ? new(0) : new(1, GridUnitType.Star);
+        PlaybackLayout.RowDefinitions[3].Height = _fullscreen ? new(0) : new(2, GridUnitType.Star);
         Grid.SetRowSpan(VideoFrame, _fullscreen ? 4 : 1);
         bool wide = !_fullscreen && Bounds.Width >= 900;
-        PlaybackLayout.ColumnDefinitions[0].Width = new(wide ? 3 : 1, Avalonia.Controls.GridUnitType.Star);
-        PlaybackLayout.ColumnDefinitions[1].Width = wide ? new(2, Avalonia.Controls.GridUnitType.Star) : new(0);
+        PlaybackLayout.ColumnDefinitions[0].Width = new(wide ? 7 : 1, Avalonia.Controls.GridUnitType.Star);
+        PlaybackLayout.ColumnDefinitions[1].Width = wide ? new(3, Avalonia.Controls.GridUnitType.Star) : new(0);
         PlaybackLayout.ColumnSpacing = wide ? 16 : 0;
         Grid.SetColumnSpan(VideoFrame, wide ? 1 : 2);
         Grid.SetRow(DetailRegion, wide ? 0 : 2);
         Grid.SetColumn(DetailRegion, wide ? 1 : 0);
         Grid.SetColumnSpan(DetailRegion, wide ? 1 : 2);
     }
+    private async void OpenMediaClick(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    { if (DataContext is MainViewModel model && await ViewFilePicker.PickAsync(this, "打开本地媒体") is { } path) await model.OpenFileAsync(path); }
     public EpisodeBrowserView EpisodeBrowser => EpisodesPanel;
     public Grid VideoContainer => VideoHost;
     public VlcVideoSurface VideoSurface => SurfaceControl;

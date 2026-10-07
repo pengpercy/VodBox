@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VodBox.Desktop;
+using VodBox.Desktop.Views;
 using Xunit;
 
 namespace VodBox.Tests;
@@ -150,14 +151,14 @@ public sealed class HomeFlowTests
             window.Show(); Dispatcher.UIThread.RunJobs();
             Assert.True(model.ShowHome);
             Assert.True(window.FindControl<VodBox.Desktop.Views.HomeView>("HomePage")!.IsVisible);
-            Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            Assert.Null(window.FindControl<Border>("NavigationPane"));
             window.WindowState = WindowState.FullScreen; Dispatcher.UIThread.RunJobs();
             Assert.True(model.ShowPlaybackPage);
             window.WindowState = WindowState.Normal; Dispatcher.UIThread.RunJobs();
             Assert.True(model.ShowHome); Assert.False(model.ShowPlaybackPage);
-            Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            Assert.Null(window.FindControl<Border>("NavigationPane"));
             await model.NavigateCommand.ExecuteAsync("设置"); Dispatcher.UIThread.RunJobs();
-            Assert.False(window.FindControl<Border>("NavigationPane")!.IsVisible);
+            Assert.Null(window.FindControl<Border>("NavigationPane"));
             var settings = Assert.IsType<SettingsWindow>(window.SettingsWindow);
             Assert.True(settings.IsVisible); Assert.Same(model, settings.DataContext);
             settings.WindowState = WindowState.Minimized;

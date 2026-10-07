@@ -56,6 +56,8 @@ public partial class MainViewModel
         token.ThrowIfCancellationRequested();
         _aggregateCancellation?.Cancel(); _playlist.Clear(); _playingChannel = null; await _coordinator.StopAsync();
         _config = config; _resolution.Configure(config); NotifyHomeConfiguration();
+        ConfigurationWarnings.Clear(); foreach (var warning in config.ImportWarnings) ConfigurationWarnings.Add(warning);
+        OnPropertyChanged(nameof(HasConfigurationWarnings)); OnPropertyChanged(nameof(ConfigurationImportSummary));
         Resolvers.Clear(); Resolvers.Add(new() { Id = "_direct", Name = "直接播放", Kind = ResolutionKind.Direct });
         Resolvers.Add(new() { Id = "_browser", Name = "网页嗅探", Kind = ResolutionKind.Browser });
         foreach (var resolver in config.Resolvers ?? []) Resolvers.Add(resolver); SelectedResolver = Resolvers[0]; SelectedSource = null; await _sourceTask;
@@ -64,22 +66,40 @@ public partial class MainViewModel
         await _sourceTask;
         _allChannels.Clear(); Channels.Clear(); LiveGroups.Clear(); LiveGroups.Add("全部"); Programmes.Clear();
         var failures = new List<string>();
-        foreach (var live in config.LiveSources)
+        using var liveRequests = new SemaphoreSlim(3, 3);
+        var liveResults = await Task.WhenAll(config.LiveSources.Select(async live =>
         {
-            token.ThrowIfCancellationRequested();
-            try
-            {
-                var uri = new Uri(live.Uri);
-                await using var stream = uri.IsFile ? File.OpenRead(uri.LocalPath) : await _http.GetStreamAsync(uri, token);
-                var text = TextEncoding.Decode(await BoundedLiveAsync(stream, token));
-                foreach (var channel in LiveParser.Parse(text))
-                    _allChannels.Add(channel with { LiveSourceId = live.Id, Uris = channel.Uris.Select(x => new Uri(uri, x).AbsoluteUri).ToList() });
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !token.IsCancellationRequested) { failures.Add($"{live.Name}: {ex.Message}"); }
-        }
+            await liveRequests.WaitAsync(token);
+            try { return await LoadConfiguredLiveAsync(live, token); }
+            finally { liveRequests.Release(); }
+        }));
+        foreach (var result in liveResults) { _allChannels.AddRange(result.Channels); if (result.Error is not null) failures.Add(result.Error); }
         foreach (var group in _allChannels.Select(x => x.Group).Distinct()) LiveGroups.Add(group);
         SelectedLiveGroup = "全部"; await RefreshLiveFavoritesAsync();
-        Status = $"已加载 {Sources.Count} 个内容源、{_allChannels.Count} 个直播频道。" + (failures.Count > 0 ? " 未加载：" + string.Join("；", failures) : "");
+        Status = $"已加载 {Sources.Count} 个内容源、{_allChannels.Count} 个直播频道。" + ConfigurationImportSummary + (failures.Count > 0 ? " 未加载：" + string.Join("；", failures) : "");
+    }
+    private async Task<(IReadOnlyList<LiveChannel> Channels, string? Error)> LoadConfiguredLiveAsync(LiveSourceDefinition live, CancellationToken token)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        try
+        {
+            var uri = new Uri(live.Uri);
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            if (!string.IsNullOrWhiteSpace(live.UserAgent)) request.Headers.UserAgent.ParseAdd(live.UserAgent);
+            using var response = uri.IsFile ? null : await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+            response?.EnsureSuccessStatusCode();
+            await using var stream = uri.IsFile ? File.OpenRead(uri.LocalPath) : await response!.Content.ReadAsStreamAsync(deadline.Token);
+            string text = TextEncoding.Decode(await BoundedLiveAsync(stream, deadline.Token));
+            var channels = LiveParser.Parse(text).Select(channel =>
+            {
+                var headers = new Dictionary<string,string>(channel.Headers ?? [], StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(live.UserAgent)) headers.TryAdd("User-Agent", live.UserAgent);
+                return channel with { LiveSourceId = live.Id, Uris = channel.Uris.Select(value => new Uri(uri, value).AbsoluteUri).ToList(), Headers = headers.Count > 0 ? headers : channel.Headers };
+            }).ToArray();
+            return (channels, null);
+        }
+        catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
+        { return ([], $"{live.Name}: {error.Message}"); }
     }
     private static async Task<byte[]> BoundedLiveAsync(Stream stream, CancellationToken token)
     {
@@ -199,7 +219,7 @@ public partial class MainViewModel
         await EnsureStoredConfigurationAsync(configId);
         var source = _config.Sources.FirstOrDefault(x => x.Id == sourceId) ?? throw new InvalidDataException("记录所属内容源已被移除。");
         await SelectSourceAsync(source); await DetailAsync(new(mediaId, ""));
-        await NavigateAsync("发现"); ShowPlaybackPage = true; SchedulePreferencesSave();
+        ShowPlaybackPage = true; SchedulePreferencesSave();
     }
     private async Task EnsureStoredConfigurationAsync(string configId)
     {

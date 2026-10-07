@@ -49,7 +49,10 @@ public sealed class FeatureTests
             Assert.Equal("https://api.example/config.json", Assert.Single(await repository.ListAsync()).Location);
             var preferences = new PreferencesStore(Path.Combine(directory, "preferences.json"));
             var expected = new AppPreferences { LastConfigId = config.Id, Volume = 35, AutoNext = false, SkipIntroSeconds = 15, PlaybackEngineMode = PlaybackEngineMode.Mpv };
-            await preferences.SaveAsync(expected); Assert.Equal(expected, await preferences.LoadAsync());
+            expected.SearchHistory = ["探索自然", "城市"];
+            await preferences.SaveAsync(expected); var restored = await preferences.LoadAsync();
+            Assert.Equal(expected.SearchHistory, restored.SearchHistory);
+            Assert.Equal(expected with { SearchHistory = restored.SearchHistory }, restored);
             await repository.RemoveAsync(config.Id); Assert.Empty(await repository.ListAsync());
         }
         finally { Directory.Delete(directory, true); }

@@ -3,17 +3,23 @@ using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-public sealed class ConfigLoader(HttpClient http)
+public sealed partial class ConfigLoader(HttpClient http)
 {
     public async Task<VodBoxConfig> LoadAsync(string location, CancellationToken cancellationToken = default)
     {
+        location = location.Trim();
+        if (location.Length == 0) throw new InvalidDataException("请输入播放源配置地址。");
         Uri origin = Uri.TryCreate(location, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" or "file"
             ? uri : new Uri(Path.GetFullPath(location));
-        string json = origin.IsFile ? await File.ReadAllTextAsync(origin.LocalPath, cancellationToken)
-            : await http.GetStringAsync(origin, cancellationToken);
-        var config = JsonSerializer.Deserialize(json, VodBoxJson.Default.VodBoxConfig)
-            ?? throw new InvalidDataException("配置为空。");
-        config = config with { Resolvers = config.Resolvers ?? [], Sources = config.Sources ?? [], LiveSources = config.LiveSources ?? [] };
+        string json = await ReadConfigurationAsync(origin, cancellationToken);
+        using var document = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        if (document.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidDataException("配置必须是 JSON 对象。");
+        var config = document.RootElement.TryGetProperty("sites", out _)
+            ? await ImportTvAsync(document.RootElement, origin, cancellationToken)
+            : document.RootElement.Deserialize(VodBoxJson.Default.VodBoxConfig) ?? throw new InvalidDataException("配置为空。");
+        if (!document.RootElement.TryGetProperty("sites", out _) && !document.RootElement.TryGetProperty("schemaVersion", out _))
+            throw new InvalidDataException("未识别的配置格式，需包含 schemaVersion 或 sites。");
+        config = config with { ImportWarnings = config.ImportWarnings ?? [], Resolvers = config.Resolvers ?? [], Sources = config.Sources ?? [], LiveSources = config.LiveSources ?? [] };
         Validate(config);
         return config with
         {
@@ -46,7 +52,8 @@ public sealed class ConfigLoader(HttpClient http)
             if (resolver.NextResolverId is not null && !resolverIds.Contains(resolver.NextResolverId)) throw new InvalidDataException("解析器链引用了不存在的解析器。");
         var liveIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var live in config.LiveSources)
-            if (string.IsNullOrWhiteSpace(live.Id) || !liveIds.Add(live.Id) || string.IsNullOrWhiteSpace(live.Uri)) throw new InvalidDataException("直播源 ID 为空 / 重复，或入口为空。");
+            if (live.UserAgent?.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("直播请求标识无效。");
+            else if (string.IsNullOrWhiteSpace(live.Id) || !liveIds.Add(live.Id) || string.IsNullOrWhiteSpace(live.Uri)) throw new InvalidDataException("直播源 ID 为空 / 重复，或入口为空。");
         foreach (var source in config.Sources)
         {
             if (string.IsNullOrWhiteSpace(source.Id) || source.Id.StartsWith("live/", StringComparison.Ordinal) || !ids.Add(source.Id))

@@ -5,7 +5,13 @@
   <Design.DataContext>
     <vm:DesignMainViewModel />
   </Design.DataContext>
-  <Grid RowDefinitions="Auto,*" RowSpacing="12">
+  <Grid RowDefinitions="Auto,*" RowSpacing="20">
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+      <Button Command="{Binding NavigateCommand}" CommandParameter="首页" ToolTip.Tip="返回首页" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M18,2 L8,12 L18,22 M8,12 H28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
+      <TextBlock Grid.Column="1" Text="分类浏览" FontSize="24" VerticalAlignment="Center" />
+      <Button Grid.Column="2" Content="搜索" Command="{Binding NavigateCommand}" CommandParameter="搜索" />
+    </Grid>
+  <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="12">
     <StackPanel Spacing="10">
       <Grid ColumnDefinitions="*" ColumnSpacing="8">
         <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" HorizontalAlignment="Stretch">
@@ -44,14 +50,10 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
       </Grid>
-      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-        <TextBox Text="{Binding SearchText}" PlaceholderText="搜索内容" />
-        <Button Grid.Column="1" Content="当前源" Command="{Binding SearchCommand}" />
-        <Button Grid.Column="2" Content="全源搜索" Command="{Binding SearchAllCommand}" />
-      </Grid>
+
     </StackPanel>
     <Grid RowDefinitions="*,Auto,Auto" RowSpacing="8" Grid.Row="1">
-      <ListBox x:Name="PosterGrid" IsVisible="{Binding !AggregateResultsVisible}" ItemsSource="{Binding CardRows}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+      <ListBox x:Name="PosterGrid" ItemContainerTheme="{StaticResource PosterRowTheme}" ItemsSource="{Binding CardRows}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.Styles>
           <Style Selector="ListBoxItem">
             <Setter Property="Padding" Value="0" />
@@ -89,18 +91,8 @@
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
-      <ListBox IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchResults}" SelectionChanged="SearchSelectionChanged" Background="Transparent">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="core:SearchHit">
-            <StackPanel Margin="8" Spacing="4">
-              <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding SourceName}" Classes="muted" />
-            </StackPanel>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-      <ItemsControl Grid.Row="1" IsVisible="{Binding AggregateResultsVisible}" ItemsSource="{Binding SearchErrors}" MaxHeight="70" />
-      <Button Grid.Row="2" IsVisible="{Binding !AggregateResultsVisible}" Content="加载更多" Command="{Binding LoadMoreCommand}" HorizontalAlignment="Center" />
+      <Button Grid.Row="2" Content="加载更多" Command="{Binding LoadMoreCommand}" HorizontalAlignment="Center" />
     </Grid>
+  </Grid>
   </Grid>
 </UserControl>

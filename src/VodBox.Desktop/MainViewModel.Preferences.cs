@@ -21,6 +21,7 @@ public partial class MainViewModel
         Theme = preferences.Theme; ApplyTheme(); _preferredSourceId = preferences.LastSourceId;
         _lastLiveConfigId = preferences.LastLiveConfigId; _lastLiveSourceId = preferences.LastLiveSourceId; _lastLiveChannelId = preferences.LastLiveChannelId;
         AutoLiveFallback = preferences.AutoLiveFallback; ResumeLiveOnStartup = preferences.ResumeLiveOnStartup;
+        SearchHistory.Clear(); foreach (var term in preferences.SearchHistory.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Take(20)) SearchHistory.Add(term);
         _initialized = true; await RefreshSavedConfigurationsAsync(); await RefreshRecentHistoryAsync();
         var saved = SavedConfigurations.FirstOrDefault(x => x.Id == preferences.LastConfigId);
         if (saved is not null) { await LoadSavedConfigurationAsync(saved); if (ResumeLiveOnStartup) await ResumeLastLiveAsync(); return; }
@@ -31,6 +32,7 @@ public partial class MainViewModel
     private AppPreferences CapturePreferences() => new()
     {
         DanmakuEnabled = DanmakuEnabled, DanmakuFontSize = DanmakuFontSize, DanmakuOpacity = DanmakuOpacity, DanmakuCoverage = DanmakuCoverage, DanmakuDelayMs = DanmakuDelayMs,
+        SearchHistory = SearchHistory.ToList(),
         LastConfigId = _config.Id, LastSourceId = SelectedSource?.Id, Volume = Volume, Rate = Rate,
         PlaybackEngineMode = SelectedPlaybackEngine.Mode,
         AutoNext = AutoNext, ResumePlayback = ResumePlayback, SkipIntroSeconds = SkipIntroSeconds, SkipOutroSeconds = SkipOutroSeconds, Theme = Theme, LastLiveConfigId = _lastLiveConfigId, LastLiveSourceId = _lastLiveSourceId, LastLiveChannelId = _lastLiveChannelId, AutoLiveFallback = AutoLiveFallback, ResumeLiveOnStartup = ResumeLiveOnStartup, AudioDelayMs = AudioDelayMs, SubtitleDelayMs = SubtitleDelayMs

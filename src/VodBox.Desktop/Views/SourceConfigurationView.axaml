@@ -10,6 +10,6 @@
       <Button Grid.Column="1" Content="保存" Click="LoadClick" IsEnabled="{Binding !IsBusy}" />
     </Grid>
     <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" />
-    <TextBlock Text="支持 VodBox 配置格式；旧 TV 配置暂不兼容。" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+    <TextBlock Text="支持 VodBox 配置及 TV 订阅导入；未适配的站点会在设置中列出。" TextWrapping="Wrap" Classes="muted" FontSize="12" />
   </StackPanel>
 </UserControl>
