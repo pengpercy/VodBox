@@ -61,22 +61,23 @@ public class FtyConfigChainTests
 
         var sources = ConfigLoader.ToSources(config);
 
-        // 7 个 csp_BiliGuard 已有 C# 原生实现 → 存活为 NativeSpider
+        // 8 个 csp_ 已有 C# 原生实现 → 存活为 NativeSpider（7 个 BiliGuard + 1 个 FirstAidGuard）
         var native = sources.Where(s => s.Runtime == SourceRuntime.NativeSpider).ToList();
-        Assert.Equal(7, native.Count);
-        Assert.All(native, s => Assert.Equal("csp_BiliGuard", s.Api));
+        Assert.Equal(8, native.Count);
+        Assert.Equal(7, native.Count(s => s.Api == "csp_BiliGuard"));
+        Assert.Equal(1, native.Count(s => s.Api == "csp_FirstAidGuard"));
 
         // 3 个 .js drpy 脚本站点存活，运行时判定为 QuickJs
         var scripts = sources.Where(s => s.Runtime == SourceRuntime.QuickJs).ToList();
         Assert.Equal(3, scripts.Count);
         Assert.All(new[] { "dr_兔小贝", "虎牙js", "斗鱼js" }, key => Assert.Contains(scripts, s => s.Key == key));
 
-        // 38 个未实现的 csp_ 仍被过滤：45 - 7 存活
+        // 37 个未实现的 csp_ 仍被过滤：45 - 8 存活
         Assert.Equal(45 - native.Count, csp.Count - native.Count);
         Assert.DoesNotContain(sources, s => s.Runtime == SourceRuntime.Node);
 
-        // 总存活 = 7 原生 + 3 脚本 = 10；站点总数 48 = 38 过滤 + 10 存活
-        Assert.Equal(10, sources.Count);
+        // 总存活 = 8 原生 + 3 脚本 = 11；站点总数 48 = 37 过滤 + 11 存活
+        Assert.Equal(11, sources.Count);
         Assert.Equal(48, sources.Count + (csp.Count - native.Count));
     }
 
