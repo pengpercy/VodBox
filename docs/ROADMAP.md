@@ -46,7 +46,7 @@
 4. README 与实现对齐：删掉未实现的 catchup / 轨道 UI 声称
 5. 接入测试源：`.cache/test-sources.md` 里的两个源加进冒烟脚本
 
-### S0.5 · 共享地基（P0，0.5 天，S1/S3 前置）
+### S0.5 · 共享地基（P0，0.5 天，S1/S3 前置）✅ 已完成 `cbd8785` `1a74a91`
 已决策纳入四个低成本高收益组件（详见 `docs/SALVAGE.md` §D）：
 - `BoundedContent.ReadAsync(stream,max,ct)` —— 从旧 `MacCmsProvider.cs:146` 的 private static 抽成独立文件；
   几乎所有复用文件都依赖它
@@ -107,7 +107,26 @@ VM 骨架可直接复用，**协议层必须重写**：旧宿主跑私有 VodBox
 收益：4 个条目（虎牙/斗鱼/儿童启蒙，两源合计）。注意旧代码已有虎牙/斗鱼/兔小贝的
 **原生 C# provider**（真机 AOT 验证过），故 drpy 优先级可低于 S3b。工作量 **L**。
 
-**S3b · 原生 C# 高频站点适配** —— 范围收窄为**头部 ~11 个入口**
+**S3b · 原生 C# 高频站点适配** —— 范围收窄为**头部 ~11 个入口** 🔨 进行中（1/11 完成）
+
+✅ **已完成 `4eba5ab` `5de0726`**：
+- `NativeSpiders` 注册表 + `SourceRuntime.NativeSpider` + `IResolvingContentSource`
+  （签名/时效播放地址需在点播时现取，不能预置 `Episode.Uri`；直连源不实现，无破坏性变更）
+- `BilibiliSource`：`csp_Bili` / `csp_BiliGuard`（覆盖排名第 1、2 的入口，两源合计 16 条目 = 16.3%）
+- `ConfigLoader.ToSources` 路由 csp_；`DetailViewModel.PlayAsync` 走即时解析
+- **真实端到端验证**：饭太硬存活源 0 → 10（7 个 BiliGuard），分类 130、首页 20 项、
+  详情/播放解析出真实 CDN URL + cid 弹幕地址；宝盒存活 0 → 10（9 个 NativeSpider），
+  分类 42、首页 20 项、聚合搜索 102 条
+- **两个真实配置暴露的缺陷已修**：`TvBoxParse.Ext` 多态（宝盒整份配置曾解析失败）、
+  B 站匿名搜索 `v_voucher` 风控（约 1/4 概率，已加退避重试 + 明确报错）
+- **聚合搜索静默吞异常已修**：`SearchWithFailuresAsync` 返回逐源失败原因 + 每站独立 25s 超时
+- 测试 71 → 90 全绿（B 站离线回归 19 项，含真实抓取的 popular/nav/spi fixture）
+
+⏭️ **下一个**：`csp_AppGet`（排名第 3，宝盒 4 条目）。注意旧实现吃的是预解析 options
+字典，**从未实现 TVBox `ext` 管道格式**（`url|key|version|ua`）解析，需新写；且旧验证
+记录仅咕咕(V119)真机通过，一碗/蔬菜/首发均失败，Qiji-v122 仅 fixture——ROI 低于 Bilibili。
+
+原始范围表：
 实测 69 个独立 `csp_` 入口中**仅 11 个出现 ≥2 次（覆盖 38% 条目）**，**58 个只出现 1 次**；
 前 20 入口才覆盖 47%。全量移植不现实（每个入口都是独立站点协议逆向）。
 按频次移植，旧代码基本都有真机验证实现可复用：
