@@ -150,6 +150,10 @@ public sealed class CollectionPageTests
             var target = new LibraryStore(Path.Combine(directory, "restored.db")); target.MergeSnapshot(reopened.ExportSnapshot());
             Assert.Equal(favorite, Assert.Single(await target.GetFavoritesAsync())); Assert.Equal(history, Assert.Single(await target.GetHistoryAsync()));
         }
-        finally { Directory.Delete(directory, true); }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, true);
+        }
     }
 }
