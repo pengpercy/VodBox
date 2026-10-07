@@ -10,7 +10,7 @@
         Background="Transparent"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="-1"
-        SystemDecorations="Full"
+        WindowDecorations="Full"
         FontSize="13">
 
   <!-- Mica 底色：桌面壁纸采样 + 深色叠加 -->
@@ -25,7 +25,7 @@
           <TextBlock Text="VodBox" VerticalAlignment="Center" FontSize="12.5" Opacity="0.8" />
         </StackPanel>
         <!-- 全局搜索框 -->
-        <TextBox Grid.Column="1" Text="{Binding SearchKeyword}" Watermark="搜索影片、剧集…"
+        <TextBox Grid.Column="1" Text="{Binding SearchKeyword}" PlaceholderText="搜索影片、剧集…"
                  Width="380" Height="30" CornerRadius="15" HorizontalAlignment="Center"
                  KeyDown="OnSearchKeyDown" VerticalContentAlignment="Center" />
         <TextBlock Grid.Column="2" Text="{Binding Clock}" VerticalAlignment="Center" FontSize="12.5"

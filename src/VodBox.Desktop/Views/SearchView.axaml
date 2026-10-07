@@ -11,7 +11,7 @@
 
       <StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center" Margin="0,10,0,0">
         <TextBlock Text="🔍" FontSize="18" VerticalAlignment="Center" />
-        <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="480" Height="42"
+        <TextBox Text="{Binding Keyword}" PlaceholderText="搜索影片、剧集、综艺…" Width="480" Height="42"
                  CornerRadius="21" FontSize="14" VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
         <Button Content="搜索 ⏎" Command="{Binding RunSearchCommand}" Click="OnSearchClick"
                 CornerRadius="18" Padding="16,8" Background="#0078D4" Foreground="White"

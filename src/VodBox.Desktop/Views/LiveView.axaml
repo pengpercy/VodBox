@@ -19,7 +19,7 @@
           <Button Content="🕘 历史" Click="OnTabHistory" CornerRadius="7,7,0,0" Padding="0,8" Width="100"
                   Background="Transparent" BorderThickness="0" Foreground="#85FFFFFF" FontSize="12.5" />
         </StackPanel>
-        <TextBox Grid.Row="1" Text="{Binding FilterText}" Watermark="🔍 筛选频道…" Margin="12" Height="34"
+        <TextBox Grid.Row="1" Text="{Binding FilterText}" PlaceholderText="🔍 筛选频道…" Margin="12" Height="34"
                  CornerRadius="7" />
         <ComboBox Grid.Row="2" ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}"
                   Margin="12,0,12,8" PlaceholderText="选择分组">
