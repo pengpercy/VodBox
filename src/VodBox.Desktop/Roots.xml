@@ -1,0 +1,7 @@
+<linker>
+  <!-- Avalonia XAML 编译生成的类型由 StartUp 间接保留；此处显式根化 App 与 DesignData（设计预览） -->
+  <assembly fullname="VodBox.Desktop">
+    <type fullname="VodBox.Desktop.App" preserve="All" />
+    <type fullname="VodBox.Desktop.Design.DesignData" preserve="All" />
+  </assembly>
+</linker>

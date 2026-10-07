@@ -5,6 +5,45 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationIcon>Assets/Icons/vodbox.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <TreatAsLocalProperty>PublishAot;DisableAOT</TreatAsLocalProperty>
+    <EffectiveRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</EffectiveRuntimeIdentifier>
+    <EffectiveRuntimeIdentifier Condition="'$(EffectiveRuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</EffectiveRuntimeIdentifier>
+  </PropertyGroup>
+
+  <!-- Debug：只禁用 AOT 与 JSON 反射限制，以支持设计器预览 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <PublishAot>false</PublishAot>
+    <DebuggerSupport>true</DebuggerSupport>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <!-- Release：AOT 优化（-p:DisableAOT=true 可临时关闭） -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' != 'true'">
+    <PublishAot>true</PublishAot>
+    <TrimMode>full</TrimMode>
+    <UseAppHost>true</UseAppHost>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AvaloniaEnableILVerify>true</AvaloniaEnableILVerify>
+    <AvaloniaSkipUnknownCLRInstrumentation>true</AvaloniaSkipUnknownCLRInstrumentation>
+    <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+    <IlcOptimizationPreference>Size</IlcOptimizationPreference>
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+    <StripSymbols>true</StripSymbols>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <TieredCompilation>false</TieredCompilation>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimmerRemoveSymbols>true</TrimmerRemoveSymbols>
+    <DebuggerSupport>false</DebuggerSupport>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <StackTraceSupport>false</StackTraceSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <AppleGenerateDSym>false</AppleGenerateDSym>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,5 +61,9 @@
     <ProjectReference Include="..\VodBox.Core\VodBox.Core.csproj" />
     <ProjectReference Include="..\VodBox.Infrastructure\VodBox.Infrastructure.csproj" />
     <ProjectReference Include="..\VodBox.Playback.Mpv\VodBox.Playback.Mpv.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <TrimmerRootDescriptor Include="Roots.xml" />
+    <TrimmerRootAssembly Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
 </Project>
