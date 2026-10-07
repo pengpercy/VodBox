@@ -13,9 +13,8 @@ public sealed class AppServices : IDisposable
     public MpvEngine Player { get; }
     public IPreferences Prefs => Store;
 
-    public AppServices() : this(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".vodbox"))
+    /// <summary>默认数据目录走平台规范（XDG / macOS ~/Library / Windows LocalApplicationData）。</summary>
+    public AppServices() : this(AppPaths.DataDirectory)
     {
     }
 
