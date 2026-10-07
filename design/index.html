@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VodBox 桌面版 · 设计稿</title>
+<style>
+/* ===================== 基础 & Fluent/Mica 令牌 ===================== */
+:root{
+  --accent:#4cc2ff; --accent-strong:#0078d4; --accent-soft:rgba(76,194,255,.16);
+  --bg-base:#202020; --bg-mica-1:#2b2b2b; --bg-mica-2:#323232;
+  --card:rgba(255,255,255,.045); --card-hover:rgba(255,255,255,.085);
+  --stroke:rgba(255,255,255,.09); --stroke-soft:rgba(255,255,255,.055);
+  --text-1:#ffffff; --text-2:rgba(255,255,255,.78); --text-3:rgba(255,255,255,.52);
+  --danger:#ff6b6b; --ok:#6ccb5f; --warn:#ffb900;
+  --r-lg:12px; --r-md:8px; --r-sm:6px;
+  --shadow-1:0 2px 8px rgba(0,0,0,.35);
+  --shadow-2:0 8px 24px rgba(0,0,0,.45);
+  --shadow-3:0 16px 48px rgba(0,0,0,.55);
+  --font:"Segoe UI Variable","Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:#111;font-family:var(--font);color:var(--text-1)}
+body{padding:48px 32px 96px}
+h1.doc{font-size:34px;font-weight:600;letter-spacing:.5px;margin:0 0 6px}
+.doc-sub{color:var(--text-3);font-size:14px;margin-bottom:40px}
+.doc-sub b{color:var(--text-2)}
+.board-label{display:flex;align-items:baseline;gap:12px;margin:56px 0 16px}
+.board-label .num{font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:3px 10px;white-space:nowrap}
+.board-label .t{font-size:22px;font-weight:600}
+.board-label .d{color:var(--text-3);font-size:13px}
+
+/* ===================== 窗口画板（带 Mica） ===================== */
+.window{width:1280px;height:800px;border-radius:10px;overflow:hidden;position:relative;
+  box-shadow:0 30px 90px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.08);
+  background:linear-gradient(135deg,#3a2f4a 0%,#2b3242 30%,#26343b 60%,#332a3f 100%);
+  display:flex;flex-direction:column}
+/* Mica 采样层：桌面壁纸模糊 + 深色叠加 */
+.window::before{content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(600px 400px at 15% -10%, rgba(124,92,191,.35), transparent 60%),
+    radial-gradient(700px 500px at 90% 110%, rgba(45,110,120,.35), transparent 60%),
+    radial-gradient(500px 380px at 85% 0%, rgba(64,96,140,.28), transparent 60%),
+    linear-gradient(rgba(32,32,32,.82), rgba(32,32,32,.86));
+  backdrop-filter:blur(40px);pointer-events:none}
+.window>*{position:relative;z-index:1}
+
+/* 标题栏 */
+.titlebar{height:44px;display:flex;align-items:center;padding:0 0 0 16px;flex:none;
+  -webkit-app-region:drag;position:relative}
+.titlebar .tb-title{font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:8px}
+.tb-search{margin:0 auto;width:380px;height:30px;border-radius:15px;background:rgba(255,255,255,.07);
+  border:1px solid var(--stroke-soft);display:flex;align-items:center;padding:0 14px;gap:8px;
+  color:var(--text-3);font-size:12.5px}
+.tb-search:hover{background:rgba(255,255,255,.1)}
+.tb-clock{font-size:12.5px;color:var(--text-2);margin-right:14px;font-variant-numeric:tabular-nums}
+.win-controls{display:flex;height:44px}
+.win-controls span{width:46px;display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:13px}
+.win-controls span:hover{background:rgba(255,255,255,.08)}
+.win-controls span.close:hover{background:#c42b1c;color:#fff}
+
+.shell{flex:1;display:flex;min-height:0}
+
+/* ===================== 左侧导航 ===================== */
+.nav{width:216px;flex:none;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.nav .brand{display:flex;align-items:center;gap:10px;padding:8px 10px 16px}
+.nav .brand .logo{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#4cc2ff,#7c5cbf);font-size:17px;box-shadow:var(--shadow-1)}
+.nav .brand .n{font-size:15px;font-weight:600}
+.nav .brand .v{font-size:10.5px;color:var(--text-3)}
+.nav-item{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:7px;color:var(--text-2);
+  font-size:13.5px;cursor:pointer;position:relative;transition:background .12s}
+.nav-item:hover{background:var(--card-hover);color:var(--text-1)}
+.nav-item.active{background:var(--card);color:var(--text-1)}
+.nav-item.active::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--accent)}
+.nav-item .ic{width:20px;text-align:center;font-size:15px}
+.nav-item .badge{margin-left:auto;font-size:10.5px;background:var(--accent-soft);color:var(--accent);
+  border-radius:10px;padding:1px 7px}
+.nav .sp{flex:1}
+.nav .foot{padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--stroke-soft)}
+
+/* ===================== 内容区通用 ===================== */
+.content{flex:1;min-width:0;overflow-y:auto;padding:8px 28px 28px}
+.content::-webkit-scrollbar{width:10px}
+.content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:5px;border:2px solid transparent;background-clip:content-box}
+.page-head{display:flex;align-items:center;gap:14px;margin:14px 0 20px}
+.page-head h2{font-size:24px;font-weight:600}
+.page-head .sub{color:var(--text-3);font-size:13px}
+.card{background:var(--card);border:1px solid var(--stroke-soft);border-radius:var(--r-lg)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:16px;font-size:12.5px;
+  background:var(--card);border:1px solid var(--stroke-soft);color:var(--text-2);cursor:pointer;transition:all .12s}
+.chip:hover{background:var(--card-hover);color:var(--text-1)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer;
+  background:var(--card);border:1px solid var(--stroke);color:var(--text-1);transition:all .12s;white-space:nowrap;flex:none}
+.btn:hover{background:var(--card-hover)}
+.chip{white-space:nowrap}
+.btn.primary{background:var(--accent-strong);border-color:transparent}
+.btn.primary:hover{filter:brightness(1.15)}
+.icon-btn{width:32px;height:32px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--card);border:1px solid var(--stroke-soft);color:var(--text-2);cursor:pointer;font-size:14px}
+.icon-btn:hover{background:var(--card-hover);color:var(--text-1)}
+
+/* 海报卡 */
+.posters{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:18px}
+.poster{cursor:pointer;position:relative}
+.poster .art{border-radius:var(--r-md);aspect-ratio:2/3;overflow:hidden;position:relative;
+  border:1px solid var(--stroke-soft);box-shadow:var(--shadow-1);transition:transform .15s, box-shadow .15s}
+.poster:hover .art{transform:translateY(-4px);box-shadow:var(--shadow-2)}
+.poster .art .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;color:rgba(255,255,255,.25)}
+.poster .art .mark{position:absolute;left:0;right:0;padding:22px 8px 7px;font-size:10.5px;color:#fff;
+  background:linear-gradient(transparent,rgba(0,0,0,.85));bottom:0}
+.poster .art .tag{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  border-radius:5px;padding:2px 7px;font-size:10.5px;color:var(--accent)}
+.poster .art .hover{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);opacity:0;
+  transition:opacity .15s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.poster:hover .art .hover{opacity:1}
+.poster .nm{font-size:13px;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.poster .mt{font-size:11px;color:var(--text-3);margin-top:2px}
+.poster .prog{height:3px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:6px;overflow:hidden}
+.poster .prog i{display:block;height:100%;background:var(--accent);border-radius:2px}
+
+/* 横向卡带 */
+.rail{display:flex;gap:16px;overflow:hidden}
+.rail .poster{width:150px;flex:none}
+.sec-title{font-size:16px;font-weight:600;margin:26px 0 14px;display:flex;align-items:center;gap:10px}
+.sec-title .more{font-size:12px;color:var(--text-3);font-weight:400;margin-left:auto;cursor:pointer}
+.sec-title .more:hover{color:var(--accent)}
+
+/* 英雄区 */
+.hero{border-radius:var(--r-lg);overflow:hidden;position:relative;height:300px;border:1px solid var(--stroke-soft)}
+.hero .bg{position:absolute;inset:0}
+.hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(16,16,20,.92) 8%,rgba(16,16,20,.45) 55%,transparent)}
+.hero .shade2{position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(16,16,20,.9))}
+.hero .in{position:absolute;left:32px;bottom:28px;right:40%}
+.hero .kicker{font-size:11.5px;color:var(--accent);letter-spacing:2px;margin-bottom:8px}
+.hero h3{font-size:30px;font-weight:600;margin-bottom:8px}
+.hero p{font-size:12.5px;color:var(--text-2);line-height:1.7;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hero .ops{display:flex;gap:10px;margin-top:16px}
+.hero .dots{position:absolute;bottom:16px;right:20px;display:flex;gap:6px}
+.hero .dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.3)}
+.hero .dots i.on{width:18px;background:var(--accent)}
+
+/* ===================== 点播页 ===================== */
+.type-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.filter-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:18px;flex-wrap:wrap}
+.filter-bar .fl{display:flex;align-items:center;gap:8px;font-size:12px}
+.filter-bar .fl .k{color:var(--text-3)}
+.pager{display:flex;justify-content:center;gap:6px;margin:26px 0 4px}
+.pager span{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;color:var(--text-2);background:var(--card);cursor:pointer}
+.pager span.on{background:var(--accent-soft);color:var(--accent)}
+
+/* ===================== 详情页 ===================== */
+.detail{display:flex;gap:28px}
+.detail .big-poster{width:230px;flex:none}
+.detail .big-poster .art{border-radius:var(--r-lg);aspect-ratio:2/3;overflow:hidden;position:relative;
+  border:1px solid var(--stroke-soft);box-shadow:var(--shadow-3)}
+.detail .info{flex:1;min-width:0;width:0}
+.detail h3{font-size:28px;font-weight:600}
+.detail .remark{color:var(--accent);font-size:13px;margin-top:6px}
+.detail .meta{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.detail .meta span{font-size:12px;color:var(--text-2);background:var(--card);border:1px solid var(--stroke-soft);
+  border-radius:5px;padding:4px 10px}
+.detail .crew{font-size:12.5px;color:var(--text-3);line-height:1.9}
+.detail .crew b{color:var(--text-2);font-weight:500}
+.detail .intro{font-size:12.5px;color:var(--text-2);line-height:1.8;margin-top:10px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.detail .intro:hover{color:var(--text-1)}
+.detail .ops{display:flex;gap:10px;margin-top:18px}
+.detail .screen{width:344px;flex:none}
+.detail .screen .player{aspect-ratio:16/9;border-radius:var(--r-lg);background:#000;position:relative;overflow:hidden;
+  border:1px solid var(--stroke-soft);box-shadow:var(--shadow-2)}
+.detail .screen .cap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.detail .screen .play-fab{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.14);
+  backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.25)}
+.detail .screen .hint{text-align:center;color:var(--text-3);font-size:11.5px;margin-top:10px}
+.sel-block{margin-top:22px}
+.sel-block .sel-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sel-block .sel-head .t{font-size:14px;font-weight:600}
+.sel-block .sel-head .note{font-size:11.5px;color:var(--text-3)}
+.ep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.ep{padding:9px 0;text-align:center;font-size:12.5px;border-radius:7px;background:var(--card);
+  border:1px solid var(--stroke-soft);color:var(--text-2);cursor:pointer;position:relative;transition:all .1s}
+.ep:hover{background:var(--card-hover);color:var(--text-1)}
+.ep.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.ep.seen::after{content:"✓";position:absolute;top:2px;right:4px;font-size:9px;color:var(--ok)}
+
+/* ===================== 播放窗口 ===================== */
+.playwin{background:#000 !important}
+.playwin::before{display:none}
+.player-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.player-stage .fake-video{position:absolute;inset:0}
+.osd-top{position:absolute;top:0;left:0;right:0;padding:18px 22px;display:flex;align-items:center;gap:14px;
+  background:linear-gradient(rgba(0,0,0,.7),transparent);z-index:5}
+.osd-top .back{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.1);display:flex;
+  align-items:center;justify-content:center;cursor:pointer}
+.osd-top .tt{font-size:15px;font-weight:600}
+.osd-top .ep-t{font-size:12.5px;color:var(--text-2)}
+.osd-top .res{margin-left:auto;font-size:11.5px;color:var(--text-2);background:rgba(255,255,255,.1);
+  padding:3px 9px;border-radius:5px}
+.osd-msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);
+  backdrop-filter:blur(8px);border-radius:7px;padding:7px 16px;font-size:12.5px;z-index:5;border:1px solid rgba(255,255,255,.12)}
+.danmaku-demo{position:absolute;left:0;right:0;top:110px;pointer-events:none;z-index:4}
+.danmaku-demo div{position:absolute;white-space:nowrap;font-size:15px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.osd-bottom{position:absolute;left:0;right:0;bottom:0;padding:0 22px 16px;z-index:5;
+  background:linear-gradient(transparent,rgba(0,0,0,.78))}
+.seek{position:relative;height:22px;display:flex;align-items:center;cursor:pointer;margin-bottom:4px}
+.seek .track{position:relative;height:4px;border-radius:2px;background:rgba(255,255,255,.22);width:100%}
+.seek .buf{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:rgba(255,255,255,.4)}
+.seek .played{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--accent)}
+.seek .knob{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--accent);top:50%;
+  transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(76,194,255,.8)}
+.seek .mark{position:absolute;top:-3px;width:2px;height:10px;background:rgba(255,255,255,.5)}
+.ctl-row{display:flex;align-items:center;gap:6px}
+.ctl-row .cbtn{height:34px;min-width:34px;padding:0 9px;border-radius:7px;display:inline-flex;align-items:center;
+  justify-content:center;gap:5px;color:var(--text-2);font-size:12.5px;cursor:pointer;transition:all .1s;white-space:nowrap;flex:none}
+.ctl-row .cbtn:hover{background:rgba(255,255,255,.12);color:#fff}
+.ctl-row .cbtn.big{font-size:17px}
+.ctl-row .cbtn.on{color:var(--accent)}
+.ctl-row .time{font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums;padding:0 8px}
+.ctl-row .gap{flex:1}
+.vol{width:64px;height:4px;border-radius:2px;background:rgba(255,255,255,.22);position:relative}
+.vol i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:#fff}
+
+/* ===================== 直播 ===================== */
+.live-shell{display:flex;flex:1;min-height:0}
+.chan-panel{width:360px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--stroke-soft);
+  background:rgba(255,255,255,.02)}
+.chan-panel .tabs{display:flex;gap:4px;padding:10px 12px 0}
+.chan-panel .tabs span{flex:1;text-align:center;padding:8px 0;font-size:12.5px;color:var(--text-3);border-radius:7px 7px 0 0;cursor:pointer}
+.chan-panel .tabs span.on{color:var(--text-1);background:var(--card);border-bottom:2px solid var(--accent)}
+.chan-search{margin:12px;padding:8px 12px;border-radius:7px;background:var(--card);border:1px solid var(--stroke-soft);
+  color:var(--text-3);font-size:12.5px;display:flex;gap:8px;align-items:center}
+.gname{padding:9px 16px;font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:8px}
+.gname .cnt{margin-left:auto;font-size:11px}
+.chan-list{flex:1;overflow-y:auto;padding:0 8px 12px}
+.chan-list::-webkit-scrollbar{width:8px}
+.chan-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+.chan{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer}
+.chan:hover{background:var(--card-hover)}
+.chan.on{background:var(--accent-soft)}
+.chan .no{width:34px;font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.chan .lg{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;flex:none}
+.chan .nm{font-size:13px}
+.chan .epg{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chan .lv{margin-left:auto;font-size:10px;color:#ff5f5f;border:1px solid #ff5f5f;border-radius:4px;padding:0 5px}
+.live-stage{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;min-width:0}
+.live-info{position:absolute;left:24px;bottom:86px;display:flex;align-items:center;gap:14px;z-index:5;
+  background:rgba(0,0,0,.5);backdrop-filter:blur(10px);padding:12px 18px;border-radius:12px;border:1px solid rgba(255,255,255,.1)}
+.live-info .lg{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700}
+.live-info .nm{font-size:16px;font-weight:600}
+.live-info .now{font-size:12px;color:var(--accent)}
+.live-info .nxt{font-size:11px;color:var(--text-3)}
+.epg-strip{position:absolute;left:24px;right:24px;bottom:150px;display:flex;gap:8px;z-index:5}
+.epg-item{flex:1;background:rgba(0,0,0,.5);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);
+  border-radius:9px;padding:9px 12px;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.epg-item .t{color:var(--text-1);overflow:hidden;text-overflow:ellipsis}
+.epg-item .tm{color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.epg-item.now{border-color:var(--accent)}
+.epg-item.now .t{color:var(--accent)}
+.epg-item.past{opacity:.55}
+.num-osd{position:absolute;top:38%;right:60px;font-size:64px;font-weight:700;color:#fff;
+  text-shadow:0 2px 12px rgba(0,0,0,.9);z-index:6;letter-spacing:4px}
+
+/* ===================== 搜索页 ===================== */
+.search-hero{display:flex;flex-direction:column;align-items:center;margin:30px 0 26px}
+.search-box{width:560px;height:46px;border-radius:23px;background:rgba(255,255,255,.07);
+  border:1px solid var(--stroke);display:flex;align-items:center;padding:0 20px;gap:12px;font-size:14px;
+  box-shadow:var(--shadow-1)}
+.search-box input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:14px;font-family:inherit}
+.search-box .k{color:var(--text-3);font-size:12px;border:1px solid var(--stroke);border-radius:5px;padding:2px 8px}
+.suggest{width:560px;margin-top:6px;padding:8px;border-radius:12px;background:rgba(40,40,42,.92);
+  backdrop-filter:blur(24px);border:1px solid var(--stroke);box-shadow:var(--shadow-3)}
+.suggest .sg{padding:8px 14px;border-radius:7px;font-size:13px;color:var(--text-2);cursor:pointer;display:flex;gap:10px}
+.suggest .sg:hover,.sg.hl{background:var(--card-hover);color:var(--text-1)}
+.suggest .sg .hot{color:var(--warn);font-size:11px;margin-left:auto}
+.search-result{display:flex;gap:20px;align-items:flex-start}
+.site-list{width:200px;flex:none;padding:8px}
+.site-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:7px;font-size:13px;
+  color:var(--text-2);cursor:pointer}
+.site-item:hover{background:var(--card-hover)}
+.site-item.on{background:var(--accent-soft);color:var(--accent)}
+.site-item .cnt{margin-left:auto;font-size:11px;color:var(--text-3)}
+.site-item .spin{width:12px;height:12px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent);
+  border-radius:50%;margin-left:auto;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ===================== 设置中心 ===================== */
+.set-shell{display:flex;flex:1;min-height:0}
+.set-nav{width:220px;flex:none;padding:18px 12px;border-right:1px solid var(--stroke-soft)}
+.set-nav .si{padding:9px 13px;border-radius:7px;font-size:13px;color:var(--text-2);cursor:pointer;margin-bottom:2px;
+  display:flex;gap:10px;align-items:center}
+.set-nav .si:hover{background:var(--card-hover)}
+.set-nav .si.on{background:var(--accent-soft);color:var(--accent)}
+.set-body{flex:1;overflow-y:auto;padding:24px 32px}
+.set-body::-webkit-scrollbar{width:10px}
+.set-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:5px}
+.set-card{padding:6px 20px;margin-bottom:18px}
+.set-row{display:flex;align-items:center;gap:16px;padding:15px 0;border-bottom:1px solid var(--stroke-soft)}
+.set-row:last-child{border-bottom:none}
+.set-row .lab{font-size:13.5px}
+.set-row .desc{font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.6}
+.set-row .rt{margin-left:auto;display:flex;align-items:center;gap:10px;flex:none}
+.set-row .val{font-size:12.5px;color:var(--text-3);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.input{height:32px;padding:0 12px;border-radius:6px;background:rgba(255,255,255,.06);border:1px solid var(--stroke);
+  color:#fff;font-size:12.5px;outline:none;width:300px}
+.input:focus{border-color:var(--accent)}
+.toggle{width:42px;height:22px;border-radius:11px;background:rgba(255,255,255,.15);position:relative;cursor:pointer;transition:background .15s}
+.toggle i{position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .15s}
+.toggle.on{background:var(--accent-strong)}
+.toggle.on i{left:23px}
+.select{height:32px;padding:0 12px;border-radius:6px;background:rgba(255,255,255,.06);border:1px solid var(--stroke);
+  color:var(--text-1);font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer;min-width:130px;justify-content:space-between}
+.slider{width:150px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);position:relative}
+.slider i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--accent)}
+.slider b{position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:-4px}
+.swatches{display:flex;gap:8px}
+.swatches i{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.swatches i.on{border-color:#fff}
+.seg{display:flex;background:rgba(255,255,255,.06);border-radius:7px;padding:3px;border:1px solid var(--stroke-soft)}
+.seg span{padding:5px 14px;font-size:12px;border-radius:5px;color:var(--text-2);cursor:pointer}
+.seg span.on{background:var(--accent-soft);color:var(--accent)}
+
+/* ===================== 弹窗 ===================== */
+.modal-mask{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:50;
+  display:flex;align-items:center;justify-content:center}
+.modal{width:520px;max-height:560px;border-radius:12px;background:rgba(43,43,46,.96);backdrop-filter:blur(30px);
+  border:1px solid var(--stroke);box-shadow:var(--shadow-3);display:flex;flex-direction:column;overflow:hidden}
+.modal .m-head{padding:16px 20px 12px;display:flex;align-items:center;gap:10px}
+.modal .m-head .t{font-size:15px;font-weight:600}
+.modal .m-head .x{margin-left:auto;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;color:var(--text-3)}
+.modal .m-head .x:hover{background:var(--card-hover);color:#fff}
+.modal .m-body{padding:4px 20px 18px;overflow-y:auto}
+.modal .m-foot{padding:12px 20px;border-top:1px solid var(--stroke-soft);display:flex;justify-content:flex-end;gap:10px}
+.qr{width:150px;height:150px;border-radius:10px;background:#fff;display:grid;place-items:center;color:#222;
+  font-size:11px;text-align:center;line-height:1.4}
+
+/* 标注 */
+.anno{background:#e8112d;color:#fff;font-size:11px;min-width:20px;height:20px;border-radius:10px;
+  display:inline-flex;align-items:center;justify-content:center;padding:0 6px;z-index:99;box-shadow:0 2px 8px rgba(232,17,45,.5);
+  font-weight:600;position:absolute;flex:none;white-space:nowrap}
+.anno-list{width:1280px;margin-top:14px;padding:14px 20px;border-radius:10px;background:rgba(255,255,255,.03);
+  border:1px dashed rgba(255,255,255,.15);font-size:12.5px;color:var(--text-2);line-height:2}
+.anno-list b{color:#ff6b6b;font-weight:600;margin-right:2px}
+.anno-list .it{margin-right:26px;white-space:nowrap}
+@media (min-width:1400px){.window,.anno-list{width:1360px}}
+</style>
+</head>
+<body>
+
+<h1 class="doc">VodBox 桌面版 · 界面设计稿</h1>
+<div class="doc-sub">基于 FongMi/TV 功能重排的 PC 端交互 · Fluent / Mica 深色主题 · 适配 <b>Windows / macOS / Linux</b> · 画板 1280×800 · 红标为交互标注</div>
+
+<!-- ============================================================ 1 首页 -->
+<div class="board-label"><span class="num">01</span><span class="t">首页</span><span class="d">左侧常驻导航 · 英雄区推荐 · 最近观看带进度 · 顶部全局搜索</span></div>
+<div class="window" id="p-home">
+  <div class="titlebar">
+    <span class="tb-title">🎬 VodBox</span>
+    <div class="tb-search">🔍&nbsp;搜索影片、剧集、直播频道…&nbsp;&nbsp;<span style="margin-left:auto;border:1px solid var(--stroke);border-radius:4px;padding:0 5px;font-size:10px">Ctrl K</span></div>
+    <span class="tb-clock">周五 19:30</span>
+    <div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div>
+  </div>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand"><div class="logo">▶</div><div><div class="n">VodBox</div><div class="v">当前源：泥巴影视</div></div></div>
+      <div class="nav-item active"><span class="ic">🏠</span>首页</div>
+      <div class="nav-item"><span class="ic">🎬</span>点播</div>
+      <div class="nav-item"><span class="ic">📺</span>直播</div>
+      <div class="nav-item"><span class="ic">🔍</span>搜索</div>
+      <div class="nav-item"><span class="ic">⭐</span>收藏</div>
+      <div class="nav-item"><span class="ic">🕘</span>历史</div>
+      <div class="sp"></div>
+      <div class="nav-item"><span class="ic">📁</span>本地文件</div>
+      <div class="nav-item"><span class="ic">⚙️</span>设置</div>
+      <div class="foot">HTTP 服务 · 运行中 :9978</div>
+    </div>
+    <div class="content">
+      <div class="hero">
+        <div class="bg" style="background:linear-gradient(120deg,#1c2a4a,#3a2a55 55%,#54263c)"></div>
+        <div class="shade"></div><div class="shade2"></div>
+        <div class="in">
+          <div class="kicker">今日推荐 · TOP 1 <span class="anno" style="position:static;top:auto;right:auto;margin-left:4px">1</span></div>
+          <h3>庆余年 第二季</h3>
+          <p>身世神秘的少年范闲，历经家族、江湖、庙堂的种种考验与锤炼，书写出一段人生传奇。张若昀、李沁领衔主演。</p>
+          <div class="ops">
+            <span class="btn primary">▶ 立即播放</span>
+            <span class="btn">详情</span>
+            <span class="btn">⭐ 收藏</span>
+          </div>
+        </div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i></div>
+              </div>
+
+      <div class="sec-title">🕘 最近观看 <span class="anno" style="position:static;top:auto;right:auto;margin-left:2px">2</span> <span class="more">查看全部 ›</span></div>
+      <div class="rail">
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274064,#1a2a44)"><span class="ph">🎞</span><span class="mark">看到 第12集 · 23:41</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 续播</span></span></div><div class="nm">庆余年 第二季</div><div class="prog"><i style="width:56%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#40274a,#2a1a36)"><span class="ph">🎞</span><span class="mark">看到 第3集 · 08:12</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 续播</span></span></div><div class="nm">狐妖小红娘月红篇</div><div class="prog"><i style="width:22%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274a40,#17332b)"><span class="ph">🎞</span><span class="mark">已看完</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 重播</span></span></div><div class="nm">九龙城寨之围城</div><div class="prog"><i style="width:100%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#4a3a27,#33271a)"><span class="ph">🎞</span><span class="mark">看到 45:30</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 续播</span></span></div><div class="nm">歌手 2024 直播回放</div><div class="prog"><i style="width:41%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#27384a,#16222e)"><span class="ph">🎞</span><span class="mark">看到 第8集</span></div><div class="nm">与凤行</div><div class="prog"><i style="width:63%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#3c274a,#261736)"><span class="ph">🎞</span><span class="mark">看到 第1集</span></div><div class="nm">承欢记</div><div class="prog"><i style="width:8%"></i></div></div>
+      </div>
+
+      <div class="sec-title">✨ 站点推荐 · 泥巴影视 <span class="more">换源 ▾</span></div>
+      <div class="rail">
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#503a2a,#3a2a1e)"><span class="ph">🎬</span><span class="tag">更至20集</span></div><div class="nm">哈尔滨一九四四</div><div class="mt">2024 · 大陆</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#2a3d50,#1e2d3a)"><span class="ph">🎬</span><span class="tag">HD</span></div><div class="nm">沙丘2</div><div class="mt">2024 · 美国</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#502a3d,#3a1e2d)"><span class="ph">🎬</span><span class="tag">更至14集</span></div><div class="nm">惜花芷</div><div class="mt">2024 · 大陆</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#3d502a,#2d3a1e)"><span class="ph">🎬</span><span class="tag">完结</span></div><div class="nm">繁花</div><div class="mt">2023 · 大陆</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#2a5050,#1e3a3a)"><span class="ph">🎬</span><span class="tag">综艺</span></div><div class="nm">奔跑吧 第八季</div><div class="mt">2024 · 综艺</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#4a2a50,#301e3a)"><span class="ph">🎬</span><span class="tag">4K</span></div><div class="nm">哥斯拉大战金刚2</div><div class="mt">2024 · 美国</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>英雄区轮播站点推荐位，自动切换；毛玻璃渐变遮罩保证文字可读</span>
+  <span class="it"><b>2</b>历史卡含进度条，悬停浮现「续播」；右键菜单：删除/置顶/查看详情</span>
+</div>
+
+<!-- ============================================================ 2 点播 -->
+<div class="board-label"><span class="num">02</span><span class="t">点播 · 分类浏览</span><span class="d">分类药丸 Tab + 可展开筛选面板（类型/地区/年份）+ 海报网格（底部分页在 800px 画板下方）</span></div>
+<div class="window" id="p-vod">
+  <div class="titlebar"><span class="tb-title">🎬 VodBox · 点播</span><div class="tb-search">🔍&nbsp;搜索影片…</div><span class="tb-clock">19:31</span><div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div></div>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand"><div class="logo">▶</div><div><div class="n">VodBox</div><div class="v">当前源：泥巴影视</div></div></div>
+      <div class="nav-item"><span class="ic">🏠</span>首页</div>
+      <div class="nav-item active"><span class="ic">🎬</span>点播</div>
+      <div class="nav-item"><span class="ic">📺</span>直播</div>
+      <div class="nav-item"><span class="ic">🔍</span>搜索</div>
+      <div class="nav-item"><span class="ic">⭐</span>收藏</div>
+      <div class="nav-item"><span class="ic">🕘</span>历史</div>
+      <div class="sp"></div>
+      <div class="nav-item"><span class="ic">📁</span>本地文件</div>
+      <div class="nav-item"><span class="ic">⚙️</span>设置</div>
+    </div>
+    <div class="content">
+      <div class="page-head">
+        <h2>点播</h2>
+        <span class="chip on" style="cursor:pointer">📡 泥巴影视 ▾</span>
+        <span class="sub">共 12 个可用站点</span>
+        <span style="margin-left:auto"></span>
+        <span class="seg"><span class="on">▦ 网格</span><span>☰ 列表</span></span>
+      </div>
+      <div class="type-row">
+        <span class="chip on">全部</span><span class="chip">电影</span><span class="chip">电视剧</span><span class="chip">综艺</span><span class="chip">动漫</span><span class="chip">纪录片</span><span class="chip">短剧</span><span class="chip">少儿</span><span class="chip">美剧</span><span class="chip">韩剧</span>
+        <span class="anno" style="position:static">1</span>
+      </div>
+      <div class="filter-bar card">
+        <span class="fl"><span class="k">类型</span><span class="chip on">全部</span><span class="chip">动作</span><span class="chip">喜剧</span><span class="chip">爱情</span><span class="chip">科幻</span></span>
+        <span class="fl"><span class="k">地区</span><span class="chip on">全部</span><span class="chip">大陆</span><span class="chip">香港</span><span class="chip">美国</span></span>
+        <span class="fl"><span class="k">年份</span><span class="chip on">全部</span><span class="chip">2026</span><span class="chip">2025</span><span class="chip">更早</span></span>
+        <span style="margin-left:auto"></span>
+        <span class="fl"><span class="k">排序</span><span class="chip on">最新</span><span class="chip">最热</span></span>
+        <span class="anno" style="position:static">2</span>
+      </div>
+      <div class="posters">
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274064,#1a2a44)"><span class="ph">🎬</span><span class="tag">更至36集</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 播放</span><span style="font-size:11px;color:#ddd">⭐ 收藏 · 🔍 换源</span></span></div><div class="nm">庆余年 第二季</div><div class="mt">2024 · 大陆 · 古装</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#40274a,#2a1a36)"><span class="ph">🎬</span><span class="tag">更至40集</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 播放</span></span></div><div class="nm">狐妖小红娘月红篇</div><div class="mt">2024 · 大陆 · 奇幻</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274a40,#17332b)"><span class="ph">🎬</span><span class="tag">HD</span></div><div class="nm">九龙城寨之围城</div><div class="mt">2024 · 香港 · 动作</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#4a3a27,#33271a)"><span class="ph">🎬</span><span class="tag">4K</span></div><div class="nm">沙丘2</div><div class="mt">2024 · 美国 · 科幻</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#27384a,#16222e)"><span class="ph">🎬</span><span class="tag">完结</span></div><div class="nm">与凤行</div><div class="mt">2024 · 大陆 · 仙侠</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#3c274a,#261736)"><span class="ph">🎬</span><span class="tag">更至28集</span></div><div class="nm">承欢记</div><div class="mt">2024 · 大陆 · 都市</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#503a2a,#3a2a1e)"><span class="ph">🎬</span><span class="tag">更至20集</span></div><div class="nm">哈尔滨一九四四</div><div class="mt">2024 · 大陆 · 谍战</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#2a3d50,#1e2d3a)"><span class="ph">🎬</span><span class="tag">HD</span></div><div class="nm">哥斯拉大战金刚2</div><div class="mt">2024 · 美国 · 怪兽</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#502a3d,#3a1e2d)"><span class="ph">🎬</span><span class="tag">更至14集</span></div><div class="nm">惜花芷</div><div class="mt">2024 · 大陆 · 古装</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#3d502a,#2d3a1e)"><span class="ph">🎬</span><span class="tag">完结</span></div><div class="nm">繁花</div><div class="mt">2023 · 大陆 · 年代</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#2a5050,#1e3a3a)"><span class="ph">🎬</span><span class="tag">综艺</span></div><div class="nm">奔跑吧 第八季</div><div class="mt">2024 · 综艺</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#4a2a50,#301e3a)"><span class="ph">🎬</span><span class="tag">动漫</span></div><div class="nm">凡人修仙传</div><div class="mt">2024 · 动漫</div></div>
+      </div>
+      <div class="pager"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>…</span><span>›</span></div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>分类来自当前站点 Class 列表，横向滚动；切换站点自动刷新分类</span>
+  <span class="it"><b>2</b>筛选面板对应 Filter/Value 模型，由站点接口动态下发，组内单选</span>
+</div>
+
+<!-- ============================================================ 3 详情 -->
+<div class="board-label"><span class="num">03</span><span class="t">点播详情 · 影院模式</span><span class="d">左侧大海报 + 元信息 · 右上内嵌试看播放器 · 线路/剧集/快搜三级选择器</span></div>
+<div class="window" id="p-detail">
+  <div class="titlebar"><span class="tb-title">🎬 VodBox · 详情</span><div class="tb-search">🔍&nbsp;搜索影片…</div><span class="tb-clock">19:33</span><div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div></div>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand"><div class="logo">▶</div><div><div class="n">VodBox</div><div class="v">当前源：泥巴影视</div></div></div>
+      <div class="nav-item"><span class="ic">🏠</span>首页</div>
+      <div class="nav-item active"><span class="ic">🎬</span>点播</div>
+      <div class="nav-item"><span class="ic">📺</span>直播</div>
+      <div class="nav-item"><span class="ic">🔍</span>搜索</div>
+      <div class="nav-item"><span class="ic">⭐</span>收藏</div>
+      <div class="nav-item"><span class="ic">🕘</span>历史</div>
+      <div class="sp"></div>
+      <div class="nav-item"><span class="ic">📁</span>本地文件</div>
+      <div class="nav-item"><span class="ic">⚙️</span>设置</div>
+    </div>
+    <div class="content">
+      <div class="detail">
+        <div class="big-poster">
+          <div class="art" style="background:linear-gradient(160deg,#274064,#0f1c33)"><span class="ph" style="font-size:52px">🎬</span><span class="mark">庆余年 第二季</span></div>
+        </div>
+        <div class="info">
+          <h3>庆余年 第二季</h3>
+          <div class="remark">更新至 36 集 · 豆瓣 8.2</div>
+          <div class="meta"><span>站源：泥巴影视</span><span>2024</span><span>中国大陆</span><span>古装 / 权谋</span><span>45 分钟/集</span></div>
+          <div class="crew"><b>导演：</b>孙皓　　<b>主演：</b>张若昀 / 李沁 / 陈道明 / 吴刚 / 郭麒麟</div>
+          <div class="intro">该剧改编自猫腻同名畅销小说，承接上季，范闲率领使团回归途中，二皇子以费介、范思辙以及滕家遗孤的安危来威胁范闲，逼他向自己俯首称臣…… <u>展开全文</u></div>
+          <div class="ops">
+            <span class="btn primary">▶ 续播 第12集</span>
+            <span class="btn">⭐ 收藏</span>
+            <span class="btn">🔍 换源</span>
+            <span class="btn">📲 推送</span>
+            <span class="anno" style="position:static">1</span>
+          </div>
+        </div>
+        <div class="screen">
+          <div class="player" style="background:linear-gradient(140deg,#101b30,#1b1030)">
+            <div class="cap"><div class="play-fab">▶</div></div>
+            <div style="position:absolute;left:12px;bottom:10px;font-size:11px;color:#aaa">试看模式 · 点击全屏播放</div>
+            <div style="position:absolute;right:12px;top:10px;font-size:11px;color:#ccc;background:rgba(0,0,0,.5);padding:3px 8px;border-radius:5px">1080P</div>
+          </div>
+          <div style="position:relative;height:0"><span class="anno" style="position:absolute;top:6px;right:2px">2</span></div>
+          <div class="hint">鼠标双击画面 / 按 Enter 进入全屏播放窗口</div>
+        </div>
+      </div>
+
+      <div class="sel-block">
+        <div class="sel-head"><span class="t">线路</span><span class="note">播放失败时可切换其他线路</span></div>
+        <div class="type-row" style="margin:0">
+          <span class="chip on">主线 ①</span><span class="chip">主线 ②</span><span class="chip">备用 4K</span><span class="chip">海外专线</span>
+          <span class="anno" style="position:static">3</span>
+        </div>
+      </div>
+      <div class="sel-block">
+        <div class="sel-head"><span class="t">剧集</span><span class="note">共 36 集</span>
+          <span style="margin-left:auto"></span>
+          <span class="chip" style="font-size:11px">⇅ 倒序</span>
+          <span class="select" style="height:28px;min-width:96px;font-size:11.5px">1 – 20 ▾</span>
+        </div>
+        <div class="ep-grid">
+          <span class="ep seen">1</span><span class="ep seen">2</span><span class="ep seen">3</span><span class="ep seen">4</span><span class="ep seen">5</span><span class="ep seen">6</span><span class="ep seen">7</span><span class="ep seen">8</span><span class="ep seen">9</span><span class="ep seen">10</span><span class="ep seen">11</span><span class="ep on">12</span><span class="ep">13</span><span class="ep">14</span><span class="ep">15</span><span class="ep">16</span><span class="ep">17</span><span class="ep">18</span><span class="ep">19</span><span class="ep">20</span>
+        </div>
+      </div>
+      <div class="sel-block">
+        <div class="sel-head"><span class="t">快搜换站</span><span class="note">同名内容在其他站点的结果，点击即切换</span></div>
+        <div class="type-row" style="margin:0">
+          <span class="chip">🎬 金牌影院 · 更至36集</span><span class="chip">🎬 量子影视 · 更至36集</span><span class="chip">🎬 天堂影视 · 更至30集</span><span class="chip">🎬 卧龙视频 · HD</span>
+          <span class="anno" style="position:static">4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>主按钮智能显示「续播 第N集」（读取历史进度）；换源打开跨站聚合弹窗</span>
+  <span class="it"><b>2</b>详情页内嵌播放器，小窗试看；双击/Enter 弹出独立全屏播放窗口，进度无缝衔接</span>
+  <span class="it"><b>3</b>线路 = vod_play_from 拆分（原 Flag 模型），当前线路记忆到历史记录</span>
+  <span class="it"><b>4</b>快搜对应原 quick 行，跨站点搜索同名内容一键换源</span>
+</div>
+
+<!-- ============================================================ 4 点播播放 -->
+<div class="board-label"><span class="num">04</span><span class="t">点播播放窗口</span><span class="d">悬停浮现控制条 · 弹幕层 · 片头片尾标记 · 完整快捷操作行</span></div>
+<div class="window playwin" id="p-play">
+  <div class="player-stage" style="background:linear-gradient(140deg,#0d1526,#1c1030 60%,#26101f)">
+    <div class="danmaku-demo">
+      <div style="left:70%;top:0;color:#fff">这集伏笔好多！</div>
+      <div style="left:35%;top:28px;color:#ffd76b">名场面预警 ⚠️</div>
+      <div style="left:55%;top:56px;color:#9be29b">二皇子又开始算计了</div>
+    </div>
+    <div class="osd-msg">▶ 已开启 1.5x 倍速 · 片头跳过 00:00–01:30</div>
+    <div class="osd-top">
+      <span class="back">←</span>
+      <span class="tt">庆余年 第二季</span><span class="ep-t">第12集 · 抱月楼风波</span>
+      <span class="res">1920×1080 · HEVC</span>
+      <span class="tb-clock" style="color:#ddd">19:45</span>
+      <span class="cbtn" style="font-size:13px">📲</span>
+      <span class="cbtn" style="font-size:13px">▣ 小窗</span>
+    </div>
+    <div class="osd-bottom">
+      <div class="seek">
+        <span style="position:absolute;left:32%;top:-22px;font-size:10.5px;color:#ffb9b9;background:rgba(0,0,0,.5);padding:1px 6px;border-radius:4px">ED 44:10</span>
+        <div class="track">
+          <div class="buf" style="width:58%"></div>
+          <div class="played" style="width:42%"></div>
+          <div class="mark" style="left:3.4%"></div>
+          <div class="mark" style="left:96%"></div>
+          <div class="knob" style="left:42%"></div>
+        </div>
+        <div class="anno" style="top:-34px;left:52%">1</div>
+      </div>
+      <div class="ctl-row">
+        <span class="cbtn big">⏮</span><span class="cbtn big">⏸</span><span class="cbtn big">⏭</span>
+        <span class="time">19:12 / 45:30</span>
+        <span class="cbtn">📑 剧集</span>
+        <span class="cbtn on">1.5x ▾</span>
+        <span class="cbtn">比例 ▾</span>
+        <span class="cbtn">🔁 关</span>
+        <span class="cbtn">字幕 ▾</span>
+        <span class="cbtn">音轨 ▾</span>
+        <span class="cbtn on">弹 ✓</span>
+        <span class="cbtn">章节</span>
+        <span class="cbtn">解析</span>
+        <span class="gap"></span>
+        <span class="cbtn">mpv ▾</span>
+        <span class="cbtn">🔊</span><span class="vol"><i style="width:70%"></i></span>
+        <span class="cbtn">⛶ 全屏</span>
+        <span class="anno" style="top:-44px;right:0">2</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>进度条：浅灰=缓冲、蓝=已播、刻度=片头片尾区间（悬停显示跳过按钮）、章节标记</span>
+  <span class="it"><b>2</b>控制行完整对应 TV 端 action 行：上下集/剧集/倍速/比例/循环/字幕/音轨/弹幕/章节/解析/内核/音量/全屏；鼠标静止 3 秒自动隐藏</span>
+</div>
+
+<!-- ============================================================ 5 直播 -->
+<div class="board-label"><span class="num">05</span><span class="t">直播</span><span class="d">左侧频道面板（分组/收藏/历史 Tab）· EPG 时间轴 · 数字选台 · 回看进度</span></div>
+<div class="window" id="p-live">
+  <div class="titlebar"><span class="tb-title">📺 VodBox · 直播</span><div class="tb-search">🔍&nbsp;搜索频道…</div><span class="tb-clock">19:48</span><div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div></div>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand"><div class="logo">▶</div><div><div class="n">VodBox</div><div class="v">直播源：MyTV 合集</div></div></div>
+      <div class="nav-item"><span class="ic">🏠</span>首页</div>
+      <div class="nav-item"><span class="ic">🎬</span>点播</div>
+      <div class="nav-item active"><span class="ic">📺</span>直播</div>
+      <div class="nav-item"><span class="ic">🔍</span>搜索</div>
+      <div class="nav-item"><span class="ic">⭐</span>收藏</div>
+      <div class="nav-item"><span class="ic">🕘</span>历史</div>
+      <div class="sp"></div>
+      <div class="nav-item"><span class="ic">📁</span>本地文件</div>
+      <div class="nav-item"><span class="ic">⚙️</span>设置</div>
+    </div>
+    <div class="live-shell">
+      <div class="chan-panel">
+        <div class="tabs" style="position:relative"><span class="on">分组</span><span>⭐ 收藏</span><span>🕘 历史</span><span class="anno" style="top:10px;right:8px">1</span></div>
+        <div class="chan-search">🔍 筛选频道…</div>
+        <div class="gname">▾ 央视频道 <span class="cnt">18</span></div>
+        <div class="chan-list">
+          <div class="chan on"><span class="no">001</span><span class="lg" style="background:#c0392b">央1</span><div style="min-width:0"><div class="nm">CCTV-1 综合</div><div class="epg">正在播出：新闻联播重播</div></div><span class="lv">LIVE</span></div>
+          <div class="chan"><span class="no">002</span><span class="lg" style="background:#8e44ad">央2</span><div style="min-width:0"><div class="nm">CCTV-2 财经</div><div class="epg">正在播出：经济半小时</div></div></div>
+          <div class="chan"><span class="no">003</span><span class="lg" style="background:#2980b9">央3</span><div style="min-width:0"><div class="nm">CCTV-3 综艺</div><div class="epg">正在播出：开门大吉</div></div></div>
+        </div>
+        <div class="gname">▾ 卫视频道 <span class="cnt">24</span></div>
+        <div class="chan-list" style="flex:none">
+          <div class="chan"><span class="no">101</span><span class="lg" style="background:#16a085">芒果</span><div style="min-width:0"><div class="nm">湖南卫视</div><div class="epg">正在播出：歌手2024</div></div></div>
+          <div class="chan"><span class="no">102</span><span class="lg" style="background:#d35400">番茄</span><div style="min-width:0"><div class="nm">东方卫视</div><div class="epg">正在播出：今晚80后</div></div></div>
+        </div>
+        <div class="gname">▸ 🔒 影视频道（密码分组）<span class="cnt">36</span><span class="anno" style="position:static;top:auto;right:auto;margin-left:6px">2</span></div>
+        <div class="gname">▸ 地方频道 <span class="cnt">58</span></div>
+      </div>
+      <div class="live-stage" style="background:linear-gradient(140deg,#101828,#181028)">
+        <div class="num-osd">0 0 1</div>
+        <div class="anno" style="top:30%;right:56px">3</div>
+        <div class="epg-strip">
+          <div class="epg-item past"><div class="t">晚间新闻</div><div class="tm">18:00 – 19:00</div></div>
+          <div class="epg-item past"><div class="t">新闻联播</div><div class="tm">19:00 – 19:38 ↩回看</div></div>
+          <div class="epg-item now"><div class="t">焦点访谈</div><div class="tm">19:38 – 20:06 · 直播</div></div>
+          <div class="epg-item"><div class="t">黄金档剧场</div><div class="tm">20:06 – 21:40</div></div>
+          <div class="epg-item"><div class="t">晚间剧场</div><div class="tm">21:40 – 23:30</div></div>
+          <div class="anno" style="top:-12px;right:-8px">4</div>
+        </div>
+        <div class="live-info">
+          <span class="lg" style="background:#c0392b">央1</span>
+          <div><div class="nm">CCTV-1 综合 <span style="font-size:11px;color:#888;font-weight:400">001 · 线路 1/3</span></div>
+          <div class="now">▶ 焦点访谈 19:38 – 20:06</div>
+          <div class="nxt">接下来：黄金档剧场 20:06</div></div>
+        </div>
+        <div class="osd-bottom">
+          <div class="ctl-row" style="padding-bottom:8px">
+            <span class="cbtn big">⏸</span>
+            <span class="cbtn">⏮</span><span class="cbtn">⏭</span>
+            <span class="cbtn">📋 频道</span>
+            <span class="cbtn">线路 1 ▾</span>
+            <span class="cbtn">↩ 回看</span>
+            <span class="gap"></span>
+            <span class="cbtn">⚙ 直播源</span>
+            <span class="cbtn">… 更多</span>
+            <span class="cbtn">🔊</span><span class="vol"><i style="width:70%"></i></span>
+            <span class="cbtn">⛶</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>频道面板三 Tab：分组（Group→Channel 二级）/ 收藏频道 / 观看历史，可整体折叠</span>
+  <span class="it"><b>2</b>密码分组（Group.pass）锁定，点击弹密码框</span>
+  <span class="it"><b>3</b>键盘数字选台 OSD，输入后自动确认或 Enter 立即换台</span>
+  <span class="it"><b>4</b>EPG 横向时间轴，过去节目支持 catchup 回看（点击即 seek）</span>
+  <span class="it"><b>5</b>直播控制行：换台/频道面板/多线路/回看/比例/音轨/换直播源</span>
+</div>
+
+<!-- ============================================================ 6 搜索 -->
+<div class="board-label"><span class="num">06</span><span class="t">搜索</span><span class="d">居中大搜索框 + 实时联想 · 历史/热搜 · 聚合结果（左站点列表 + 右网格）</span></div>
+<div class="window" id="p-search">
+  <div class="titlebar"><span class="tb-title">🔍 VodBox · 搜索</span><span class="tb-clock" style="margin-left:auto">19:50</span><div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div></div>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand"><div class="logo">▶</div><div><div class="n">VodBox</div><div class="v">当前源：泥巴影视</div></div></div>
+      <div class="nav-item"><span class="ic">🏠</span>首页</div>
+      <div class="nav-item"><span class="ic">🎬</span>点播</div>
+      <div class="nav-item"><span class="ic">📺</span>直播</div>
+      <div class="nav-item active"><span class="ic">🔍</span>搜索</div>
+      <div class="nav-item"><span class="ic">⭐</span>收藏</div>
+      <div class="nav-item"><span class="ic">🕘</span>历史</div>
+      <div class="sp"></div>
+      <div class="nav-item"><span class="ic">📁</span>本地文件</div>
+      <div class="nav-item"><span class="ic">⚙️</span>设置</div>
+    </div>
+    <div class="content" style="display:flex;flex-direction:column">
+      <div class="search-hero">
+        <div class="search-box">🔍<input value="庆余年" readonly><span class="k">⏎ 搜索</span>
+          <div class="anno" style="margin-left:6px;position:static">1</div>
+        </div>
+        <div class="suggest">
+          <div class="sg hl">庆余年 第二季 <span class="hot">🔥 热</span></div>
+          <div class="sg">庆余年 第一季</div>
+          <div class="sg">庆余年 动画版</div>
+          <div class="sg">庆余年 有声书</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:16px">「庆余年」在 <b style="color:var(--accent)">8</b> 个站点找到结果 <span style="margin-left:14px">搜索历史：庆余年 · 繁花 · 歌手 ✕</span></div>
+      <div class="search-result">
+        <div class="site-list card" style="position:relative">
+          <span class="anno" style="bottom:-8px;right:8px">2</span>
+          <div class="site-item on">泥巴影视 <span class="cnt">12</span></div>
+          <div class="site-item">金牌影院 <span class="cnt">9</span></div>
+          <div class="site-item">量子影视 <span class="cnt">7</span></div>
+          <div class="site-item">天堂影视 <span class="cnt">5</span></div>
+          <div class="site-item">卧龙视频 <span class="spin"></span></div>
+          <div class="site-item" style="color:var(--text-3)">天天视频 <span class="cnt">0</span></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="posters">
+            <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274064,#1a2a44)"><span class="ph">🎬</span><span class="tag">更至36集</span></div><div class="nm">庆余年 第二季</div><div class="mt">2024 · 大陆</div></div>
+            <div class="poster"><div class="art" style="background:linear-gradient(160deg,#40274a,#2a1a36)"><span class="ph">🎬</span><span class="tag">完结</span></div><div class="nm">庆余年 第一季</div><div class="mt">2019 · 大陆</div></div>
+            <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274a40,#17332b)"><span class="ph">🎬</span><span class="tag">动漫</span></div><div class="nm">庆余年 动画</div><div class="mt">2023 · 动漫</div></div>
+            <div class="poster"><div class="art" style="background:linear-gradient(160deg,#4a3a27,#33271a)"><span class="ph">🎬</span><span class="tag">花絮</span></div><div class="nm">庆余年 幕后纪实</div><div class="mt">2024 · 纪录</div></div>
+            <div class="poster"><div class="art" style="background:linear-gradient(160deg,#27384a,#16222e)"><span class="ph">🎬</span></div><div class="nm">庆余年 特别篇</div><div class="mt">2020 · 大陆</div></div>
+            <div class="poster"><div class="art" style="background:linear-gradient(160deg,#3c274a,#261736)"><span class="ph">🎬</span></div><div class="nm">庆余年 有声剧</div><div class="mt">2021 · 有声</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>桌面端取消屏幕键盘，输入即联想（站点 suggest 接口）；Enter 聚合搜索全部 searchable 站点</span>
+  <span class="it"><b>2</b>左侧站点实时并行搜索，徽标显示结果数，转圈=加载中；点击切换右侧结果</span>
+</div>
+
+<!-- ============================================================ 7 收藏+历史 -->
+<div class="board-label"><span class="num">07</span><span class="t">收藏 & 历史</span><span class="d">收藏分点播/直播 Tab · 历史按时间分组 · 无痕模式横幅</span></div>
+<div class="window" id="p-keep">
+  <div class="titlebar"><span class="tb-title">⭐ VodBox · 收藏</span><span class="tb-clock" style="margin-left:auto">19:52</span><div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div></div>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand"><div class="logo">▶</div><div><div class="n">VodBox</div><div class="v">当前源：泥巴影视</div></div></div>
+      <div class="nav-item"><span class="ic">🏠</span>首页</div>
+      <div class="nav-item"><span class="ic">🎬</span>点播</div>
+      <div class="nav-item"><span class="ic">📺</span>直播</div>
+      <div class="nav-item"><span class="ic">🔍</span>搜索</div>
+      <div class="nav-item active"><span class="ic">⭐</span>收藏</div>
+      <div class="nav-item"><span class="ic">🕘</span>历史 <span class="badge">12</span></div>
+      <div class="sp"></div>
+      <div class="nav-item"><span class="ic">📁</span>本地文件</div>
+      <div class="nav-item"><span class="ic">⚙️</span>设置</div>
+    </div>
+    <div class="content">
+      <div class="page-head">
+        <h2>收藏</h2>
+        <span class="seg"><span class="on">🎬 点播 (24)</span><span>📺 直播频道 (6)</span></span>
+        <span style="margin-left:auto"></span>
+        <span class="chip">站点：全部 ▾</span>
+        <span class="chip">排序：最近收藏 ▾</span>
+        <span class="btn" style="padding:7px 14px">☑ 管理</span>
+        <span class="anno" style="position:static">1</span>
+      </div>
+      <div class="posters">
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274064,#1a2a44)"><span class="ph">🎬</span><span class="tag" style="color:var(--warn)">更至36集</span><span class="hover"><span class="btn primary" style="padding:6px 14px">▶ 播放</span><span style="font-size:11px;color:#ddd">✕ 取消收藏</span></span></div><div class="nm">庆余年 第二季</div><div class="mt">泥巴影视 · 3 天前收藏</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#40274a,#2a1a36)"><span class="ph">🎬</span><span class="tag" style="color:var(--warn)">有更新</span></div><div class="nm">狐妖小红娘月红篇</div><div class="mt">金牌影院 · 上周收藏</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274a40,#17332b)"><span class="ph">🎬</span><span class="tag">HD</span></div><div class="nm">九龙城寨之围城</div><div class="mt">泥巴影视 · 上周</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#4a3a27,#33271a)"><span class="ph">🎬</span><span class="tag">4K</span></div><div class="nm">沙丘2</div><div class="mt">量子影视 · 2 周前</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#27384a,#16222e)"><span class="ph">🎬</span></div><div class="nm">与凤行</div><div class="mt">泥巴影视 · 3 周前</div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#3d502a,#2d3a1e)"><span class="ph">🎬</span></div><div class="nm">繁花</div><div class="mt">天堂影视 · 1 个月前</div></div>
+      </div>
+      <div class="sec-title" style="margin-top:34px">🕘 历史 · 今天 <span class="more">全部历史 ›　🗑 清空</span></div>
+      <div class="rail">
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#274064,#1a2a44)"><span class="ph">🎞</span><span class="mark">第12集 · 23:41</span></div><div class="nm">庆余年 第二季</div><div class="prog"><i style="width:56%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#2a3d50,#1e2d3a)"><span class="ph">🎞</span><span class="mark">45:30</span></div><div class="nm">沙丘2</div><div class="prog"><i style="width:33%"></i></div></div>
+        <div class="poster"><div class="art" style="background:linear-gradient(160deg,#c0392b,#7c241a)"><span class="ph" style="font-size:20px">央1</span><span class="mark">直播 · 看了 32 分钟</span></div><div class="nm">CCTV-1 综合</div><div class="prog"><i style="width:100%;background:var(--warn)"></i></div></div>
+      </div>
+      <div class="card" style="margin-top:24px;padding:14px 18px;display:flex;gap:12px;align-items:center">
+        <span style="font-size:16px">🕶</span>
+        <span style="font-size:12.5px;color:var(--text-2)">无痕模式已开启 — 观看记录不会被保存</span>
+        <span class="btn" style="margin-left:auto;padding:5px 14px">关闭无痕</span>
+        <span class="anno" style="position:static">2</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>「管理」进入多选删除模式；收藏角标提示「有更新」（对比 vod_remarks 变化）</span>
+  <span class="it"><b>2</b>无痕开启时历史页显示横幅；历史含直播观看记录，可续播回看</span>
+</div>
+
+<!-- ============================================================ 8 设置中心 + 弹窗 -->
+<div class="board-label"><span class="num">08</span><span class="t">设置中心 & 弹窗体系</span><span class="d">左侧分组导航 + 表单卡片 · 配置订阅弹窗 · 推送二维码弹窗</span></div>
+<div class="window" id="p-setting">
+  <div class="titlebar"><span class="tb-title">⚙️ VodBox · 设置</span><span class="tb-clock" style="margin-left:auto">19:55</span><div class="win-controls"><span>—</span><span>▢</span><span class="close">✕</span></div></div>
+  <div class="set-shell">
+    <div class="set-nav">
+      <div class="si on">📡 源与订阅</div>
+      <div class="si">🗂 站点管理</div>
+      <div class="si">▶ 播放</div>
+      <div class="si">💬 弹幕</div>
+      <div class="si">🔤 字幕</div>
+      <div class="si">🎨 界面</div>
+      <div class="si">💾 数据与备份</div>
+      <div class="si">ℹ 关于</div>
+    </div>
+    <div class="set-body">
+      <h2 style="font-size:20px;font-weight:600;margin-bottom:16px">源与订阅</h2>
+      <div class="set-card card">
+        <div class="set-row">
+          <div><div class="lab">点播配置 <span class="anno" style="position:static;top:auto;right:auto;margin-left:6px">1</span></div><div class="desc">TVBox 格式 JSON 接口地址，支持加密配置与多仓订阅</div></div>
+          <div class="rt"><span class="val">https://mirror.ghproxy.com/…/tvbox.json</span><span class="btn" style="padding:6px 14px">更改</span><span class="icon-btn" title="历史配置">🕘</span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">直播配置</div><div class="desc">支持 m3u / txt / JSON 直播源；与点播同源时自动复用</div></div>
+          <div class="rt"><span class="val">http://…/mytv.m3u</span><span class="btn" style="padding:6px 14px">更改</span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">DoH 解析</div><div class="desc">防止 DNS 污染，影响所有接口请求</div></div>
+          <div class="rt"><span class="select">Google ▾</span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">全局代理</div><div class="desc">http / socks5 代理</div></div>
+          <div class="rt"><span class="input" style="width:190px;display:flex;align-items:center;color:var(--text-3)">未设置</span></div>
+        </div>
+      </div>
+      <div class="set-card card">
+        <div class="set-row">
+          <div><div class="lab">默认首页站点</div></div>
+          <div class="rt"><span class="select">泥巴影视 ▾</span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">无痕模式</div><div class="desc">不记录观看历史</div></div>
+          <div class="rt"><span class="toggle on"><i></i></span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">海报网格密度</div></div>
+          <div class="rt"><span class="seg"><span>紧凑</span><span class="on">适中</span><span>宽松</span></span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">主题色</div></div>
+          <div class="rt"><span class="swatches"><i style="background:#4cc2ff" class="on"></i><i style="background:#7c5cbf"></i><i style="background:#6ccb5f"></i><i style="background:#ffb900"></i><i style="background:#ff6b6b"></i></span></div>
+        </div>
+      </div>
+
+      <!-- 配置订阅弹窗 -->
+      <div class="modal-mask" style="position:absolute;inset:0">
+        <div class="modal" style="width:560px">
+          <div class="m-head" style="position:relative"><span class="t">📡 更改点播配置</span><span class="anno" style="top:14px;right:44px">2</span><span class="x">✕</span></div>
+          <div class="m-body">
+            <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">输入 TVBox 配置地址，或从剪贴板读取 / 扫码推送</div>
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input class="input" style="flex:1" value="https://mirror.ghproxy.com/…/tvbox.json" readonly>
+              <span class="btn" style="padding:0 14px">📋 粘贴</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">历史配置</div>
+            <div class="card" style="border-radius:8px">
+              <div class="set-row" style="padding:11px 14px"><span style="font-size:12.5px">tvbox.json（当前）</span><span class="rt"><span class="chip" style="font-size:11px;border-color:var(--accent);color:var(--accent)">使用中</span></span></div>
+              <div class="set-row" style="padding:11px 14px"><span style="font-size:12.5px;color:var(--text-2)">https://…/fm.json</span><span class="rt"><span class="chip" style="font-size:11px">切换</span><span class="chip" style="font-size:11px;color:var(--danger)">删除</span></span></div>
+              <div class="set-row" style="padding:11px 14px"><span style="font-size:12.5px;color:var(--text-2)">clan://localhost/…/duo.json</span><span class="rt"><span class="chip" style="font-size:11px">切换</span><span class="chip" style="font-size:11px;color:var(--danger)">删除</span></span></div>
+            </div>
+          </div>
+          <div class="m-foot">
+            <span class="btn">📲 手机扫码推送</span>
+            <span style="flex:1"></span>
+            <span class="btn">取消</span><span class="btn primary">确定加载</span>
+          </div>
+        </div>
+      </div>
+      <div class="anno" style="right:30px;top:30px">3</div>
+    </div>
+  </div>
+</div>
+<div class="anno-list">
+  <span class="it"><b>1</b>点播/直播配置独立管理，各带历史配置列表（Config 表按 type 区分）</span>
+  <span class="it"><b>2</b>配置弹窗：地址输入 + 历史切换 + 删除 + 扫码推送，与原 ConfigDialog 等价</span>
+  <span class="it"><b>3</b>弹窗体系统一：亚克力材质、圆角 12px、Esc 关闭；全应用复用此规格</span>
+</div>
+
+</body>
+</html>
