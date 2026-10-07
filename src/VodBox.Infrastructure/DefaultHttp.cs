@@ -83,19 +83,13 @@ public sealed class DefaultHttp : IDisposable
         return await response.Content.ReadAsByteArrayAsync(timeout.Token);
     }
 
-    /// <summary>处理 UTF-8 / UTF-16 / GB18030 等编码的文本解码。</summary>
-    public static string Decode(byte[] bytes)
-    {
-        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
-            return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
-        if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
-            return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
-        if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
-            return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
-        var text = Encoding.UTF8.GetString(bytes);
-        // 含替换字符说明不是合法 UTF-8，回退 GB18030
-        return text.Contains('\uFFFD') && OperatingSystem.IsWindows() ? Encoding.UTF8.GetString(bytes) : text;
-    }
+    /// <summary>
+    /// 处理 UTF-8 / UTF-16 / GB18030 等编码的文本解码。
+    /// 委托给 <see cref="TextEncoding.Decode"/>：旧实现在非 Windows 平台不回退 GB18030
+    /// （仅靠 U+FFFD 替换字符判断，中文站点在 macOS/Linux 上会乱码），现已全平台严格回退。
+    /// 保留此静态入口以免破坏现有调用点（ConfigLoader 等）。
+    /// </summary>
+    public static string Decode(byte[] bytes) => TextEncoding.Decode(bytes);
 
     public void Dispose() => _client.Dispose();
 }
