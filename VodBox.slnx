@@ -7,5 +7,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VodBox.Tests/VodBox.Tests.csproj" />
+    <Project Path="tests/VodBox.Mpv.Smoke/VodBox.Mpv.Smoke.csproj" />
+    <Project Path="tests/VodBox.Mpv.UiSmoke/VodBox.Mpv.UiSmoke.csproj" />
   </Folder>
 </Solution>

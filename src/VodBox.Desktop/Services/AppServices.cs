@@ -25,7 +25,8 @@ public sealed class AppServices : IDisposable
         Directory.CreateDirectory(DataDir);
         Store = new LibraryStore(Path.Combine(DataDir, "library.db"));
         Registry = new SourceRegistry();
-        Player = new MpvEngine();
+        // GUI 模式 + 等渲染面：loadfile 不早于 render-context 创建，消除静默丢画面竞态。
+        Player = new MpvEngine(waitForVideoSurface: true);
     }
 
     /// <summary>当前活跃点播配置 URL。</summary>

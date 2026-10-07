@@ -1,273 +1,288 @@
-using System.Runtime.InteropServices;
+using System.Globalization;
 using VodBox.Core;
 
 namespace VodBox.Playback.Mpv;
 
-/// <summary>libmpv 播放引擎（render API 由渲染控件驱动，本类负责命令/属性/事件）。</summary>
+/// <summary>惰性初始化的 mpv 引擎：命令串行化、属性观察驱动状态、SafeHandle 生命周期安全。</summary>
 public sealed class MpvEngine : IPlaybackEngine
 {
-    private IntPtr _ctx;
-    private IntPtr _renderCtx;
-    private Thread? _eventThread;
-    private volatile bool _running;
-    private long _sessionId;
-    private readonly Lock _sync = new();
+    private readonly Func<IMpvClient> _factory;
+    private readonly bool _headless;
+    private readonly bool _waitForVideoSurface;
+    private readonly TaskCompletionSource _videoSurfaceReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly SemaphoreSlim _commands = new(1, 1);
+    private readonly CancellationTokenSource _shutdown = new();
+    private IMpvClient? _client;
+    private Task? _pump;
+    private int _disposed;
+    private long _session, _startPosition;
+    private bool _loaded, _paused, _buffering;
+    private int _volume = 80;
+    private double _rate = 1;
+    private IReadOnlyList<MediaTrack> _tracks = [];
+    private PlaybackSnapshot _snapshot = new(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false);
 
-    public PlaybackSnapshot Snapshot { get; private set; } = new(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false);
+    public PlaybackSnapshot Snapshot => Volatile.Read(ref _snapshot);
+
+    /// <summary>已初始化的低层客户端（未初始化时为 null，供探测/诊断用）。</summary>
+    public IMpvClient? Client => Volatile.Read(ref _client);
+
+    /// <summary>libmpv 可用性。headless 模式下立即探测；GUI 模式下等渲染面安装后确认为真。</summary>
+    public bool Available => _headless || _client is not null;
+
+    public event EventHandler? Initialized;
     public event EventHandler<PlaybackEvent>? StateChanged;
-    public event Action? RenderUpdate;
-    public event Action? VideoChanged;
 
-    /// <summary>是否成功加载 libmpv。</summary>
-    public bool Available { get; }
-
-    public MpvEngine()
+    public MpvEngine(bool headless = false, Func<IMpvClient>? factory = null, bool waitForVideoSurface = false)
     {
-        try
+        _headless = headless;
+        _waitForVideoSurface = waitForVideoSurface;
+        _factory = factory ?? (() => new MpvClient(new Dictionary<string, string>
         {
-            _ctx = MpvNative.mpv_create();
-            if (_ctx == IntPtr.Zero) return;
-            SetOption("vo", "libmpv");
-            SetOption("hwdec", "auto");
-            SetOption("keep-open", "always");
-            SetOption("idle", "yes");
-            if (MpvNative.mpv_initialize(_ctx) < 0) return;
-            Available = true;
-        }
-        catch (DllNotFoundException)
+            ["vo"] = headless ? "null" : "libmpv",
+            ["ao"] = headless ? "null" : "auto",
+            ["hwdec"] = headless ? "no" : "auto-safe",
+        }));
+        if (headless)
         {
-            Available = false;
-        }
-    }
-
-    private void EnsureReady()
-    {
-        if (!Available) throw new InvalidOperationException("libmpv 不可用");
-    }
-
-    private void SetOption(string name, string value)
-    {
-        if (_ctx != IntPtr.Zero) MpvNative.mpv_set_option_string(_ctx, name, value);
-    }
-
-    internal void SetProperty(string name, string value)
-    {
-        EnsureReady();
-        lock (_sync) MpvNative.mpv_set_property_string(_ctx, name, value);
-    }
-
-    internal string? GetProperty(string name)
-    {
-        EnsureReady();
-        IntPtr value;
-        lock (_sync) value = MpvNative.mpv_get_property_string(_ctx, name);
-        if (value == IntPtr.Zero) return null;
-        var result = Marshal.PtrToStringUTF8(value);
-        MpvNative.mpv_free(value);
-        return result;
-    }
-
-    private void Command(params string[] args)
-    {
-        EnsureReady();
-        var array = new IntPtr[args.Length + 1];
-        try
-        {
-            for (var i = 0; i < args.Length; i++) array[i] = Marshal.StringToHGlobalAnsi(args[i]);
-            lock (_sync)
+            try
             {
-                var error = MpvNative.mpv_command(_ctx, args);
-                if (error < 0) throw new InvalidOperationException($"mpv 命令失败 {args[0]}: {error}");
+                Initialize();
+            }
+            catch (Exception)
+            {
+                // libmpv 缺失：headless 探测失败时静默降级为不可用。
+                _client = null;
             }
         }
-        finally
+    }
+
+    /// <summary>渲染面已创建并安装好 render context（消除 loadfile 早于渲染上下文导致无声丢画面的竞态）。</summary>
+    public void NotifyVideoSurfaceReady() => _videoSurfaceReady.TrySetResult();
+    public void NotifyVideoSurfaceFailure(Exception error) => _videoSurfaceReady.TrySetException(error);
+
+    private void Initialize()
+    {
+        if (_client is not null) return;
+        var client = _factory();
+        try
         {
-            foreach (var pointer in array) if (pointer != IntPtr.Zero) Marshal.FreeHGlobal(pointer);
+            client.Observe("time-pos", 1, MpvPropertyFormat.Double);
+            client.Observe("duration", 2, MpvPropertyFormat.Double);
+            client.Observe("pause", 3, MpvPropertyFormat.Flag);
+            client.Observe("seekable", 4, MpvPropertyFormat.Flag);
+            client.Observe("paused-for-cache", 5, MpvPropertyFormat.Flag);
+            client.Observe("track-list", 6, MpvPropertyFormat.None);
+            _client = client; Initialized?.Invoke(this, EventArgs.Empty);
+            _pump = Task.Run(PumpAsync);
         }
+        catch { _client = null; client.Dispose(); throw; }
     }
 
-    public Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken ct = default)
+    private async Task ExecuteAsync(Action action, CancellationToken token)
     {
-        EnsureReady();
-        _sessionId = sessionId;
-        foreach (var (key, value) in request.Headers)
+        Check(); await _commands.WaitAsync(token).ConfigureAwait(false);
+        try { Check(); token.ThrowIfCancellationRequested(); await Task.Run(action, CancellationToken.None).ConfigureAwait(false); }
+        finally { _commands.Release(); }
+    }
+
+    public async Task OpenAsync(PlaybackRequest request, long sessionId, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https" or "file" or "rtsp" or "rtmp" or "udp" or "rtp"))
+            throw new InvalidDataException("mpv 需要明确的媒体 URI。");
+        foreach (var header in request.Headers)
         {
-            if (key.Equals("referer", StringComparison.OrdinalIgnoreCase)) SetProperty("referrer", value);
-            else if (key.Equals("user-agent", StringComparison.OrdinalIgnoreCase)) SetProperty("user-agent", value);
+            if (header.Value.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("媒体请求头含控制字符。");
+            // mpv 只接受全局 UA/Referer；其余请求头需走媒体代理（S7 实现），此处明确拒绝而非静默丢弃。
+            if (!header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
+                && !header.Key.Equals("Referer", StringComparison.OrdinalIgnoreCase))
+                throw new NotSupportedException($"请求头 {header.Key} 需要通过媒体代理传递（S7 实现）。");
         }
-        if (request.StartPositionMs > 0)
-            Command("loadfile", request.Uri, "replace", $"start={request.StartPositionMs / 1000.0:0.###}");
-        else
-            Command("loadfile", request.Uri, "replace");
-        Update(PlaybackState.Loading);
-        StartEventLoop();
-        return Task.CompletedTask;
-    }
-
-    public Task PlayAsync(CancellationToken ct = default)
-    {
-        SetProperty("pause", "no");
-        Update(PlaybackState.Playing);
-        return Task.CompletedTask;
-    }
-
-    public Task PauseAsync(CancellationToken ct = default)
-    {
-        SetProperty("pause", "yes");
-        Update(PlaybackState.Paused);
-        return Task.CompletedTask;
-    }
-
-    public Task StopAsync(CancellationToken ct = default)
-    {
-        Command("stop");
-        Update(PlaybackState.Idle);
-        return Task.CompletedTask;
-    }
-
-    public Task SeekToAsync(TimeSpan position, CancellationToken ct = default)
-    {
-        Command("seek", $"{position.TotalSeconds:0.###}", "absolute");
-        return Task.CompletedTask;
-    }
-
-    public Task SeekByAsync(TimeSpan delta, CancellationToken ct = default)
-    {
-        Command("seek", $"{delta.TotalSeconds:0.###}", "relative");
-        return Task.CompletedTask;
-    }
-
-    public Task SetRateAsync(double rate, CancellationToken ct = default)
-    {
-        SetProperty("speed", rate.ToString("0.###"));
-        return Task.CompletedTask;
-    }
-
-    public Task SetVolumeAsync(int volume, CancellationToken ct = default)
-    {
-        SetProperty("volume", Math.Clamp(volume, 0, 100).ToString());
-        return Task.CompletedTask;
-    }
-
-    public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind)
-    {
-        var prefix = kind switch
+        if (_waitForVideoSurface)
         {
-            TrackKind.Audio => "audio",
-            TrackKind.Subtitle => "sub",
-            TrackKind.Video => "video",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-        };
-        var count = int.TryParse(GetProperty($"{prefix}-track-count"), out var c) ? c : 0;
-        var selectedId = int.TryParse(GetProperty($"{prefix}-id"), out var s) ? s : 0;
-        var tracks = new List<MediaTrack>();
-        for (var i = 1; i <= count; i++)
-        {
-            var title = GetProperty($"track-list/{i - 1}/title") ?? $"{prefix} {i}";
-            tracks.Add(new MediaTrack(i.ToString(), title, kind, i == selectedId));
+            await ExecuteAsync(Initialize, token).ConfigureAwait(false);
+            // loadfile 早于 render-context 创建时 libmpv 会静默丢视频。
+            await _videoSurfaceReady.Task.WaitAsync(TimeSpan.FromSeconds(8), token).ConfigureAwait(false);
         }
-        return tracks;
+        await ExecuteAsync(() =>
+        {
+            Initialize();
+            var client = _client!;
+            client.Command("stop");
+            for (int i = 0; i < 256 && client.PollEvent().Id != 0; i++) { }
+            _session = sessionId; _loaded = _paused = _buffering = false; _startPosition = Math.Max(0, request.StartPositionMs);
+            Volatile.Write(ref _tracks, []);
+            SetSnapshot(new PlaybackSnapshot(PlaybackState.Loading, TimeSpan.Zero, TimeSpan.Zero, false));
+            string agent = "", referer = "";
+            foreach (var header in request.Headers)
+            {
+                if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)) agent = header.Value;
+                else referer = header.Value;
+            }
+            // 每次打开都重置这两个全局选项，避免上一个源的请求头泄漏到下一个。
+            client.Command("set", "user-agent", agent); client.Command("set", "referrer", referer);
+            client.Command("set", "pause", "no"); client.Command("set", "volume", _volume.ToString(CultureInfo.InvariantCulture));
+            client.Command("set", "speed", Number(_rate));
+            try { client.Command("loadfile", uri.AbsoluteUri, "replace"); }
+            catch (Exception error) { SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message }); throw; }
+        }, token);
     }
 
-    public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default)
+    public Task PlayAsync(CancellationToken token = default) =>
+        ExecuteAsync(() => _client?.Command("set", "pause", "no"), token);
+
+    public Task PauseAsync(CancellationToken token = default) =>
+        ExecuteAsync(() => _client?.Command("set", "pause", "yes"), token);
+
+    public Task StopAsync(CancellationToken token = default) => ExecuteAsync(() =>
     {
-        var prefix = kind switch
+        _client?.Command("stop"); _loaded = false; _startPosition = 0;
+        Volatile.Write(ref _tracks, []);
+        SetSnapshot(new PlaybackSnapshot(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false));
+    }, token);
+
+    public Task SeekToAsync(TimeSpan position, CancellationToken token = default) => ExecuteAsync(() =>
+    {
+        if (_loaded && Snapshot.CanSeek)
+            _client!.Command("seek", Number(Math.Clamp(position.TotalSeconds, 0,
+                Snapshot.Duration > TimeSpan.Zero ? Snapshot.Duration.TotalSeconds : double.MaxValue)), "absolute+exact");
+    }, token);
+
+    public Task SeekByAsync(TimeSpan delta, CancellationToken token = default) => ExecuteAsync(() =>
+    {
+        if (_loaded) _client!.Command("seek", Number(delta.TotalSeconds), "relative");
+    }, token);
+
+    public Task SetRateAsync(double rate, CancellationToken token = default) => ExecuteAsync(() =>
+    { _rate = Math.Clamp(double.IsFinite(rate) ? rate : 1, .25, 4); _client?.Command("set", "speed", Number(_rate)); }, token);
+
+    public Task SetVolumeAsync(int volume, CancellationToken token = default) => ExecuteAsync(() =>
+    { _volume = Math.Clamp(volume, 0, 100); _client?.Command("set", "volume", _volume.ToString(CultureInfo.InvariantCulture)); }, token);
+
+    public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) =>
+        Volatile.Read(ref _tracks).Where(x => x.Kind == kind).ToArray();
+
+    public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken token = default)
+    {
+        if (trackId != "no" && (!long.TryParse(trackId, NumberStyles.None, CultureInfo.InvariantCulture, out long id) || id <= 0))
+            throw new InvalidDataException("mpv 轨道编号无效。");
+        var property = kind switch
         {
             TrackKind.Audio => "aid",
             TrackKind.Subtitle => "sid",
             TrackKind.Video => "vid",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
-        if (trackId == "0") SetProperty(prefix, "no");
-        else SetProperty(prefix, trackId);
-        return Task.CompletedTask;
+        return ExecuteAsync(() => _client?.Command("set", property, trackId), token);
     }
 
-    // ---------- 事件循环 ----------
-
-    private void StartEventLoop()
-    {
-        if (_eventThread is { IsAlive: true }) return;
-        _running = true;
-        _eventThread = new Thread(EventLoop) { IsBackground = true, Name = "mpv-events" };
-        _eventThread.Start();
-    }
-
-    private void EventLoop()
-    {
-        while (_running)
-        {
-            var eventPointer = MpvNative.mpv_wait_event(_ctx, 1000);
-            if (eventPointer == IntPtr.Zero) continue;
-            var evt = Marshal.PtrToStructure<MpvNative.MpvEvent>(eventPointer);
-            switch (evt.EventId)
-            {
-                case MpvNative.MpvEventFileLoaded:
-                    Update(PlaybackState.Playing);
-                    VideoChanged?.Invoke();
-                    break;
-                case MpvNative.MpvEventEndFile:
-                    Update(PlaybackState.Ended);
-                    break;
-                case MpvNative.MpvEventShutdown:
-                    _running = false;
-                    Update(PlaybackState.Idle);
-                    break;
-            }
-        }
-    }
-
-    private void Update(PlaybackState state, string? error = null)
-    {
-        var position = TimeSpan.Zero;
-        var duration = TimeSpan.Zero;
-        try
-        {
-            if (state is PlaybackState.Playing or PlaybackState.Paused or PlaybackState.Buffering)
-            {
-                if (double.TryParse(GetProperty("time-pos"), out var pos)) position = TimeSpan.FromSeconds(pos);
-                if (double.TryParse(GetProperty("duration"), out var dur)) duration = TimeSpan.FromSeconds(dur);
-            }
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        Snapshot = new PlaybackSnapshot(state, position, duration, state is PlaybackState.Playing or PlaybackState.Paused, error);
-        StateChanged?.Invoke(this, new PlaybackEvent(_sessionId, Snapshot));
-    }
-
-    /// <summary>当前位置（事件线程外轮询用）。</summary>
-    public (TimeSpan Position, TimeSpan Duration) PollPosition()
+    private async Task PumpAsync()
     {
         try
         {
-            var pos = double.TryParse(GetProperty("time-pos"), out var p) ? TimeSpan.FromSeconds(p) : Snapshot.Position;
-            var dur = double.TryParse(GetProperty("duration"), out var d) ? TimeSpan.FromSeconds(d) : Snapshot.Duration;
-            return (pos, dur);
-        }
-        catch (InvalidOperationException)
-        {
-            return (Snapshot.Position, Snapshot.Duration);
-        }
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        _running = false;
-        try
-        {
-            if (_ctx != IntPtr.Zero)
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+            while (await timer.WaitForNextTickAsync(_shutdown.Token).ConfigureAwait(false))
             {
-                MpvNative.mpv_wakeup(_ctx);
-                _eventThread?.Join(500);
-                MpvNative.mpv_terminate_destroy(_ctx);
-                _ctx = IntPtr.Zero;
+                await _commands.WaitAsync(_shutdown.Token).ConfigureAwait(false);
+                try
+                {
+                    var before = Snapshot; var snapshot = before;
+                    for (int i = 0; i < 256; i++)
+                    {
+                        var item = _client!.PollEvent(); if (item.Id == 0) break;
+                        snapshot = Process(item, snapshot);
+                    }
+                    if (snapshot != before) SetSnapshot(snapshot);
+                }
+                catch (ObjectDisposedException) when (_shutdown.IsCancellationRequested) { }
+                catch (Exception error) { SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message }); }
+                finally { _commands.Release(); }
             }
         }
-        catch (DllNotFoundException)
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+    }
+
+    private PlaybackSnapshot Process(MpvEvent item, PlaybackSnapshot snapshot)
+    {
+        if (item.Id == 8) // MPV_EVENT_FILE_LOADED
         {
+            _loaded = true; RefreshTracks();
+            if (_startPosition > 0) { _client!.Command("seek", Number(_startPosition / 1000d), "absolute+exact"); _startPosition = 0; }
+            return snapshot with { State = CurrentState(), Error = null };
         }
-        GC.SuppressFinalize(this);
-        return ValueTask.CompletedTask;
+        if (item.Id == 7) // MPV_EVENT_END_FILE
+        {
+            if (item.EndReason == 2 && !_loaded && snapshot.State == PlaybackState.Loading) return snapshot; // OpenAsync 的前置 stop
+            _loaded = false;
+            return snapshot with
+            {
+                State = item.EndReason == 0 ? PlaybackState.Ended : item.EndReason == 4 ? PlaybackState.Failed : PlaybackState.Idle,
+                Error = item.EndReason == 4 ? $"mpv 无法播放此媒体（错误 {item.EndError}）。" : null
+            };
+        }
+        if (item.Id != 22) return snapshot; // 只关心 MPV_EVENT_PROPERTY_CHANGE
+        switch (item.PropertyName)
+        {
+            case "time-pos" when item.PropertyDouble is { } position && double.IsFinite(position): return snapshot with { Position = Seconds(position) };
+            case "duration" when item.PropertyDouble is { } duration && double.IsFinite(duration): return snapshot with { Duration = Seconds(duration) };
+            case "seekable" when item.PropertyFlag is { } seekable: return snapshot with { CanSeek = seekable };
+            case "pause" when item.PropertyFlag is { } paused: _paused = paused; break;
+            case "paused-for-cache" when item.PropertyFlag is { } buffering: _buffering = buffering; break;
+            case "track-list": if (_loaded) RefreshTracks(); break;
+        }
+        return _loaded ? snapshot with { State = CurrentState() } : snapshot;
+    }
+
+    private PlaybackState CurrentState() => _paused ? PlaybackState.Paused : _buffering ? PlaybackState.Buffering : PlaybackState.Playing;
+
+    private void RefreshTracks()
+    {
+        int count = (int)Math.Clamp(_client!.GetDouble("track-list/count") ?? 0, 0, 256);
+        var tracks = new List<MediaTrack>();
+        // aid/vid/sid 只有字符串形式（mpv_get_property DOUBLE 会报 -9），统一用字符串解析。
+        long selectedAudio = ParseId(_client.GetString("aid"));
+        long selectedVideo = ParseId(_client.GetString("vid"));
+        long selectedSub = ParseId(_client.GetString("sid"));
+        for (int i = 0; i < count; i++)
+        {
+            string prefix = $"track-list/{i}/";
+            string? type = _client.GetString(prefix + "type");
+            // 新契约含视频轨，三种都收。
+            var kind = type switch
+            {
+                "audio" => TrackKind.Audio,
+                "sub" => TrackKind.Subtitle,
+                "video" => TrackKind.Video,
+                _ => (TrackKind?)null,
+            };
+            if (kind is null) continue;
+            long id = (long)(_client.GetDouble(prefix + "id") ?? 0); if (id <= 0) continue;
+            var name = _client.GetString(prefix + "title") ?? _client.GetString(prefix + "lang") ?? $"{type} {id}";
+            var selected = kind == TrackKind.Audio ? id == selectedAudio : kind == TrackKind.Video ? id == selectedVideo : id == selectedSub;
+            tracks.Add(new MediaTrack(id.ToString(CultureInfo.InvariantCulture), name, kind.Value, selected));
+        }
+        tracks.Add(new MediaTrack("no", "关闭字幕", TrackKind.Subtitle, selectedSub < 0));
+        Volatile.Write(ref _tracks, tracks.ToArray());
+    }
+
+    private void SetSnapshot(PlaybackSnapshot snapshot) { Volatile.Write(ref _snapshot, snapshot); StateChanged?.Invoke(this, new PlaybackEvent(_session, snapshot)); }
+    private static long ParseId(string? value) =>
+        long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : -1;
+    private static TimeSpan Seconds(double value) => TimeSpan.FromSeconds(Math.Clamp(value, 0, TimeSpan.MaxValue.TotalSeconds / 2));
+    private static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
+    private void Check() => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _shutdown.Cancel();
+        try { if (_client is MpvClient real) real.Wakeup(); } catch (ObjectDisposedException) { }
+        await _commands.WaitAsync().ConfigureAwait(false);
+        try { if (_client is { } client) await Task.Run(client.Dispose).ConfigureAwait(false); _client = null; }
+        finally { _commands.Release(); }
+        if (_pump is not null) await _pump.ConfigureAwait(false);
+        _shutdown.Dispose();
     }
 }

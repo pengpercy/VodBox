@@ -27,8 +27,7 @@
 
 结论：**当前实现对真实 TVBox 配置的可用站点数 = 0**。这是最大的功能性缺口。
 
-**视频渲染是空壳**：`MpvNative.cs` 无 `mpv_render_context_*` 绑定，`MpvVideoSurface` 是占位，`PlayerOverlay.axaml` 只画黑矩形 + "libmpv 渲染窗口"文字。**有传输层但看不到画面**。
-好消息：git 历史（`9a67c2d^`）有可用的 `MpvRenderContext.cs` + `MpvNative.Render.cs` + `OpenGlControlBase` 版 `MpvVideoSurface.cs`，旧版曾通过 macOS JIT/AOT 真实解码验证，可捞回适配。
+~~**视频渲染是空壳**~~（S1 已完成）：已移植旧栈 `MpvClient`（SafeHandle + 手工 argv）+ `MpvNative.Render.cs` + `MpvRenderContext` + `OpenGlControlBase` 版 `MpvVideoSurface`，引擎等待渲染面握手后才 loadfile。macOS 本机 JIT（37 帧）与 NativeAOT 探针（帧数见 S1 验收记录）均渲染真实画面。
 
 **其他半成品（B 类）**
 - 本地文件页能浏览不能播（`PlayRequested` 事件零订阅者）
@@ -58,13 +57,19 @@
   当前 `AppServices` 硬编码 `~/.vodbox`（`AppServices.cs:16-18`）
 - `AtomicFile.WriteAsync`(9行，DROP-IN) —— 原子写（旧 `ConfigurationRepository` 里唯一值得捞的部分）
 
-### S1 · 视频渲染落地（P0，2–4 天）★ 最关键 🔨 进行中
-- 捞回 `9a67c2d^` 的 `MpvRenderContext` / `MpvNative.Render.cs`，适配 Avalonia 12 `OpenGlControlBase` API
-- `MpvNative` 补 `mpv_render_context_create/update/render/free/set_parameter/proc_address` 绑定
-- `MpvEngine.OpenAsync` 装 render context（当前设了 `vo=libmpv` 但没回调 → 必然无画面）
-- `PlayerOverlay.axaml` 黑矩形换成 `MpvVideoSurface`；DPI / 尺寸变化 / GL 丢失恢复
-- 三平台验证（macOS 本机先过，Windows/Linux 靠 CI）
-- 验收：本地 mp4 + 一个 HLS 直播源能看到画面、暂停、seek、全屏往返
+### S1 · 视频渲染落地（P0，2–4 天）★ 最关键 ✅ 已完成（2026-10-08，macOS x64）
+- ✅ 移植 `9a67c2d^` 整套 mpv 栈：`MpvClient`（SafeHandle + 锁串行化 + 手工 NULL 结尾 UTF-8 argv）/
+  `MpvNative`（保留新树 DllImportResolver 与 `VODBOX_MPV_LIB` 覆盖）/ `MpvNative.Render.cs`（5 个 render 绑定）/
+  `MpvRenderContext`（UnmanagedCallersOnly 回调只置脏标记）/ `MpvVideoSurface`（Avalonia 12.1.3 `OpenGlControlBase`，零漂移编译）
+- ✅ 旧 `MpvEngine` 适配新 `IPlaybackEngine`：`SeekAsync`→`SeekToAsync`+`SeekByAsync`；音量 double 0..1→int 0..100；
+  `AddSubtitleAsync`/`SubtitleSource` 按决策丢弃（S8 另行设计）；`RefreshTracks` 收录视频轨（新 `TrackKind.Video`）
+- ✅ `PlayerOverlay.axaml` 黑矩形+占位文字 → 真 `MpvVideoSurface`（`waitForVideoSurface` 握手：Ready 前不 loadfile）
+- ✅ 保留加固选项（`config=no, load-scripts=no, ytdl=no, terminal=no, idle=yes, hwdec=auto-safe`）与非 UA/Referer 头明确拒绝（S7 媒体代理后再放行）
+- ✅ 修新发现的 bug：`aid/vid/sid` 只能字符串读（DOUBLE 报 -9）
+- 实测：本地合成 5s H.264 mp4 —— JIT 渲染 **37 帧**、NativeAOT **52 帧**（2.5s 窗口，position=2.23s，width=640 校验通过）；
+  headless 传输层冒烟（seek/pause/resume/rate/volume/UTF-8 路径/错误/双重 dispose）全绿；Release NativeAOT 发布 0 警告
+- 验证缺口（如实记录）：HLS 直播源与全屏往返未验证；Windows/Linux 未跑（无环境，靠 CI）；详情页内嵌影院模式播放器留 TODO（设计为全局浮层播放）
+- 验收：本地 mp4 能看到画面、暂停、seek ✅；HLS + 全屏 ⏳ 待 S2 控制条完善后补验
 
 ### S2 · 播放体验（P0–P1，3–5 天）
 **已决策纳入**：移植旧 `PlaybackCoordinator.cs`(88行) + `PlaylistSession.cs`(43行)（ADAPT）。

@@ -1,30 +1,64 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Media;
-using Avalonia.Platform;
-
-using VodBox.Core;
+using Avalonia.OpenGL;
+using Avalonia.OpenGL.Controls;
+using Avalonia.Threading;
 
 namespace VodBox.Playback.Mpv;
 
-/// <summary>libmpv 视频渲染面（占位实现：libmpv render API 需要 OpenGL 上下文接入 Avalonia 的 IGlPlatformSurface）。</summary>
-public sealed class MpvVideoSurface : Control
+/// <summary>libmpv OpenGL 视频渲染面（Avalonia 12 OpenGlControlBase；播放器与探针共用）。</summary>
+public sealed class MpvVideoSurface : OpenGlControlBase
 {
-    private readonly MpvEngine _engine;
+    private readonly MpvClient _client;
+    private MpvRenderContext? _renderer;
+    private readonly DispatcherTimer _updates = new() { Interval = TimeSpan.FromMilliseconds(16) };
 
-    public MpvVideoSurface(MpvEngine engine)
+    public event EventHandler? Ready;
+    public event EventHandler<Exception>? Failed;
+    public long RenderedFrames { get; private set; }
+
+    public MpvVideoSurface(MpvClient client)
     {
-        _engine = engine;
-        ClipToBounds = true;
+        _client = client;
     }
 
-    public override void Render(DrawingContext context)
+    protected override void OnOpenGlInit(GlInterface gl)
     {
-        base.Render(context);
-        // 视频 GL 渲染经 NativeControlHost / render-context 接入（后续接入 RenderApi）
-        if (_engine.Snapshot is { State: PlaybackState.Idle or PlaybackState.Failed })
+        try
         {
-            context.FillRectangle(Brushes.Black, new Rect(Bounds.Size));
+            _renderer = new MpvRenderContext(_client, gl.GetProcAddress);
+            _updates.Tick += OnUpdate;
+            _updates.Start();
+            Ready?.Invoke(this, EventArgs.Empty);
         }
+        catch (Exception error) { Failed?.Invoke(this, error); }
+    }
+
+    private void OnUpdate(object? sender, EventArgs args)
+    {
+        if (_renderer?.HasUpdate == true && IsEffectivelyVisible) RequestNextFrameRendering();
+    }
+
+    protected override void OnOpenGlRender(GlInterface gl, int fb)
+    {
+        if (_renderer is null) return;
+        var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+        try
+        {
+            _renderer.Render(fb, Math.Max(1, (int)(Bounds.Width * scale)), Math.Max(1, (int)(Bounds.Height * scale)));
+            RenderedFrames++;
+        }
+        catch (Exception error) { _updates.Stop(); Failed?.Invoke(this, error); }
+    }
+
+    protected override void OnOpenGlDeinit(GlInterface gl)
+    {
+        _updates.Stop(); _updates.Tick -= OnUpdate;
+        _renderer?.Dispose(); _renderer = null;
+    }
+
+    protected override void OnOpenGlLost()
+    {
+        _updates.Stop();
+        Failed?.Invoke(this, new InvalidOperationException("mpv OpenGL 上下文丢失：需要重建渲染面。"));
     }
 }

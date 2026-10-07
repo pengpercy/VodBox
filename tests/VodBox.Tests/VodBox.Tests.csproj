@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\VodBox.Core\VodBox.Core.csproj" />
     <ProjectReference Include="..\..\src\VodBox.Infrastructure\VodBox.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\VodBox.Playback.Mpv\VodBox.Playback.Mpv.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

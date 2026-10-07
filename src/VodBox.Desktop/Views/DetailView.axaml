@@ -51,6 +51,8 @@
         </StackPanel>
 
         <!-- 播放器窗 -->
+        <!-- TODO(S5 影院模式)：若需要内嵌小窗播放，此处可挂第二个 MpvVideoSurface（需独立 MpvClient，mpv 单实例只能一个 render context 时共享渲染面）。
+             当前产品决策：播放统一走全局浮层，此窗只作提示。 -->
         <StackPanel Grid.Column="3" Spacing="10">
           <Border CornerRadius="12" Height="193" Background="#000000" ClipToBounds="True">
             <TextBlock Text="播放中 · 请看底部浮层" FontSize="11.5" Foreground="#85FFFFFF"

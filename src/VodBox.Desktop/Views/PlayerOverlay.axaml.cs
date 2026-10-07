@@ -4,7 +4,9 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
+using VodBox.Playback.Mpv;
 
 namespace VodBox.Desktop.Views;
 
@@ -30,10 +32,57 @@ public static class TimeConverters
 
 public partial class PlayerOverlay : UserControl
 {
-    public PlayerOverlay() => InitializeComponent();
+    private MpvVideoSurface? _surface;
+
+    public PlayerOverlay()
+    {
+        InitializeComponent();
+        AttachedToVisualTree += OnAttached;
+        DetachedFromVisualTree += OnDetached;
+    }
+
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
     private PlayerViewModel VM => ((MainViewModel)DataContext!).Player;
+
+    private void OnAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e) => TryInstallSurface();
+
+    private void OnDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        // 控件卸载时丢渲染面；重新入树时重建（OpenGlControlBase 会重新走 Init 流程）。
+        if (_surface is not null)
+        {
+            _surface.Ready -= OnSurfaceReady;
+            _surface.Failed -= OnSurfaceFailed;
+            VideoHost.Children.Remove(_surface);
+            _surface = null;
+        }
+    }
+
+    /// <summary>引擎触发懒初始化后拿到真实 MpvClient，装渲染面；重复调用幂等。</summary>
+    private void TryInstallSurface()
+    {
+        if (_surface is not null || Avalonia.Application.Current is not App) return;
+        var engine = App.Services.Player;
+        if (engine.Client is not MpvClient client) return;
+        _surface = new MpvVideoSurface(client);
+        _surface.Ready += OnSurfaceReady;
+        _surface.Failed += OnSurfaceFailed;
+        VideoHost.Children.Add(_surface);
+    }
+
+    private void OnSurfaceReady(object? sender, EventArgs e)
+    {
+        if (_surface is not null) _surface.Ready -= OnSurfaceReady;
+        if (Avalonia.Application.Current is App) App.Services.Player.NotifyVideoSurfaceReady();
+    }
+
+    private void OnSurfaceFailed(object? sender, Exception error)
+    {
+        if (_surface is not null) _surface.Failed -= OnSurfaceFailed;
+        if (Avalonia.Application.Current is App) App.Services.Player.NotifyVideoSurfaceFailure(error);
+        if (DataContext is MainViewModel main) main.Player.Error = error.Message;
+    }
 
     private void OnTogglePlay(object? sender, RoutedEventArgs e) => VM.TogglePlayPauseCommand.Execute(null);
 

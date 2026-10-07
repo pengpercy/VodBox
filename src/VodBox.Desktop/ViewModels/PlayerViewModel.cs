@@ -42,14 +42,6 @@ public sealed partial class PlayerViewModel : ObservableObject
                     _ = SaveHistoryAsync();
             });
         };
-        var poll = new System.Timers.Timer(1000) { AutoReset = true };
-        poll.Elapsed += (_, _) =>
-        {
-            if (State is not (PlaybackState.Playing or PlaybackState.Paused)) return;
-            var (position, duration) = engine.PollPosition();
-            _main.RunOnUi(() => { Position = position; Duration = duration; });
-        };
-        poll.Start();
     }
 
     private PlaybackRequest? _current;
@@ -61,13 +53,23 @@ public sealed partial class PlayerViewModel : ObservableObject
         Visible = true;
         Error = null;
         _sessionId = DateTime.UtcNow.Ticks;
-        if (!_services.Player.Available)
+        _ = OpenSafeAsync(request);
+    }
+
+    /// <summary>异步打开媒体并兜底：libmpv 缺失/渲染面失败/代理头拒绝等异常落到 Error，而不是未观察任务。</summary>
+    private async Task OpenSafeAsync(PlaybackRequest request)
+    {
+        try
+        {
+            await _services.Player.OpenAsync(request, _sessionId);
+        }
+        catch (Exception error)
         {
             State = PlaybackState.Failed;
-            Error = "libmpv 未加载：请安装 mpv 或设置 VODBOX_MPV_LIB 指向 libmpv 动态库";
-            return;
+            Error = error is DllNotFoundException or InvalidOperationException or NotSupportedException
+                ? $"无法播放：{error.Message}（libmpv 缺失时请安装 mpv 或设置 VODBOX_MPV_LIB 指向 libmpv 动态库）"
+                : $"无法播放：{error.Message}";
         }
-        _ = _services.Player.OpenAsync(request, _sessionId);
     }
 
     [RelayCommand]

@@ -1,19 +1,23 @@
-using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace VodBox.Playback.Mpv;
 
-/// <summary>libmpv C API 绑定（LibraryImport 源码生成，AOT 安全）。</summary>
+/// <summary>libmpv C API 绑定（LibraryImport 源码生成 + 手工 NULL 结尾 UTF-8 封送，AOT 安全）。</summary>
 internal static partial class MpvNative
 {
+    // 单一常量名，解析器按平台候选路径预加载真实动态库。
+    private const string Library = "vodbox-mpv";
+
     static MpvNative() => InstallResolver();
 
-    /// <summary>macOS 需按候选路径预加载 dylib（应用 bundle 内 / 环境变量）；Windows/Linux 由 dyld/ld 按名解析。</summary>
+    /// <summary>按候选路径预加载 libmpv（环境变量覆盖 → 应用目录 → 系统目录）。</summary>
     private static void InstallResolver()
     {
         NativeLibrary.SetDllImportResolver(typeof(MpvNative).Assembly, static (name, _, _) =>
         {
-            if (name is not ("mpv" or "libmpv" or "mpv-2" or "libmpv-2")) return IntPtr.Zero;
+            if (name != Library) return IntPtr.Zero;
             foreach (var candidate in CandidateLibraries())
             {
                 if (NativeLibrary.TryLoad(candidate, out var handle)) return handle;
@@ -44,59 +48,86 @@ internal static partial class MpvNative
         }
     }
 
-    [LibraryImport("mpv", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial IntPtr mpv_create();
+    [LibraryImport(Library, EntryPoint = "mpv_create")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial MpvHandle Create();
 
-    [LibraryImport("mpv")]
-    internal static partial int mpv_initialize(IntPtr ctx);
+    [LibraryImport(Library, EntryPoint = "mpv_initialize")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int Initialize(MpvHandle handle);
 
-    [LibraryImport("mpv")]
-    internal static partial void mpv_destroy(IntPtr ctx);
+    [LibraryImport(Library, EntryPoint = "mpv_terminate_destroy")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial void Destroy(nint handle);
 
-    [LibraryImport("mpv")]
-    internal static partial void mpv_terminate_destroy(IntPtr ctx);
+    [LibraryImport(Library, EntryPoint = "mpv_set_option_string", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int Option(MpvHandle handle, string name, string value);
 
-    [LibraryImport("mpv", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial int mpv_command(IntPtr ctx, string[] args);
+    [LibraryImport(Library, EntryPoint = "mpv_command")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int Command(MpvHandle handle, nint arguments);
 
-    [LibraryImport("mpv", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial int mpv_set_option_string(IntPtr ctx, string name, string value);
+    [LibraryImport(Library, EntryPoint = "mpv_get_property", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int GetDouble(MpvHandle handle, string name, int format, out double value);
 
-    [LibraryImport("mpv", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial int mpv_set_property_string(IntPtr ctx, string name, string value);
+    [LibraryImport(Library, EntryPoint = "mpv_get_property_string", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial nint GetString(MpvHandle handle, string name);
 
-    [LibraryImport("mpv", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial IntPtr mpv_get_property_string(IntPtr ctx, string name);
+    [LibraryImport(Library, EntryPoint = "mpv_free")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial void Free(nint pointer);
 
-    [LibraryImport("mpv")]
-    internal static partial void mpv_free(IntPtr data);
+    [LibraryImport(Library, EntryPoint = "mpv_observe_property", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int Observe(MpvHandle handle, ulong id, string name, int format);
 
-    [LibraryImport("mpv")]
-    internal static partial ulong mpv_client_api_version();
+    [LibraryImport(Library, EntryPoint = "mpv_wait_event")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial nint WaitEvent(MpvHandle handle, double timeout);
 
-    // ---------- 事件 ----------
-    [LibraryImport("mpv")]
-    internal static partial IntPtr mpv_wait_event(IntPtr ctx, int timeout);
+    [LibraryImport(Library, EntryPoint = "mpv_wakeup")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial void Wakeup(MpvHandle handle);
 
-    [LibraryImport("mpv")]
-    internal static partial void mpv_wakeup(IntPtr ctx);
+    [LibraryImport(Library, EntryPoint = "mpv_error_string")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial nint ErrorString(int error);
 
-    internal const int MpvFormatNone = 0;
-    internal const int MpvFormatString = 1;
-    internal const int MpvEventIdle = 0;
-    internal const int MpvEventShutdown = 1;
-    internal const int MpvEventLogMessage = 5;
-    internal const int MpvEventEndFile = 7;
-    internal const int MpvEventFileLoaded = 9;
-    internal const int MpvEventPropertyChange = 11;
+    [LibraryImport(Library, EntryPoint = "mpv_request_log_messages", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial int RequestLogs(MpvHandle handle, string level);
 
-    /// <summary>mpv_event 结构：event_id(int) + error(int) + reply_userdata(ulong) + data(void*)。</summary>
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct MpvEvent
+    internal static void Check(int error)
     {
-        public int EventId;
-        public int ErrorCode;
-        public ulong ReplyUserdata;
-        public IntPtr Data;
+        if (error < 0) throw new MpvException(error, Marshal.PtrToStringUTF8(ErrorString(error)) ?? "Unknown mpv error");
     }
 }
+
+/// <summary>mpv 句柄（SafeHandle：引用计数保证 render context 与销毁顺序安全）。</summary>
+internal sealed class MpvHandle : SafeHandleZeroOrMinusOneIsInvalid
+{
+    public MpvHandle() : base(true) { }
+    protected override bool ReleaseHandle()
+    {
+        MpvNative.Destroy(handle);
+        return true;
+    }
+}
+
+/// <summary>mpv 错误（携带原生错误码）。</summary>
+public sealed class MpvException(int code, string message) : Exception($"mpv ({code}): {message}")
+{
+    public int Code { get; } = code;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeEvent { public int Id; public int Error; public ulong ReplyUserData; public nint Data; }
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeEndFile { public int Reason; public int Error; public long PlaylistEntryId; }
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeLogMessage { public nint Prefix; public nint Level; public nint Text; public int LogLevel; }
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeProperty { public nint Name; public int Format; public nint Data; }

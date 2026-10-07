@@ -8,8 +8,9 @@
     <x:Static Member="design:DesignData.Main" />
   </Design.DataContext>
   <Panel DataContext="{Binding Player}">
-    <!-- 黑底 -->
+    <!-- 黑底 + libmpv 渲染面（由代码后置在 Ready 后插入 VideoHost，保证 loadfile 不早于渲染上下文） -->
     <Rectangle Fill="#000000" />
+    <Panel x:Name="VideoHost" />
 
     <!-- 控制层 -->
     <Grid RowDefinitions="*,Auto">
@@ -17,8 +18,6 @@
         <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
         <TextBlock Text="{Binding Error}" FontSize="13" Foreground="#FF6B6B" HorizontalAlignment="Center"
                    TextWrapping="Wrap" MaxWidth="520" IsVisible="{Binding Error, Converter={x:Static v:StringConverters.IsNotNullOrEmpty}}" />
-        <TextBlock Text="libmpv 渲染窗口" FontSize="12" Foreground="#85FFFFFF" Opacity="0.7"
-                   HorizontalAlignment="Center" />
       </StackPanel>
 
       <Border Grid.Row="1" Padding="22,12,22,16">
