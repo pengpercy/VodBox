@@ -1,39 +1,40 @@
 using Avalonia.Controls;
-using Avalonia.Threading;
-using Avalonia.VisualTree;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml;
 using VodBox.Core;
+using VodBox.Desktop.ViewModels;
 
 namespace VodBox.Desktop.Views;
 
-public sealed partial class HomeView : UserControl
+public partial class HomeView : UserControl
 {
-    private MainViewModel? Model => DataContext as MainViewModel;
-    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
-    public HomeView()
+    public HomeView() => InitializeComponent();
+    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
+
+    private HomeViewModel VM => ((MainViewModel)DataContext!).Home;
+
+    private void OnHeroClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => VM.OpenHeroCommand.Execute(null);
+    private void OnHeroPlay(object? sender, RoutedEventArgs e) => VM.OpenHeroCommand.Execute(null);
+    private void OnHeroPressed(object? sender, PointerPressedEventArgs e) => VM.OpenHeroCommand.Execute(null);
+
+    private void OnResumeHistory(object? sender, PointerPressedEventArgs e)
     {
-        InitializeComponent();
-        _clock.Tick += (_, _) => UpdateClock();
-        AttachedToVisualTree += (_, _) => { UpdateClock(); _clock.Start(); };
-        DetachedFromVisualTree += (_, _) => _clock.Stop();
-        SizeChanged += (_, _) => Model?.UpdateHomeColumns(Bounds.Width);
-        DataContextChanged += (_, _) => Model?.UpdateHomeColumns(Bounds.Width);
+        if ((sender as Control)?.Tag is HistoryEntry entry) VM.ResumeCommand.Execute(entry);
     }
-    private void UpdateClock() => Clock.Text = DateTime.Now.ToString("MM/dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-    private void RecommendationClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (Model is not null && sender is Button { DataContext: MediaCard card }) Model.SelectedCard = card; }
-    private async void HistoryClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (Model is not null && sender is Button { DataContext: HistoryEntry entry }) await Model.ResumeHistoryCommand.ExecuteAsync(entry); }
-    private async void OpenLocalClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    { if (Model is not null && await ViewFilePicker.PickAsync(this, "打开本地媒体") is { } path) await Model.OpenFileAsync(path); }
-    private readonly Dictionary<Image, MediaCard> _posterControls = [];
-    private void PosterAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e) => PosterContextChanged(sender, EventArgs.Empty);
-    private void PosterDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
-    { if (sender is Image image && _posterControls.Remove(image, out var previous)) MainViewModel.ReleasePoster(previous); }
-    private void PosterContextChanged(object? sender, EventArgs e)
+
+    private void OnOpenRecommend(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Image image) return;
-        if (_posterControls.Remove(image, out var previous)) MainViewModel.ReleasePoster(previous);
-        if (Model is not null && image.IsAttachedToVisualTree() && image.DataContext is MediaCard card)
-        { _posterControls[image] = card; Model.ActivatePoster(card); }
+        if ((sender as Control)?.Tag is MediaItem item) VM.OpenItemCommand.Execute(item);
+    }
+
+    private void OnShowAllHistory(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is MainViewModel main) main.GoHistoryCommand.Execute(null);
+    }
+
+    private void OnSwitchSource(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is MainViewModel main) main.GoSettingsCommand.Execute(null);
     }
 }

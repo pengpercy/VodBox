@@ -1,12 +1,27 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Markup.Xaml;
+using VodBox.Core;
+using VodBox.Desktop.ViewModels;
+
 namespace VodBox.Desktop.Views;
-public sealed partial class SearchView : UserControl
+
+public partial class SearchView : UserControl
 {
-    private MainViewModel? Model => DataContext as MainViewModel;
     public SearchView() => InitializeComponent();
-    private async void KeywordKeyDown(object? sender, KeyEventArgs args)
-    { if (args.Key == Key.Enter && Model is not null) { args.Handled = true; await Model.SubmitSearchCommand.ExecuteAsync(null); } }
-    private async void KeywordClick(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
-    { if (Model is not null && sender is Button { DataContext: string keyword }) await Model.SubmitSearchCommand.ExecuteAsync(keyword); }
+    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
+
+    private SearchViewModel VM => ((MainViewModel)DataContext!).Search;
+
+    private void OnSearchKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Enter or Key.Return) VM.RunSearchCommand.Execute(null);
+    }
+
+    private void OnSearchClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => VM.RunSearchCommand.Execute(null);
+
+    private void OnOpenItem(object? sender, PointerPressedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is MediaItem item) VM.OpenItemCommand.Execute(item);
+    }
 }

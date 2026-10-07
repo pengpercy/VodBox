@@ -1,15 +1,51 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:VodBox.Desktop" xmlns:views="using:VodBox.Desktop.Views" x:Class="VodBox.Desktop.Views.FavoritesView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
- <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
- <Grid RowDefinitions="Auto,*" RowSpacing="20">
-  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-   <Button Command="{Binding NavigateCommand}" CommandParameter="首页" ToolTip.Tip="返回首页" Width="40" Height="40" Background="Transparent" BorderThickness="0" Padding="10"><Path Data="M18,2 L8,12 L18,22 M8,12 H28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
-   <TextBlock Grid.Column="1" Text="我的收藏" FontSize="24" VerticalAlignment="Center" />
-   <Button Grid.Column="2" Command="{Binding RefreshFavoritesCommand}" ToolTip.Tip="刷新" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M20,6 A9,9 0 1 0 22,16 M20,0 V6 H14" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
-   <Button Grid.Column="3" Command="{Binding ClearFavoritesCommand}" ToolTip.Tip="清空我的收藏" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M4,6 H20 M8,6 V2 H16 V6 M6,6 V23 H18 V6" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
-  </Grid>
-  <Grid Grid.Row="1">
-   <TextBlock Text="暂无我的收藏" Classes="muted" IsVisible="{Binding !HasFavoriteCards}" />
-   <views:CollectionGridView Items="{Binding FavoriteCards}" />
-  </Grid>
- </Grid>
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
+             x:Class="VodBox.Desktop.Views.FavoritesView" x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <x:Static Member="design:DesignData.Main" />
+  </Design.DataContext>
+  <ScrollViewer Padding="28,12,28,28">
+    <StackPanel Spacing="24" DataContext="{Binding Favorites}">
+      <StackPanel Orientation="Horizontal" Spacing="14">
+        <TextBlock Text="收藏" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Text="点播收藏" FontSize="12.5" Foreground="#4CC2FF" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <ItemsControl ItemsSource="{Binding Vod}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="6" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenFavorite" Tag="{Binding}">
+              <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
+                <Panel>
+                  <TextBlock Text="🎬" FontSize="34" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
+                          VerticalAlignment="Top" Margin="6">
+                    <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#FFB900" TextTrimming="CharacterEllipsis" MaxWidth="90" />
+                  </Border>
+                  <Button Content="✕" Click="OnRemoveFavorite" Tag="{Binding}" Background="#66000000"
+                          Foreground="White" BorderThickness="0" CornerRadius="5" Width="24" Height="24"
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" FontSize="11" />
+                </Panel>
+              </Border>
+              <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0"
+                         TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="暂无收藏 — 在详情页点击 ⭐ 收藏" FontSize="12.5" Foreground="#85FFFFFF"
+                 HorizontalAlignment="Center" Margin="0,20,0,0"
+                 IsVisible="{Binding Vod.Count, Converter={x:Static views:CountConverters.IsZero}}" />
+    </StackPanel>
+  </ScrollViewer>
 </UserControl>

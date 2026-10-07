@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="VodBox.Desktop.Views.NavItemView"
+             x:Name="Root">
+  <Panel>
+    <Border x:Name="Shell" CornerRadius="7" Padding="12,9" Background="Transparent" Cursor="Hand">
+      <Panel>
+        <Border x:Name="Indicator" Width="3" CornerRadius="2" Background="#4CC2FF"
+                HorizontalAlignment="Left" Margin="-12,1,0,1" IsVisible="False" />
+        <StackPanel Orientation="Horizontal" Spacing="12" Margin="6,0,0,0">
+          <TextBlock x:Name="IconText" FontSize="15" />
+          <TextBlock x:Name="LabelText" FontSize="13.5" Foreground="#C7FFFFFF" />
+        </StackPanel>
+      </Panel>
+    </Border>
+  </Panel>
+</UserControl>

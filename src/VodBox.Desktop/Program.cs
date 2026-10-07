@@ -1,16 +1,16 @@
 using Avalonia;
+using System;
 
 namespace VodBox.Desktop;
 
 internal static class Program
 {
     [STAThread]
-    public static int Main(string[] args)
-    {
-        if (args.Contains("--diagnostics")) return Diagnostics.RunAsync(args).GetAwaiter().GetResult();
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args); return 0;
-    }
-    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>().UsePlatformDetect()
-        .With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.OpenGl, AvaloniaNativeRenderingMode.Software] })
-        .WithInterFont().LogToTrace();
+    public static void Main(string[] args) => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+
+    public static AppBuilder BuildAvaloniaApp()
+        => AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .WithInterFont()
+            .LogToTrace();
 }

@@ -1,3 +1,26 @@
-<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.App" RequestedThemeVariant="Dark">
-  <Application.Styles><FluentTheme /><StyleInclude Source="avares://VodBox/Themes/DesktopTheme.axaml" /></Application.Styles>
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="VodBox.Desktop.App"
+             RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <FluentTheme />
+      </ResourceDictionary.MergedDictionaries>
+      <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
+      <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
+      <SolidColorBrush x:Key="AccentStrongBrush" Color="#0078D4" />
+      <SolidColorBrush x:Key="CardBrush" Color="#2D2D2D" Opacity="0.45" />
+      <SolidColorBrush x:Key="CardHoverBrush" Color="#FFFFFF" Opacity="0.085" />
+      <SolidColorBrush x:Key="StrokeBrush" Color="#FFFFFF" Opacity="0.09" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FFFFFF" Opacity="0.78" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FFFFFF" Opacity="0.52" />
+      <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
+      <SolidColorBrush x:Key="WarnBrush" Color="#FFB900" />
+      <SolidColorBrush x:Key="OkBrush" Color="#6CCB5F" />
+      <CornerRadius x:Key="CornerRadiusLarge">12</CornerRadius>
+      <CornerRadius x:Key="CornerRadiusMedium">8</CornerRadius>
+    </ResourceDictionary>
+  </Application.Resources>
 </Application>

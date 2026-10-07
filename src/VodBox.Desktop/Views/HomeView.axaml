@@ -1,73 +1,115 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core"
-             x:Class="VodBox.Desktop.Views.HomeView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
-  <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
-  <UserControl.Styles>
-    <Style Selector="Button.homeEntry">
-      <Setter Property="Width" Value="96" /><Setter Property="Height" Value="88" />
-      <Setter Property="Margin" Value="0,0,12,8" /><Setter Property="Padding" Value="12" />
-      <Setter Property="Background" Value="{DynamicResource SidebarSurfaceBrush}" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button.homeEntry.current"><Setter Property="BorderThickness" Value="1" /><Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" /></Style>
-    <Style Selector="ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
-  </UserControl.Styles>
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="12">
-    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-      <StackPanel Orientation="Horizontal" Spacing="16"><TextBlock Text="{Binding HomeTitle}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /><Button Content="浏览分类" Command="{Binding NavigateCommand}" CommandParameter="发现" IsVisible="{Binding HasConfiguredSources}" /></StackPanel>
-      <TextBlock x:Name="Clock" Grid.Column="1" VerticalAlignment="Center" />
-    </Grid>
-    <WrapPanel Grid.Row="1">
-      <Button Classes="homeEntry current" Command="{Binding NavigateCommand}" CommandParameter="首页"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M2,2 H22 V22 H2 Z M9,6 L18,12 L9,18 Z" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="点播" HorizontalAlignment="Center" /></StackPanel></Button>
-      <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="直播"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M1,5 H17 V19 H1 Z M17,9 L23,5 V19 L17,15" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="直播" HorizontalAlignment="Center" /></StackPanel></Button>
-      <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="搜索"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M19,10 A9,9 0 1 1 1,10 A9,9 0 1 1 19,10 M16,17 L23,24" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="搜索" HorizontalAlignment="Center" /></StackPanel></Button>
-      <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="收藏"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M12,1 L15,8 L23,9 L17,15 L19,23 L12,19 L5,23 L7,15 L1,9 L9,8 Z" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="收藏" HorizontalAlignment="Center" /></StackPanel></Button>
-      <Button Classes="homeEntry" IsEnabled="False" ToolTip.Tip="暂不支持远程推送"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M4,17 A6,6 0 0 1 4,5 A7,7 0 0 1 18,5 A6,6 0 0 1 20,17 M12,23 V10 M7,15 L12,10 L17,15" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="推送" HorizontalAlignment="Center" /></StackPanel></Button>
-      <Button Classes="homeEntry" IsEnabled="False" ToolTip.Tip="暂不支持投屏"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M1,5 V1 H23 V20 H15 M1,10 A13,13 0 0 1 14,23 M1,16 A7,7 0 0 1 8,23 M1,22 H2" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="投屏" HorizontalAlignment="Center" /></StackPanel></Button>
-      <Button Classes="homeEntry" Command="{Binding NavigateCommand}" CommandParameter="设置"><StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center"><Path Data="M6,2 H18 L24,12 L18,22 H6 L0,12 Z M16,12 A4,4 0 1 1 8,12 A4,4 0 1 1 16,12" Width="24" Height="24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" /><TextBlock Text="设置" HorizontalAlignment="Center" /></StackPanel></Button>
-    </WrapPanel>
-    <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
-      <TextBlock Text="最近观看" FontSize="19" FontWeight="SemiBold" />
-      <Button Grid.Column="1" Content="全部历史" Command="{Binding NavigateCommand}" CommandParameter="历史" IsVisible="{Binding HasRecentHistory}" />
-    </Grid>
-    <Grid Grid.Row="3">
-      <TextBlock Text="暂无观看记录" Classes="muted" IsVisible="{Binding !HasRecentHistory}" />
-      <ItemsControl ItemsSource="{Binding RecentHistory}" IsVisible="{Binding HasRecentHistory}">
-        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate><DataTemplate x:DataType="core:HistoryEntry"><Button Content="{Binding Title}" Click="HistoryClick" MaxWidth="220" Margin="0,0,8,8" /></DataTemplate></ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </Grid>
-    <TextBlock Grid.Row="4" Text="更新推荐" FontSize="19" FontWeight="SemiBold" />
-    <Grid Grid.Row="5">
-      <StackPanel IsVisible="{Binding !HasHomeRecommendations}" Spacing="12">
-        <TextBlock Text="{Binding ConfigurationImportSummary}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasConfigurationWarnings}" />
-        <TextBlock Text="{Binding HomeRecommendationStatus}" Classes="muted" TextWrapping="Wrap" />
-        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasConfiguredSources}">
-          <Button Content="前往设置配置播放源" Command="{Binding ConfigureSourcesCommand}" />
-          <Button Content="打开本地媒体" Click="OpenLocalClick" />
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
+             x:Class="VodBox.Desktop.Views.HomeView" x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <x:Static Member="design:DesignData.Main" />
+  </Design.DataContext>
+  <ScrollViewer Padding="28,12,28,28">
+    <StackPanel Spacing="26" DataContext="{Binding Home}">
+
+      <!-- 英雄区 -->
+      <Border CornerRadius="12" Height="300" ClipToBounds="True" Background="#3A2F4A"
+              PointerPressed="OnHeroPressed" Cursor="Hand">
+        <Panel>
+          <Border Background="#2B3242" />
+          <Border>
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                <GradientStop Color="#E6161620" Offset="0" />
+                <GradientStop Color="#73161620" Offset="0.55" />
+                <GradientStop Color="#00161620" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+          </Border>
+          <StackPanel VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="8">
+            <TextBlock Text="今日推荐 · TOP 1" FontSize="11.5" Foreground="#4CC2FF" LetterSpacing="2" />
+            <TextBlock Text="{Binding HeroTitle}" FontSize="30" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding HeroRemarks}" FontSize="13" Foreground="#4CC2FF" />
+            <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" />
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+              <Button Content="▶ 立即播放" Background="#0078D4" Foreground="White" BorderThickness="0"
+                      CornerRadius="7" Padding="18,9" Click="OnHeroPlay" Cursor="Hand" />
+              <Button Content="⭐ 收藏" Background="#12FFFFFF" Foreground="White" BorderThickness="1"
+                      BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
+            </StackPanel>
+          </StackPanel>
+        </Panel>
+      </Border>
+
+      <!-- 最近观看 -->
+      <StackPanel Spacing="14">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="🕘 最近观看" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="查看全部 ›" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center"
+                     Cursor="Hand" PointerPressed="OnShowAllHistory" />
         </StackPanel>
+        <ItemsControl ItemsSource="{Binding Recent}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="16" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Width="150" Cursor="Hand" PointerPressed="OnResumeHistory" Tag="{Binding}">
+                <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
+                  <Panel>
+                    <TextBlock Text="🎞" FontSize="34" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,0">
+                      <Border Background="#66000000" Padding="8,18,8,7">
+                        <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
+                      </Border>
+                    </StackPanel>
+                  </Panel>
+                </Border>
+                <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Margin="0,6,0,0">
+                  <Border Background="#4CC2FF" Height="3" CornerRadius="2"
+                          Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}}" />
+                </Border>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
-      <ListBox x:Name="RecommendationGrid" ItemContainerTheme="{StaticResource PosterRowTheme}" ItemsSource="{Binding HomeCardRows}" IsVisible="{Binding HasHomeRecommendations}" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:MediaCardRow">
-          <ItemsControl ItemsSource="{Binding Cards}">
-            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding Columns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:MediaCard">
-              <Button Click="RecommendationClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="0,0,12,12" Padding="0" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="8">
-                <StackPanel>
-                  <Border Height="200" CornerRadius="8,8,0,0" ClipToBounds="True"><Grid>
-                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Margin="12" VerticalAlignment="Center" HorizontalAlignment="Center" Classes="muted" />
-                    <Image Source="{Binding Poster}" Stretch="UniformToFill" AttachedToVisualTree="PosterAttached" DetachedFromVisualTree="PosterDetached" DataContextChanged="PosterContextChanged" />
-                    <Border Background="#90000000" VerticalAlignment="Bottom" Padding="8,4"><TextBlock Text="{Binding Remarks}" Foreground="White" TextTrimming="CharacterEllipsis" /></Border>
-                  </Grid></Border>
-                  <TextBlock Text="{Binding Title}" Margin="8" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
-                </StackPanel>
-              </Button>
-            </DataTemplate></ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </DataTemplate></ListBox.ItemTemplate>
-      </ListBox>
-    </Grid>
-  </Grid>
+
+      <!-- 推荐 -->
+      <StackPanel Spacing="14">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="✨ 站点推荐" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="换源 ▾" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand"
+                     PointerPressed="OnSwitchSource" />
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding Recommendations}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Margin="0,0,16,0" Cursor="Hand" PointerPressed="OnOpenRecommend" Tag="{Binding}">
+                <Border CornerRadius="8" Height="210" Background="#3A2A55" ClipToBounds="True">
+                  <Panel>
+                    <TextBlock Text="🎬" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
+                            VerticalAlignment="Top" Margin="6">
+                      <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />
+                    </Border>
+                  </Panel>
+                </Border>
+                <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                  <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
+                </TextBlock>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
 </UserControl>

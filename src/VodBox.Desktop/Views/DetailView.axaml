@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             x:Class="VodBox.Desktop.Views.DetailView" x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <x:Static Member="design:DesignData.Main" />
+  </Design.DataContext>
+  <ScrollViewer Padding="28,12,28,28">
+    <StackPanel Spacing="22" DataContext="{Binding Detail}">
+
+      <Grid ColumnDefinitions="230,*,30,344">
+        <!-- 海报 -->
+        <Border Grid.Column="0" CornerRadius="12" Height="345" Background="#274064" ClipToBounds="True">
+          <TextBlock Text="🎬" FontSize="52" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+
+        <!-- 元信息 -->
+        <StackPanel Grid.Column="1" Spacing="12" VerticalAlignment="Top">
+          <TextBlock Text="{Binding Detail.Item.Title}" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="13" Foreground="#4CC2FF" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
+              <TextBlock Text="2024" FontSize="12" Foreground="#C7FFFFFF" />
+            </Border>
+            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
+              <TextBlock Text="{Binding Detail.Item.Area}" FontSize="12" Foreground="#C7FFFFFF" />
+            </Border>
+            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
+              <TextBlock Text="{Binding Detail.Item.TypeName}" FontSize="12" Foreground="#C7FFFFFF" />
+            </Border>
+          </StackPanel>
+          <TextBlock FontSize="12.5" Foreground="#85FFFFFF" TextWrapping="Wrap">
+            <Run Text="导演：" /><Run Text="{Binding Detail.Director}" Foreground="#C7FFFFFF" />
+          </TextBlock>
+          <TextBlock FontSize="12.5" Foreground="#85FFFFFF" TextWrapping="Wrap">
+            <Run Text="主演：" /><Run Text="{Binding Detail.Actor}" Foreground="#C7FFFFFF" />
+          </TextBlock>
+          <TextBlock Text="{Binding Detail.Description}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9"
+                     TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+            <Button Content="▶ 立即播放" Command="{Binding PlayCommand}" Background="#0078D4"
+                    Foreground="White" BorderThickness="0" CornerRadius="7" Padding="18,9" Cursor="Hand" />
+            <Button Command="{Binding ToggleFavoriteCommand}" Background="#12FFFFFF" Foreground="White"
+                    BorderThickness="1" BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Cursor="Hand">
+              <TextBlock>
+                <Run Text="⭐ " /><Run Text="{Binding IsFavorite, Mode=OneWay}" />
+              </TextBlock>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- 播放器窗 -->
+        <StackPanel Grid.Column="3" Spacing="10">
+          <Border CornerRadius="12" Height="193" Background="#000000" ClipToBounds="True">
+            <TextBlock Text="播放中 · 请看底部浮层" FontSize="11.5" Foreground="#85FFFFFF"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="播放画面显示在全局播放浮层中" FontSize="11" Foreground="#85FFFFFF"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+
+      <!-- 线路 -->
+      <StackPanel Spacing="10">
+        <TextBlock Text="线路" FontSize="14" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Lines}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="8" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Button Content="{Binding Name}" Click="OnPickLine" Tag="{Binding}"
+                      CornerRadius="16" Padding="14,6" FontSize="12.5" Cursor="Hand"
+                      Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- 剧集 -->
+      <StackPanel Spacing="10">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="剧集" FontSize="14" FontWeight="SemiBold" />
+          <TextBlock Text="选择集数开始播放" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding SelectedLine.Episodes}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="10" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Button Content="{Binding Title}" Click="OnPickEpisode" Tag="{Binding}" Margin="0,0,8,8"
+                      CornerRadius="7" Padding="0,9" FontSize="12.5" Cursor="Hand"
+                      Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

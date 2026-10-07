@@ -1,4 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../VodBox.Core/VodBox.Core.csproj" /></ItemGroup>
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VodBox.Core\VodBox.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
 </Project>

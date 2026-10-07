@@ -21,9 +21,6 @@ jobs:
           - { os: ubuntu-22.04-arm, rid: linux-arm64 }
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - uses: actions/download-artifact@v7
         with:
           name: vodbox.${{ matrix.rid }}
@@ -37,11 +34,11 @@ jobs:
         if: startsWith(matrix.rid, 'linux')
         run: |
           sudo apt-get update
-          sudo apt-get install -y ruby-dev build-essential rpm squashfs-tools libfuse2
+          sudo apt-get install -y ruby-dev build-essential rpm
           sudo gem install fpm --version 1.16.0 --no-document
       - name: Package
         shell: bash
-        run: python build/package.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/packages --version ${{ inputs.version }}
+        run: python3 build/package.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/packages --version ${{ inputs.version }}
       - uses: actions/upload-artifact@v6
         with:
           name: package.${{ matrix.rid }}
@@ -50,6 +47,4 @@ jobs:
             artifacts/packages/*.dmg
             artifacts/packages/*.deb
             artifacts/packages/*.rpm
-            artifacts/packages/*.AppImage
-            artifacts/packages/*.sha256
           retention-days: 14

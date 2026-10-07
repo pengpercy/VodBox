@@ -1,39 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationIcon>Assets/Icons/vodbox.ico</ApplicationIcon>
-    <OutputType>WinExe</OutputType><AssemblyName>VodBox</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
-  <!-- Debug keeps the designer on managed, untrimmed assemblies, even with an explicit RID. -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-    <PublishAot>false</PublishAot><PublishTrimmed>false</PublishTrimmed>
-    <DebuggerSupport>true</DebuggerSupport>
-    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
-  </PropertyGroup>
-  <!-- Release publishing enables AOT when targeting a RID; ordinary no-RID builds remain managed. -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' != 'true'">
-    <TrimMode>full</TrimMode><OptimizationPreference>Speed</OptimizationPreference>
-    <StripSymbols>true</StripSymbols>
-    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' != 'true' and '$(RuntimeIdentifier)' != ''">
-    <PublishAot>true</PublishAot>
-    <PublishTrimmed>true</PublishTrimmed>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(DisableAOT)' == 'true'">
-    <PublishAot>false</PublishAot><PublishTrimmed>false</PublishTrimmed>
-  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets/Icons/linux/256/vodbox.png" />
-    <PackageReference Include="Avalonia" /><PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Themes.Fluent" /><PackageReference Include="Avalonia.Fonts.Inter" />
-    <PackageReference Include="CommunityToolkit.Mvvm" />
-    <ProjectReference Include="../VodBox.Application/VodBox.Application.csproj" />
-    <ProjectReference Include="../VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
-    <ProjectReference Include="../VodBox.Playback.LibVlc/VodBox.Playback.LibVlc.csproj" />
-    <ProjectReference Include="../VodBox.Playback.Mpv/VodBox.Playback.Mpv.csproj" />
-    <Content Include="../../examples/**" Exclude="../../examples/**/__pycache__/**;../../examples/**/*.pyc" Link="examples/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="../../plugins/**" Exclude="../../plugins/**/__pycache__/**;../../plugins/**/*.pyc" Link="plugins/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VodBox.Core\VodBox.Core.csproj" />
+    <ProjectReference Include="..\VodBox.Infrastructure\VodBox.Infrastructure.csproj" />
+    <ProjectReference Include="..\VodBox.Playback.Mpv\VodBox.Playback.Mpv.csproj" />
   </ItemGroup>
 </Project>

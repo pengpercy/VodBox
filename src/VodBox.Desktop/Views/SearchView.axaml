@@ -1,32 +1,68 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:VodBox.Desktop" xmlns:core="using:VodBox.Core" xmlns:views="using:VodBox.Desktop.Views" x:Class="VodBox.Desktop.Views.SearchView" x:DataType="vm:MainViewModel" x:CompileBindings="True">
- <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
- <UserControl.Styles>
-  <Style Selector="Button.keyword"><Setter Property="CornerRadius" Value="20" /><Setter Property="Padding" Value="18,8" /><Setter Property="Margin" Value="0,0,12,12" /><Setter Property="Background" Value="{DynamicResource CardSurfaceBrush}" /><Setter Property="BorderThickness" Value="0" /></Style>
- </UserControl.Styles>
- <Grid RowDefinitions="Auto,*" RowSpacing="20">
-  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-   <Button Command="{Binding SearchBackCommand}" ToolTip.Tip="返回" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M18,2 L8,12 L18,22 M8,12 H28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
-   <TextBox x:Name="KeywordInput" Grid.Column="1" Text="{Binding SearchText}" PlaceholderText="关键词…" KeyDown="KeywordKeyDown" FontSize="22" Background="Transparent" BorderThickness="0" />
-   <Button Grid.Column="2" Content="搜索" Command="{Binding SubmitSearchCommand}" IsEnabled="{Binding !IsBusy}" />
-   <Button Grid.Column="3" Command="{Binding NavigateCommand}" CommandParameter="首页" ToolTip.Tip="首页" Width="40" Height="40" Padding="10" Background="Transparent" BorderThickness="0"><Path Data="M2,11 L12,2 L22,11 V23 H15 V15 H9 V23 H2 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Stretch="Uniform" /></Button>
-  </Grid>
-  <ScrollViewer Grid.Row="1" IsVisible="{Binding !SearchSubmitted}" HorizontalScrollBarVisibility="Disabled">
-   <StackPanel Spacing="18">
-    <Grid ColumnDefinitions="*,Auto"><TextBlock Text="历史" FontSize="21" /><Button Grid.Column="1" Content="清空" Command="{Binding ClearSearchHistoryCommand}" /></Grid>
-    <TextBlock Text="暂无搜索历史" Classes="muted" IsVisible="{Binding !HasSearchHistory}" />
-    <ItemsControl ItemsSource="{Binding SearchHistory}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><Button Classes="keyword" Content="{Binding}" Click="KeywordClick" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-    <TextBlock Text="推荐搜索" FontSize="21" />
-    <TextBlock Text="配置播放源后，将显示首页推荐中的关键词。" Classes="muted" IsVisible="{Binding !HasSearchSuggestions}" />
-    <ItemsControl ItemsSource="{Binding SearchSuggestions}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><Button Classes="keyword" Content="{Binding}" Click="KeywordClick" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-   </StackPanel>
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             x:Class="VodBox.Desktop.Views.SearchView" x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <x:Static Member="design:DesignData.Main" />
+  </Design.DataContext>
+  <ScrollViewer Padding="28,16,28,28">
+    <StackPanel Spacing="20" DataContext="{Binding Search}">
+
+      <StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center" Margin="0,10,0,0">
+        <TextBlock Text="🔍" FontSize="18" VerticalAlignment="Center" />
+        <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="480" Height="42"
+                 CornerRadius="21" FontSize="14" VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
+        <Button Content="搜索 ⏎" Command="{Binding RunSearchCommand}" Click="OnSearchClick"
+                CornerRadius="18" Padding="16,8" Background="#0078D4" Foreground="White"
+                BorderThickness="0" FontSize="13" Cursor="Hand" />
+      </StackPanel>
+
+      <TextBlock Text="{Binding Summary}" FontSize="13" Foreground="#85FFFFFF" />
+
+      <Grid ColumnDefinitions="200,20,*">
+        <Border Grid.Column="0" CornerRadius="8" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
+                BorderThickness="1" Padding="8">
+          <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,4">
+                  <TextBlock Text="{Binding SiteName}" FontSize="13" />
+                  <TextBlock Text="{Binding Items.Count}" FontSize="11" Foreground="#85FFFFFF"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+
+        <ItemsControl Grid.Column="2" ItemsSource="{Binding AllResults}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="5" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
+                <Border CornerRadius="8" Height="216" Background="#274064" ClipToBounds="True">
+                  <Panel>
+                    <TextBlock Text="🎬" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
+                            VerticalAlignment="Top" Margin="6">
+                      <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />
+                    </Border>
+                  </Panel>
+                </Border>
+                <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                  <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
+                </TextBlock>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Grid>
+    </StackPanel>
   </ScrollViewer>
-  <Grid Grid.Row="1" IsVisible="{Binding SearchSubmitted}" ColumnDefinitions="200,*" ColumnSpacing="24">
-   <ListBox x:Name="SourceFilters" ItemsSource="{Binding SearchSourceFilters}" SelectedItem="{Binding SearchSourceFilter}" Background="Transparent"><ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="CornerRadius" Value="6" /><Setter Property="Padding" Value="12,10" /><Setter Property="Margin" Value="0,0,0,10" /></Style></ListBox.Styles><ListBox.ItemTemplate><DataTemplate x:DataType="core:SourceDefinition"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ListBox.ItemTemplate></ListBox>
-   <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto" RowSpacing="12">
-    <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding SearchPageStatus}" Classes="muted" TextWrapping="Wrap" /><Button Grid.Column="1" Content="停止搜索" Command="{Binding CancelSearchCommand}" IsVisible="{Binding IsBusy}" /></Grid>
-    <views:CollectionGridView Grid.Row="1" Items="{Binding FilteredSearchCards}" HorizontalCards="True" />
-    <ItemsControl Grid.Row="2" ItemsSource="{Binding SearchErrors}" MaxHeight="80" />
-   </Grid>
-  </Grid>
- </Grid>
 </UserControl>

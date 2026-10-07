@@ -1,97 +1,249 @@
+using System.Text;
 using Microsoft.Data.Sqlite;
 using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-public sealed partial class LibraryStore : ILibraryStore
+/// <summary>SQLite 库存储：历史、收藏、配置订阅、键值偏好（7 表结构中桌面首版需要的 4 张）。</summary>
+public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, IDisposable
 {
-    private readonly string _connectionString;
+    private readonly SqliteConnection _db;
+
     public LibraryStore(string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = path }.ToString();
-        using var connection = Open();
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText = "PRAGMA user_version";
-        int version = Convert.ToInt32(cmd.ExecuteScalar());
-        if (version > 3) throw new InvalidDataException("数据库版本高于当前应用支持的版本。");
-        cmd.CommandText = """
-            PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS history(config TEXT, source TEXT, media TEXT, episode TEXT,
-                title TEXT NOT NULL, uri TEXT NOT NULL, position INTEGER NOT NULL, updated TEXT NOT NULL,
-                PRIMARY KEY(config,source,media,episode));
-            CREATE TABLE IF NOT EXISTS favorites(config TEXT, source TEXT, media TEXT, title TEXT NOT NULL,
-                PRIMARY KEY(config,source,media));
-            """;
-        cmd.ExecuteNonQuery();
-        if (version < 2)
-        {
-            using var transaction = connection.BeginTransaction(); cmd.Transaction = transaction;
-            cmd.CommandText = "ALTER TABLE history ADD COLUMN resolution INTEGER NOT NULL DEFAULT 0; ALTER TABLE history ADD COLUMN resolver TEXT; PRAGMA user_version=2;";
-            cmd.ExecuteNonQuery(); transaction.Commit();
-        }
-        if (version < 3)
-        {
-            using var transaction = connection.BeginTransaction(); cmd.Transaction = transaction;
-            cmd.CommandText = "ALTER TABLE history ADD COLUMN poster TEXT; ALTER TABLE history ADD COLUMN source_name TEXT; ALTER TABLE favorites ADD COLUMN poster TEXT; ALTER TABLE favorites ADD COLUMN source_name TEXT; PRAGMA user_version=3;";
-            cmd.ExecuteNonQuery(); transaction.Commit();
-        }
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        _db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path }.ToString());
+        _db.Open();
+        Migrate();
     }
-    private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
 
-    public Task SaveHistoryAsync(HistoryEntry entry, CancellationToken cancellationToken = default)
+    private void Migrate()
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var connection = Open(); using var cmd = connection.CreateCommand();
-        cmd.CommandText = "INSERT INTO history(config,source,media,episode,title,uri,position,updated,resolution,resolver,poster,source_name) VALUES($c,$s,$m,$e,$t,$u,$p,$d,$r,$v,$a,$n) ON CONFLICT(config,source,media,episode) DO UPDATE SET title=$t,uri=$u,position=$p,updated=$d,resolution=$r,resolver=$v,poster=$a,source_name=$n";
-        Bind(cmd, entry.ConfigId, entry.SourceId, entry.MediaId, entry.Title);
-        cmd.Parameters.AddWithValue("$e", entry.EpisodeId); cmd.Parameters.AddWithValue("$u", entry.Uri);
-        cmd.Parameters.AddWithValue("$p", entry.PositionMs); cmd.Parameters.AddWithValue("$d", entry.UpdatedAt.ToString("O"));
-        cmd.Parameters.AddWithValue("$a", (object?)entry.Poster ?? DBNull.Value); cmd.Parameters.AddWithValue("$n", (object?)entry.SourceName ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$r", (int)entry.ResolutionKind); cmd.Parameters.AddWithValue("$v", (object?)entry.ResolverId ?? DBNull.Value);
-        cmd.ExecuteNonQuery(); return Task.CompletedTask;
+        Exec("""
+            CREATE TABLE IF NOT EXISTS history(
+                source_key TEXT NOT NULL, source_name TEXT NOT NULL, media_id TEXT NOT NULL,
+                title TEXT NOT NULL, poster TEXT, remarks TEXT, line_id TEXT DEFAULT '',
+                episode_id TEXT DEFAULT '', position_ms INTEGER DEFAULT 0, duration_ms INTEGER DEFAULT 0,
+                rate REAL DEFAULT 1.0, opening_skip INTEGER DEFAULT 0, ending_skip INTEGER DEFAULT 0,
+                updated_at INTEGER NOT NULL, PRIMARY KEY(source_key, media_id));
+            CREATE TABLE IF NOT EXISTS favorite(
+                kind INTEGER NOT NULL, source_key TEXT NOT NULL, media_id TEXT NOT NULL,
+                source_name TEXT NOT NULL, title TEXT NOT NULL, poster TEXT, remarks TEXT,
+                created_at INTEGER NOT NULL, PRIMARY KEY(kind, source_key, media_id));
+            CREATE TABLE IF NOT EXISTS config(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, name TEXT NOT NULL,
+                kind INTEGER NOT NULL, created_at INTEGER NOT NULL, active INTEGER DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS prefs(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            """);
     }
-    public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(CancellationToken cancellationToken = default)
+
+    private int Exec(string sql)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var connection = Open(); using var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT config,source,media,episode,title,uri,position,updated,resolution,resolver,poster,source_name FROM history ORDER BY updated DESC LIMIT 200";
-        using var reader = cmd.ExecuteReader(); var entries = new List<HistoryEntry>();
-        while (reader.Read()) entries.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetInt64(6), DateTimeOffset.Parse(reader.GetString(7)), (ResolutionKind)reader.GetInt32(8), reader.IsDBNull(9) ? null : reader.GetString(9), reader.IsDBNull(10) ? null : reader.GetString(10), reader.IsDBNull(11) ? null : reader.GetString(11)));
-        return Task.FromResult<IReadOnlyList<HistoryEntry>>(entries);
+        using var command = _db.CreateCommand();
+        command.CommandText = sql;
+        return command.ExecuteNonQuery();
     }
-    public Task DeleteHistoryAsync(HistoryEntry? entry, CancellationToken cancellationToken = default)
+
+    private SqliteCommand Query(string sql, params (string, object?)[] args)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = entry is null ? "DELETE FROM history" : "DELETE FROM history WHERE config=$c AND source=$s AND media=$m AND episode=$e";
-        if (entry is not null)
+        var command = _db.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, value) in args)
         {
-            command.Parameters.AddWithValue("$c", entry.ConfigId); command.Parameters.AddWithValue("$s", entry.SourceId);
-            command.Parameters.AddWithValue("$m", entry.MediaId); command.Parameters.AddWithValue("$e", entry.EpisodeId);
+            command.Parameters.AddWithValue(name, value ?? DBNull.Value);
         }
-        command.ExecuteNonQuery(); return Task.CompletedTask;
+        return command;
     }
-    public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken cancellationToken = default)
+
+    // ---------- 历史 ----------
+
+    public async Task SaveHistoryAsync(HistoryEntry entry, CancellationToken ct = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var connection = Open(); using var cmd = connection.CreateCommand();
-        cmd.CommandText = favorite ? "INSERT INTO favorites(config,source,media,title,poster,source_name) VALUES($c,$s,$m,$t,$a,$n) ON CONFLICT(config,source,media) DO UPDATE SET title=$t,poster=$a,source_name=$n"
-            : "DELETE FROM favorites WHERE config=$c AND source=$s AND media=$m";
-        Bind(cmd, entry.ConfigId, entry.SourceId, entry.MediaId, entry.Title);
-        cmd.Parameters.AddWithValue("$a", (object?)entry.Poster ?? DBNull.Value); cmd.Parameters.AddWithValue("$n", (object?)entry.SourceName ?? DBNull.Value); cmd.ExecuteNonQuery(); return Task.CompletedTask;
+        await Task.Run(() =>
+        {
+            using var command = Query("""
+                INSERT INTO history(source_key, source_name, media_id, title, poster, remarks, line_id, episode_id,
+                    position_ms, duration_ms, rate, opening_skip, ending_skip, updated_at)
+                VALUES($k,$sn,$m,$t,$p,$r,$l,$e,$pos,$dur,$rate,$op,$ed,$time)
+                ON CONFLICT(source_key, media_id) DO UPDATE SET source_name=$sn, title=$t, poster=$p, remarks=$r,
+                    line_id=$l, episode_id=$e, position_ms=$pos, duration_ms=$dur, rate=$rate,
+                    opening_skip=$op, ending_skip=$ed, updated_at=$time
+                """,
+                ("$k", entry.SourceKey), ("$sn", entry.SourceName), ("$m", entry.MediaId), ("$t", entry.Title),
+                ("$p", entry.Poster), ("$r", entry.Remarks), ("$l", entry.LineId), ("$e", entry.EpisodeId),
+                ("$pos", entry.PositionMs), ("$dur", entry.DurationMs), ("$rate", entry.Rate),
+                ("$op", entry.OpeningSkipSec), ("$ed", entry.EndingSkipSec), ("$time", entry.UpdatedAt.ToUnixTimeMilliseconds()));
+            command.ExecuteNonQuery();
+        }, ct);
     }
-    public Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(CancellationToken cancellationToken = default)
+
+    public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default) => Task.Run<IReadOnlyList<HistoryEntry>>(() =>
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var connection = Open(); using var cmd = connection.CreateCommand(); cmd.CommandText = "SELECT * FROM favorites ORDER BY title";
-        using var reader = cmd.ExecuteReader(); var entries = new List<FavoriteEntry>();
-        while (reader.Read()) entries.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5)));
-        return Task.FromResult<IReadOnlyList<FavoriteEntry>>(entries);
-    }
-    private static void Bind(SqliteCommand cmd, string config, string source, string media, string title)
+        using var command = Query($"SELECT * FROM history ORDER BY updated_at DESC LIMIT {limit}");
+        using var reader = command.ExecuteReader();
+        var list = new List<HistoryEntry>();
+        while (reader.Read()) list.Add(ReadHistory(reader));
+        return list;
+    }, ct);
+
+    public Task<HistoryEntry?> FindHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.Run(() =>
     {
-        cmd.Parameters.AddWithValue("$c", config); cmd.Parameters.AddWithValue("$s", source);
-        cmd.Parameters.AddWithValue("$m", media); cmd.Parameters.AddWithValue("$t", title);
+        using var command = Query("SELECT * FROM history WHERE source_key=$k AND media_id=$m", ("$k", sourceKey), ("$m", mediaId));
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadHistory(reader) : null;
+    }, ct);
+
+    private static HistoryEntry ReadHistory(SqliteDataReader reader) => new()
+    {
+        SourceKey = reader.GetString(reader.GetOrdinal("source_key")),
+        SourceName = reader.GetString(reader.GetOrdinal("source_name")),
+        MediaId = reader.GetString(reader.GetOrdinal("media_id")),
+        Title = reader.GetString(reader.GetOrdinal("title")),
+        Poster = reader.IsDBNull(reader.GetOrdinal("poster")) ? null : reader.GetString(reader.GetOrdinal("poster")),
+        Remarks = reader.IsDBNull(reader.GetOrdinal("remarks")) ? null : reader.GetString(reader.GetOrdinal("remarks")),
+        LineId = reader.GetString(reader.GetOrdinal("line_id")),
+        EpisodeId = reader.GetString(reader.GetOrdinal("episode_id")),
+        PositionMs = reader.GetInt64(reader.GetOrdinal("position_ms")),
+        DurationMs = reader.GetInt64(reader.GetOrdinal("duration_ms")),
+        Rate = reader.GetDouble(reader.GetOrdinal("rate")),
+        OpeningSkipSec = reader.GetInt32(reader.GetOrdinal("opening_skip")),
+        EndingSkipSec = reader.GetInt32(reader.GetOrdinal("ending_skip")),
+        UpdatedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(reader.GetOrdinal("updated_at"))),
+    };
+
+    public Task DeleteHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.Run(() =>
+    {
+        using var command = Query("DELETE FROM history WHERE source_key=$k AND media_id=$m", ("$k", sourceKey), ("$m", mediaId));
+        command.ExecuteNonQuery();
+    }, ct);
+
+    public Task ClearHistoryAsync(CancellationToken ct = default) => Task.Run(() => Exec("DELETE FROM history"), ct);
+
+    // ---------- 收藏 ----------
+
+    public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken ct = default) => Task.Run(() =>
+    {
+        if (favorite)
+        {
+            using var command = Query("""
+                INSERT INTO favorite(kind, source_key, media_id, source_name, title, poster, remarks, created_at)
+                VALUES($kind,$k,$m,$sn,$t,$p,$r,$time)
+                ON CONFLICT(kind, source_key, media_id) DO UPDATE SET source_name=$sn, title=$t, poster=$p, remarks=$r
+                """,
+                ("$kind", (int)entry.Kind), ("$k", entry.SourceKey), ("$m", entry.MediaId), ("$sn", entry.SourceName),
+                ("$t", entry.Title), ("$p", entry.Poster), ("$r", entry.Remarks), ("$time", entry.CreatedAt.ToUnixTimeMilliseconds()));
+            command.ExecuteNonQuery();
+        }
+        else
+        {
+            using var command = Query("DELETE FROM favorite WHERE kind=$kind AND source_key=$k AND media_id=$m",
+                ("$kind", (int)entry.Kind), ("$k", entry.SourceKey), ("$m", entry.MediaId));
+            command.ExecuteNonQuery();
+        }
+    }, ct);
+
+    public Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(FavoriteKind kind, CancellationToken ct = default) => Task.Run<IReadOnlyList<FavoriteEntry>>(() =>
+    {
+        using var command = Query("SELECT * FROM favorite WHERE kind=$kind ORDER BY created_at DESC", ("$kind", (int)kind));
+        using var reader = command.ExecuteReader();
+        var list = new List<FavoriteEntry>();
+        while (reader.Read()) list.Add(ReadFavorite(reader));
+        return list;
+    }, ct);
+
+    public Task<bool> IsFavoriteAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.Run(() =>
+    {
+        using var command = Query("SELECT COUNT(1) FROM favorite WHERE kind=$kind AND source_key=$k AND media_id=$m",
+            ("$kind", (int)FavoriteKind.Vod), ("$k", sourceKey), ("$m", mediaId));
+        return Convert.ToInt64(command.ExecuteScalar()) > 0;
+    }, ct);
+
+    private static FavoriteEntry ReadFavorite(SqliteDataReader reader) => new()
+    {
+        Kind = (FavoriteKind)reader.GetInt32(reader.GetOrdinal("kind")),
+        SourceKey = reader.GetString(reader.GetOrdinal("source_key")),
+        MediaId = reader.GetString(reader.GetOrdinal("media_id")),
+        SourceName = reader.GetString(reader.GetOrdinal("source_name")),
+        Title = reader.GetString(reader.GetOrdinal("title")),
+        Poster = reader.IsDBNull(reader.GetOrdinal("poster")) ? null : reader.GetString(reader.GetOrdinal("poster")),
+        Remarks = reader.IsDBNull(reader.GetOrdinal("remarks")) ? null : reader.GetString(reader.GetOrdinal("remarks")),
+        CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(reader.GetOrdinal("created_at"))),
+    };
+
+    // ---------- 配置订阅 ----------
+
+    public Task<IReadOnlyList<ConfigSubscription>> ListAsync(ConfigKind kind, CancellationToken ct = default) => Task.Run<IReadOnlyList<ConfigSubscription>>(() =>
+    {
+        using var command = Query("SELECT * FROM config WHERE kind=$kind ORDER BY created_at DESC", ("$kind", (int)kind));
+        using var reader = command.ExecuteReader();
+        var list = new List<ConfigSubscription>();
+        while (reader.Read())
+        {
+            list.Add(new ConfigSubscription
+            {
+                Id = reader.GetInt64(reader.GetOrdinal("id")),
+                Url = reader.GetString(reader.GetOrdinal("url")),
+                Name = reader.GetString(reader.GetOrdinal("name")),
+                Kind = (ConfigKind)reader.GetInt32(reader.GetOrdinal("kind")),
+                CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(reader.GetOrdinal("created_at"))),
+                Active = reader.GetInt32(reader.GetOrdinal("active")) != 0,
+            });
+        }
+        return list;
+    }, ct);
+
+    public Task AddAsync(ConfigSubscription subscription, CancellationToken ct = default) => Task.Run(() =>
+    {
+        using var command = Query("INSERT INTO config(url, name, kind, created_at, active) VALUES($u,$n,$kind,$time,0)",
+            ("$u", subscription.Url), ("$n", subscription.Name), ("$kind", (int)subscription.Kind),
+            ("$time", subscription.CreatedAt.ToUnixTimeMilliseconds()));
+        command.ExecuteNonQuery();
+    }, ct);
+
+    public Task RemoveAsync(long id, CancellationToken ct = default) => Task.Run(() =>
+    {
+        using var command = Query("DELETE FROM config WHERE id=$id", ("$id", id));
+        command.ExecuteNonQuery();
+    }, ct);
+
+    public Task SetActiveAsync(ConfigKind kind, long id, CancellationToken ct = default) => Task.Run(() =>
+    {
+        Exec("UPDATE config SET active=0 WHERE kind=$kind".Replace("$kind", ((int)kind).ToString()));
+        using var command = Query("UPDATE config SET active=1 WHERE id=$id", ("$id", id));
+        command.ExecuteNonQuery();
+    }, ct);
+
+    // ---------- 键值偏好 ----------
+
+    private string? ReadPref(string key)
+    {
+        using var command = Query("SELECT value FROM prefs WHERE key=$k", ("$k", key));
+        return command.ExecuteScalar() as string;
     }
+
+    public string GetString(string key, string fallback = "") => ReadPref(key) ?? fallback;
+    public int GetInt(string key, int fallback = 0) => int.TryParse(ReadPref(key), out var v) ? v : fallback;
+    public bool GetBool(string key, bool fallback = false) => ReadPref(key) switch
+    {
+        "1" or "true" or "True" => true,
+        "0" or "false" or "False" => false,
+        _ => fallback,
+    };
+    public double GetDouble(string key, double fallback = 0) => double.TryParse(ReadPref(key), out var v) ? v : fallback;
+
+    public void Set(string key, string value) => WritePref(key, value);
+    public void Set(string key, int value) => WritePref(key, value.ToString());
+    public void Set(string key, bool value) => WritePref(key, value ? "1" : "0");
+    public void Set(string key, double value) => WritePref(key, value.ToString());
+
+    private void WritePref(string key, string value)
+    {
+        using var command = Query("""
+            INSERT INTO prefs(key, value) VALUES($k,$v)
+            ON CONFLICT(key) DO UPDATE SET value=$v
+            """, ("$k", key), ("$v", value));
+        command.ExecuteNonQuery();
+    }
+
+    public void Dispose() => _db.Dispose();
 }

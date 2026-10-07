@@ -1,102 +1,52 @@
 # VodBox
 
-使用 Avalonia 的 macOS / Windows / Linux 媒体应用。采用 .NET 10 Native AOT、libmpv / LibVLC 双播放内核，以及 C#、QuickJS、Python、Node.js 内容源。Java Spider 的业务逻辑通过 C# Provider 实现，不包含 JVM/Dex 兼容层；支持将 TV 订阅中的已适配入口转换为原生配置，其余入口保留导入说明。
+基于 [FongMi/TV](https://github.com/FongMi/TV) 重新设计的跨平台桌面影音应用。**Avalonia 12 + .NET 10（NativeAOT）+ libmpv**，覆盖 **macOS / Windows / Linux**（x64 + arm64，共 6 个 RID）。
 
-当前工程是首版实现，不是 FongMi/TV 全功能移植。方案与分阶段范围见 [实现方案](docs/avalonia-rewrite-plan.md)，逐项进度与未完成任务见 [功能清单](docs/implementation-progress.md)。
+设计与交互稿见 [VodBoxDesign/design](../VodBoxDesign/design/DESIGN.md)：Mica/Fluent 深色主题、左侧导航 Shell、影院式详情页、全局播放浮层。
 
-## 已实现
+## 已实现（0.2.0）
 
-- 本地文件/URL 播放、暂停、停止、进度、音量、倍速、字幕与音轨选择、全屏。
-- 新版 JSON 配置，C# 目录源及 MacCMS HTTP JSON/XML 采集源的分类、分页、搜索、详情、多线路和选集；哔哩哔哩公开投稿的 C# Spider 基础适配。
-- 配置快照仓库、偏好设置持久化、全源并发搜索、收藏打开、历史重新解析、连续播放与片头片尾设置。
-- 直播分组/搜索/备用地址、UTF-8/UTF-16/GB18030 编码、gzip XMLTV 缓存与节目表界面。
-- QuickJS-NG 独立 AOT 宿主，LibraryImport 源码生成绑定；Python/Node 独立进程 NDJSON 协议。
-- SQLite 历史、续播、收藏和无痕播放；M3U/TXT/JSON 直播列表与 XMLTV 解析。
-- MVVM 与 JSON 源码生成、XAML 编译绑定、`Design.DataContext` 预览数据。
-- Mica 优先，AcrylicBlur/Blur/实色回退。Mica 原生效果限 Windows 11；其他平台使用可用的材质效果。
-- Downio 风格的 Build / Package / CI / Draft Release 工作流，覆盖六个 RID 的本机 AOT 构建。
+- **TVBox 配置体系**：远程订阅加载、JS 变量包裹、`//` 行注释剥离、JPEG 尾部 base64 隐写（饭太硬 `in.bmp` 形态）、宽容字段解析（`type_id` 数字/字符串、`ext`/`style` 对象、`rules` 数组）——与 FongMi Gson 容错行为对齐。
+- **点播**：MacCMS（苹果CMS V10 JSON 采集）站点分类/分页/筛选/详情/搜索全链路；`vod_play_from$$$vod_play_url` 线路/选集拆分。
+- **直播**：M3U（group-title/tvg-logo/catchup）与 TXT（`分组,#genre#`）双格式解析、多线路、频道面板（分组/筛选）。
+- **播放器**：libmpv 唯一内核，`LibraryImport` 源码生成 P/Invoke + `DllImportResolver` 按平台候选路径加载（`VODBOX_MPV_LIB` 可覆盖）；播放/暂停/Seek/倍速/音量/音轨/字幕轨/视频轨；历史进度续播。
+- **数据**：SQLite（Microsoft.Data.Sqlite）历史/收藏/配置订阅/偏好；多站点并发聚合搜索。
+- **UI**：8 页面（首页/点播/详情/直播/搜索/收藏/历史/本地文件）+ 设置中心 + 播放浮层；全视图 `Design.DataContext` 设计预览数据（Rider 打开 axaml 即可预览，不触网不触库）。
+- **AOT 约束**：全 JSON 源码生成（`JsonSerializerIsReflectionEnabledByDefault=false`）、`PublishAot` 六 RID 发布、无反射容器（手写组合根）。
 
-## 版本与开发
+> `csp_`（Java jar 爬虫）站点已过滤——桌面端无 JVM，等待后续适配层。
 
-固定 .NET SDK **10.0.401** / 运行时 **10.0.12**、Avalonia **12.1.3**、LibVLCSharp **3.10.1**。需要对应平台的 C/C++ 工具链；macOS 使用 Xcode Command Line Tools，Windows 使用 Visual Studio C++ 工具链，Linux 使用 clang/zlib 开发包。
+## 开发
+
+要求 .NET SDK 10.0.400（`global.json` 固定）。播放需 libmpv：macOS 开发机可下载 mpv 官方 app 并把主二进制重链接（或 `export VODBOX_MPV_LIB=/path/to/libmpv.dylib`）；Windows 放 `mpv-2.dll`；Linux `apt install libmpv2`。
 
 ```sh
 dotnet restore VodBox.slnx
-dotnet build VodBox.slnx -c Release
-dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release
+dotnet build VodBox.slnx -c Debug
+dotnet test tests/VodBox.Tests/VodBox.Tests.csproj
 dotnet run --project src/VodBox.Desktop
 ```
 
-本机若已由 Codex 将 SDK 放入项目 `.cache/dotnet`，可用 `.cache/dotnet/dotnet` 替代上述 `dotnet`。项目级 NuGet.Config 继承系统包源/代理，使用华为镜像和 nuget.org 映射；CI 使用 `build/NuGet.ci.config`，避免依赖本机镜像或代理。
+首次启动 → 设置 → 填入 TVBox 配置地址（如 `https://example.com/tvbox.json`）加载；直播页填 m3u 地址。
 
-设计预览使用 Debug 配置，打开 `src/VodBox.Desktop/MainWindow.axaml`。Debug 明确关闭 AOT/裁剪，启用调试器及设计器所需的 JSON 反射开关；业务序列化仍使用源码生成。Release 指定 RID 发布默认启用 AOT/full trim；传入 `-p:DisableAOT=true` 可临时关闭 AOT 和裁剪以诊断托管运行。设计数据不访问 SQLite、网络、脚本或原生播放器。设计器使用深色实色底板；系统级材质需运行应用查看。
+## 打包与发布
 
-开发运行播放前需安装 VLC 3.x，或配置 `VODBOX_VLC_PATH` 为原生库目录。打包产物携带播放器与三种脚本运行时；开发目录中的 QuickJS 宿主需按下列步骤构建并复制到桌面输出的 `plugin-host` 子目录。Python/Node 开发模式可使用系统运行时或 `VODBOX_PYTHON` / `VODBOX_NODE` 指定路径。
-
-图标资源位于 `src/VodBox.Desktop/Assets/Icons/`；平台尺寸、macOS 透明留白及导出方式见 [资源说明](src/VodBox.Desktop/Assets/Icons/README.md)。
-
-首次运行不自动加载示例：从首页打开独立「设置」窗口，在左侧「通用」中点击「点播」或「直播」行，加载 VodBox JSON 配置后返回首页；两处目前共用一个配置包。首页推荐与点播分类独立，推送/投屏暂未实现。
-
-## Native AOT 与打包
-
-下面以 macOS Intel 为例。每个 RID 在对应的本机 runner 上构建，避免混用架构。
+推送 `vX.Y.Z` tag（与 `VERSION` 一致）触发 Release：每 RID 在对应本机 runner 上 NativeAOT 构建 → 捆绑钉定 sha256 的 libmpv → 产物为 Windows ZIP、macOS `.app`/ZIP/DMG（ad-hoc 签名）、Linux deb/rpm（fpm）。CI 全量构建 + 测试在每次 push 运行。
 
 ```sh
-cmake -S build/quickjs -B artifacts/quickjs -DCMAKE_BUILD_TYPE=Release
-cmake --build artifacts/quickjs --config Release --target vodbox_quickjs --parallel 2
+# 本机 AOT 发布（macOS x64 示例）
 dotnet publish src/VodBox.Desktop -c Release -r osx-x64 --self-contained -o artifacts/publish/osx-x64
-dotnet publish src/VodBox.PluginHost -c Release -r osx-x64 --self-contained -o artifacts/publish/osx-x64/plugin-host
 python3 build/bundle.py osx-x64 artifacts/publish/osx-x64
-python3 build/smoke.py osx-x64 artifacts/publish/osx-x64
-python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages
+python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --version 0.2.0
 ```
 
-输出格式：Windows ZIP；macOS `.app`、ZIP、DMG；Linux deb、rpm、AppImage。Linux 构建机需安装 libvlc-dev、vlc-plugin-base、vlc-plugin-video-output、libicu-dev；打包机额外安装 dpkg-deb、rpm、Ruby/fpm 1.16.0。原生依赖闭包从目标 runner 收集，保留系统 glibc、显示服务器、字体与 GPU 驱动依赖。Linux 产物基线为 Ubuntu 22.04 / glibc 2.35，不承诺兼容所有发行版。
+## 结构
 
-默认 macOS 使用本地 ad-hoc 签名供验证，未做 Apple notarization。`CODESIGN_IDENTITY` 可以选择已安装的 Developer ID；正式分发前仍需配置签名与公证流程。CI 默认仅上传构建和安装包 artifacts；推送与 VERSION 匹配的 `v*` tag 才创建草稿 Release。
-
-Python、Node、VLC 的下载地址与 SHA-256 固定在 `build/native-assets.json`，QuickJS 固定提交与压缩包 SHA-256。`native-manifest.json` 记录实际打包文件的校验值。调试符号与运行包分离。Node 仅携带运行时和许可证，排除 npm、开发头文件与文档。macOS 使用标准 app bundle 资源目录，封包前验证签名、原生解码和三种脚本宿主。AOT 主要减小托管运行时开销；完整 VLC 编解码插件和外部脚本运行时仍占据大部分包体积。
-
-## 内容源与插件
-
-`examples/vodbox.json` 演示四种源类型，`examples/catalog.json` 是 C# 目录格式。示例不附带影片；可以把自己的媒体放到 `examples/sample.mp4`，也可在三个脚本源的 `options.mediaUri` 中填写媒体地址。
-
-插件实现 `init`、`categories`、`items`、`search`、`detail`、`resolvePlayback`。QuickJS 使用全局 `VodBoxProvider` 对象；Node 使用 default export；Python 使用同名函数。返回模型以 `VodBox.Core` 为准，协议版本为 1，stdout 仅用于 NDJSON，日志发到 stderr。Python 支持同步与 async 函数，Node 支持 Promise，QuickJS 支持立即可完成的 Promise jobs。
-
-QuickJS 宿主提供 `vodbox.fetchText(url)` 与 `vodbox.sha256(text)`；无 CLR 反射对象暴露、Node 模块兼容或浏览器 DOM。插件入口必须是本地文件 URI；相对路径由配置加载器解析。
-
-## 验证与剩余范围
-
-六个 RID 的 Native AOT 构建、27 项功能测试、真实 LibVLC WAV 解码、随包 QuickJS/Python/Node 协议测试与全部安装包生成已通过 [CI 验证](https://github.com/pengpercy/VodBox/actions/runs/37245948796)（ed2cc55）。macOS 安装包另外执行严格签名与依赖哈希校验。用户提供来源中的一个 HLS 直播流在 macOS x64 实际进入 Playing，解码 H.264/AAC 并观察到 VideoToolbox 日志；详见 [播放测试记录](docs/playback-testing.md)。有画面的交互、长时稳定性和各系统完整安装流程仍需真机验证。
-
-本轮继续实现海报缓存 / 缩略图、历史管理、直播收藏 / 恢复 / 有限重试 / 节目表刷新、音频字幕延迟 / 截图、快捷键 / 拖放 / 主题，以及 DASH 请求头代理。78 项自动测试通过，新增弹幕加载 / 时间轴 / 透明叠层、数据备份 / 合并导入、单源搜索分页、MacCMS 年份 / 完结筛选、可见海报加载和无窗口 XAML 预览测试。已验证的跨平台打包版本见上方 CI 链接；当前改动的本机 Native AOT 与实际 HLS 的 150ms 音频延迟验证通过；本轮新增功能的跨平台 CI 与桌面验收独立进行。通用筛选元数据、聚合分页、全屏弹幕验收、大屏布局、媒体键 / 休眠、DLNA / 局域网、SMB / WebDAV、自动更新及完整桌面验收仍需继续。旧配置与 Java 兼容层不在当前范围内。
-
-参考项目：[FongMi/TV](https://github.com/FongMi/TV)、[Screenbox](https://github.com/huynhsontung/Screenbox)、[Downio](https://github.com/pengpercy/Downio)。当前实现没有复制其应用源码。分发原生依赖前应保留各依赖的许可证与 notice；相关文件随运行时打包。
-
-解析器配置、HLS 请求头代理与独立浏览器嗅探使用说明见 [播放解析](docs/playback-resolution.md)。完整重写的逐项覆盖及尚未实现内容见 [实现进度](docs/implementation-progress.md)。
-
-海报缓存、直播恢复、快捷键、延迟、截图与主题操作见 [桌面操作](docs/desktop-controls.md)。
-
-设置页支持导出与合并导入数据备份，范围和恢复规则见 [数据备份](docs/data-backup.md)。
-
-为节约 GitHub Actions 额度，CI 当前仅支持手动触发，代码推送不会自动运行。备份阶段的六 RID 测试与 AOT 诊断通过；安装包任务因账户付款 / 支出限制未启动，详见实现进度。后续功能先在本地开发和验证，再集中执行 CI。
-
-弹幕支持本地 / HTTP XML 与 JSON、gzip、滚动 / 顶部 / 底部、自绘透明叠层与播放时间同步，使用说明及验证范围见 [弹幕](docs/danmaku.md)。
-
-主窗口已接入 libmpv + LibVLC 双内核，设置页可选自动、libmpv、LibVLC，并保存偏好。自动模式普通媒体优先 mpv、失败最多回退一次；mpv 弹幕与视频在同一 UI 树，LibVLC 使用透明原生叠层。178 项本地回归通过，macOS x64 已通过真实 JIT / AOT 窗口往返播放及弹幕验收。Windows / Linux 真机和六 RID 双内核依赖打包尚待完成。详见 [播放内核实现](docs/mpv-engine.md)。
-
-界面参考 FongMi/TV 的页面职责拆成 15 个独立视图：浏览与播放独立，播放页内部宽屏并列、窄屏上下排列；独立设置窗口以侧栏切换通用／播放／弹幕。海报网格和分集支持虚拟化，保留编译绑定、设计预览、Mica 与扩展标题栏。全屏控制自动隐藏和三平台布局验收仍待完成，见 [PC 布局](docs/desktop-layout.md)。
-
-libmpv 尚未纳入全部发行包。开发时可通过 `VODBOX_MPV_PATH` 指定本机原生库完整路径；未提供 mpv 时，自动模式会尝试现有 LibVLC。不要将本机 GUI 验收视为三平台安装包验收。
-
-`examples/bilibili.json` 提供 C# 哔哩哔哩公开投稿适配：热门、关键词分类、固定 BV/av 片单分页、搜索分页、分集、单段低清媒体和自动 XML 弹幕。源工厂显式注册 `bilibili` / `csp_Bili`，订阅导入可将 `csp_BiliGuard` 的关键词分类转换到该 Provider，不运行原 Guard 插件。两个用户源的逐插件统计与后续顺序见 [Spider 优先级](docs/spider-migration-priority.md)。
-
-C# AppGet（V119 / 显式 Qiji V122）已注册 `appget` / `csp_AppGet`，支持分类、分页筛选、搜索、多线路分集、直接媒体/站内解析和声明式外部 JSON 解析。示例 `examples/appget.json` 使用占位参数；真实播放与版本限制见 [AppGet Spider](docs/appget-spider.md)，不代表四个原条目均已可播放。
-
-C# App99 已注册 `app99` / `csp_App99` 的显式 `bn-v2` 协议，支持匿名分类、分页筛选、搜索、多线路分集和 JSON 解析；双星真实 LibVLC 解码通过。配置示例见 `examples/app99.json`，协议范围与验收见 [App99 Spider](docs/app99-spider.md)。`csp_App99Guard` 尚未接入。
-
-相声/评书音频专辑已接入 C# `audio-site`（显式 `audio-zblog-v1`，亦可用 `csp_XBPQ` 别名），支持两个已核对站点的分类分页、专辑分集和音频播放，不支持通用 XBPQ 规则与站点搜索。见 [示例](examples/audio-sites.json) 和 [音频 Spider](docs/audio-site-spider.md)。
-
-饭太硬的已知兔小贝、虎牙、斗鱼 drpy 入口可自动转换为独立 C# Provider；急救教学与荐影预告片也支持订阅导入。仅识别已核对的入口，不执行下载的规则脚本，不代表通用 drpy/Guard 兼容。斗鱼使用隔离 Chrome/Edge/Chromium 嗅探播放。见 [原生示例](examples/public-sites.json) 和 [本批适配范围](docs/public-site-spiders.md)。
-
-libmpv 已新增可接入 PlaybackCoordinator 的 `MpvEngine`，事件状态、轨道、控制与延迟已通过 macOS JIT/Native AOT 实测；主窗口路由与设置仍在后续接入。详见 [mpv 播放接口](docs/mpv-engine.md)。
+```
+src/VodBox.Core           领域模型 + TVBox/MacCMS 契约（零依赖，JSON 源码生成）
+src/VodBox.Infrastructure 配置加载/隐写解码、MacCMS 适配、直播解析、SQLite 存储、聚合搜索
+src/VodBox.Playback.Mpv   libmpv P/Invoke（LibraryImport）+ DllImportResolver
+src/VodBox.Desktop        Avalonia Shell + 8 页面 + 播放浮层（CommunityToolkit.Mvvm）
+tests/VodBox.Tests        21 项测试：配置/隐写/MacCMS/直播/存储（含饭太硬真实样本回归）
+build/                    mpv 资产捆绑、打包、冒烟、归档脚本
+```

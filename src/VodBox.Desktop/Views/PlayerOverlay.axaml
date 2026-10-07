@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:v="clr-namespace:VodBox.Desktop.Views"
+             x:Class="VodBox.Desktop.Views.PlayerOverlay" x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <x:Static Member="design:DesignData.Main" />
+  </Design.DataContext>
+  <Panel DataContext="{Binding Player}">
+    <!-- 黑底 -->
+    <Rectangle Fill="#000000" />
+
+    <!-- 控制层 -->
+    <Grid RowDefinitions="*,Auto">
+      <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Error}" FontSize="13" Foreground="#FF6B6B" HorizontalAlignment="Center"
+                   TextWrapping="Wrap" MaxWidth="520" IsVisible="{Binding Error, Converter={x:Static v:StringConverters.IsNotNullOrEmpty}}" />
+        <TextBlock Text="libmpv 渲染窗口" FontSize="12" Foreground="#85FFFFFF" Opacity="0.7"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+
+      <Border Grid.Row="1" Padding="22,12,22,16">
+        <StackPanel Spacing="10">
+          <!-- 进度条 -->
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <TextBlock Grid.Column="0" Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
+                       FontSize="12" Foreground="#C7FFFFFF" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <Slider Grid.Column="1" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
+                    Value="{Binding Position.TotalSeconds, Mode=TwoWay}" />
+            <TextBlock Grid.Column="2" Text="{Binding Duration, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
+                       FontSize="12" Foreground="#C7FFFFFF" VerticalAlignment="Center" Margin="10,0,0,0" />
+          </Grid>
+
+          <!-- 控制行 -->
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+            <Button Content="⏮" Click="OnBack10" Background="#66000000" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Width="34" Height="34" Cursor="Hand" />
+            <Button Content="⏸" Click="OnTogglePlay" Background="#66000000" Foreground="White"
+                    BorderThickness="0" CornerRadius="7" Width="40" Height="40" FontSize="17" Cursor="Hand" />
+            <Button Content="⏭" Click="OnForward10" Background="#66000000" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Width="34" Height="34" Cursor="Hand" />
+            <TextBlock Text="倍速" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Margin="16,0,6,0" />
+            <ComboBox SelectedIndex="3" SelectionChanged="OnRateChanged" MinWidth="80" Height="30">
+              <ComboBoxItem Content="0.5x" />
+              <ComboBoxItem Content="0.75x" />
+              <ComboBoxItem Content="1.0x" />
+              <ComboBoxItem Content="1.25x" />
+              <ComboBoxItem Content="1.5x" />
+              <ComboBoxItem Content="2.0x" />
+            </ComboBox>
+            <TextBlock Text="音量" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Margin="16,0,6,0" />
+            <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" Width="100" VerticalAlignment="Center" />
+            <Button Content="✕ 关闭" Click="OnClose" Background="#66000000" Foreground="#FF6B6B"
+                    BorderThickness="0" CornerRadius="7" Padding="12,7" Margin="16,0,0,0" Cursor="Hand" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Panel>
+</UserControl>

@@ -1,5 +1,8 @@
 name: CI
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,10 +21,5 @@ jobs:
   build:
     needs: version
     uses: ./.github/workflows/build.yml
-    with:
-      version: ${{ needs.version.outputs.value }}
-  package:
-    needs: [version, build]
-    uses: ./.github/workflows/package.yml
     with:
       version: ${{ needs.version.outputs.value }}

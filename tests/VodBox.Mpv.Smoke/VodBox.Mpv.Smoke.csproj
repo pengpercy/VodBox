@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><TrimMode>full</TrimMode></PropertyGroup>
-  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' and '$(Configuration)' == 'Release' and '$(DisableAOT)' != 'true'">
-    <PublishAot>true</PublishAot><PublishTrimmed>true</PublishTrimmed>
-  </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../src/VodBox.Playback.Mpv/VodBox.Playback.Mpv.csproj" /></ItemGroup>
-</Project>

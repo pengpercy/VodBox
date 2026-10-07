@@ -1,69 +1,112 @@
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-public sealed partial class ConfigLoader(HttpClient http)
+/// <summary>
+/// TVBox 订阅加载：URL →（隐写/base64 解码 + 注释剥离，对齐 FongMi Decoder）→ TvBoxConfig → 运行时 SourceInfo。
+/// 支持三种形态：
+/// 1. 明文 JSON / JS 变量包裹；
+/// 2. JPEG 等二进制尾部附加 base64（饭太硬 in.bmp：前缀干扰 + "**" 分隔）；
+/// 3. 含 "//{...}" 行内注释的配置（剥落后再解析）。
+/// </summary>
+public sealed class ConfigLoader(DefaultHttp http)
 {
-    public async Task<VodBoxConfig> LoadAsync(string location, CancellationToken cancellationToken = default)
+    public async Task<TvBoxConfig> LoadAsync(string url, CancellationToken ct = default)
     {
-        location = location.Trim();
-        if (location.Length == 0) throw new InvalidDataException("请输入播放源配置地址。");
-        Uri origin = Uri.TryCreate(location, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" or "file"
-            ? uri : new Uri(Path.GetFullPath(location));
-        string json = await ReadConfigurationAsync(origin, cancellationToken);
-        using var document = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-        if (document.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidDataException("配置必须是 JSON 对象。");
-        var config = document.RootElement.TryGetProperty("sites", out _)
-            ? await ImportTvAsync(document.RootElement, origin, cancellationToken)
-            : document.RootElement.Deserialize(VodBoxJson.Default.VodBoxConfig) ?? throw new InvalidDataException("配置为空。");
-        if (!document.RootElement.TryGetProperty("sites", out _) && !document.RootElement.TryGetProperty("schemaVersion", out _))
-            throw new InvalidDataException("未识别的配置格式，需包含 schemaVersion 或 sites。");
-        config = config with { ImportWarnings = config.ImportWarnings ?? [], Resolvers = config.Resolvers ?? [], Sources = config.Sources ?? [], LiveSources = config.LiveSources ?? [] };
-        Validate(config);
-        return config with
-        {
-            Sources = config.Sources.Select(source => source with
-            {
-                Entry = source.Entry is null ? null : new Uri(origin, source.Entry).ToString()
-            }).ToList(),
-            LiveSources = config.LiveSources.Select(live => live with
-            {
-                Uri = new Uri(origin, live.Uri).ToString(),
-                Epg = live.Epg is null ? null : new Uri(origin, live.Epg).ToString()
-            }).ToList(),
-            Resolvers = config.Resolvers.Select(resolver => resolver with { Entry = resolver.Entry is null ? null : new Uri(origin, resolver.Entry).ToString() }).ToList()
-        };
+        var raw = await http.GetStringAsync(url, ct: ct);
+        return Parse(raw) ?? throw new InvalidDataException($"配置解析失败：{url}");
     }
 
-    public static void Validate(VodBoxConfig config)
+    public async Task<TvBoxConfig> LoadBytesAsync(string url, CancellationToken ct = default)
     {
-        if (config.SchemaVersion != 1) throw new InvalidDataException($"不支持配置版本 {config.SchemaVersion}，当前为 1。");
-        if (string.IsNullOrWhiteSpace(config.Id)) throw new InvalidDataException("配置 id 不能为空。");
-        var ids = new HashSet<string>(StringComparer.Ordinal);
-        var resolverIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var resolver in config.Resolvers)
+        var bytes = await http.GetByteArrayAsync(url, ct: ct);
+        return ParseBytes(bytes) ?? throw new InvalidDataException($"配置解析失败：{url}");
+    }
+
+    public static TvBoxConfig? Parse(string raw)
+    {
+        raw = raw.Trim();
+        if (!raw.StartsWith('{'))
         {
-            if (string.IsNullOrWhiteSpace(resolver.Id) || !resolverIds.Add(resolver.Id) || resolver.Id.StartsWith('_')) throw new InvalidDataException("解析器 ID 为空、重复或使用了保留前缀。");
-            if (string.IsNullOrWhiteSpace(resolver.Name) || resolver.Kind == ResolutionKind.Json && string.IsNullOrWhiteSpace(resolver.Entry)) throw new InvalidDataException("解析器名称或 JSON 入口为空。");
-            if (!Enum.IsDefined(resolver.Kind) || resolver.TimeoutSeconds is < 1 or > 120) throw new InvalidDataException("解析器类型或超时设置无效。");
+            var start = raw.IndexOf('{');
+            if (start < 0) return null;
+            raw = raw[start..];
         }
-        foreach (var resolver in config.Resolvers)
-            if (resolver.NextResolverId is not null && !resolverIds.Contains(resolver.NextResolverId)) throw new InvalidDataException("解析器链引用了不存在的解析器。");
-        var liveIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var live in config.LiveSources)
-            if (live.UserAgent?.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("直播请求标识无效。");
-            else if (string.IsNullOrWhiteSpace(live.Id) || !liveIds.Add(live.Id) || string.IsNullOrWhiteSpace(live.Uri)) throw new InvalidDataException("直播源 ID 为空 / 重复，或入口为空。");
-        foreach (var source in config.Sources)
+        raw = StripComments(raw);
+        try
         {
-            if (string.IsNullOrWhiteSpace(source.Id) || source.Id.StartsWith("live/", StringComparison.Ordinal) || !ids.Add(source.Id))
-                throw new InvalidDataException($"内容源 id 为空或重复：{source.Id}");
-            if (!Enum.IsDefined(source.Runtime)) throw new InvalidDataException("未知源运行时。");
-            if (string.IsNullOrWhiteSpace(source.Name)) throw new InvalidDataException("内容源 name 不能为空。");
-            if (source.Runtime != ProviderRuntime.Csharp && string.IsNullOrWhiteSpace(source.Entry))
-                throw new InvalidDataException($"脚本源 {source.Id} 缺少 entry。");
-            if (source.ResolverId is not null && source.ResolverId is not ("_direct" or "_browser") && !resolverIds.Contains(source.ResolverId))
-                throw new InvalidDataException($"内容源 {source.Id} 引用了不存在的解析器。");
+            return JsonSerializer.Deserialize<TvBoxConfig>(raw, Json.Options);
         }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>解析二进制载体（JPEG/BMP 头 + 尾部 base64 载荷）。</summary>
+    public static TvBoxConfig? ParseBytes(byte[] bytes)
+    {
+        // 找 base64 纯 ASCII 长尾（至少 64 字符连续 base64 字母表）
+        var tail = ExtractBase64Tail(bytes);
+        return tail is null ? null : Parse(Encoding.UTF8.GetString(Convert.FromBase64String(tail)));
+    }
+
+    private static string? ExtractBase64Tail(byte[] bytes)
+    {
+        // 从尾部向前找最长连续 base64 段
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=*$#";
+        var start = -1;
+        for (var i = bytes.Length - 1; i >= 0; i--)
+        {
+            var c = (char)bytes[i];
+            if (char.IsAsciiLetterOrDigit(c) || c is '+' or '/' or '=' or '*' or '$' or '#' or '\n' or '\r') continue;
+            start = i + 1;
+            break;
+        }
+        if (start < 0) start = 0;
+        var text = Encoding.ASCII.GetString(bytes[start..]).Trim();
+        // 饭太硬形态：任意前缀 + "**" + base64
+        var marker = text.IndexOf("**", StringComparison.Ordinal);
+        if (marker >= 0 && marker < 64) text = text[(marker + 2)..];
+        text = text.Trim();
+        // 清洗分隔符噪声
+        text = text.Replace("\n", "").Replace("\r", "");
+        if (text.Length < 64) return null;
+        if (text.Length % 4 != 0) text = text[..(text.Length - text.Length % 4)];
+        return text;
+    }
+
+    /// <summary>剥 "//" 行注释（FongMi Decoder.extract 的注释剥离：如 "//{...}" 整段被注释的站点行）。</summary>
+    public static string StripComments(string json)
+    {
+        // 只处理行首 //（含缩进），避免误伤 URL 里的 "//"（https:）
+        return Regex.Replace(json, @"^[ \t]*//.*$", "", RegexOptions.Multiline);
+    }
+
+    /// <summary>把 TvBoxConfig 转为可用的内容源列表（过滤桌面端不支持的 csp_ 站点）。</summary>
+    public static List<SourceInfo> ToSources(TvBoxConfig config)
+    {
+        var sources = new List<SourceInfo>();
+        foreach (var site in config.Sites)
+        {
+            if (site.Runtime == SourceRuntime.Node) continue; // csp_ Java 爬虫，桌面端无 JVM
+            if (string.IsNullOrWhiteSpace(site.Key) || string.IsNullOrWhiteSpace(site.Name)) continue;
+            sources.Add(new SourceInfo
+            {
+                Key = site.Key,
+                Name = site.Name,
+                Runtime = site.Runtime,
+                Api = site.Api,
+                Ext = site.Ext is { ValueKind: JsonValueKind.String } s ? s.GetString() : site.Ext?.GetRawText(),
+                Type = site.Type,
+                Searchable = site.Searchable != 0,
+                Changeable = site.Changeable != 0,
+                Categories = site.Categories,
+            });
+        }
+        return sources;
     }
 }

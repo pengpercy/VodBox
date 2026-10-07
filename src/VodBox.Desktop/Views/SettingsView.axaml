@@ -1,48 +1,101 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VodBox.Desktop.Views.SettingsView"
-             x:DataType="vm:MainViewModel" x:CompileBindings="True">
-  <Design.DataContext><vm:DesignMainViewModel /></Design.DataContext>
-  <UserControl.Styles>
-    <Style Selector="ListBox.settingsMenu ListBoxItem">
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Padding" Value="12,6" />
-      <Setter Property="Margin" Value="0,0,0,3" />
-      <Setter Property="MinHeight" Value="36" /><Setter Property="Height" Value="36" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="FocusAdorner">
-        <Template><Border Classes="settingsMenuFocus" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}" IsHitTestVisible="False" /></Template>
-      </Setter>
-    </Style>
-    <Style Selector="ListBox.settingsMenu ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="ListBox.settingsMenu ListBoxItem /template/ Border#PART_LayoutRoot">
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="ListBox.settingsMenu ListBoxItem:selected">
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-  </UserControl.Styles>
-  <Grid ColumnDefinitions="160,*">
-    <Border x:Name="SidebarBackground" Background="{DynamicResource SidebarSurfaceBrush}" Padding="12,60,12,20">
-      <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="设置" FontSize="24" FontWeight="SemiBold" Margin="8,0,0,20" />
-        <TextBlock DockPanel.Dock="Bottom" Text="偏好更改即时生效" Classes="muted" FontSize="11" Margin="8,16,0,0" TextWrapping="Wrap" />
-        <ListBox x:Name="SettingsMenu" Classes="settingsMenu" SelectionChanged="MenuSelectionChanged" SelectedIndex="0" Background="Transparent" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-          <ListBoxItem Content="通用" />
-          <ListBoxItem Content="播放" />
-          <ListBoxItem Content="弹幕" />
-        </ListBox>
-      </DockPanel>
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             x:Class="VodBox.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <x:Static Member="design:DesignData.Main" />
+  </Design.DataContext>
+  <Grid ColumnDefinitions="220,*">
+    <!-- 设置导航 -->
+    <Border Grid.Column="0" BorderBrush="#17FFFFFF" BorderThickness="0,0,1,0" Padding="12,18">
+      <StackPanel Spacing="2">
+        <Border CornerRadius="7" Padding="13,9" Background="#264CC2FF">
+          <TextBlock Text="📡 源与订阅" FontSize="13" Foreground="#4CC2FF" />
+        </Border>
+        <Border CornerRadius="7" Padding="13,9">
+          <TextBlock Text="▶ 播放" FontSize="13" Foreground="#C7FFFFFF" Opacity="0.7" />
+        </Border>
+        <Border CornerRadius="7" Padding="13,9">
+          <TextBlock Text="💾 数据" FontSize="13" Foreground="#C7FFFFFF" Opacity="0.7" />
+        </Border>
+        <Border CornerRadius="7" Padding="13,9">
+          <TextBlock Text="ℹ 关于" FontSize="13" Foreground="#C7FFFFFF" Opacity="0.7" />
+        </Border>
+      </StackPanel>
     </Border>
-    <Grid Grid.Column="1" Margin="0,40,0,0" RowDefinitions="Auto,*" RowSpacing="12">
-      <TextBlock x:Name="SectionTitle" Text="通用设置" Margin="24,20,24,0" FontSize="22" FontWeight="SemiBold" />
-      <Grid Grid.Row="1">
-        <views:SettingsGeneralView x:Name="GeneralPage" />
-        <views:SettingsPlaybackView x:Name="PlaybackPage" IsVisible="False" />
-        <views:SettingsDanmakuView x:Name="DanmakuPage" IsVisible="False" />
-      </Grid>
-    </Grid>
+
+    <!-- 表单 -->
+    <ScrollViewer Grid.Column="1" Padding="32,24,32,28">
+      <StackPanel Spacing="18" DataContext="{Binding Settings}">
+        <TextBlock Text="源与订阅" FontSize="20" FontWeight="SemiBold" />
+
+        <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1">
+          <StackPanel Margin="20,4,20,4">
+            <Grid ColumnDefinitions="*,Auto" MinHeight="64">
+              <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                <TextBlock Text="点播配置（TVBox JSON）" FontSize="13.5" />
+                <TextBlock Text="远程订阅地址，支持 MacCMS 采集站" FontSize="11.5" Foreground="#85FFFFFF" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBox Text="{Binding VodConfigUrl}" Width="300" Height="32" CornerRadius="6"
+                         Watermark="https://…/tvbox.json" />
+                <Button Content="加载" Command="{Binding ApplyVodConfigCommand}" CornerRadius="6" Padding="14,7"
+                        Background="#0078D4" Foreground="White" BorderThickness="0" Cursor="Hand" />
+              </StackPanel>
+            </Grid>
+            <Separator Background="#17FFFFFF" Height="1" />
+            <Grid ColumnDefinitions="*,Auto" MinHeight="64">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                <TextBlock Text="直播配置（m3u / txt）" FontSize="13.5" />
+                <TextBlock Text="IPTV 直播源地址" FontSize="11.5" Foreground="#85FFFFFF" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBox Text="{Binding LiveConfigUrl}" Width="300" Height="32" CornerRadius="6"
+                         Watermark="https://…/live.m3u" />
+                <Button Content="加载" Command="{Binding ApplyLiveConfigCommand}" CornerRadius="6" Padding="14,7"
+                        Background="#0078D4" Foreground="White" BorderThickness="0" Cursor="Hand" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="站点列表" FontSize="20" FontWeight="SemiBold" />
+        <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" MinHeight="120">
+          <ItemsControl ItemsSource="{Binding Sites}" Margin="20,12">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="{Binding Name}" FontSize="13" />
+                    <Border CornerRadius="5" Background="#264CC2FF" Padding="6,1">
+                      <TextBlock Text="{Binding Runtime}" FontSize="10.5" Foreground="#4CC2FF" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding Api}" FontSize="11" Foreground="#85FFFFFF"
+                             TextTrimming="CharacterEllipsis" MaxWidth="380" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+
+        <TextBlock Text="{Binding Message}" FontSize="12.5" Foreground="#4CC2FF" TextWrapping="Wrap" />
+
+        <TextBlock Text="数据" FontSize="20" FontWeight="SemiBold" />
+        <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1">
+          <StackPanel Margin="20,12" Spacing="10">
+            <Button Content="清空观看历史" Command="{Binding ClearHistoryCommand}" CornerRadius="6"
+                    Padding="14,7" Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" Cursor="Hand" />
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="VodBox 0.2.0 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" Foreground="#85FFFFFF" />
+      </StackPanel>
+    </ScrollViewer>
   </Grid>
 </UserControl>

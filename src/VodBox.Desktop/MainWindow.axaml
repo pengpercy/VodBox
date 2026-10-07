@@ -1,31 +1,87 @@
-<Window
-    xmlns:core="using:VodBox.Core" xmlns="https://github.com/avaloniaui" xmlns:chrome="using:Avalonia.Controls.Chrome"
-    xmlns:views="using:VodBox.Desktop.Views" xmlns:vm="using:VodBox.Desktop" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel" x:CompileBindings="True"
-    Icon="avares://VodBox/Assets/Icons/linux/256/vodbox.png" Title="VodBox" Width="1280" Height="850"
-    MinWidth="800" MinHeight="640" ExtendClientAreaToDecorationsHint="True"
-    ExtendClientAreaTitleBarHeightHint="40" WindowDecorations="Full" TransparencyLevelHint="Mica,AcrylicBlur,Blur,None"
-    TransparencyBackgroundFallback="{DynamicResource WindowFallbackBrush}" Background="Transparent">
-  <Design.DataContext>
-    <vm:DesignMainViewModel />
-  </Design.DataContext>
-  <Grid x:Name="WindowLayout" RowDefinitions="40,*">
-    <Border x:Name="WindowTitleBar" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
-    <Grid x:Name="AppShell" Grid.Row="1" RowDefinitions="*">
-      <Grid x:Name="Workspace" Margin="24,24,24,16" RowDefinitions="*,Auto" RowSpacing="12">
-        <Grid x:Name="ContentWorkspace" ColumnDefinitions="*">
-          <Grid x:Name="BrowsePane">
-            <views:HomeView x:Name="HomePage" IsVisible="{Binding ShowHome}" />
-            <views:SearchView x:Name="SearchPage" IsVisible="{Binding ShowSearch}" />
-            <views:LibraryView x:Name="LibraryPage" IsVisible="{Binding ShowLibrary}" />
-            <views:LiveView x:Name="LivePage" IsVisible="{Binding ShowLive}" />
-            <views:HistoryView x:Name="HistoryPage" IsVisible="{Binding ShowHistory}" />
-            <views:FavoritesView x:Name="FavoritesPage" IsVisible="{Binding ShowFavorites}" />
-          </Grid>
-          <views:PlaybackView x:Name="PlaybackPane" />
-        </Grid>
-        <TextBlock x:Name="StatusBar" Grid.Row="1" Text="{Binding Status}" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:VodBox.Desktop.Views"
+        xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+        x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel"
+        Title="VodBox"
+        Width="1280" Height="800" MinWidth="960" MinHeight="600"
+        TransparencyLevelHint="Mica"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="Full"
+        FontSize="13">
+
+  <!-- Mica 底色：桌面壁纸采样 + 深色叠加 -->
+  <Panel>
+    <Rectangle Fill="#202020" Opacity="0.86" />
+    <Grid RowDefinitions="44,*">
+
+      <!-- 标题栏 -->
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0" Spacing="10">
+          <Image Source="/Assets/Icons/linux/256/vodbox.png" Width="22" Height="22" />
+          <TextBlock Text="VodBox" VerticalAlignment="Center" FontSize="12.5" Opacity="0.8" />
+        </StackPanel>
+        <!-- 全局搜索框 -->
+        <TextBox Grid.Column="1" Text="{Binding SearchKeyword}" Watermark="搜索影片、剧集…"
+                 Width="380" Height="30" CornerRadius="15" HorizontalAlignment="Center"
+                 KeyDown="OnSearchKeyDown" VerticalContentAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="{Binding Clock}" VerticalAlignment="Center" FontSize="12.5"
+                   Opacity="0.7" Margin="0,0,14,0" />
       </Grid>
+
+      <!-- 主 Shell -->
+      <Grid Grid.Row="1" ColumnDefinitions="216,*">
+
+        <!-- 左侧导航 -->
+        <Border Grid.Column="0" BorderBrush="#FFFFFF" BorderThickness="0,0,1,0" Opacity="0.98">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="10,4,10,14">
+              <Border CornerRadius="9" Width="34" Height="34" Background="#0078D4">
+                <TextBlock Text="▶" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel>
+                <TextBlock Text="VodBox" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding CurrentSourceName}" FontSize="10.5" Opacity="0.55" />
+              </StackPanel>
+            </StackPanel>
+
+            <views:NavItemView Grid.Row="1" Icon="🏠" Label="首页" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHomeCommand}" />
+            <views:NavItemView Grid.Row="2" Icon="🎬" Label="点播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoVodCommand}" />
+            <views:NavItemView Grid.Row="3" Icon="📺" Label="直播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsLive}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoLiveCommand}" />
+            <views:NavItemView Grid.Row="4" Icon="🔍" Label="搜索" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSearch}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSearchCommand}" />
+            <views:NavItemView Grid.Row="5" Icon="⭐" Label="收藏" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFavoritesCommand}" />
+            <views:NavItemView Grid.Row="6" Icon="🕘" Label="历史" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHistoryCommand}" />
+
+            <views:NavItemView Grid.Row="8" Icon="📁" Label="本地文件" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFilesCommand}" />
+            <views:NavItemView Grid.Row="9" Icon="⚙️" Label="设置" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSettingsCommand}" />
+            <TextBlock Grid.Row="10" Text="HTTP 服务 · 未启用" FontSize="10.5" Opacity="0.5" Margin="22,10,0,10" />
+          </Grid>
+        </Border>
+
+        <!-- 页面容器 -->
+        <Panel Grid.Column="1">
+          <views:HomeView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" />
+          <views:VodView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" />
+          <views:LiveView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsLive}, ConverterParameter=0, Mode=OneWay}" />
+          <views:SearchView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsSearch}, ConverterParameter=0, Mode=OneWay}" />
+          <views:FavoritesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" />
+          <views:HistoryView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" />
+          <views:FilesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" />
+          <views:SettingsView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" />
+          <views:DetailView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsDetail}, ConverterParameter=0, Mode=OneWay}" />
+          <!-- 播放器浮层（任意页面之上） -->
+          <views:PlayerOverlay IsVisible="{Binding Player.Visible}" />
+        </Panel>
+      </Grid>
+
+      <!-- 状态栏 -->
+      <Border Grid.Row="1" VerticalAlignment="Bottom" Height="26" Background="#202020" Opacity="0.85"
+              IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding StatusMessage}" Margin="16,0" VerticalAlignment="Center" FontSize="11.5" Opacity="0.75" />
+      </Border>
     </Grid>
-  </Grid>
+  </Panel>
 </Window>
