@@ -43,24 +43,41 @@ public class FtyConfigChainTests
         Assert.Equal(48, config!.Sites.Count);
     }
 
+    /// <summary>
+    /// csp_ 站点的桌面端可用性锚点：45 个 csp_ 入口中已用 C# 原生重写的
+    /// （当前为 csp_BiliGuard ×7）提升为 <see cref="SourceRuntime.NativeSpider"/> 并存活，
+    /// 其余仍为 Node 并被过滤（桌面端无 JVM）；3 个 .js drpy 站点归 QuickJs。
+    /// S3b 每新增一个原生爬虫，此处的存活数应相应增长——数字必须精确。
+    /// </summary>
     [Fact]
-    public void CspSitesAreNodeRuntimeAndFilteredOutWhileJsSitesSurvive()
+    public void CspSitesPromoteToNativeSpiderWhenImplementedAndOthersAreFilteredOut()
     {
         var config = ConfigLoader.ParseBytes(File.ReadAllBytes(FixturePath))!;
 
-        // 45 个 csp_ Java jar 爬虫：分类为 Node，且被 ToSources 全部过滤
+        // 45 个 csp_ Java jar 爬虫，全部在模型层分类为 Node（提升发生在 ToSources）
         var csp = config.Sites.Where(s => s.Api.StartsWith("csp_", StringComparison.Ordinal)).ToList();
         Assert.Equal(45, csp.Count);
         Assert.All(csp, s => Assert.Equal(SourceRuntime.Node, s.Runtime));
 
-        // 3 个 .js drpy 脚本站点存活，运行时判定为 QuickJs
         var sources = ConfigLoader.ToSources(config);
-        Assert.Equal(3, sources.Count);
-        Assert.All(sources, s => Assert.Equal(SourceRuntime.QuickJs, s.Runtime));
-        Assert.All(new[] { "dr_兔小贝", "虎牙js", "斗鱼js" }, key => Assert.Contains(sources, s => s.Key == key));
 
-        // 站点总数 = 45 过滤 + 3 存活，没有别的形态
-        Assert.Equal(48, csp.Count + sources.Count);
+        // 7 个 csp_BiliGuard 已有 C# 原生实现 → 存活为 NativeSpider
+        var native = sources.Where(s => s.Runtime == SourceRuntime.NativeSpider).ToList();
+        Assert.Equal(7, native.Count);
+        Assert.All(native, s => Assert.Equal("csp_BiliGuard", s.Api));
+
+        // 3 个 .js drpy 脚本站点存活，运行时判定为 QuickJs
+        var scripts = sources.Where(s => s.Runtime == SourceRuntime.QuickJs).ToList();
+        Assert.Equal(3, scripts.Count);
+        Assert.All(new[] { "dr_兔小贝", "虎牙js", "斗鱼js" }, key => Assert.Contains(scripts, s => s.Key == key));
+
+        // 38 个未实现的 csp_ 仍被过滤：45 - 7 存活
+        Assert.Equal(45 - native.Count, csp.Count - native.Count);
+        Assert.DoesNotContain(sources, s => s.Runtime == SourceRuntime.Node);
+
+        // 总存活 = 7 原生 + 3 脚本 = 10；站点总数 48 = 38 过滤 + 10 存活
+        Assert.Equal(10, sources.Count);
+        Assert.Equal(48, sources.Count + (csp.Count - native.Count));
     }
 
     /// <summary>独立解析饭太硬形态：最后一个 "**" 之后即纯 base64 载荷。</summary>

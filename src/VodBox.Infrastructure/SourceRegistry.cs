@@ -29,22 +29,33 @@ public sealed class SourceRegistry : IDisposable
     private void Rebuild()
     {
         _sources.Clear();
-        foreach (var info in Sources.Where(s => s.Runtime == SourceRuntime.MacCms))
-            _sources[info.Key] = new MacCmsSource(info, _http);
+        foreach (var info in Sources)
+        {
+            switch (info.Runtime)
+            {
+                case SourceRuntime.MacCms:
+                    _sources[info.Key] = new MacCmsSource(info, _http);
+                    break;
+                case SourceRuntime.NativeSpider:
+                    if (NativeSpiders.Create(info) is { } native) _sources[info.Key] = native;
+                    break;
+                // QuickJs/Python/Node 尚无桌面运行时，保持不在册（Get 返回 null，UI 提示不支持）
+            }
+        }
         SourcesChanged?.Invoke();
     }
 
     public IContentSource? Get(string key) => _sources.TryGetValue(key, out var source) ? source : null;
 
-    /// <summary>默认源：第一个可用的 MacCMS 源。</summary>
-    public IContentSource? Default() => Sources.FirstOrDefault(s => s.Runtime == SourceRuntime.MacCms) is { } info ? Get(info.Key) : null;
+    /// <summary>默认源：第一个已注册且有实现的源（MacCMS 或原生爬虫）。</summary>
+    public IContentSource? Default() => Sources.FirstOrDefault(s => Get(s.Key) is not null) is { } info ? Get(info.Key) : null;
 
     /// <summary>并发聚合搜索全部 searchable 源，结果带站点来源标记。</summary>
     public async Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>> SearchAllAsync(string query, CancellationToken ct = default)
     {
         var results = new ConcurrentBag<(SourceInfo, MediaItem)>();
         var tasks = Sources
-            .Where(s => s.Searchable && s.Runtime == SourceRuntime.MacCms)
+            .Where(s => s.Searchable && s.Runtime is SourceRuntime.MacCms or SourceRuntime.NativeSpider)
             .Select(async site =>
             {
                 try

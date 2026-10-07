@@ -109,9 +109,9 @@ public sealed partial class DetailViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Play()
+    private async Task PlayAsync()
     {
-        if (Detail is null || SelectedLine is null || SelectedEpisode is null || SelectedEpisode.Uri is null)
+        if (Detail is null || SelectedLine is null || SelectedEpisode is null)
         {
             _main.StatusMessage = "没有可播放的选集";
             return;
@@ -119,6 +119,27 @@ public sealed partial class DetailViewModel : ObservableObject
         var resumeMs = MediaDetail.ResumePositionApplies(_resumeLineId, _resumeEpisodeId, SelectedLine.Id, SelectedEpisode.Id)
             ? _resumePositionMs
             : 0;
+
+        // 原生爬虫源（csp_ 类）的媒体地址带签名/时效，需在点播时现取；MacCMS 源用预置直链
+        if (_services.Registry.Get(_sourceKey) is IResolvingContentSource resolver)
+        {
+            try
+            {
+                var resolved = await resolver.ResolvePlaybackAsync(Detail.Item.Id, SelectedEpisode.Id);
+                _main.Player.Play(resolved with { StartPositionMs = resumeMs });
+            }
+            catch (Exception error)
+            {
+                _main.StatusMessage = $"播放地址解析失败：{error.Message}";
+            }
+            return;
+        }
+
+        if (SelectedEpisode.Uri is null)
+        {
+            _main.StatusMessage = "没有可播放的选集";
+            return;
+        }
         _main.Player.Play(new PlaybackRequest
         {
             Uri = SelectedEpisode.Uri,

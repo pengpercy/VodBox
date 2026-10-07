@@ -80,3 +80,14 @@ public interface IPreferences
     void Set(string key, bool value);
     void Set(string key, double value);
 }
+
+/// <summary>
+/// 需要即时解析播放地址的内容源（对应 TVBox 的 csp_ 爬虫类型站点）。
+/// 这类站点的媒体地址带签名/时效（如哔哩哔哩 CDN），不能预置在 <see cref="Episode.Uri"/>，
+/// 必须在用户点播时现取。不实现本接口的源（如 MacCMS）走 <see cref="Episode.Uri"/> 直连。
+/// </summary>
+public interface IResolvingContentSource : IContentSource
+{
+    /// <summary>解析某线路某一集的最终播放请求（含请求头、弹幕地址、续播位置）。</summary>
+    Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId, string episodeId, CancellationToken ct = default);
+}

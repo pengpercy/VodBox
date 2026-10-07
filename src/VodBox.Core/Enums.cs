@@ -3,7 +3,21 @@ using System.Text.Json.Serialization;
 namespace VodBox.Core;
 
 /// <summary>内容源运行时分类（对应 TVBox site.api 的 csp_/.js/.py 与 MacCMS 直连）。</summary>
-public enum SourceRuntime { MacCms, QuickJs, Python, Node, Local }
+public enum SourceRuntime
+{
+    /// <summary>苹果 CMS v10 JSON/XML 采集直连。</summary>
+    MacCms,
+    /// <summary>原生 C# 重写的 csp_ 爬虫（无 JVM/脚本，见 CspSpiders 注册表）。</summary>
+    NativeSpider,
+    /// <summary>drpy .js 脚本（QuickJS 宿主）。</summary>
+    QuickJs,
+    /// <summary>.py 脚本。</summary>
+    Python,
+    /// <summary>csp_ Java jar/其他无桌面实现，桌面端不支持。</summary>
+    Node,
+    /// <summary>本地媒体。</summary>
+    Local,
+}
 
 /// <summary>播放地址解析方式：直连 / JSON 解析接口 / 网页嗅探。</summary>
 public enum ResolutionKind { Direct, Json, Sniff }

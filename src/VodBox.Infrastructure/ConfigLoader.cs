@@ -122,13 +122,17 @@ public sealed class ConfigLoader(DefaultHttp http)
         var sources = new List<SourceInfo>();
         foreach (var site in config.Sites)
         {
-            if (site.Runtime == SourceRuntime.Node) continue; // csp_ Java 爬虫，桌面端无 JVM
             if (string.IsNullOrWhiteSpace(site.Key) || string.IsNullOrWhiteSpace(site.Name)) continue;
+            // csp_ 入口：已用 C# 原生重写的提升为 NativeSpider，其余（无桌面实现）保持 Node 并丢弃
+            var runtime = site.Runtime;
+            if (runtime == SourceRuntime.Node && NativeSpiders.IsSupported(site.Api))
+                runtime = SourceRuntime.NativeSpider;
+            if (runtime == SourceRuntime.Node) continue;
             sources.Add(new SourceInfo
             {
                 Key = site.Key,
                 Name = site.Name,
-                Runtime = site.Runtime,
+                Runtime = runtime,
                 Api = site.Api,
                 Ext = site.Ext is { ValueKind: JsonValueKind.String } s ? s.GetString() : site.Ext?.GetRawText(),
                 Type = site.Type,

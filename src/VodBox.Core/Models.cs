@@ -151,6 +151,8 @@ public sealed record PlaybackRequest
     public string? Poster { get; init; }
     public string? Remarks { get; init; }
     public bool IsLive { get; init; }
+    /// <summary>弹幕文件地址（XML/JSON，如哔哩哔哩 comment.bilibili.com/{cid}.xml）。无则 null。</summary>
+    public string? DanmakuUri { get; init; }
 }
 
 // ---------- 直播模型 ----------
