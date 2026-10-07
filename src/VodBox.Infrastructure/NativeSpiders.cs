@@ -19,6 +19,8 @@ public static class NativeSpiders
             ["csp_BiliGuard"] = info => new BilibiliSource(info),
             ["csp_FirstAid"] = info => new FirstAidSource(info),
             ["csp_FirstAidGuard"] = info => new FirstAidSource(info),
+            ["csp_YGP"] = info => new TrailerSource(info),
+            ["csp_YGPGuard"] = info => new TrailerSource(info),
         };
 
     /// <summary>判断某 api 是否有原生 C# 实现。</summary>
