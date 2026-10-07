@@ -128,6 +128,10 @@ public sealed class ConfigLoader(DefaultHttp http)
             if (runtime == SourceRuntime.Node && NativeSpiders.IsSupported(site.Api))
                 runtime = SourceRuntime.NativeSpider;
             if (runtime == SourceRuntime.Node) continue;
+            // .js 入口：按站点 key 有原生实现的提升为 NativeSpider（如 虎牙js→虎牙直播）；
+            // 其余 .js 保持 QuickJs 待 S3a 的 JS 宿主
+            if (runtime == SourceRuntime.QuickJs && NativeSpiders.IsSupportedKey(site.Key))
+                runtime = SourceRuntime.NativeSpider;
             sources.Add(new SourceInfo
             {
                 Key = site.Key,

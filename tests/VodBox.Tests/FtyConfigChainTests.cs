@@ -61,25 +61,29 @@ public class FtyConfigChainTests
 
         var sources = ConfigLoader.ToSources(config);
 
-        // 9 个 csp_ 已有 C# 原生实现 → 存活为 NativeSpider（7 BiliGuard + FirstAidGuard + YGPGuard）
+        // 10 个源已有 C# 原生实现 → 存活为 NativeSpider：
+        //   9 个按 api（7 BiliGuard + FirstAidGuard + YGPGuard）+ 1 个按 key（虎牙js，配置里是 .js 入口）
         var native = sources.Where(s => s.Runtime == SourceRuntime.NativeSpider).ToList();
-        Assert.Equal(9, native.Count);
+        Assert.Equal(10, native.Count);
         Assert.Equal(7, native.Count(s => s.Api == "csp_BiliGuard"));
         Assert.Equal(1, native.Count(s => s.Api == "csp_FirstAidGuard"));
         Assert.Equal(1, native.Count(s => s.Api == "csp_YGPGuard"));
+        Assert.Equal(1, native.Count(s => s.Key == "虎牙js"));
 
-        // 3 个 .js drpy 脚本站点存活，运行时判定为 QuickJs
+        // 剩余 .js drpy 脚本站点归 QuickJs（dr_兔小贝、斗鱼js 暂无原生实现，待 S3a JS 宿主）
         var scripts = sources.Where(s => s.Runtime == SourceRuntime.QuickJs).ToList();
-        Assert.Equal(3, scripts.Count);
-        Assert.All(new[] { "dr_兔小贝", "虎牙js", "斗鱼js" }, key => Assert.Contains(scripts, s => s.Key == key));
+        Assert.Equal(2, scripts.Count);
+        Assert.All(new[] { "dr_兔小贝", "斗鱼js" }, key => Assert.Contains(scripts, s => s.Key == key));
 
         // 36 个未实现的 csp_ 仍被过滤：45 - 9 存活
         Assert.Equal(45 - native.Count, csp.Count - native.Count);
         Assert.DoesNotContain(sources, s => s.Runtime == SourceRuntime.Node);
 
-        // 总存活 = 9 原生 + 3 脚本 = 12；站点总数 48 = 36 过滤 + 12 存活
+        // 总存活 = 9 csp_原生 + 1 虎牙js + 2 脚本 = 12；
+        // csp_ 过滤数 = 45 - 9 = 36；站点总数 48 = 36 过滤 + 12 存活
         Assert.Equal(12, sources.Count);
-        Assert.Equal(48, sources.Count + (csp.Count - native.Count));
+        Assert.Equal(36, csp.Count - 9);
+        Assert.Equal(48, sources.Count + 36);
     }
 
     /// <summary>独立解析饭太硬形态：最后一个 "**" 之后即纯 base64 载荷。</summary>
