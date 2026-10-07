@@ -4,7 +4,7 @@
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              x:Class="VodBox.Desktop.Views.SearchView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
-    <x:Static Member="design:DesignData.Main" />
+    <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <ScrollViewer Padding="28,16,28,28">
     <StackPanel Spacing="20" DataContext="{Binding Search}">

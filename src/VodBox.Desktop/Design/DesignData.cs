@@ -11,6 +11,9 @@ public static class DesignData
 {
     public static MainViewModel Main { get; } = CreateMain();
 
+    /// <summary>设计器专用入口：以 object 类型公开同一实例，匹配 Design.DataContext 附加属性。</summary>
+    public static object? MainForDesign => Main;
+
     private static MainViewModel CreateMain()
     {
         var main = new MainViewModel(DesignAppServices.Create());

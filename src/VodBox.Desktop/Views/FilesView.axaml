@@ -4,7 +4,7 @@
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              x:Class="VodBox.Desktop.Views.FilesView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
-    <x:Static Member="design:DesignData.Main" />
+    <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <Grid RowDefinitions="Auto,*" DataContext="{Binding Files}" Margin="28,12,28,28">
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="14" Margin="0,0,0,14">

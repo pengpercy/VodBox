@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.HomeView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
-    <x:Static Member="design:DesignData.Main" />
+    <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <ScrollViewer Padding="28,12,28,28">
     <StackPanel Spacing="26" DataContext="{Binding Home}">

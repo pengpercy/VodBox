@@ -4,7 +4,7 @@
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              x:Class="VodBox.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
-    <x:Static Member="design:DesignData.Main" />
+    <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <Grid ColumnDefinitions="220,*">
     <!-- 设置导航 -->

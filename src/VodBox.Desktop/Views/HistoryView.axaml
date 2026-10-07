@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.HistoryView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
-    <x:Static Member="design:DesignData.Main" />
+    <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <ScrollViewer Padding="28,12,28,28">
     <StackPanel Spacing="24" DataContext="{Binding History}">

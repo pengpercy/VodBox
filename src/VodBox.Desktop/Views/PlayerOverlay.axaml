@@ -5,7 +5,7 @@
              xmlns:v="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.PlayerOverlay" x:DataType="vm:MainViewModel">
   <Design.DataContext>
-    <x:Static Member="design:DesignData.Main" />
+    <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <Panel DataContext="{Binding Player}">
     <!-- 黑底 + libmpv 渲染面（由代码后置在 Ready 后插入 VideoHost，保证 loadfile 不早于渲染上下文） -->
