@@ -6,7 +6,13 @@ namespace VodBox.Tests;
 
 public sealed class LibraryStoreTests : IDisposable
 {
-    private readonly LibraryStore _store = new(Path.Combine(Path.GetTempPath(), $"vodbox-test-{Guid.NewGuid():N}.db"));
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), $"vodbox-test-{Guid.NewGuid():N}");
+    private readonly LibraryStore _store;
+
+    public LibraryStoreTests()
+    {
+        _store = new LibraryStore(Path.Combine(_directory, "library.db"));
+    }
 
     [Fact]
     public async Task HistoryUpsertsBySourceAndMedia()
@@ -133,6 +139,13 @@ public sealed class LibraryStoreTests : IDisposable
         Assert.True(_store.GetBool("incognito"));
         Assert.Equal(1.5, _store.GetDouble("rate"));
         Assert.Equal("fallback", _store.GetString("missing", "fallback"));
+
+        _store.Dispose();
+        using var reopened = new LibraryStore(Path.Combine(_directory, "library.db"));
+        Assert.Equal("dark", reopened.GetString("theme"));
+        Assert.Equal(66, reopened.GetInt("volume"));
+        Assert.True(reopened.GetBool("incognito"));
+        Assert.Equal(1.5, reopened.GetDouble("rate"));
     }
 
     private static HistoryEntry MakeHistory(string sourceKey, string mediaId, long position = 0) => new()
@@ -145,5 +158,9 @@ public sealed class LibraryStoreTests : IDisposable
         DurationMs = 90_000,
     };
 
-    public void Dispose() => _store.Dispose();
+    public void Dispose()
+    {
+        _store.Dispose();
+        if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+    }
 }

@@ -1,4 +1,4 @@
-using System.Text;
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using VodBox.Core;
 
@@ -7,19 +7,51 @@ namespace VodBox.Infrastructure;
 /// <summary>SQLite 库存储：历史、收藏、配置订阅、键值偏好（7 表结构中桌面首版需要的 4 张）。</summary>
 public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, IDisposable
 {
+    private const int SchemaVersion = 4;
     private readonly SqliteConnection _db;
 
     public LibraryStore(string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        _db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path }.ToString());
-        _db.Open();
-        Migrate();
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        _db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
+        try
+        {
+            _db.Open();
+            Migrate(); // 完成升级和验证后才允许服务/视图模型读取库存储。
+        }
+        catch
+        {
+            _db.Dispose();
+            throw;
+        }
     }
 
     private void Migrate()
     {
-        Exec("""
+        using var transaction = _db.BeginTransaction();
+        using (var version = MigrationQuery(transaction, "PRAGMA user_version"))
+        {
+            if (Convert.ToInt32(version.ExecuteScalar()) > SchemaVersion)
+                throw new InvalidDataException("库存储版本高于当前应用支持的版本，未修改数据库。");
+        }
+
+        var historyColumns = Columns(transaction, "history");
+        var favoriteColumns = Columns(transaction, "favorites");
+        var legacyHistory = historyColumns.Count > 0 && !historyColumns.Contains("source_key");
+        if (legacyHistory)
+        {
+            RequireColumns(historyColumns, "history", "config", "source", "media", "episode", "title", "uri", "position", "updated");
+            using var rename = MigrationQuery(transaction, "ALTER TABLE history RENAME TO history_legacy");
+            rename.ExecuteNonQuery();
+        }
+        if (favoriteColumns.Count > 0)
+        {
+            RequireColumns(favoriteColumns, "favorites", "config", "source", "media", "title");
+            using var rename = MigrationQuery(transaction, "ALTER TABLE favorites RENAME TO favorites_legacy");
+            rename.ExecuteNonQuery();
+        }
+
+        using (var create = MigrationQuery(transaction, """
             CREATE TABLE IF NOT EXISTS history(
                 source_key TEXT NOT NULL, source_name TEXT NOT NULL, media_id TEXT NOT NULL,
                 title TEXT NOT NULL, poster TEXT, remarks TEXT, line_id TEXT DEFAULT '',
@@ -34,7 +66,138 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
                 id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, name TEXT NOT NULL,
                 kind INTEGER NOT NULL, created_at INTEGER NOT NULL, active INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS prefs(key TEXT PRIMARY KEY, value TEXT NOT NULL);
-            """);
+            """)) create.ExecuteNonQuery();
+
+        ValidateSchema(transaction);
+        if (legacyHistory) ImportHistory(transaction, historyColumns);
+        if (favoriteColumns.Count > 0) ImportFavorites(transaction, favoriteColumns);
+        using (var version = MigrationQuery(transaction, $"PRAGMA user_version={SchemaVersion}"))
+            version.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    private SqliteCommand MigrationQuery(SqliteTransaction transaction, string sql, params (string, object?)[] args)
+    {
+        var command = Query(sql, args);
+        command.Transaction = transaction;
+        return command;
+    }
+
+    private HashSet<string> Columns(SqliteTransaction transaction, string table)
+    {
+        using var command = MigrationQuery(transaction, $"PRAGMA table_info({table})");
+        using var reader = command.ExecuteReader();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read()) columns.Add(reader.GetString(1));
+        return columns;
+    }
+
+    private static void RequireColumns(HashSet<string> columns, string table, params string[] required)
+    {
+        if (required.Any(column => !columns.Contains(column)))
+            throw new InvalidDataException($"库存储表 {table} 的结构不受支持，未修改数据库。");
+    }
+
+    private void ValidateSchema(SqliteTransaction transaction)
+    {
+        RequireColumns(Columns(transaction, "history"), "history", "source_key", "source_name", "media_id", "title",
+            "poster", "remarks", "line_id", "episode_id", "position_ms", "duration_ms", "rate", "opening_skip", "ending_skip", "updated_at");
+        RequireColumns(Columns(transaction, "favorite"), "favorite", "kind", "source_key", "media_id", "source_name",
+            "title", "poster", "remarks", "created_at");
+        RequireColumns(Columns(transaction, "config"), "config", "id", "url", "name", "kind", "created_at", "active");
+        RequireColumns(Columns(transaction, "prefs"), "prefs", "key", "value");
+        RequirePrimaryKey(transaction, "history", "source_key", "media_id");
+        RequirePrimaryKey(transaction, "favorite", "kind", "source_key", "media_id");
+        RequirePrimaryKey(transaction, "config", "id");
+        RequirePrimaryKey(transaction, "prefs", "key");
+    }
+
+    private void RequirePrimaryKey(SqliteTransaction transaction, string table, params string[] required)
+    {
+        using var command = MigrationQuery(transaction, $"PRAGMA table_info({table})");
+        using var reader = command.ExecuteReader();
+        var key = new SortedDictionary<int, string>();
+        while (reader.Read())
+        {
+            var position = reader.GetInt32(5);
+            if (position > 0) key.Add(position, reader.GetString(1));
+        }
+        if (!key.Values.SequenceEqual(required, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidDataException($"库存储表 {table} 的主键不受支持，未修改数据库。");
+    }
+
+    private static string? OptionalString(SqliteDataReader reader, HashSet<string> columns, string column) =>
+        !columns.Contains(column) || reader.IsDBNull(reader.GetOrdinal(column)) ? null : reader.GetString(reader.GetOrdinal(column));
+
+    private void ImportHistory(SqliteTransaction transaction, HashSet<string> columns)
+    {
+        // 保留旧表所有配置/集数及解析字段；当前主键只容纳每部媒体的最新观看记录。
+        var entries = new List<HistoryEntry>();
+        using (var command = MigrationQuery(transaction, "SELECT * FROM history_legacy ORDER BY rowid DESC"))
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var timestamp = reader.GetString(reader.GetOrdinal("updated"));
+                if (!DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var updated))
+                    throw new InvalidDataException("旧观看历史时间格式不受支持，迁移已回滚。");
+                var source = OptionalString(reader, columns, "source") ?? "";
+                entries.Add(new HistoryEntry
+                {
+                    SourceKey = source,
+                    SourceName = OptionalString(reader, columns, "source_name") ?? source,
+                    MediaId = OptionalString(reader, columns, "media") ?? "",
+                    Title = reader.GetString(reader.GetOrdinal("title")),
+                    Poster = OptionalString(reader, columns, "poster"),
+                    // 旧选集 ID 与当前源未必兼容，原始 URI/配置/集数仍在归档中完整保存。
+                    EpisodeId = OptionalString(reader, columns, "episode") ?? "",
+                    PositionMs = reader.GetInt64(reader.GetOrdinal("position")),
+                    UpdatedAt = updated,
+                });
+            }
+        }
+        foreach (var entry in entries.OrderByDescending(entry => entry.UpdatedAt))
+        {
+            using var insert = MigrationQuery(transaction, """
+                INSERT INTO history(source_key, source_name, media_id, title, poster, episode_id, updated_at, position_ms)
+                VALUES($k,$sn,$m,$t,$p,$e,$time,$pos)
+                ON CONFLICT(source_key, media_id) DO NOTHING
+                """, ("$k", entry.SourceKey), ("$sn", entry.SourceName), ("$m", entry.MediaId), ("$t", entry.Title),
+                ("$p", entry.Poster), ("$e", entry.EpisodeId), ("$time", entry.UpdatedAt.ToUnixTimeMilliseconds()), ("$pos", entry.PositionMs));
+            insert.ExecuteNonQuery();
+        }
+    }
+
+    private void ImportFavorites(SqliteTransaction transaction, HashSet<string> columns)
+    {
+        var entries = new List<FavoriteEntry>();
+        using (var command = MigrationQuery(transaction, "SELECT * FROM favorites_legacy ORDER BY rowid DESC"))
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var source = OptionalString(reader, columns, "source") ?? "";
+                entries.Add(new FavoriteEntry
+                {
+                    SourceKey = source,
+                    SourceName = OptionalString(reader, columns, "source_name") ?? source,
+                    MediaId = OptionalString(reader, columns, "media") ?? "",
+                    Title = reader.GetString(reader.GetOrdinal("title")),
+                    Poster = OptionalString(reader, columns, "poster"),
+                    CreatedAt = DateTimeOffset.UnixEpoch, // 旧收藏未保存创建时间。
+                });
+            }
+        }
+        foreach (var entry in entries)
+        {
+            using var insert = MigrationQuery(transaction, """
+                INSERT INTO favorite(kind, source_key, media_id, source_name, title, poster, created_at)
+                VALUES($kind,$k,$m,$sn,$t,$p,$time)
+                ON CONFLICT(kind, source_key, media_id) DO NOTHING
+                """, ("$kind", (int)FavoriteKind.Vod), ("$k", entry.SourceKey), ("$m", entry.MediaId),
+                ("$sn", entry.SourceName), ("$t", entry.Title), ("$p", entry.Poster), ("$time", entry.CreatedAt.ToUnixTimeMilliseconds()));
+            insert.ExecuteNonQuery();
+        }
     }
 
     private int Exec(string sql)
