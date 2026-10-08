@@ -114,9 +114,24 @@ public partial class PlayerOverlay : UserControl
             badge.Text = $"{vm.Rate:0.##}x";
     }
 
-    private void OnToggleWindowSmall(object? sender, RoutedEventArgs e)
+    private void OnTogglePip(object? sender, RoutedEventArgs e)
     {
-        if (VM is { } vm) vm.FlashToast("小窗模式（S2 接）");
+        if (VM is { } vm) vm.FlashToast("画中画（S2 接）");
+    }
+
+    private void OnTogglePlugin(object? sender, RoutedEventArgs e)
+    {
+        if (VM is { } vm) vm.FlashToast("插件（S3 接）");
+    }
+
+    private void OnTogglePlaylist(object? sender, RoutedEventArgs e)
+    {
+        if (VM is { } vm) vm.FlashToast("播放列表（S2 接）");
+    }
+
+    private void OnToggleSettings(object? sender, RoutedEventArgs e)
+    {
+        if (VM is { } vm) vm.FlashToast("播放设置（S2 接）");
     }
 
     private void OnToggleAspectRatio(object? sender, RoutedEventArgs e)

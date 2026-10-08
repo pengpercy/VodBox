@@ -15,7 +15,8 @@
     <FluentTheme />
     <!-- IINA 风格加粗滑杆（与 App.axaml 同步） -->
     <Style Selector="Slider.playerFat">
-      <Setter Property="Height" Value="18" />
+      <Setter Property="MinHeight" Value="18" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Slider.playerFat /template/ Track">
       <Setter Property="Height" Value="5" />
