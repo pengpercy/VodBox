@@ -2,79 +2,167 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
+             xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              x:Class="VodBox.Desktop.Views.LiveView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <Grid ColumnDefinitions="360,*" DataContext="{Binding Live}">
+  <Grid ColumnDefinitions="320,*" DataContext="{Binding Live}">
 
-    <!-- 频道面板 -->
+    <!-- 频道面板：分组/收藏/历史 三 Tab + 筛选（对齐设计稿 p-live ①） -->
     <Border Grid.Column="0" BorderBrush="#17FFFFFF" BorderThickness="0,0,1,0">
-      <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="12,10,12,0">
-          <Button Content="分组" Click="OnTabGroups" CornerRadius="7,7,0,0" Padding="0,8" Width="100"
-                  Background="#12FFFFFF" BorderThickness="0,0,0,2" BorderBrush="#4CC2FF" Foreground="White" FontSize="12.5" />
-          <Button Content="⭐ 收藏" Click="OnTabFavorites" CornerRadius="7,7,0,0" Padding="0,8" Width="100"
-                  Background="Transparent" BorderThickness="0" Foreground="#85FFFFFF" FontSize="12.5" />
-          <Button Content="🕘 历史" Click="OnTabHistory" CornerRadius="7,7,0,0" Padding="0,8" Width="100"
-                  Background="Transparent" BorderThickness="0" Foreground="#85FFFFFF" FontSize="12.5" />
-        </StackPanel>
-        <TextBox Grid.Row="1" Text="{Binding FilterText}" PlaceholderText="🔍 筛选频道…" Margin="12" Height="34"
+      <Grid RowDefinitions="Auto,Auto,*">
+        <!-- 三 Tab：选中=底部蓝线 + 白字 -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*" Margin="16,14,16,6">
+          <Button Grid.Column="0" Click="OnTabGroups" Background="Transparent" BorderThickness="0,0,0,2"
+                  x:Name="TabGroups" BorderBrush="#4CC2FF" CornerRadius="0" Padding="0,8" Cursor="Hand">
+            <TextBlock Text="分组" FontSize="13" Foreground="White" />
+          </Button>
+          <Button Grid.Column="1" Click="OnTabFavorites" Background="Transparent" BorderThickness="0,0,0,2"
+                  x:Name="TabFavorites" BorderBrush="Transparent" CornerRadius="0" Padding="0,8" Cursor="Hand">
+            <TextBlock Text="⭐ 收藏" FontSize="13" Foreground="#85FFFFFF" />
+          </Button>
+          <Button Grid.Column="2" Click="OnTabHistory" Background="Transparent" BorderThickness="0,0,0,2"
+                  x:Name="TabHistory" BorderBrush="Transparent" CornerRadius="0" Padding="0,8" Cursor="Hand">
+            <TextBlock Text="🕘 历史" FontSize="13" Foreground="#85FFFFFF" />
+          </Button>
+        </Grid>
+        <TextBox Grid.Row="1" Text="{Binding FilterText}" Watermark="🔍 筛选频道…" Margin="12,4,12,10" Height="32"
                  CornerRadius="7" />
-        <ComboBox Grid.Row="2" ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}"
-                  Margin="12,0,12,8" PlaceholderText="选择分组">
-          <ComboBox.ItemTemplate>
-            <DataTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="{Binding Name}" />
-                <TextBlock Text="{Binding Channels.Count}" Foreground="#85FFFFFF" FontSize="11" />
+        <!-- 频道列表：组头（可折叠 + 计数）+ 频道行（台标+EPG 单行） -->
+        <ListBox Grid.Row="2" ItemsSource="{Binding VisibleChannels}" Margin="6,0,6,12"
+                 Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.DataTemplates>
+            <!-- 组头行：▾ 名称 + 计数（密码分组 🔒 锁定） -->
+            <DataTemplate x:DataType="vm:LiveViewModel+LiveGroupHeader">
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,12,6,4">
+                <TextBlock Text="{Binding Arrow}" FontSize="11" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+                <TextBlock FontSize="12" Foreground="#C7FFFFFF" FontWeight="SemiBold" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" MaxWidth="180">
+                  <Run Text="{Binding LockIcon, Mode=OneWay}" /><Run Text="{Binding Name, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Text="{Binding Count}" FontSize="11" Foreground="#4CFFFFFF" VerticalAlignment="Center" />
               </StackPanel>
             </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <ListBox Grid.Row="4" ItemsSource="{Binding VisibleChannels}" Margin="8,0,8,12"
-                 Background="Transparent" BorderThickness="0">
-          <ListBox.ItemTemplate>
-            <DataTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="10" Margin="2,4" Cursor="Hand"
-                          PointerPressed="OnPlayChannel" Tag="{Binding}">
-                <TextBlock Text="{Binding Number}" FontSize="11" Foreground="#85FFFFFF" Width="32"
-                           VerticalAlignment="Center" />
-                <Border CornerRadius="6" Width="30" Height="30" Background="#C0392B">
-                  <TextBlock Text="TV" FontSize="11" Foreground="White" HorizontalAlignment="Center"
-                             VerticalAlignment="Center" FontWeight="SemiBold" />
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="230" />
+            <!-- 频道行 -->
+            <DataTemplate x:DataType="core:LiveChannel">
+              <!-- 频道行容器：选中态整行蓝灰底 -->
+              <Border x:Name="Row" CornerRadius="7" Padding="2,4" Background="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}">
+                <StackPanel Orientation="Horizontal" Spacing="10" Cursor="Hand"
+                            PointerPressed="OnPlayChannel" Tag="{Binding}">
+                  <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="#85FFFFFF"
+                             Width="30" VerticalAlignment="Center" />
+                  <Border CornerRadius="7" Width="32" Height="32" Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}">
+                    <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" FontWeight="SemiBold" />
+                  </Border>
+                  <StackPanel VerticalAlignment="Center" Spacing="2" Width="176">
+                    <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding EpgNow}" FontSize="10.5" Foreground="#85FFFFFF"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <Border Background="Transparent" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
+                          Padding="6,1" VerticalAlignment="Center" IsVisible="{Binding IsCurrent}">
+                    <TextBlock Text="LIVE" FontSize="9.5" Foreground="#4CC2FF" FontWeight="SemiBold" />
+                  </Border>
                 </StackPanel>
-              </StackPanel>
+              </Border>
             </DataTemplate>
-          </ListBox.ItemTemplate>
+          </ListBox.DataTemplates>
         </ListBox>
       </Grid>
     </Border>
 
-    <!-- 播放区 -->
-    <Grid Grid.Column="1" RowDefinitions="*,Auto">
-      <Border Grid.Row="0" Background="#000000">
-        <TextBlock Text="直播画面显示在全局播放浮层中" FontSize="12.5" Foreground="#85FFFFFF"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-      </Border>
-      <StackPanel Grid.Row="1" Spacing="10" Margin="24,0,24,20">
-        <Border Background="#66000000" CornerRadius="12" Padding="18,14" BorderBrush="#17FFFFFF" BorderThickness="1"
-                IsVisible="{Binding CurrentChannel, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <StackPanel Orientation="Horizontal" Spacing="14">
-            <Border CornerRadius="9" Width="44" Height="44" Background="#C0392B">
-              <TextBlock Text="LIVE" FontSize="12" Foreground="White" HorizontalAlignment="Center"
-                         VerticalAlignment="Center" FontWeight="Bold" />
-            </Border>
-            <StackPanel VerticalAlignment="Center" Spacing="4">
-              <TextBlock Text="{Binding CurrentChannel.Name}" FontSize="16" FontWeight="SemiBold" />
-              <TextBlock Text="频道播放中 · 见播放浮层" FontSize="12" Foreground="#4CC2FF" />
+    <!-- 播放区：中央台号大数字（数字选台 OSD，对齐设计稿 ③）+ 频道信息卡 + EPG 时间轴 -->
+    <Grid Grid.Column="1" RowDefinitions="*,Auto,Auto">
+      <Border Grid.Row="0" Background="#000000" ClipToBounds="True">
+        <Grid>
+          <!-- 台号 OSD 大数字 -->
+          <TextBlock Text="{Binding CurrentChannel.Number, StringFormat='D3'}" FontSize="88" FontWeight="Bold"
+                     Foreground="#26FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     IsVisible="{Binding CurrentChannel, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <!-- 频道信息卡（EPG 时间轴左下叠放，对齐设计稿） -->
+          <Border Background="#66000000" CornerRadius="10" Padding="14,10" Margin="18" HorizontalAlignment="Left"
+                  VerticalAlignment="Bottom" BorderBrush="#17FFFFFF" BorderThickness="1"
+                  IsVisible="{Binding CurrentChannel, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Border CornerRadius="8" Width="40" Height="40" Background="{Binding CurrentChannel.BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}">
+                <TextBlock Text="{Binding CurrentChannel.Badge}" FontSize="12" Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
+              </Border>
+              <StackPanel VerticalAlignment="Center" Spacing="3">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <TextBlock Text="{Binding CurrentChannel.Name}" FontSize="15.5" FontWeight="SemiBold" />
+                  <TextBlock VerticalAlignment="Center" FontSize="11.5" Foreground="#85FFFFFF">
+                    <Run Text="{Binding CurrentChannel.Number, StringFormat='D3', Mode=OneWay}" /><Run Text=" · 线路 1/" /><Run Text="{Binding CurrentChannel.Uris.Count, Mode=OneWay}" />
+                  </TextBlock>
+                </StackPanel>
+                <TextBlock FontSize="12" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="340">
+                  <Run Text="▶ " /><Run Text="{Binding CurrentChannel.EpgNow, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock FontSize="11" Foreground="#85FFFFFF" TextTrimming="CharacterEllipsis" MaxWidth="340">
+                  <Run Text="接下来：" /><Run Text="{Binding CurrentChannel.EpgNext, Mode=OneWay}" />
+                </TextBlock>
+              </StackPanel>
             </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+
+      <!-- EPG 横向时间轴（对齐设计稿 ④：当前节目高亮描边，过去节目可回看） -->
+      <Border Grid.Row="1" Background="#0DFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="0,1,0,0" Padding="14,10">
+        <StackPanel Spacing="6">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="节目单" FontSize="12" Foreground="#C7FFFFFF" VerticalAlignment="Center" />
+            <TextBlock Text="EPG 时间轴 · 点击回看" FontSize="10.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
           </StackPanel>
-        </Border>
-      </StackPanel>
+          <ItemsControl ItemsSource="{Binding EpgTimeline}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="10" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Width="150" CornerRadius="8" Background="#0FFFFFFF" Padding="10,8" Cursor="Hand"
+                        BorderThickness="1" Tag="{Binding}" PointerPressed="OnEpgSeek">
+                  <Border.BorderBrush>
+                    <Binding Path="IsNow" Converter="{x:Static ObjectConverters.IsNotNull}">
+                      <Binding.ConverterParameter>#4CC2FF</Binding.ConverterParameter>
+                    </Binding>
+                  </Border.BorderBrush>
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="{Binding Title}" FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="130" />
+                    <TextBlock Text="{Binding Range}" FontSize="10.5" Foreground="#85FFFFFF" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- 控制行（对齐设计稿 ⑤） -->
+      <Border Grid.Row="2" Background="#66000000" Padding="18,10">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+          <Button Grid.Column="0" Content="⏸" Click="OnToggleLive" Background="#12FFFFFF" Foreground="White"
+                  BorderThickness="0" CornerRadius="7" Width="34" Height="30" Cursor="Hand" />
+          <Button Grid.Column="1" Content="⏮ 频道" Click="OnPrevChannel" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                  BorderThickness="0" CornerRadius="7" Padding="10,6" Margin="8,0,0,0" FontSize="12" Cursor="Hand" />
+          <Button Grid.Column="2" Content="⏭ 频道" Click="OnNextChannel" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                  BorderThickness="0" CornerRadius="7" Padding="10,6" Margin="8,0,0,0" FontSize="12" Cursor="Hand" />
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="线路 1 ⌄" Click="OnSwitchLine" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+            <Button Content="回看" Click="OnCatchup" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+            <TextBlock Text="直播源：MyTV 合集" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center"
+                       Margin="6,0,0,0" />
+          </StackPanel>
+          <TextBlock Grid.Column="4" Text="🔊" FontSize="14" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
     </Grid>
   </Grid>
 </UserControl>

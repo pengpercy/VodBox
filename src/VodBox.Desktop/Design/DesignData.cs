@@ -189,18 +189,36 @@ public static class DesignData
 
     private static void FillLive(MainViewModel main)
     {
-        var channels = new List<LiveChannel>
-        {
-            new() { Name = "CCTV-1 综合", Group = "央视频道", Number = 1, Logo = "https://live.fanmingming.cn/tv/CCTV1.png", Uris = ["http://iptv.example.com/cctv1.m3u8"] },
-            new() { Name = "CCTV-2 财经", Group = "央视频道", Number = 2, Logo = "https://live.fanmingming.cn/tv/CCTV2.png", Uris = ["http://iptv.example.com/cctv2.m3u8"] },
-            new() { Name = "CCTV-3 综艺", Group = "央视频道", Number = 3, Logo = "https://live.fanmingming.cn/tv/CCTV3.png", Uris = ["http://iptv.example.com/cctv3.m3u8"] },
-            new() { Name = "湖南卫视", Group = "卫视频道", Number = 101, Uris = ["http://iptv.example.com/hntv.m3u8"] },
-            new() { Name = "东方卫视", Group = "卫视频道", Number = 102, Uris = ["http://iptv.example.com/dftv.m3u8"] },
-        };
-        main.Live.Groups.Add(new LiveGroup("央视频道", channels.Where(c => c.Group == "央视频道").ToList(), false));
-        main.Live.Groups.Add(new LiveGroup("卫视频道", channels.Where(c => c.Group == "卫视频道").ToList(), false));
+        // 对齐设计稿 p-live：18 央视 + 24 卫视示例量级取前几个；台标短字 + 彩色底；EPG 单行。
+        (string name, string badge, string color, string epg, int no)[] cctv =
+        [
+            ("CCTV-1 综合", "央1", "#C0392B", "正在播出：新闻联播重播", 1),
+            ("CCTV-2 财经", "央2", "#8E44AD", "正在播出：经济半小时", 2),
+            ("CCTV-3 综艺", "央3", "#2471A3", "正在播出：开门大吉", 3),
+            ("CCTV-4 中文国际", "央4", "#148F77", "正在播出：今日亚洲", 4),
+            ("CCTV-5 体育", "央5", "#D68910", "正在播出：体育新闻", 5),
+            ("CCTV-6 电影", "央6", "#7D3C98", "正在播出：流金岁月", 6),
+        ];
+        (string name, string badge, string color, string epg, int no)[] satellite =
+        [
+            ("湖南卫视", "芒果", "#27AE60", "正在播出：歌手2024", 101),
+            ("东方卫视", "番茄", "#E67E22", "正在播出：今晚80后", 102),
+            ("浙江卫视", "蓝莓", "#2E86C1", "正在播出：奔跑吧", 103),
+            ("江苏卫视", "荔枝", "#CB4335", "正在播出：非诚勿扰", 104),
+        ];
+        var all = new List<LiveChannel>();
+        foreach (var c in cctv)
+            all.Add(new LiveChannel { Name = c.name, Group = "央视频道", Number = c.no, Badge = c.badge, BadgeColor = c.color, EpgNow = c.epg, EpgNext = "黄金档剧场 20:06", Uris = [$"http://iptv.example.com/c{c.no}.m3u8", "http://iptv2.example.com/backup.m3u8"] });
+        foreach (var c in satellite)
+            all.Add(new LiveChannel { Name = c.name, Group = "卫视频道", Number = c.no, Badge = c.badge, BadgeColor = c.color, EpgNow = c.epg, EpgNext = "晚间剧场 21:40", Uris = [$"http://iptv.example.com/s{c.no}.m3u8"] });
+        main.Live.Groups.Add(new LiveGroup("央视频道", all.Where(c => c.Group == "央视频道").ToList(), false));
+        main.Live.Groups.Add(new LiveGroup("卫视频道", all.Where(c => c.Group == "卫视频道").ToList(), false));
+        main.Live.Groups.Add(new LiveGroup("影视频道（密码分组）", [], true, DisplayCount: 36));
+        main.Live.Groups.Add(new LiveGroup("地方频道", [], false, DisplayCount: 58));
         main.Live.SelectedGroup = main.Live.Groups[0];
-        main.Live.CurrentChannel = main.Live.Groups[0].Channels[0];
+        // 选中 CCTV-1 并点亮 LIVE 徽标 + EPG 时间轴
+        var first = main.Live.Groups[0].Channels[0];
+        main.Live.SetCurrent(first); // 同步 VisibleChannels 选中态 + EPG，不触播放
     }
 
     private static void FillSearch(MainViewModel main)

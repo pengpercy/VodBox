@@ -75,3 +75,35 @@ public static class CountConverters
             => throw new NotSupportedException();
     }
 }
+
+/// <summary>hex 字符串 → IBrush（台标底色等设计数据）。</summary>
+public static class BrushConverters
+{
+    public static readonly IValueConverter FromHex = new FromHexConverter();
+
+    private sealed class FromHexConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is string hex && Avalonia.Media.Color.TryParse(hex, out var color)
+                ? new Avalonia.Media.SolidColorBrush(color)
+                : Avalonia.Media.Brushes.DarkSlateBlue;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+}
+
+/// <summary>bool → 行选中底色（频道列表）。</summary>
+public static class BoolConverters
+{
+    public static readonly IValueConverter ToSelectedRow = new ToSelectedRowConverter();
+
+    private sealed class ToSelectedRowConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is true ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x264CC2FF)) : Avalonia.Media.Brushes.Transparent;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+}

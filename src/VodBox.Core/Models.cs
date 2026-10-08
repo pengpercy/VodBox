@@ -171,8 +171,37 @@ public sealed record LiveChannel
     public string Group { get; init; } = "未分组";
     public string? TvgId { get; init; }
     public int Number { get; init; }
+
+    // ---- 展示态（运行时可变；EPG/台标由 S4 直播中心刷新） ----
+    /// <summary>台标短字（如 央1 / 芒果），无 Logo 时的占位。</summary>
+    public string Badge { get; set; } = "TV";
+    /// <summary>台标底色（hex），演示期占位。</summary>
+    public string BadgeColor { get; set; } = "#C0392B";
+    /// <summary>当前节目（EPG now）。</summary>
+    public string EpgNow { get; set; } = "";
+    /// <summary>下一节目（EPG next）。</summary>
+    public string EpgNext { get; set; } = "";
+
+    /// <summary>是否正在播放（列表行 LIVE 角标 + 选中底色）。列表渲染后再赋值，需通知 UI。</summary>
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set
+        {
+            if (_isCurrent == value) return;
+            _isCurrent = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsCurrent)));
+        }
+    }
+    private bool _isCurrent;
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }
-public sealed record LiveGroup(string Name, IReadOnlyList<LiveChannel> Channels, bool Locked);
+public sealed record LiveGroup(string Name, IReadOnlyList<LiveChannel> Channels, bool Locked, int DisplayCount = -1)
+{
+    /// <summary>面板显示的频道数（密码分组未解锁时也可显示总量的假计数）。</summary>
+    public int Count => DisplayCount >= 0 ? DisplayCount : Channels.Count;
+}
 public sealed record Programme(string ChannelKey, string Title, DateTimeOffset Start, DateTimeOffset End, string ChannelName = "");
 
 // ---------- 历史与收藏 ----------
