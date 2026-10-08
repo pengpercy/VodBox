@@ -13,7 +13,6 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly AppServices _services;
 
     [ObservableProperty] private AppPage _page = AppPage.Home;
-    [ObservableProperty] private string _clock = "";
     [ObservableProperty] private string _currentSourceName = "未配置";
     [ObservableProperty] private string _searchKeyword = "";
     [ObservableProperty] private string _statusMessage = "";
@@ -30,8 +29,13 @@ public sealed partial class MainViewModel : ObservableObject
     public PlayerViewModel Player { get; set; }
     public DetailViewModel Detail { get; }
 
-    /// <summary>设计时构造：纯内存 VM 图，不枚举文件系统（Files 初始为空目录）、不启动时钟计时器、不挂播放管线（填充发生在设置 Player 之后）。</summary>
+    /// <summary>设计时构造：纯内存 VM 图，不枚举文件系统（Files 初始为空目录）、不挂播放管线（填充发生在设置 Player 之后）。</summary>
     public MainViewModel(AppServices services, bool designTime)
+        : this(services, designTime, services.Registry.Get, services.Store)
+    {
+    }
+
+    internal MainViewModel(AppServices services, bool designTime, Func<string, IContentSource?> getSource, ILibraryStore store)
     {
         _services = services;
         Home = new HomeViewModel(services, this);
@@ -42,7 +46,7 @@ public sealed partial class MainViewModel : ObservableObject
         History = new HistoryViewModel(services, this);
         Settings = new SettingsViewModel(services, this);
         Files = new FilesViewModel(services, designTime);
-        Detail = new DetailViewModel(services, this);
+        Detail = new DetailViewModel(getSource, store, this);
         if (!designTime)
         {
             Player = new PlayerViewModel(services, this);
@@ -55,11 +59,7 @@ public sealed partial class MainViewModel : ObservableObject
                 MediaId = entry.FullPath,
             });
             UpdateSourceName();
-            var timer = new System.Timers.Timer(1000) { AutoReset = true };
-            timer.Elapsed += (_, _) => Clock = DateTime.Now.ToString("HH:mm");
-            timer.Start();
         }
-        Clock = DateTime.Now.ToString("HH:mm");
     }
 
     public MainViewModel(AppServices services) : this(services, designTime: false)
@@ -74,14 +74,24 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>跨线程回 UI 线程（播放器事件线程 → UI）。</summary>
     public void RunOnUi(Action action)
     {
-        if (uidispatcher is null) { action(); return; }
+        if (uidispatcher is null || uidispatcher.CheckAccess()) { action(); return; }
         uidispatcher.Post(action);
     }
-#pragma warning disable CS0414
+    /// <summary>等待 UI 更新完成，供异步请求在回填前检查代次。</summary>
+    public async Task RunOnUiAsync(Action action)
+    {
+        if (uidispatcher is null || uidispatcher.CheckAccess()) { action(); return; }
+        await uidispatcher.InvokeAsync(action);
+    }
+
     private Avalonia.Threading.Dispatcher? uidispatcher;
-#pragma warning restore CS0414
 
     public void AttachDispatcher(Avalonia.Threading.Dispatcher dispatcher) => uidispatcher = dispatcher;
+
+    partial void OnPageChanged(AppPage value)
+    {
+        if (value != AppPage.Detail) Detail.CancelPending();
+    }
 
     public void Navigate(AppPage page) => Page = page;
 

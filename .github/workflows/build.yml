@@ -45,6 +45,7 @@ jobs:
         run: |
           dotnet restore VodBox.slnx
           dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore
+          dotnet test tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj -c Debug --no-restore
       - name: Publish Native AOT
         shell: bash
         run: |

@@ -15,23 +15,35 @@
         <StackPanel Spacing="2">
           <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionSources"
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=0}">
-            <TextBlock Text="📡 源与订阅" FontSize="13"
-                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=0}" />
+            <StackPanel Orientation="Horizontal" Spacing="8"
+                        TextElement.Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=0}">
+              <PathIcon Data="{StaticResource Icon.Broadcast}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="源与订阅" FontSize="13" VerticalAlignment="Center" />
+            </StackPanel>
           </Border>
           <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionPlayback"
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=1}">
-            <TextBlock Text="▶ 播放" FontSize="13"
-                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=1}" />
+            <StackPanel Orientation="Horizontal" Spacing="8"
+                        TextElement.Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=1}">
+              <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="播放" FontSize="13" VerticalAlignment="Center" />
+            </StackPanel>
           </Border>
           <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionData"
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=2}">
-            <TextBlock Text="💾 数据" FontSize="13"
-                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=2}" />
+            <StackPanel Orientation="Horizontal" Spacing="8"
+                        TextElement.Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=2}">
+              <PathIcon Data="{StaticResource Icon.ContentSave}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="数据" FontSize="13" VerticalAlignment="Center" />
+            </StackPanel>
           </Border>
           <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionAbout"
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=3}">
-            <TextBlock Text="ℹ 关于" FontSize="13"
-                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=3}" />
+            <StackPanel Orientation="Horizontal" Spacing="8"
+                        TextElement.Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=3}">
+              <PathIcon Data="{StaticResource Icon.Information}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="关于" FontSize="13" VerticalAlignment="Center" />
+            </StackPanel>
           </Border>
         </StackPanel>
       </Border>
@@ -114,12 +126,14 @@
           <!-- 弹窗头 -->
           <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,16,16,10">
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="📡" FontSize="15" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" VerticalAlignment="Center" />
               <TextBlock Text="更改点播配置" FontSize="15.5" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
-            <Button Grid.Column="1" Content="✕" Command="{Binding Settings.CancelConfigDialogCommand}"
+            <Button Grid.Column="1" Command="{Binding Settings.CancelConfigDialogCommand}" ToolTip.Tip="关闭"
                     Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0" CornerRadius="6"
-                    Width="28" Height="28" FontSize="13" Cursor="Hand" />
+                    Width="28" Height="28" Padding="0" FontSize="13" Cursor="Hand">
+              <PathIcon Data="{StaticResource Icon.Close}" Width="18" Height="18" />
+            </Button>
           </Grid>
           <!-- 弹窗体 -->
           <StackPanel Grid.Row="1" Margin="20,4,20,12" Spacing="12">
@@ -127,9 +141,14 @@
             <Grid ColumnDefinitions="*,Auto">
               <TextBox Grid.Column="0" Text="{Binding Settings.DialogUrl}" Height="34" CornerRadius="7"
                        Watermark="https://…/tvbox.json" />
-              <Button Grid.Column="1" Content="📋 粘贴" Command="{Binding Settings.PasteFromClipboardCommand}"
+              <Button Grid.Column="1" Command="{Binding Settings.PasteFromClipboardCommand}"
                       CornerRadius="7" Padding="12,6" Background="#12FFFFFF" Foreground="#C7FFFFFF"
-                      BorderThickness="0" Margin="8,0,0,0" FontSize="12" Cursor="Hand" />
+                      BorderThickness="0" Margin="8,0,0,0" FontSize="12" Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Data="{StaticResource Icon.Clipboard}" Width="18" Height="18" VerticalAlignment="Center" />
+                  <TextBlock Text="粘贴" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
             </Grid>
 
             <TextBlock Text="历史配置" FontSize="12" Margin="0,4,0,0" />
@@ -164,8 +183,13 @@
           <!-- 弹窗脚 -->
           <Border Grid.Row="2" BorderBrush="#17FFFFFF" BorderThickness="0,1,0,0" Padding="20,12">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <Button Grid.Column="0" Content="📱 手机扫码推送" Background="#12FFFFFF" Foreground="#C7FFFFFF"
-                      BorderThickness="0" CornerRadius="7" Padding="12,7" FontSize="12" Cursor="Hand" />
+              <Button Grid.Column="0" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                      BorderThickness="0" CornerRadius="7" Padding="12,7" FontSize="12" Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" VerticalAlignment="Center" />
+                  <TextBlock Text="手机扫码推送" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                 <Button Content="取消" Command="{Binding Settings.CancelConfigDialogCommand}" Background="#12FFFFFF"
                         Foreground="#C7FFFFFF" BorderThickness="0" CornerRadius="7" Padding="16,7" FontSize="12.5" Cursor="Hand" />

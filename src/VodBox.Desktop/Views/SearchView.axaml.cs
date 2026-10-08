@@ -11,6 +11,18 @@ public partial class SearchView : UserControl
     public SearchView() => InitializeComponent();
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
+    private void OnResultsSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel main) main.Search.SetResultWidth(e.NewSize.Width);
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (DataContext is MainViewModel main && this.FindControl<ListBox>("ResultsList") is { } list)
+            main.Search.SetResultWidth(list.Bounds.Width);
+    }
+
     private SearchViewModel VM => ((MainViewModel)DataContext!).Search;
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
@@ -48,6 +60,7 @@ public partial class SearchView : UserControl
     /// <summary>站点列表行选中：右侧网格切到该站结果（S5 接，当前显示全部）。</summary>
     private void OnSiteChanged(object? sender, SelectionChangedEventArgs e)
     {
-        // 预留：SelectedSite 驱动右侧网格过滤
+        if (DataContext is MainViewModel main && sender is ListBox list)
+            main.Search.SelectedSite = list.SelectedItem as SearchSiteResult;
     }
 }

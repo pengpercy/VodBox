@@ -5,7 +5,6 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <FluentTheme />
         <ResourceInclude Source="avares://VodBox.Desktop/Resources/Icons.xaml" />
       </ResourceDictionary.MergedDictionaries>
       <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
@@ -25,6 +24,7 @@
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
+    <FluentTheme />
     <!-- Material Design 3 风格滑杆：4px 圆头轨道 + 14px 圆 thumb，配 MDI 图标 -->
     <Style Selector="Slider.md">
       <Setter Property="MinHeight" Value="24" />

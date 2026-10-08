@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using VodBox.Desktop.Design;
 using VodBox.Desktop.Views;
 using Xunit;
@@ -56,6 +57,21 @@ public sealed class DesignPreviewTests
         var window = new Window { Width = 1280, Height = 800, Content = view };
         window.Show();
         window.UpdateLayout(); // 强制走完一次 Measure/Arrange/Render
+        Assert.All(view.GetVisualDescendants().OfType<PathIcon>(), icon =>
+        {
+            Assert.NotNull(icon.Data);
+            // Fluent 控件模板自身的图标（如滚动条箭头）使用主题尺寸。
+            if (icon.TemplatedParent is not null) return;
+            Assert.Equal(icon.Width, icon.Height);
+            Assert.Contains(icon.Width, new[] { 12d, 18d, 24d, 48d });
+            Assert.False(icon.IsSet(PathIcon.ForegroundProperty));
+        });
+        if (view is SearchView)
+        {
+            var hot = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "热");
+            var fire = Assert.IsType<StackPanel>(hot.Parent).Children.OfType<PathIcon>().Single();
+            Assert.Equal(hot.Foreground, fire.Foreground);
+        }
         if (Environment.GetEnvironmentVariable("VODBOX_PREVIEW_SHOT") is { Length: > 0 })
         {
             var frame = CaptureFrame(window);

@@ -38,7 +38,7 @@ public sealed partial class LiveViewModel : ObservableObject
     private void ApplyFilter()
     {
         VisibleChannels.Clear();
-        // 面板两级结构：组头（▾ 名称 + 计数）+ 频道行；密码分组只显示 🔒 组头不展开。
+        // 面板两级结构：组头（名称 + 计数）+ 频道行；密码分组只显示锁定组头不展开。
         // 筛选按频道名过滤；有筛选词时隐藏空组（含密码组）。
         foreach (var group in Groups)
         {
@@ -52,12 +52,8 @@ public sealed partial class LiveViewModel : ObservableObject
         }
     }
 
-    /// <summary>频道面板组头行（▾ 央视频道 18 / ▸ 🔒 影视频道 36）。</summary>
-    public sealed record LiveGroupHeader(string Name, int Count, bool Locked)
-    {
-        public string Arrow => Locked ? "▸" : "▾";
-        public string LockIcon => Locked ? "🔒 " : "";
-    }
+    /// <summary>频道面板组头行：名称、计数与锁定状态，图标由视图呈现。</summary>
+    public sealed record LiveGroupHeader(string Name, int Count, bool Locked);
 
     public async Task LoadAsync()
     {

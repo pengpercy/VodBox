@@ -16,6 +16,7 @@ public sealed partial class HomeViewModel : ObservableObject
     public ObservableCollection<HistoryEntry> Recent { get; } = [];
 
     [ObservableProperty] private bool _loading;
+    [ObservableProperty] private string? _heroPoster;
     [ObservableProperty] private string _heroTitle = "";
     [ObservableProperty] private string _heroRemarks = "";
     [ObservableProperty] private string _heroDescription = "";
@@ -46,6 +47,7 @@ public sealed partial class HomeViewModel : ObservableObject
             foreach (var item in page.Items.Take(24))
                 Recommendations.Add(item);
             _hero = page.Items.FirstOrDefault();
+            HeroPoster = _hero?.Poster;
             HeroTitle = _hero?.Title ?? "";
             HeroRemarks = _hero?.Remarks ?? "";
             HeroDescription = $"{_hero?.Year ?? ""} · {_hero?.Area ?? ""} · {_hero?.TypeName ?? ""}";

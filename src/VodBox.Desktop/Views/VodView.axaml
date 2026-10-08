@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              xmlns:v="clr-namespace:VodBox.Desktop.Views"
@@ -15,19 +16,25 @@
       <Button CornerRadius="15" Background="#264CC2FF" Foreground="#4CC2FF"
               BorderBrush="#4CC2FF" BorderThickness="1" Padding="14,5" Click="OnSwitchSource" Cursor="Hand">
         <StackPanel Orientation="Horizontal" Spacing="6">
-          <TextBlock Text="📡" />
-          <TextBlock Text="泥巴影视" />
-          <TextBlock Text="▾" FontSize="10" />
+          <PathIcon Data="{StaticResource Icon.Broadcast}" Width="18" Height="18" VerticalAlignment="Center" />
+          <TextBlock Text="泥巴影视" VerticalAlignment="Center" />
+          <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
       <TextBlock Text="共 12 个可用站点" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" Opacity="0.75" />
       <Panel HorizontalAlignment="Right" />
       <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
         <Border CornerRadius="6" Background="#264CC2FF" Padding="10,4">
-          <TextBlock Text="▦ 网格" FontSize="11.5" Foreground="#4CC2FF" />
+          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#4CC2FF">
+            <PathIcon Data="{StaticResource Icon.ViewGrid}" Width="18" Height="18" VerticalAlignment="Center" />
+            <TextBlock Text="网格" FontSize="11.5" VerticalAlignment="Center" />
+          </StackPanel>
         </Border>
         <Border CornerRadius="6" Background="#12FFFFFF" Padding="10,4">
-          <TextBlock Text="≡ 列表" FontSize="11.5" Foreground="#85FFFFFF" />
+          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#85FFFFFF">
+            <PathIcon Data="{StaticResource Icon.ViewList}" Width="18" Height="18" VerticalAlignment="Center" />
+            <TextBlock Text="列表" FontSize="11.5" VerticalAlignment="Center" />
+          </StackPanel>
         </Border>
       </StackPanel>
     </StackPanel>
@@ -103,7 +110,8 @@
                 <StackPanel Width="158" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
               <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
                 <Panel>
-                  <TextBlock Text="🎬" FontSize="34" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <views:RemotePoster Url="{Binding Poster}" />
                   <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
                           VerticalAlignment="Top" Margin="6">
                     <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />
@@ -124,15 +132,19 @@
 
     <!-- 分页 -->
     <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,16,0,0">
-      <Button Content="‹" Command="{Binding PrevPageCommand}" Width="30" Height="30" CornerRadius="6"
-              Background="#12FFFFFF" BorderThickness="0" Foreground="#C7FFFFFF" />
+      <Button Command="{Binding PrevPageCommand}" ToolTip.Tip="上一页" Width="30" Height="30" CornerRadius="6"
+              Background="#12FFFFFF" BorderThickness="0" Foreground="#C7FFFFFF" Padding="0">
+        <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="18" Height="18" />
+      </Button>
       <Border CornerRadius="6" Background="#264CC2FF" Width="30" Height="30">
         <TextBlock Text="{Binding Page}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#4CC2FF" FontSize="12.5" />
       </Border>
       <TextBlock Text=" / " Foreground="#85FFFFFF" VerticalAlignment="Center" />
       <TextBlock Text="{Binding PageCount}" Foreground="#C7FFFFFF" VerticalAlignment="Center" />
-      <Button Content="›" Command="{Binding NextPageCommand}" Width="30" Height="30" CornerRadius="6"
-              Background="#12FFFFFF" BorderThickness="0" Foreground="#C7FFFFFF" />
+      <Button Command="{Binding NextPageCommand}" ToolTip.Tip="下一页" Width="30" Height="30" CornerRadius="6"
+              Background="#12FFFFFF" BorderThickness="0" Foreground="#C7FFFFFF" Padding="0">
+        <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" />
+      </Button>
     </StackPanel>
   </Grid>
 </UserControl>

@@ -9,7 +9,8 @@ namespace VodBox.Desktop.ViewModels;
 /// <summary>播放器：状态、进度、控制命令。</summary>
 public sealed partial class PlayerViewModel : ObservableObject
 {
-    private readonly AppServices _services;
+    private readonly IPlaybackEngine _engine;
+    private readonly ILibraryStore _store;
     private readonly MainViewModel _main;
     private readonly PlaybackCoordinator _coordinator;
     private long _intent;
@@ -30,15 +31,19 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _showToast;
     [ObservableProperty] private string _toastText = "";
 
-    public PlayerViewModel(AppServices services, MainViewModel main)
+    public PlayerViewModel(AppServices services, MainViewModel main) : this(services.Player, services.Store, main)
     {
-        _services = services;
+    }
+
+    internal PlayerViewModel(IPlaybackEngine engine, ILibraryStore store, MainViewModel main)
+    {
+        _engine = engine;
+        _store = store;
         _main = main;
-        var engine = services.Player;
         _coordinator = new PlaybackCoordinator(engine);
         engine.StateChanged += (_, evt) =>
         {
-            var intent = _intent;
+            var intent = Volatile.Read(ref _intent);
             _main.RunOnUi(() =>
             {
                 if (intent != _intent || evt.SessionId != _coordinator.SessionId) return;
@@ -48,44 +53,61 @@ public sealed partial class PlayerViewModel : ObservableObject
                 Error = evt.Snapshot.Error;
                 // 即发即忘：此回调可能在 mpv 事件线程 / UI 线程上，绝不能同步等待 SQLite（会死锁）
                 if (State is PlaybackState.Ended or PlaybackState.Failed)
-                    _ = SaveHistoryAsync();
+                    _ = QueueHistory(CaptureHistory());
             });
         };
     }
 
     private PlaybackRequest? _current;
+    private Task _historyWrites = Task.CompletedTask;
 
     public void Play(PlaybackRequest request) => _ = PlayResolvedAsync(_ => Task.FromResult(request));
 
     /// <summary>解析也属于播放会话；新播放和关闭都会取消旧解析。</summary>
     public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve)
     {
-        var intent = ++_intent;
-        Visible = true;
-        Error = null;
-        State = PlaybackState.Resolving;
+        long intent = 0;
+        Task open = Task.CompletedTask;
         try
         {
-            await _coordinator.OpenAsync(async ct =>
+            await _main.RunOnUiAsync(() =>
             {
-                var request = await resolve(ct);
-                ct.ThrowIfCancellationRequested();
-                if (intent == _intent)
+                intent = ++_intent;
+                // 在任何 await/清空进度之前截取旧会话；后续写库不再读取可变 VM。
+                var saved = QueueHistory(CaptureHistory());
+                _current = null;
+                Visible = true;
+                Error = null;
+                State = PlaybackState.Resolving;
+                open = _coordinator.OpenAsync(async ct =>
                 {
-                    _current = request;
-                    Title = request.Title;
-                    Position = TimeSpan.Zero;
-                    Duration = TimeSpan.Zero;
-                }
-                return request;
+                    var request = await resolve(ct);
+                    ct.ThrowIfCancellationRequested();
+                    await saved.WaitAsync(ct);
+                    ct.ThrowIfCancellationRequested();
+                    await _main.RunOnUiAsync(() =>
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        if (intent != _intent) throw new OperationCanceledException(ct);
+                        _current = request;
+                        Title = request.Title;
+                        Position = TimeSpan.Zero;
+                        Duration = TimeSpan.Zero;
+                    });
+                    return request;
+                });
             });
+            await open;
         }
         catch (OperationCanceledException) { /* 新请求/关闭取消旧会话，不显示失败。 */ }
         catch (Exception error)
         {
-            if (intent != _intent) return;
-            State = PlaybackState.Failed;
-            Error = $"无法播放：{error.Message}";
+            await _main.RunOnUiAsync(() =>
+            {
+                if (intent != _intent) return;
+                State = PlaybackState.Failed;
+                Error = $"无法播放：{error.Message}";
+            });
         }
     }
 
@@ -93,34 +115,43 @@ public sealed partial class PlayerViewModel : ObservableObject
     public void TogglePlayPause()
     {
         if (State is PlaybackState.Playing or PlaybackState.Buffering)
-            _ = _services.Player.PauseAsync();
+            _ = _engine.PauseAsync();
         else
-            _ = _services.Player.PlayAsync();
+            _ = _engine.PlayAsync();
     }
 
     [RelayCommand]
-    public void Seek(TimeSpan position) => _ = _services.Player.SeekToAsync(position);
+    public void Seek(TimeSpan position) => _ = _engine.SeekToAsync(position);
 
     [RelayCommand]
-    public void SeekBy(double seconds) => _ = _services.Player.SeekByAsync(TimeSpan.FromSeconds(seconds));
+    public void SeekBy(double seconds) => _ = _engine.SeekByAsync(TimeSpan.FromSeconds(seconds));
 
     [RelayCommand]
     public async Task Close()
     {
-        var intent = ++_intent;
-        var stop = _coordinator.CloseAsync(); // 先取消解析，避免保存历史期间旧结果打开。
-        await SaveHistoryAsync();
-        await stop;
-        if (intent != _intent) return;
-        Visible = false;
-        State = PlaybackState.Idle;
-        _current = null;
+        long intent = 0;
+        Task stop = Task.CompletedTask;
+        Task saved = Task.CompletedTask;
+        await _main.RunOnUiAsync(() =>
+        {
+            intent = ++_intent;
+            saved = QueueHistory(CaptureHistory());
+            _current = null;
+            stop = _coordinator.CloseAsync(); // 立即取消解析，不等待历史写入。
+        });
+        await Task.WhenAll(saved, stop);
+        await _main.RunOnUiAsync(() =>
+        {
+            if (intent != _intent) return;
+            Visible = false;
+            State = PlaybackState.Idle;
+        });
     }
 
-    partial void OnVolumeChanged(int value) => _ = _services.Player.SetVolumeAsync(value);
+    partial void OnVolumeChanged(int value) => _ = _engine.SetVolumeAsync(value);
     partial void OnRateChanged(double value)
     {
-        _ = _services.Player.SetRateAsync(value);
+        _ = _engine.SetRateAsync(value);
         FlashToast($"{value:0.##}x 倍速");
     }
 
@@ -143,27 +174,36 @@ public sealed partial class PlayerViewModel : ObservableObject
     /// <summary>请求主窗口切换全屏（PlayerOverlay 订阅转发给 Window）。</summary>
     public event Action? RequestFullscreen;
 
-    /// <summary>落库观看历史（含线路/选集/海报上下文）。异常在此吞掉，避免存储故障中断播放或崩溃。</summary>
-    private async Task SaveHistoryAsync()
+    /// <summary>在 UI 线程截取不可变历史，避免切换/关闭后的异步写入混用新会话数据。</summary>
+    private HistoryEntry? CaptureHistory() => _current is { } request ? new HistoryEntry
     {
-        if (_current is not { } request) return;
+        SourceKey = request.SourceKey,
+        SourceName = string.IsNullOrWhiteSpace(request.SourceName) ? "本地" : request.SourceName,
+        MediaId = request.MediaId,
+        Title = request.Title,
+        Poster = request.Poster,
+        Remarks = request.Remarks,
+        LineId = request.LineId,
+        EpisodeId = request.EpisodeId,
+        PositionMs = (long)Position.TotalMilliseconds,
+        DurationMs = (long)Duration.TotalMilliseconds,
+        Rate = Rate,
+    } : null;
+
+    private Task QueueHistory(HistoryEntry? entry)
+    {
+        // 同一媒体的不同选集共用历史键，旧写入不得晚于新写入完成。
+        if (entry is not null) _historyWrites = SaveHistoryAsync(_historyWrites, entry);
+        return _historyWrites;
+    }
+
+    /// <summary>存储异常不阻断播放；写入队列始终可继续。</summary>
+    private async Task SaveHistoryAsync(Task previous, HistoryEntry entry)
+    {
+        await previous;
         try
         {
-            var entry = new HistoryEntry
-            {
-                SourceKey = request.SourceKey,
-                SourceName = string.IsNullOrWhiteSpace(request.SourceName) ? "本地" : request.SourceName,
-                MediaId = request.MediaId,
-                Title = request.Title,
-                Poster = request.Poster,
-                Remarks = request.Remarks,
-                LineId = request.LineId,
-                EpisodeId = request.EpisodeId,
-                PositionMs = (long)Position.TotalMilliseconds,
-                DurationMs = (long)Duration.TotalMilliseconds,
-                Rate = Rate,
-            };
-            await _services.Store.SaveHistoryAsync(entry);
+            await _store.SaveHistoryAsync(entry);
         }
         catch (Exception error)
         {

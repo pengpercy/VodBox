@@ -2,61 +2,60 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:VodBox.Desktop.Views"
         xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
-             xmlns:design="clr-namespace:VodBox.Desktop.Design"
+        xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
         x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel"
-        Title="VodBox"
+        Title="VodBox" Icon="/Assets/Icons/linux/256/vodbox.png"
         Width="1280" Height="800" MinWidth="960" MinHeight="600"
         TransparencyLevelHint="Mica"
         Background="Transparent"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="-1"
+        ExtendClientAreaTitleBarHeightHint="44"
         WindowDecorations="Full"
         FontSize="13">
 
   <!-- Mica 底色：桌面壁纸采样 + 深色叠加 -->
   <Panel>
     <Rectangle Fill="#202020" Opacity="0.86" />
-    <Grid RowDefinitions="44,*">
+    <Grid RowDefinitions="44,*" ColumnDefinitions="216,*"
+          chrome:WindowDecorationProperties.ElementRole="User">
 
-      <!-- 标题栏 -->
-      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0" Spacing="10">
-          <Image Source="/Assets/Icons/linux/256/vodbox.png" Width="22" Height="22" />
-          <TextBlock Text="VodBox" VerticalAlignment="Center" FontSize="12.5" Opacity="0.8" />
-        </StackPanel>
-        <!-- 全局搜索框 -->
-        <TextBox Grid.Column="1" Text="{Binding SearchKeyword}" PlaceholderText="搜索影片、剧集…"
+      <!-- 标题栏：只把非交互背景标为拖拽区；搜索框保留客户端输入。 -->
+      <Border x:Name="SidebarTitleBar" Grid.Row="0" Grid.Column="0" Background="Transparent"
+              Margin="{OnPlatform Default='0', macOS='90,0,0,0'}"
+              chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+      <Grid x:Name="TitleBar" Grid.Row="0" Grid.Column="1"
+            Background="Transparent" Margin="0,0,132,0"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar">
+        <TextBox IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsNotSearch}}" x:Name="GlobalSearch" Grid.Column="0" Text="{Binding SearchKeyword}" PlaceholderText="搜索影片、剧集…"
                  Width="380" Height="30" CornerRadius="15" HorizontalAlignment="Center"
+                 chrome:WindowDecorationProperties.ElementRole="User"
                  KeyDown="OnSearchKeyDown" VerticalContentAlignment="Center" />
-        <TextBlock Grid.Column="2" Text="{Binding Clock}" VerticalAlignment="Center" FontSize="12.5"
-                   Opacity="0.7" Margin="0,0,14,0" />
       </Grid>
 
       <!-- 主 Shell -->
-      <Grid Grid.Row="1" ColumnDefinitions="216,*">
+      <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="216,*">
 
         <!-- 左侧导航 -->
-        <Border Grid.Column="0" BorderBrush="#FFFFFF" BorderThickness="0,0,1,0" Opacity="0.98">
+        <Border x:Name="SidebarDragArea" Grid.Column="0" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="TitleBar">
           <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="10,4,10,14">
-              <Border CornerRadius="9" Width="34" Height="34" Background="#0078D4">
-                <TextBlock Text="▶" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Border>
+              <Image x:Name="BrandIcon" Source="/Assets/Icons/linux/256/vodbox.png" Width="34" Height="34" />
               <StackPanel>
                 <TextBlock Text="VodBox" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding CurrentSourceName}" FontSize="10.5" Opacity="0.55" />
               </StackPanel>
             </StackPanel>
 
-            <views:NavItemView Grid.Row="1" Icon="🏠" Label="首页" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHomeCommand}" />
-            <views:NavItemView Grid.Row="2" Icon="🎬" Label="点播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoVodCommand}" />
-            <views:NavItemView Grid.Row="3" Icon="📺" Label="直播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsLive}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoLiveCommand}" />
-            <views:NavItemView Grid.Row="4" Icon="🔍" Label="搜索" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSearch}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSearchCommand}" />
-            <views:NavItemView Grid.Row="5" Icon="⭐" Label="收藏" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFavoritesCommand}" />
-            <views:NavItemView Grid.Row="6" Icon="🕘" Label="历史" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHistoryCommand}" />
+            <views:NavItemView Grid.Row="1" Icon="{StaticResource Icon.Home}" Label="首页" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHomeCommand}" />
+            <views:NavItemView Grid.Row="2" Icon="{StaticResource Icon.Movie}" Label="点播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoVodCommand}" />
+            <views:NavItemView Grid.Row="3" Icon="{StaticResource Icon.Television}" Label="直播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsLive}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoLiveCommand}" />
+            <views:NavItemView Grid.Row="4" Icon="{StaticResource Icon.Search}" Label="搜索" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSearch}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSearchCommand}" />
+            <views:NavItemView Grid.Row="5" Icon="{StaticResource Icon.Star}" Label="收藏" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFavoritesCommand}" />
+            <views:NavItemView Grid.Row="6" Icon="{StaticResource Icon.History}" Label="历史" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHistoryCommand}" />
 
-            <views:NavItemView Grid.Row="8" Icon="📁" Label="本地文件" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFilesCommand}" />
-            <views:NavItemView Grid.Row="9" Icon="⚙️" Label="设置" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSettingsCommand}" />
+            <views:NavItemView Grid.Row="8" Icon="{StaticResource Icon.Folder}" Label="本地文件" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFilesCommand}" />
+            <views:NavItemView Grid.Row="9" Icon="{StaticResource Icon.Settings}" Label="设置" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSettingsCommand}" />
             <TextBlock Grid.Row="10" Text="HTTP 服务 · 未启用" FontSize="10.5" Opacity="0.5" Margin="22,10,0,10" />
           </Grid>
         </Border>
@@ -78,10 +77,14 @@
       </Grid>
 
       <!-- 状态栏 -->
-      <Border Grid.Row="1" VerticalAlignment="Bottom" Height="26" Background="#202020" Opacity="0.85"
+      <Border Grid.Row="1" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Height="26" Background="#202020" Opacity="0.85"
               IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
         <TextBlock Text="{Binding StatusMessage}" Margin="16,0" VerticalAlignment="Center" FontSize="11.5" Opacity="0.75" />
       </Border>
+      <!-- 与标题栏共用列边界，分隔线贯穿整个客户区。 -->
+      <Border x:Name="SidebarDivider" Grid.RowSpan="2" Grid.Column="0" Width="1"
+              HorizontalAlignment="Right" Background="{DynamicResource StrokeBrush}"
+              IsHitTestVisible="False" />
     </Grid>
   </Panel>
 </Window>

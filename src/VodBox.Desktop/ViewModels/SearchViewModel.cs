@@ -83,13 +83,26 @@ public sealed partial class SearchViewModel : ObservableObject
         _main.Detail.Open(site.SourceKey, item);
     }
 
-    /// <summary>把 AllResults 按 5 张/行分块（网格外观 + 垂直虚拟化的折中方案）。</summary>
+    private int _columns = 5;
+
+    public void SetResultWidth(double width)
+    {
+        var columns = Math.Max(1, (int)Math.Floor(Math.Max(0, width - 16) / 188));
+        if (columns == _columns) return;
+        _columns = columns;
+        RebuildResultRows();
+    }
+
+    partial void OnSelectedSiteChanged(SearchSiteResult? value) => RebuildResultRows();
+
     private void RebuildResultRows()
     {
+        var items = SelectedSite is { } site ? site.Items.ToList() : AllResults.ToList();
         ResultRows.Clear();
-        for (var i = 0; i < AllResults.Count; i += 5)
-            ResultRows.Add(new ResultRow(AllResults.Skip(i).Take(5).ToList()));
+        for (var i = 0; i < items.Count; i += _columns)
+            ResultRows.Add(new ResultRow(items.Skip(i).Take(_columns).ToList()));
     }
+
 }
 
 /// <summary>单站点搜索结果组。</summary>

@@ -13,19 +13,30 @@
       <!-- 无痕模式横幅（设计稿 ②） -->
       <Border CornerRadius="8" Background="#26FFB900" BorderBrush="#4DFFB900" BorderThickness="1" Padding="14,9"
               IsVisible="{Binding IncognitoBanner}">
-        <TextBlock Text="🕶 无痕模式已开启 — 本次观看不会写入历史" FontSize="12.5" Foreground="#FFB900" />
+        <StackPanel Orientation="Horizontal" Spacing="8" TextElement.Foreground="#FFB900">
+          <PathIcon Data="{StaticResource Icon.Incognito}" Width="18" Height="18" VerticalAlignment="Center" />
+          <TextBlock Text="无痕模式已开启 — 本次观看不会写入历史" FontSize="12.5" VerticalAlignment="Center" />
+        </StackPanel>
       </Border>
 
-      <!-- 标题行：历史 · 今天 + 右侧 全部历史 › / 清空（设计稿） -->
+      <!-- 标题行：历史 · 今天 + 右侧 全部历史 / 清空（设计稿） -->
       <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="🕘" FontSize="15" VerticalAlignment="Center" />
+          <PathIcon Data="{StaticResource Icon.History}" Width="24" Height="24" VerticalAlignment="Center" />
           <TextBlock Text="历史 · 今天" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <TextBlock Text="全部历史 ›" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand" />
-          <Button Content="🗑 清空" Command="{Binding ClearAllCommand}" CornerRadius="7" Padding="12,5"
-                  Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand" />
+          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand">
+            <TextBlock Text="全部历史" FontSize="12" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Command="{Binding ClearAllCommand}" CornerRadius="7" Padding="12,5"
+                  Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource Icon.Delete}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="清空" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
         </StackPanel>
       </Grid>
 
@@ -41,7 +52,8 @@
             <StackPanel Width="150" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
               <Border CornerRadius="8" Height="190" Background="#274064" ClipToBounds="True">
                 <Panel>
-                  <TextBlock Text="🎞" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <views:RemotePoster Url="{Binding Poster}" />
                   <StackPanel VerticalAlignment="Bottom">
                     <Border Background="#66000000" Padding="8,16,8,6">
                       <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
@@ -73,7 +85,10 @@
               <Grid ColumnDefinitions="110,*,Auto,Auto">
                 <Border Grid.Column="0" CornerRadius="6" Height="150" Width="100" Background="#274064"
                         VerticalAlignment="Top" ClipToBounds="True">
-                  <TextBlock Text="🎞" FontSize="26" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Panel>
+                    <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <views:RemotePoster Url="{Binding Poster}" />
+                  </Panel>
                 </Border>
                 <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="6" VerticalAlignment="Center">
                   <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -86,12 +101,19 @@
                             Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}, Mode=OneWay}" />
                   </Border>
                 </StackPanel>
-                <Button Grid.Column="2" Content="▶ 续播" Click="OnResumeClick" Tag="{Binding}"
+                <Button Grid.Column="2" Click="OnResumeClick" Tag="{Binding}"
                         Background="#0078D4" Foreground="White" BorderThickness="0" CornerRadius="7"
-                        Padding="14,7" VerticalAlignment="Center" Cursor="Hand" />
-                <Button Grid.Column="3" Content="✕" Click="OnDelete" Tag="{Binding}"
+                        Padding="14,7" VerticalAlignment="Center" Cursor="Hand">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" VerticalAlignment="Center" />
+                    <TextBlock Text="续播" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="3" Click="OnDelete" Tag="{Binding}" ToolTip.Tip="删除记录"
                         Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0" CornerRadius="7"
-                        Width="30" Height="30" VerticalAlignment="Center" Cursor="Hand" />
+                        Width="30" Height="30" Padding="0" VerticalAlignment="Center" Cursor="Hand">
+                  <PathIcon Data="{StaticResource Icon.Close}" Width="18" Height="18" />
+                </Button>
               </Grid>
             </Border>
           </DataTemplate>

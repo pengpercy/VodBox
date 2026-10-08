@@ -9,7 +9,8 @@ namespace VodBox.Desktop.ViewModels;
 /// <summary>详情：元信息 + 线路 + 选集 + 播放入口。</summary>
 public sealed partial class DetailViewModel : ObservableObject
 {
-    private readonly AppServices _services;
+    private readonly Func<string, IContentSource?> _getSource;
+    private readonly ILibraryStore _store;
     private readonly MainViewModel _main;
 
     public ObservableCollection<PlaybackLine> Lines { get; } = [];
@@ -23,20 +24,38 @@ public sealed partial class DetailViewModel : ObservableObject
     [ObservableProperty] private bool _loading;
     [ObservableProperty] private bool _isFavorite;
     private string _sourceKey = "";
-    private string _sourceName = "";
+    [ObservableProperty] private string _sourceName = "";
+    [ObservableProperty] private bool _episodesReversed;
+    public string EpisodeCountLabel => $"共 {SelectedLine?.Episodes.Count ?? 0} 集";
+    public string FavoriteLabel => IsFavorite ? "已收藏" : "收藏";
+    public string PlayLabel => SelectedEpisode is not { } episode ? "播放"
+        : (_resumePositionMs > 0 && MediaDetail.ResumePositionApplies(_resumeLineId, _resumeEpisodeId, SelectedLine?.Id ?? "", episode.Id)
+            ? $"续播 {episode.Title}" : $"播放 {episode.Title}");
+    partial void OnIsFavoriteChanged(bool value) => OnPropertyChanged(nameof(FavoriteLabel));
+    partial void OnSelectedEpisodeChanged(Episode? value) => OnPropertyChanged(nameof(PlayLabel));
+    partial void OnEpisodesReversedChanged(bool value) => RebuildEpisodeRows();
+    [RelayCommand] private void ToggleEpisodeOrder() => EpisodesReversed = !EpisodesReversed;
+    private CancellationTokenSource? _request;
+    private long _generation;
     // 续播上下文：上次看的是哪条线路的哪一集、看到哪；只有选集对得上才复用位置
     private string _resumeLineId = "";
     private string _resumeEpisodeId = "";
     private long _resumePositionMs;
 
-    public DetailViewModel(AppServices services, MainViewModel main)
+    public DetailViewModel(AppServices services, MainViewModel main) : this(services.Registry.Get, services.Store, main)
     {
-        _services = services;
+    }
+
+    internal DetailViewModel(Func<string, IContentSource?> getSource, ILibraryStore store, MainViewModel main)
+    {
+        _getSource = getSource;
+        _store = store;
         _main = main;
     }
 
     partial void OnSelectedLineChanged(PlaybackLine? value)
     {
+        OnPropertyChanged(nameof(EpisodeCountLabel));
         RebuildEpisodeRows();
         SelectedEpisode = value?.Episodes.FirstOrDefault();
     }
@@ -46,68 +65,98 @@ public sealed partial class DetailViewModel : ObservableObject
     {
         EpisodeRows.Clear();
         if (SelectedLine is null) return;
-        var episodes = SelectedLine.Episodes;
+        var episodes = (EpisodesReversed ? SelectedLine.Episodes.Reverse() : SelectedLine.Episodes).ToList();
         for (var i = 0; i < episodes.Count; i += 10)
             EpisodeRows.Add(new EpisodeRow(episodes.Skip(i).Take(10).ToList()));
     }
 
     /// <summary>从卡片进入详情。</summary>
-    public async void Open(string sourceKey, MediaItem item)
-    {
-        _sourceKey = sourceKey;
-        var source = _services.Registry.Get(sourceKey);
-        if (source is null) return;
-        _sourceName = source.Name;
-        Loading = true;
-        _main.Navigate(AppPage.Detail);
-        try
-        {
-            Detail = await source.GetDetailAsync(item.Id);
-            Lines.Clear();
-            foreach (var line in Detail.Lines) Lines.Add(line);
-            SelectedLine = Lines.FirstOrDefault();
-            IsFavorite = await _services.Store.IsFavoriteAsync(sourceKey, item.Id);
-            // 历史有记录时连线路/选集一起还原，否则续播位置会套到第一集上
-            ApplyResume(await _services.Store.FindHistoryAsync(sourceKey, item.Id));
-        }
-        catch (Exception error)
-        {
-            _main.StatusMessage = $"详情加载失败：{error.Message}";
-        }
-        finally
-        {
-            Loading = false;
-        }
-    }
+    public void Open(string sourceKey, MediaItem item) => _ = OpenAsync(sourceKey, item);
+
+    public Task OpenAsync(string sourceKey, MediaItem item) => LoadAsync(sourceKey, item.Id, null);
 
     /// <summary>从历史记录续播。</summary>
-    public async void Resume(HistoryEntry entry)
+    public void Resume(HistoryEntry entry) => _ = ResumeAsync(entry);
+
+    public Task ResumeAsync(HistoryEntry entry) => LoadAsync(entry.SourceKey, entry.MediaId, entry);
+
+    /// <summary>离开详情或开始新请求时取消旧请求；代次门控也拦截忽略取消的源/存储。</summary>
+    public void CancelPending()
     {
-        var source = _services.Registry.Get(entry.SourceKey);
-        if (source is null)
+        ++_generation;
+        _request?.Cancel();
+        _request = null;
+        Loading = false;
+    }
+
+    private async Task LoadAsync(string sourceKey, string mediaId, HistoryEntry? resume)
+    {
+        CancellationTokenSource? scope = null;
+        IContentSource? source = null;
+        long generation = 0;
+        await _main.RunOnUiAsync(() =>
         {
-            _main.StatusMessage = $"站点 {entry.SourceName} 在当前配置中不可用";
-            return;
-        }
-        _sourceKey = entry.SourceKey;
-        _sourceName = entry.SourceName;
-        Loading = true;
-        _main.Navigate(AppPage.Detail);
+            CancelPending();
+            generation = _generation;
+            Detail = null;
+            Lines.Clear();
+            SelectedLine = null;
+            SelectedEpisode = null;
+            IsFavorite = false;
+            ApplyResume(null);
+            _sourceKey = "";
+            SourceName = "";
+            source = _getSource(sourceKey);
+            if (source is null)
+            {
+                _main.StatusMessage = $"站点 {resume?.SourceName ?? sourceKey} 在当前配置中不可用";
+                return;
+            }
+            scope = new CancellationTokenSource();
+            _request = scope;
+            Loading = true;
+            _main.Navigate(AppPage.Detail);
+        });
+        if (scope is null || source is null) return;
+        var ct = scope.Token;
         try
         {
-            Detail = await source.GetDetailAsync(entry.MediaId);
-            Lines.Clear();
-            foreach (var line in Detail.Lines) Lines.Add(line);
-            ApplyResume(entry);
-            IsFavorite = await _services.Store.IsFavoriteAsync(entry.SourceKey, entry.MediaId);
+            var detail = await source.GetDetailAsync(mediaId, ct);
+            ct.ThrowIfCancellationRequested();
+            var favorite = await _store.IsFavoriteAsync(sourceKey, mediaId, ct);
+            ct.ThrowIfCancellationRequested();
+            var history = resume ?? await _store.FindHistoryAsync(sourceKey, mediaId, ct);
+            ct.ThrowIfCancellationRequested();
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation != _generation || ct.IsCancellationRequested) return;
+                _sourceKey = sourceKey;
+                SourceName = source.Name;
+                Detail = detail;
+                foreach (var line in detail.Lines) Lines.Add(line);
+                SelectedLine = Lines.FirstOrDefault();
+                IsFavorite = favorite;
+                ApplyResume(history);
+            });
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception error)
         {
-            _main.StatusMessage = $"详情加载失败：{error.Message}";
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation == _generation && !ct.IsCancellationRequested)
+                    _main.StatusMessage = $"详情加载失败：{error.Message}";
+            });
         }
         finally
         {
-            Loading = false;
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation != _generation) return;
+                _request = null;
+                Loading = false;
+            });
+            scope.Dispose();
         }
     }
 
@@ -117,6 +166,7 @@ public sealed partial class DetailViewModel : ObservableObject
         _resumeLineId = history?.LineId ?? "";
         _resumeEpisodeId = history?.EpisodeId ?? "";
         _resumePositionMs = history?.PositionMs ?? 0;
+        OnPropertyChanged(nameof(PlayLabel));
         if (history is null || Detail is null) return;
         SelectedLine = Detail.FindLine(history.LineId);
         SelectedEpisode = Detail.FindEpisode(SelectedLine, history.EpisodeId);
@@ -125,7 +175,7 @@ public sealed partial class DetailViewModel : ObservableObject
     [RelayCommand]
     private async Task PlayAsync()
     {
-        if (Detail is null || SelectedLine is null || SelectedEpisode is null)
+        if (Loading || Detail is null || SelectedLine is null || SelectedEpisode is null)
         {
             _main.StatusMessage = "没有可播放的选集";
             return;
@@ -135,7 +185,7 @@ public sealed partial class DetailViewModel : ObservableObject
             : 0;
 
         // 原生爬虫源（csp_ 类）的媒体地址带签名/时效，需在点播时现取；MacCMS 源用预置直链
-        if (_services.Registry.Get(_sourceKey) is IResolvingContentSource resolver)
+        if (_getSource(_sourceKey) is IResolvingContentSource resolver)
         {
             try
             {
@@ -189,7 +239,7 @@ public sealed partial class DetailViewModel : ObservableObject
             Remarks = Detail.Item.Remarks,
         };
         IsFavorite = !IsFavorite;
-        await _services.Store.SetFavoriteAsync(entry, IsFavorite);
+        await _store.SetFavoriteAsync(entry, IsFavorite);
     }
 }
 

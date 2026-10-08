@@ -65,6 +65,7 @@
     <ProjectReference Include="..\VodBox.Playback.Mpv\VodBox.Playback.Mpv.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="VodBox.PreviewTests" />
     <TrimmerRootDescriptor Include="Roots.xml" />
     <TrimmerRootAssembly Include="Avalonia.Themes.Fluent" />
   </ItemGroup>

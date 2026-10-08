@@ -50,10 +50,9 @@ public partial class LiveView : UserControl
             tabs[i]!.BorderBrush = i == index ? Avalonia.Media.Brushes.Transparent : Avalonia.Media.Brushes.Transparent;
             tabs[i]!.BorderThickness = new Avalonia.Thickness(0, 0, 0, i == index ? 2 : 0);
             if (i == index) tabs[i]!.BorderBrush = Avalonia.Media.Brush.Parse("#4CC2FF");
-            if (tabs[i]!.Content is TextBlock text)
-                text.Foreground = i == index
-                    ? Avalonia.Media.Brushes.White
-                    : Avalonia.Media.Brush.Parse("#85FFFFFF");
+            tabs[i]!.Foreground = i == index
+                ? Avalonia.Media.Brushes.White
+                : Avalonia.Media.Brush.Parse("#85FFFFFF");
         }
     }
 }

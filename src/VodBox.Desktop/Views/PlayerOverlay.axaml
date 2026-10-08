@@ -20,7 +20,7 @@
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
           <Button Click="OnClose" Background="#66000000" BorderThickness="0"
                   CornerRadius="8" Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="返回">
-            <PathIcon Data="{DynamicResource Icon.Back}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <PathIcon Data="{DynamicResource Icon.Back}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
           <StackPanel VerticalAlignment="Center" Spacing="1">
             <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" />
@@ -37,9 +37,9 @@
       <Border Grid.Row="1" Background="#CC000000" CornerRadius="9" Padding="14,8"
               VerticalAlignment="Center" HorizontalAlignment="Center"
               IsVisible="{Binding ShowToast}">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <PathIcon Data="{DynamicResource Icon.Play}" Width="11" Height="11" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding ToastText}" FontSize="12" Foreground="White" VerticalAlignment="Center" />
+        <StackPanel Orientation="Horizontal" Spacing="8" TextElement.Foreground="White">
+          <PathIcon Data="{DynamicResource Icon.Play}" Width="12" Height="12" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding ToastText}" FontSize="12" VerticalAlignment="Center" />
         </StackPanel>
       </Border>
 
@@ -57,7 +57,7 @@
                           HorizontalAlignment="Left">
                 <Button Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="音量">
-                  <PathIcon Data="{DynamicResource Icon.VolumeHigh}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.VolumeHigh}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Slider Classes="md" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" />
               </StackPanel>
@@ -79,12 +79,12 @@
                 </Button>
                 <Button Click="OnTogglePlaylist" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">
-                  <PathIcon Data="{DynamicResource Icon.HLines}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Playlist}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnCycleRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Padding="5,0" Height="30" Cursor="Hand" ToolTip.Tip="倍速">
                   <StackPanel Orientation="Horizontal" Spacing="3">
-                    <PathIcon Data="{DynamicResource Icon.Speed}" Width="16" Height="16" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.Speed}" Width="18" Height="18" VerticalAlignment="Center" />
                     <TextBlock x:Name="RateBadge" Text="1.5x" FontSize="10.5" Foreground="#4CC2FF"
                                VerticalAlignment="Center" FontWeight="SemiBold" />
                   </StackPanel>
@@ -100,19 +100,19 @@
               </StackPanel>
             </Grid>
 
-            <!-- 上层：跳过/播放/快进三键（等大 34px，图标统一 19px，IINA 同款协调比例） -->
+            <!-- 上层：跳过/播放/快进三键（等大 34px，图标统一 18px）。 -->
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
               <Button Click="OnBack10" Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="后退 10 秒">
-                <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="7"
                       Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
-                <PathIcon Data="{DynamicResource Icon.Pause}" Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <PathIcon Data="{DynamicResource Icon.Pause}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Click="OnForward10" Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="前进 10 秒">
-                <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
             </StackPanel>
           </Panel>

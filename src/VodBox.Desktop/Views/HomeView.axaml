@@ -23,6 +23,7 @@
               </LinearGradientBrush>
             </Border.Background>
           </Border>
+          <views:RemotePoster Url="{Binding HeroPoster}" />
           <!-- 左侧文字可读性遮罩 -->
           <Border>
             <Border.Background>
@@ -39,12 +40,22 @@
             <TextBlock Text="{Binding HeroRemarks}" FontSize="13" Foreground="#4CC2FF" />
             <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" MaxLines="2" TextTrimming="CharacterEllipsis" />
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-              <Button Content="▶ 立即播放" Background="#0078D4" Foreground="White" BorderThickness="0"
-                      CornerRadius="7" Padding="18,9" Click="OnHeroPlay" Cursor="Hand" />
+              <Button Background="#0078D4" Foreground="White" BorderThickness="0"
+                      CornerRadius="7" Padding="18,9" Click="OnHeroPlay" Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" />
+                  <TextBlock Text="立即播放" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               <Button Content="详情" Background="#12FFFFFF" Foreground="White" BorderThickness="1"
                       BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
-              <Button Content="⭐ 收藏" Background="#12FFFFFF" Foreground="White" BorderThickness="1"
-                      BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
+              <Button Background="#12FFFFFF" Foreground="White" BorderThickness="1"
+                      BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
+                  <TextBlock Text="收藏" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
             </StackPanel>
           </StackPanel>
           <!-- 轮播指示器（右下角，当前位为胶囊） -->
@@ -60,9 +71,13 @@
       <!-- 最近观看 -->
       <StackPanel Spacing="14">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="🕘 最近观看" FontSize="16" FontWeight="SemiBold" />
-          <TextBlock Text="查看全部 ›" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center"
-                     Cursor="Hand" PointerPressed="OnShowAllHistory" />
+          <PathIcon Data="{StaticResource Icon.History}" Width="18" Height="18" VerticalAlignment="Center" />
+          <TextBlock Text="最近观看" FontSize="16" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center"
+                      Cursor="Hand" PointerPressed="OnShowAllHistory">
+            <TextBlock Text="查看全部" FontSize="12" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12" VerticalAlignment="Center" />
+          </StackPanel>
         </StackPanel>
         <ItemsControl ItemsSource="{Binding Recent}">
           <ItemsControl.ItemsPanel>
@@ -75,7 +90,8 @@
               <StackPanel Width="150" Cursor="Hand" PointerPressed="OnResumeHistory" Tag="{Binding}">
                 <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
                   <Panel>
-                    <TextBlock Text="🎞" FontSize="34" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{StaticResource Icon.Filmstrip}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <views:RemotePoster Url="{Binding Poster}" />
                     <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,0">
                       <Border Background="#66000000" Padding="8,18,8,7">
                         <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
@@ -97,10 +113,14 @@
       <!-- 推荐 -->
       <StackPanel Spacing="14">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock FontSize="16" FontWeight="SemiBold" Text="✨ 站点推荐" />
+          <PathIcon Data="{StaticResource Icon.Sparkles}" Width="18" Height="18" VerticalAlignment="Center" />
+          <TextBlock FontSize="16" FontWeight="SemiBold" Text="站点推荐" />
           <TextBlock Text=" · 泥巴影视" FontSize="12.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
-          <TextBlock Text="换源 ▾" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand"
-                     PointerPressed="OnSwitchSource" />
+          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand"
+                      PointerPressed="OnSwitchSource">
+            <TextBlock Text="换源" FontSize="12" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" VerticalAlignment="Center" />
+          </StackPanel>
         </StackPanel>
         <ItemsControl ItemsSource="{Binding Recommendations}">
           <ItemsControl.ItemsPanel>
@@ -113,7 +133,8 @@
               <StackPanel Margin="0,0,16,0" Cursor="Hand" PointerPressed="OnOpenRecommend" Tag="{Binding}">
                 <Border CornerRadius="8" Height="210" Background="#3A2A55" ClipToBounds="True">
                   <Panel>
-                    <TextBlock Text="🎬" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <views:RemotePoster Url="{Binding Poster}" />
                     <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
                             VerticalAlignment="Top" Margin="6">
                       <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />

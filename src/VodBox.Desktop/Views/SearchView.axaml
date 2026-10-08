@@ -7,24 +7,42 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
+  <UserControl.Styles>
+    <Style Selector="ListBox.resultRows > ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" />
+        </ControlTemplate>
+      </Setter>
+    </Style>
+  </UserControl.Styles>
   <!-- 两行布局：搜索区固定在顶部，结果区独立滚动。
        结果网格用 ListBox（自带 VirtualizingStackPanel）按行分块渲染——
        数据量大时只实例化可见行，不再全量铺开（性能关键）。 -->
-  <Grid RowDefinitions="Auto,*" Margin="28,16,28,28" DataContext="{Binding Search}">
+  <Grid RowDefinitions="Auto,*" Margin="0,4,0,0" DataContext="{Binding Search}">
 
     <!-- 上：搜索框 + 联想 + 汇总行 -->
-    <StackPanel Grid.Row="0" Spacing="18">
-      <StackPanel Spacing="10" HorizontalAlignment="Center" Margin="0,8,0,0" Width="640">
-        <StackPanel Orientation="Horizontal" Spacing="12">
-          <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="500" Height="44"
-                   CornerRadius="22" FontSize="14.5" Padding="16,0"
+    <StackPanel Grid.Row="0" Spacing="10" Margin="28,0,28,0">
+      <StackPanel Spacing="10" HorizontalAlignment="Center" Margin="0" MaxWidth="440">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="340" Height="32"
+                   CornerRadius="16" FontSize="13" Padding="12,0"
                    VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
-          <Button Content="🔍 搜索 ⏎" Command="{Binding RunSearchCommand}" Click="OnSearchClick"
-                  CornerRadius="18" Padding="18,10" Height="44" Background="#0078D4" Foreground="White"
-                  BorderThickness="0" FontSize="13.5" FontWeight="SemiBold" Cursor="Hand" />
+          <Button Command="{Binding RunSearchCommand}"
+                  CornerRadius="16" Padding="12,5" Height="32" Background="#0078D4" Foreground="White"
+                  BorderThickness="0" FontSize="12.5" FontWeight="SemiBold" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="搜索" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
         </StackPanel>
 
-        <!-- 联想列表（热词带 🔥） -->
+        <!-- 联想列表（热词带火焰图标） -->
         <Border CornerRadius="10" Background="#E6161616" BorderBrush="#17FFFFFF" BorderThickness="1"
                 IsVisible="{Binding ShowSuggestions}" ClipToBounds="True">
           <ItemsControl ItemsSource="{Binding Suggestions}">
@@ -34,7 +52,10 @@
                             PointerPressed="OnPickSuggestion" Tag="{Binding}">
                   <TextBlock Text="{Binding Text}" FontSize="13" />
                   <Border CornerRadius="4" Background="#33FFB900" Padding="6,1" IsVisible="{Binding Hot}">
-                    <TextBlock Text="🔥 热" FontSize="10" Foreground="#FFB900" />
+                    <StackPanel Orientation="Horizontal" Spacing="3" TextElement.Foreground="#FFB900">
+                      <PathIcon Data="{StaticResource Icon.Fire}" Width="12" Height="12" VerticalAlignment="Center" />
+                      <TextBlock Text="热" FontSize="10" VerticalAlignment="Center" />
+                    </StackPanel>
                   </Border>
                 </StackPanel>
               </DataTemplate>
@@ -59,9 +80,12 @@
               <DataTemplate>
                 <Border CornerRadius="10" Background="#12FFFFFF" Padding="10,4" Cursor="Hand"
                         PointerPressed="OnPickHistory" Tag="{Binding}">
-                  <TextBlock FontSize="11.5" Foreground="#C7FFFFFF">
-                    <Run Text="{Binding Mode=OneWay}" /><Run Text=" ×" Foreground="#85FFFFFF" />
-                  </TextBlock>
+                  <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#C7FFFFFF">
+                    <TextBlock Text="{Binding Mode=OneWay}" FontSize="11.5" VerticalAlignment="Center" />
+                    <StackPanel TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center">
+                      <PathIcon Data="{StaticResource Icon.Close}" Width="12" Height="12" />
+                    </StackPanel>
+                  </StackPanel>
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -71,7 +95,7 @@
     </StackPanel>
 
     <!-- 下：站点列表 + 虚拟化结果网格 -->
-    <Grid Grid.Row="1" ColumnDefinitions="210,20,*" Margin="0,14,0,0">
+    <Grid Grid.Row="1" ColumnDefinitions="190,20,*" Margin="28,8,0,0">
       <Border Grid.Column="0" CornerRadius="10" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
               BorderThickness="1" Padding="6">
         <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0"
@@ -80,10 +104,12 @@
             <DataTemplate>
               <StackPanel Orientation="Horizontal" Spacing="8" Margin="4,6" Cursor="Hand">
                 <TextBlock Text="{Binding SiteName}" FontSize="13" />
-                <TextBlock Text="{Binding Items.Count}" FontSize="11.5" Foreground="#4CC2FF"
-                           VerticalAlignment="Center" FontWeight="SemiBold" />
-                <TextBlock Text="⟳" FontSize="13" Foreground="#4CC2FF" VerticalAlignment="Center"
-                           IsVisible="{Binding Loading}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" TextElement.Foreground="#4CC2FF" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Items.Count}" FontSize="11.5"
+                             VerticalAlignment="Center" FontWeight="SemiBold" />
+                  <PathIcon Data="{StaticResource Icon.Refresh}" Width="18" Height="18" VerticalAlignment="Center"
+                            IsVisible="{Binding Loading}" />
+                </StackPanel>
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -91,7 +117,7 @@
       </Border>
 
       <!-- 结果网格：按行分块（ResultRowVM.Items = 5 张卡），ListBox 垂直虚拟化 -->
-      <ListBox Grid.Column="2" ItemsSource="{Binding ResultRows}" Background="Transparent"
+      <ListBox x:Name="ResultsList" Classes="resultRows" SizeChanged="OnResultsSizeChanged" Grid.Column="2" ItemsSource="{Binding ResultRows}" Background="Transparent"
                BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.ItemTemplate>
           <DataTemplate>
@@ -106,7 +132,8 @@
                   <StackPanel Width="170" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
                     <Border CornerRadius="8" Height="216" Background="#274064" ClipToBounds="True">
                       <Panel>
-                        <TextBlock Text="🎬" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <views:RemotePoster Url="{Binding Poster}" />
                         <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
                                 VerticalAlignment="Top" Margin="6">
                           <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />

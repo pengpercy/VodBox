@@ -10,7 +10,7 @@
   <ScrollViewer Padding="28,12,28,28">
     <StackPanel Spacing="22" DataContext="{Binding Favorites}">
 
-      <!-- 标题行：收藏 + 点播/直播 Tab（设计稿：🎬 点播 (24) / 📺 直播频道 (6)）+ 右侧管理 -->
+      <!-- 标题行：收藏 + 点播/直播 Tab（设计稿：点播 (24) / 直播频道 (6)）+ 右侧管理 -->
       <Grid ColumnDefinitions="Auto,Auto,*,Auto">
         <TextBlock Grid.Column="0" Text="收藏" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="18,10,0,0" VerticalAlignment="Center">
@@ -27,24 +27,41 @@
             </Button.Foreground>
             <Button.BorderThickness>0</Button.BorderThickness>
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Text="🎬 点播" /><TextBlock Text="{Binding Vod.Count}" FontSize="11.5" />
+              <PathIcon Data="{StaticResource Icon.Movie}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="点播" VerticalAlignment="Center" /><TextBlock Text="{Binding Vod.Count}" FontSize="11.5" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Button Click="OnTabLive" CornerRadius="8" Padding="14,7" FontSize="12.5" Cursor="Hand"
                   Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Text="📺 直播频道" /><TextBlock Text="{Binding Live.Count}" FontSize="11.5" />
+              <PathIcon Data="{StaticResource Icon.Television}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="直播频道" VerticalAlignment="Center" /><TextBlock Text="{Binding Live.Count}" FontSize="11.5" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
         </StackPanel>
         <!-- 站点筛选 + 排序 + 管理（设计稿右上控制组） -->
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Content="站点：全部 ⌄" Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
-                  CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
-          <Button Content="排序：最近收藏 ⌄" Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
-                  CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
-          <Button Content="☑ 管理" Command="{Binding ToggleManageCommand}" Background="#12FFFFFF"
-                  Foreground="#4CC2FF" BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+          <Button Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
+                  CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="站点：全部" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="18" Height="18" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
+                  CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="排序：最近收藏" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="18" Height="18" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Command="{Binding ToggleManageCommand}" Background="#12FFFFFF"
+                  Foreground="#4CC2FF" BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource Icon.CheckboxMarked}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="管理" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
         </StackPanel>
       </Grid>
 
@@ -64,14 +81,17 @@
                   <StackPanel Width="158" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenFavorite" Tag="{Binding}">
               <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
                 <Panel>
-                  <TextBlock Text="🎬" FontSize="34" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <views:RemotePoster Url="{Binding Poster}" />
                   <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
                           VerticalAlignment="Top" Margin="6">
                     <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#FFB900" TextTrimming="CharacterEllipsis" MaxWidth="90" />
                   </Border>
-                  <Button Content="✕" Click="OnRemoveFavorite" Tag="{Binding}" Background="#66000000"
+                  <Button Click="OnRemoveFavorite" Tag="{Binding}" ToolTip.Tip="取消收藏" Background="#66000000"
                           Foreground="White" BorderThickness="0" CornerRadius="5" Width="24" Height="24"
-                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" FontSize="11" />
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" FontSize="11" Padding="3">
+                    <PathIcon Data="{StaticResource Icon.Close}" Width="18" Height="18" />
+                  </Button>
                 </Panel>
               </Border>
               <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
@@ -86,9 +106,13 @@
         </ListBox.ItemTemplate>
       </ListBox>
 
-      <TextBlock Text="暂无收藏 — 在详情页点击 ⭐ 收藏" FontSize="12.5" Foreground="#85FFFFFF"
-                 HorizontalAlignment="Center" Margin="0,20,0,0"
-                 IsVisible="{Binding Vod.Count, Converter={x:Static views:CountConverters.IsZero}}" />
+      <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#85FFFFFF"
+                  HorizontalAlignment="Center" Margin="0,20,0,0"
+                  IsVisible="{Binding Vod.Count, Converter={x:Static views:CountConverters.IsZero}}">
+        <TextBlock Text="暂无收藏 — 在详情页点击" FontSize="12.5" VerticalAlignment="Center" />
+        <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" VerticalAlignment="Center" />
+        <TextBlock Text="收藏" FontSize="12.5" VerticalAlignment="Center" />
+      </StackPanel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

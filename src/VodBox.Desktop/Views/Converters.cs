@@ -11,6 +11,7 @@ public static class PageConverters
     public static readonly IValueConverter IsHome = new PageConverter(AppPage.Home);
     public static readonly IValueConverter IsVod = new PageConverter(AppPage.Vod);
     public static readonly IValueConverter IsLive = new PageConverter(AppPage.Live);
+    public static readonly IValueConverter IsNotSearch = new FuncValueConverter<AppPage, bool>(page => page != AppPage.Search);
     public static readonly IValueConverter IsSearch = new PageConverter(AppPage.Search);
     public static readonly IValueConverter IsFavorites = new PageConverter(AppPage.Favorites);
     public static readonly IValueConverter IsHistory = new PageConverter(AppPage.History);
