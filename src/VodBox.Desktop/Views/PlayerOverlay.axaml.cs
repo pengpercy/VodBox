@@ -103,6 +103,11 @@ public partial class PlayerOverlay : UserControl
         }
     }
 
+    private void OnToggleWindowSmall(object? sender, RoutedEventArgs e)
+    {
+        if (VM is { } vm) vm.FlashToast("小窗模式（S2 播放体验接）");
+    }
+
     private void OnToggleFullscreen(object? sender, RoutedEventArgs e)
     {
         // 全屏由宿主 Window 处理（VM 不持控件引用）

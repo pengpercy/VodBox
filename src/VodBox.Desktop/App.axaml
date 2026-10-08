@@ -6,6 +6,7 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <FluentTheme />
+        <ResourceInclude Source="avares://VodBox.Desktop/Resources/Icons.xaml" />
       </ResourceDictionary.MergedDictionaries>
       <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
       <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
