@@ -142,8 +142,17 @@ VM 骨架可直接复用，**协议层必须重写**：旧宿主跑私有 VodBox
 - 测试 140 → 166 全绿（含 OpenSSL 加密向量、双分支端点序列、外部解析器头隔离、
   并发槽位与取消、非法信封/重定向拒绝）
 
-⏭️ **下一个**：`csp_App99`（排名第 5，宝盒 2 条目）。旧实现 App99Provider 282 行 + 161 行
-测试（`git show 78c8147`），双星仅 JIT 验证、AOT 未记录。
+✅ **`csp_App99` 完成**（2026-10-08，App99Source ~460 行 + 12 项离线测试）：
+- **ext JSON 对象形态已适配**（真实宝盒「双星99」「剧圈99」实测：host/appkey/name/
+  versionName/buildSignature/package/buildNumber，uuid 未下发时实例内随机作 AES-256 密钥）
+- **真机验收 2/2 全链路通过**（比老记录进步——旧验证仅双星 JIT）：
+  双星99（分类8/列表21/3线路/ffzy m3u8/搜索21）、剧圈99（分类18/1线路/m3u8/搜索21）
+- BN v2 协议全保留：AES-256-CBC 随机 IV + SHA256(body:timestamp:nonce::appkey) 签名 +
+  zlib/去填充双响应 + 解析器逐个试（≤3）+ 头隔离 + 8MiB 炸弹防护
+
+⏭️ **下一个候选**：排名 6-10 均为无旧实现的新协议（AppDrama/AppSxGuard/AppYd/
+S_zpsGuard/T4Guard，各 2 条目、未验证）；或转 S3a QuickJS drpy 运行时（虎牙js 已有
+原生实现兜底）。
 
 原始范围表：
 实测 69 个独立 `csp_` 入口中**仅 11 个出现 ≥2 次（覆盖 38% 条目）**，**58 个只出现 1 次**；
@@ -155,7 +164,7 @@ VM 骨架可直接复用，**协议层必须重写**：旧宿主跑私有 VodBox
 | 1 | `csp_Bili` | 9 | BilibiliProvider (329行) | **真机 JIT+AOT** | M |
 | 2 | `csp_BiliGuard` | 7 | 同上（需核对 Guard 参数） | 未核实等价 | M |
 | 3 | `csp_AppGet` | 4 | AppGetProvider (328行) | ✅ **已移植**（咕咕+一碗真机全通；ext 管道已实现；V122 仅 fixture） | ~~M/L~~ |
-| 5 | `csp_App99` | 2 | App99Provider (282行) | 双星**仅 JIT**，AOT 未记录 | M |
+| 5 | `csp_App99` | 2 | App99Provider (282行) | ✅ **已移植**（双星+剧圈真机全通） | ~~M~~ |
 | 6 | `csp_AppDrama` | 2 | 无（旧文档：公开引用是空占位，从未注册） | 未验证 | M/L |
 | 7 | `csp_AppSxGuard` | 2 | 无 | 未验证 | M |
 | 8 | `csp_AppYd` | 2 | 无（旧文档：源文件搜索为空） | 未验证 | M/L |
