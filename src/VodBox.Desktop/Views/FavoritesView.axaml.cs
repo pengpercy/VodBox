@@ -27,4 +27,8 @@ public partial class FavoritesView : UserControl
             VM.RemoveCommand.Execute(entry);
         }
     }
+
+    private void OnTabVod(object? sender, RoutedEventArgs e) => VM.Tab = 0;
+
+    private void OnTabLive(object? sender, RoutedEventArgs e) => VM.Tab = 1;
 }

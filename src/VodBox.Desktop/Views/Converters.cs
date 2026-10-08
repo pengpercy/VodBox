@@ -65,11 +65,21 @@ public static class ProgressConverters
 public static class CountConverters
 {
     public static readonly IValueConverter IsZero = new IsZeroConverter();
+    public static readonly IValueConverter IsNotZero = new IsNotZeroConverter();
 
     private sealed class IsZeroConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
             => value is int count && count == 0;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class IsNotZeroConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is int count && count != 0;
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();
@@ -102,6 +112,65 @@ public static class BoolConverters
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
             => value is true ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x264CC2FF)) : Avalonia.Media.Brushes.Transparent;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+}
+
+/// <summary>收藏页 Tab（0=点播/1=直播）→ 样式。</summary>
+public static class TabConverters
+{
+    public static readonly IValueConverter VodBackground = new TabBackgroundConverter(0);
+    public static readonly IValueConverter LiveBackground = new TabBackgroundConverter(1);
+    public static readonly IValueConverter VodForeground = new TabForegroundConverter(0);
+    public static readonly IValueConverter LiveForeground = new TabForegroundConverter(1);
+
+    private sealed class TabBackgroundConverter(int tab) : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is int i && i == tab && parameter is string hex
+                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.TryParse(hex, out var c) ? c : Avalonia.Media.Color.FromUInt32(0x264CC2FF))
+                : Avalonia.Media.Brushes.Transparent;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class TabForegroundConverter(int tab) : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is int i && i == tab && parameter is string hex
+                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.TryParse(hex, out var c) ? c : Avalonia.Media.Color.FromUInt32(0xFF4CC2FF))
+                : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x85FFFFFF));
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+}
+
+/// <summary>时间戳 → N 天前 / 上周 / N 周前 / N 个月前。</summary>
+public static class TimeAgoConverters
+{
+    public static readonly IValueConverter ToAgo = new ToAgoConverter();
+
+    private sealed class ToAgoConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is not DateTimeOffset time) return "";
+            var days = (DateTimeOffset.Now - time).TotalDays;
+            return days switch
+            {
+                < 1 => "今天",
+                < 2 => "昨天",
+                < 7 => $"{(int)days} 天前",
+                < 14 => "上周",
+                < 30 => $"{(int)(days / 7)} 周前",
+                < 60 => "1 个月前",
+                _ => $"{(int)(days / 30)} 个月前",
+            };
+        }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();

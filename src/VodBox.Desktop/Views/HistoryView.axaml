@@ -8,14 +8,64 @@
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <ScrollViewer Padding="28,12,28,28">
-    <StackPanel Spacing="24" DataContext="{Binding History}">
-      <StackPanel Orientation="Horizontal" Spacing="14">
-        <TextBlock Text="历史" FontSize="24" FontWeight="SemiBold" />
-        <Button Content="🗑 清空全部" Command="{Binding ClearAllCommand}" CornerRadius="7" Padding="12,6"
-                Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand" />
-      </StackPanel>
+    <StackPanel Spacing="22" DataContext="{Binding History}">
 
-      <ItemsControl ItemsSource="{Binding Entries}">
+      <!-- 无痕模式横幅（设计稿 ②） -->
+      <Border CornerRadius="8" Background="#26FFB900" BorderBrush="#4DFFB900" BorderThickness="1" Padding="14,9"
+              IsVisible="{Binding IncognitoBanner}">
+        <TextBlock Text="🕶 无痕模式已开启 — 本次观看不会写入历史" FontSize="12.5" Foreground="#FFB900" />
+      </Border>
+
+      <!-- 标题行：历史 · 今天 + 右侧 全部历史 › / 清空（设计稿） -->
+      <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="🕘" FontSize="15" VerticalAlignment="Center" />
+          <TextBlock Text="历史 · 今天" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <TextBlock Text="全部历史 ›" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand" />
+          <Button Content="🗑 清空" Command="{Binding ClearAllCommand}" CornerRadius="7" Padding="12,5"
+                  Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand" />
+        </StackPanel>
+      </Grid>
+
+      <!-- 今天：卡片行（海报内嵌进度文案 + 底部进度条；直播=黄条，设计稿） -->
+      <ItemsControl ItemsSource="{Binding Today}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="16" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Width="150" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
+              <Border CornerRadius="8" Height="190" Background="#274064" ClipToBounds="True">
+                <Panel>
+                  <TextBlock Text="🎞" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <StackPanel VerticalAlignment="Bottom">
+                    <Border Background="#66000000" Padding="8,16,8,6">
+                      <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
+                    </Border>
+                  </StackPanel>
+                </Panel>
+              </Border>
+              <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0"
+                         TextTrimming="CharacterEllipsis" />
+              <!-- 直播=黄条（全程），点播=蓝条按比例 -->
+              <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Margin="0,6,0,0">
+                <Border Background="#4CC2FF" Height="3" CornerRadius="2"
+                        Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}}" />
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- 更早 -->
+      <TextBlock Text="更早" FontSize="16" FontWeight="SemiBold"
+                 IsVisible="{Binding Earlier.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
+      <ItemsControl ItemsSource="{Binding Earlier}">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <Border CornerRadius="8" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1"

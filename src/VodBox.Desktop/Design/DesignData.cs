@@ -252,19 +252,54 @@ public static class DesignData
 
     private static void FillFavorites(MainViewModel main)
     {
-        foreach (var item in Items(6))
+        // 对齐设计稿 p-keep：多站点 + 时间梯度（3 天前 … 1 个月前）+ 直播频道 Tab 数据
+        var sources = new[] { ("niba", "泥巴影视"), ("jinpa", "金牌影院"), ("niba", "泥巴影视"), ("lzi", "量子影视"), ("niba", "泥巴影视"), ("tiantang", "天堂影视") };
+        var days = new[] { 3, 8, 10, 16, 22, 32 };
+        var items = Items(6);
+        for (var i = 0; i < items.Count; i++)
+        {
             main.Favorites.Vod.Add(new FavoriteEntry
             {
                 Kind = FavoriteKind.Vod,
-                SourceKey = "lzi", SourceName = "量子资源",
-                MediaId = item.Id, Title = item.Title, Poster = item.Poster, Remarks = item.Remarks,
+                SourceKey = sources[i].Item1, SourceName = sources[i].Item2,
+                MediaId = items[i].Id, Title = items[i].Title, Poster = items[i].Poster,
+                Remarks = items[i].Remarks,
+                CreatedAt = DateTimeOffset.Now.AddDays(-days[i]),
             });
+        }
+        main.Favorites.Live.Add(new FavoriteEntry
+        {
+            Kind = FavoriteKind.Live,
+            SourceKey = "live", SourceName = "直播",
+            MediaId = "cctv1", Title = "CCTV-1 综合", Remarks = "常看",
+            CreatedAt = DateTimeOffset.Now.AddDays(-1),
+        });
     }
 
     private static void FillHistory(MainViewModel main)
     {
-        foreach (var entry in History(6))
+        // 对齐设计稿 p-keep：历史 · 今天 = 3 张卡（点播×2 + 直播 CCTV-1），更早 = 3 条
+        var today = new (string title, string remarks, string source, long pos, long dur)[]
+        {
+            ("庆余年 第二季", "第12集 · 23:41", "泥巴影视", 1421_000, 45 * 60_000),
+            ("沙丘2", "45:30", "泥巴影视", 2730_000, 155 * 60_000),
+            ("CCTV-1 综合", "直播 · 看了 32 分钟", "直播", 32 * 60_000, 0),
+        };
+        foreach (var h in today)
+            main.History.Entries.Add(new HistoryEntry
+            {
+                SourceKey = h.source == "直播" ? "live" : "niba",
+                SourceName = h.source,
+                MediaId = $"today-{h.title}",
+                Title = h.title,
+                Remarks = h.remarks,
+                PositionMs = h.pos,
+                DurationMs = h.dur,
+                UpdatedAt = DateTimeOffset.Now.AddMinutes(-30),
+            });
+        foreach (var entry in History(3))
             main.History.Entries.Add(entry);
+        main.History.SplitByDay();
     }
 
     private static void FillSettings(MainViewModel main)
@@ -305,6 +340,6 @@ public static class DesignData
         EpisodeId = $"ep{i + 1}",
         PositionMs = (i + 1) * 5 * 60_000 + 41_000,
         DurationMs = 45 * 60_000,
-        UpdatedAt = DateTimeOffset.Now.AddHours(-i),
+        UpdatedAt = DateTimeOffset.Now.AddDays(-1).AddHours(-i),
     });
 }

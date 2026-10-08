@@ -8,12 +8,47 @@
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <ScrollViewer Padding="28,12,28,28">
-    <StackPanel Spacing="24" DataContext="{Binding Favorites}">
-      <StackPanel Orientation="Horizontal" Spacing="14">
-        <TextBlock Text="收藏" FontSize="24" FontWeight="SemiBold" />
-        <TextBlock Text="点播收藏" FontSize="12.5" Foreground="#4CC2FF" VerticalAlignment="Center" />
-      </StackPanel>
+    <StackPanel Spacing="22" DataContext="{Binding Favorites}">
 
+      <!-- 标题行：收藏 + 点播/直播 Tab（设计稿：🎬 点播 (24) / 📺 直播频道 (6)）+ 右侧管理 -->
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+        <TextBlock Grid.Column="0" Text="收藏" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="18,10,0,0" VerticalAlignment="Center">
+          <Button Click="OnTabVod" CornerRadius="8" Padding="14,7" FontSize="12.5" Cursor="Hand">
+            <Button.Background>
+              <Binding Path="Tab" Converter="{x:Static views:TabConverters.VodBackground}">
+                <Binding.ConverterParameter>#264CC2FF</Binding.ConverterParameter>
+              </Binding>
+            </Button.Background>
+            <Button.Foreground>
+              <Binding Path="Tab" Converter="{x:Static views:TabConverters.VodForeground}">
+                <Binding.ConverterParameter>#4CC2FF</Binding.ConverterParameter>
+              </Binding>
+            </Button.Foreground>
+            <Button.BorderThickness>0</Button.BorderThickness>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="🎬 点播" /><TextBlock Text="{Binding Vod.Count}" FontSize="11.5" />
+            </StackPanel>
+          </Button>
+          <Button Click="OnTabLive" CornerRadius="8" Padding="14,7" FontSize="12.5" Cursor="Hand"
+                  Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="📺 直播频道" /><TextBlock Text="{Binding Live.Count}" FontSize="11.5" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+        <!-- 站点筛选 + 排序 + 管理（设计稿右上控制组） -->
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Content="站点：全部 ⌄" Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
+                  CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+          <Button Content="排序：最近收藏 ⌄" Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
+                  CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+          <Button Content="☑ 管理" Command="{Binding ToggleManageCommand}" Background="#12FFFFFF"
+                  Foreground="#4CC2FF" BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+        </StackPanel>
+      </Grid>
+
+      <!-- 收藏网格（设计稿：6 张 + 徽标 + 站点·时间） -->
       <ItemsControl ItemsSource="{Binding Vod}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
@@ -36,8 +71,9 @@
                 </Panel>
               </Border>
               <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0"
-                         TextTrimming="CharacterEllipsis" />
+              <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                <Run Text="{Binding SourceName}" /><Run Text=" · " /><Run Text="{Binding CreatedAt, Converter={x:Static views:TimeAgoConverters.ToAgo}, Mode=OneWay}" />
+              </TextBlock>
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
