@@ -59,7 +59,7 @@
                         Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="音量">
                   <PathIcon Data="{DynamicResource Icon.VolumeHigh}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" VerticalAlignment="Center" />
+                <Slider Classes="md" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" />
               </StackPanel>
 
               <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
@@ -121,7 +121,7 @@
           <Grid ColumnDefinitions="Auto,*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="2,0,8,0" />
-            <Slider Grid.Column="1" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
+            <Slider Grid.Column="1" Classes="md" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
                     Value="{Binding Position.TotalSeconds, Mode=TwoWay}" />
             <TextBlock Grid.Column="2" Text="{Binding Duration, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />

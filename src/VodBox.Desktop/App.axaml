@@ -25,5 +25,37 @@
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
+    <!-- Material Design 3 风格滑杆：4px 圆头轨道 + 14px 圆 thumb，配 MDI 图标 -->
+    <Style Selector="Slider.md">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Slider.md /template/ Track">
+      <Setter Property="Height" Value="20" />
+    </Style>
+    <Style Selector="Slider.md /template/ Track RepeatButton">
+      <Setter Property="Height" Value="4" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="#4CC2FF" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Slider.md /template/ Track Button">
+      <Setter Property="Height" Value="4" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="#33FFFFFF" />
+    </Style>
+    <Style Selector="Slider.md /template/ Track Thumb">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="#4CC2FF" />
+      <Setter Property="BorderBrush" Value="#FF202020" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Slider.md:pointerover /template/ Track Thumb">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
   </Application.Styles>
 </Application>
