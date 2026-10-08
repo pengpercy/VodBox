@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -38,9 +39,26 @@ public partial class PlayerOverlay : UserControl
     public PlayerOverlay()
     {
         InitializeComponent();
+        if (this.FindControl<Slider>("ProgressSlider") is { } progress)
+        {
+            progress.AddHandler(PointerPressedEvent, (_, _) => VM?.BeginSeek(), RoutingStrategies.Tunnel, true);
+            progress.AddHandler(PointerReleasedEvent, (_, _) => VM?.CommitSeek(), RoutingStrategies.Bubble, true);
+            progress.AddHandler(KeyDownEvent, (_, e) =>
+            {
+                if (IsSeekKey(e.Key)) VM?.BeginSeek();
+            }, RoutingStrategies.Tunnel, true);
+            progress.AddHandler(KeyUpEvent, (_, e) =>
+            {
+                if (IsSeekKey(e.Key)) VM?.CommitSeek();
+            }, RoutingStrategies.Bubble, true);
+            progress.LostFocus += (_, _) => VM?.CancelSeek();
+        }
+
         AttachedToVisualTree += OnAttached;
         DetachedFromVisualTree += OnDetached;
     }
+
+    private static bool IsSeekKey(Key key) => key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown;
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
@@ -111,8 +129,7 @@ public partial class PlayerOverlay : UserControl
         if (VM is not { } vm) return;
         var index = Array.IndexOf(Rates, vm.Rate);
         vm.Rate = Rates[(index + 1) % Rates.Length];
-        if (this.FindControl<TextBlock>("RateBadge") is { } badge)
-            badge.Text = $"{vm.Rate:0.##}x";
+
     }
 
     private void OnTogglePip(object? sender, RoutedEventArgs e)
@@ -127,13 +144,28 @@ public partial class PlayerOverlay : UserControl
 
     private void OnTogglePlaylist(object? sender, RoutedEventArgs e)
     {
-        if (VM is { } vm) vm.FlashToast("播放列表（S2 接）");
+        if (VM is not { } vm || sender is not Button button) return;
+        var menu = new ContextMenu();
+        var session = vm.CurrentSessionId;
+        if (vm.Playlist.Count == 0) menu.Items.Add(new MenuItem { Header = "当前媒体没有剧集列表", IsEnabled = false });
+        for (var i = 0; i < vm.Playlist.Count; i++)
+        {
+            var index = i;
+            var item = new MenuItem { Header = (i == vm.PlaylistIndex ? "当前 · " : "") + vm.Playlist[i].Title };
+            item.Click += async (_, _) => { if (session == vm.CurrentSessionId) await vm.PlayPlaylistIndexAsync(index); };
+            menu.Items.Add(item);
+        }
+        button.ContextMenu = menu;
+        menu.Open(button);
     }
 
     private void OnToggleSettings(object? sender, RoutedEventArgs e)
     {
         if (VM is not { } vm || sender is not Button button) return;
         var menu = new ContextMenu();
+        var autoNext = new MenuItem { Header = vm.AutoNext ? "自动下一集：开" : "自动下一集：关" };
+        autoNext.Click += (_, _) => vm.AutoNext = !vm.AutoNext;
+        menu.Items.Add(autoNext);
         foreach (var (kind, label) in new[] { (TrackKind.Audio, "音轨"), (TrackKind.Subtitle, "字幕") })
         {
             var group = new MenuItem { Header = label };

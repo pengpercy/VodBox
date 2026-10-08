@@ -27,10 +27,7 @@
             <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Foreground="#80FFFFFF" />
           </StackPanel>
         </StackPanel>
-        <Border Grid.Column="2" Background="#66000000" CornerRadius="5" Padding="8,3"
-                VerticalAlignment="Center">
-          <TextBlock Text="1920x1080 · HEVC" FontSize="10.5" Foreground="#80FFFFFF" />
-        </Border>
+
       </Grid>
 
       <!-- 中央 toast（倍速/跳片头提示） -->
@@ -85,7 +82,7 @@
                         Padding="5,0" Height="30" Cursor="Hand" ToolTip.Tip="倍速">
                   <StackPanel Orientation="Horizontal" Spacing="3">
                     <PathIcon Data="{DynamicResource Icon.Speed}" Width="18" Height="18" VerticalAlignment="Center" />
-                    <TextBlock x:Name="RateBadge" Text="1.5x" FontSize="10.5" Foreground="#4CC2FF"
+                    <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="#4CC2FF"
                                VerticalAlignment="Center" FontWeight="SemiBold" />
                   </StackPanel>
                 </Button>
@@ -102,16 +99,19 @@
 
             <!-- 上层：跳过/播放/快进三键（等大 34px，图标统一 18px）。 -->
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Button Click="OnBack10" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="后退 10 秒">
+              <Button Command="{Binding PreviousEpisodeCommand}" IsEnabled="{Binding HasPreviousEpisode}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="上一集">
                 <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="7"
                       Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
-                <PathIcon Data="{DynamicResource Icon.Pause}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Panel>
+                  <PathIcon Data="{DynamicResource Icon.Pause}" IsVisible="{Binding IsPlaying}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Play}" IsVisible="{Binding IsPlaying, Converter={x:Static v:BoolConverters.Not}}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Panel>
               </Button>
-              <Button Click="OnForward10" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="前进 10 秒">
+              <Button Command="{Binding NextEpisodeCommand}" IsEnabled="{Binding HasNextEpisode}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="下一集">
                 <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
             </StackPanel>
@@ -121,8 +121,8 @@
           <Grid ColumnDefinitions="Auto,*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="2,0,8,0" />
-            <Slider Grid.Column="1" Classes="md" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
-                    Value="{Binding Position.TotalSeconds, Mode=TwoWay}" />
+            <Slider x:Name="ProgressSlider" Grid.Column="1" Classes="md" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
+                    Value="{Binding SeekPositionSeconds, Mode=TwoWay}" />
             <TextBlock Grid.Column="2" Text="{Binding Duration, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />
           </Grid>

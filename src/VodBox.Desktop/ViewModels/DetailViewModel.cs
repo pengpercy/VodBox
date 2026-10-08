@@ -165,7 +165,7 @@ public sealed partial class DetailViewModel : ObservableObject
     {
         _resumeLineId = history?.LineId ?? "";
         _resumeEpisodeId = history?.EpisodeId ?? "";
-        _resumePositionMs = history?.PositionMs ?? 0;
+        _resumePositionMs = history is null ? 0 : ResumePolicy.Position(history.PositionMs, history.DurationMs);
         OnPropertyChanged(nameof(PlayLabel));
         if (history is null || Detail is null) return;
         SelectedLine = Detail.FindLine(history.LineId);
@@ -184,44 +184,34 @@ public sealed partial class DetailViewModel : ObservableObject
             ? _resumePositionMs
             : 0;
 
-        // 原生爬虫源（csp_ 类）的媒体地址带签名/时效，需在点播时现取；MacCMS 源用预置直链
-        if (_getSource(_sourceKey) is IResolvingContentSource resolver)
+        var detail = Detail;
+        var line = SelectedLine;
+        var sourceKey = _sourceKey;
+        var sourceName = SourceName;
+        var resolver = _getSource(sourceKey) as IResolvingContentSource;
+        var selectedId = SelectedEpisode.Id;
+        var entries = line.Episodes.Select(episode => new PlaylistEntry(episode.Id, episode.Title, async ct =>
         {
-            try
+            PlaybackRequest request;
+            if (resolver is not null) request = await resolver.ResolvePlaybackAsync(detail.Item.Id, episode.Id, ct);
+            else
             {
-                var mediaId = Detail.Item.Id;
-                var episodeId = SelectedEpisode.Id;
-                await _main.Player.PlayResolvedAsync(async ct =>
+                if (episode.Uri is null) throw new InvalidOperationException("没有可播放的地址");
+                request = new PlaybackRequest
                 {
-                    var resolved = await resolver.ResolvePlaybackAsync(mediaId, episodeId, ct);
-                    return resolved with { StartPositionMs = resumeMs };
-                });
+                    Uri = episode.Uri, Title = detail.Item.Title, SourceKey = sourceKey,
+                    SourceName = sourceName, MediaId = detail.Item.Id, LineId = line.Id,
+                    EpisodeId = episode.Id, Poster = detail.Item.Poster, Remarks = detail.Item.Remarks,
+                };
             }
-            catch (Exception error)
-            {
-                _main.StatusMessage = $"播放地址解析失败：{error.Message}";
-            }
-            return;
-        }
-
-        if (SelectedEpisode.Uri is null)
+            return request with { StartPositionMs = 0 };
+        })).ToArray();
+        var index = Array.FindIndex(entries, entry => entry.Id == selectedId);
+        await _main.Player.PlayResolvedAsync(async ct =>
         {
-            _main.StatusMessage = "没有可播放的选集";
-            return;
-        }
-        _main.Player.Play(new PlaybackRequest
-        {
-            Uri = SelectedEpisode.Uri,
-            Title = Detail.Item.Title,
-            StartPositionMs = resumeMs,
-            SourceKey = _sourceKey,
-            SourceName = _sourceName,
-            MediaId = Detail.Item.Id,
-            LineId = SelectedLine.Id,
-            EpisodeId = SelectedEpisode.Id,
-            Poster = Detail.Item.Poster,
-            Remarks = Detail.Item.Remarks,
-        });
+            var request = await entries[index].Resolve(ct);
+            return request with { StartPositionMs = resumeMs };
+        }, entries, index);
     }
 
     [RelayCommand]

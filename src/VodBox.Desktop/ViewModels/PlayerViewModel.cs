@@ -11,16 +11,51 @@ public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly IPlaybackEngine _engine;
     private readonly ILibraryStore _store;
+    private readonly IPreferences? _preferences;
     private readonly MainViewModel _main;
     private readonly PlaybackCoordinator _coordinator;
     private long _intent;
 
+    public ObservableCollection<PlaylistEntry> Playlist { get; } = [];
+    [ObservableProperty] private int _playlistIndex = -1;
+    [ObservableProperty] private bool _autoNext = true;
+    private long _handledEndSession = -1;
+    public bool HasPreviousEpisode => PlaylistIndex > 0;
+    public bool HasNextEpisode => PlaylistIndex >= 0 && PlaylistIndex + 1 < Playlist.Count;
+    partial void OnPlaylistIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasPreviousEpisode));
+        OnPropertyChanged(nameof(HasNextEpisode));
+    }
+
     public ObservableCollection<MediaTrack> Tracks { get; } = [];
 
+    public bool IsPlaying => State is PlaybackState.Playing or PlaybackState.Buffering;
+    partial void OnStateChanged(PlaybackState value) => OnPropertyChanged(nameof(IsPlaying));
     [ObservableProperty] private PlaybackState _state = PlaybackState.Idle;
     [ObservableProperty] private string _title = "媒体";
     [ObservableProperty] private TimeSpan _position;
     [ObservableProperty] private TimeSpan _duration;
+    [ObservableProperty] private double _seekPositionSeconds;
+    private long? _seekIntent;
+    partial void OnPositionChanged(TimeSpan value)
+    {
+        if (_seekIntent is null) SeekPositionSeconds = value.TotalSeconds;
+    }
+    public void BeginSeek() => _seekIntent = _intent;
+    public void CancelSeek()
+    {
+        _seekIntent = null;
+        SeekPositionSeconds = Position.TotalSeconds;
+    }
+    public void CommitSeek()
+    {
+        var intent = _seekIntent;
+        var seconds = SeekPositionSeconds;
+        CancelSeek();
+        if (intent == _intent && Duration > TimeSpan.Zero && double.IsFinite(seconds))
+            Seek(TimeSpan.FromSeconds(Math.Clamp(seconds, 0, Duration.TotalSeconds)));
+    }
     [ObservableProperty] private int _volume = 100;
     [ObservableProperty] private double _rate = 1.0;
     [ObservableProperty] private bool _visible;
@@ -31,14 +66,16 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _showToast;
     [ObservableProperty] private string _toastText = "";
 
-    public PlayerViewModel(AppServices services, MainViewModel main) : this(services.Player, services.Store, main)
+    public PlayerViewModel(AppServices services, MainViewModel main) : this(services.Player, services.Store, main, services.Prefs)
     {
     }
 
-    internal PlayerViewModel(IPlaybackEngine engine, ILibraryStore store, MainViewModel main)
+    internal PlayerViewModel(IPlaybackEngine engine, ILibraryStore store, MainViewModel main, IPreferences? preferences = null)
     {
         _engine = engine;
         _store = store;
+        _preferences = preferences;
+        _autoNext = preferences?.GetBool("player.auto-next", true) ?? true;
         _main = main;
         _coordinator = new PlaybackCoordinator(engine);
         engine.StateChanged += (_, evt) =>
@@ -54,6 +91,11 @@ public sealed partial class PlayerViewModel : ObservableObject
                 // 即发即忘：此回调可能在 mpv 事件线程 / UI 线程上，绝不能同步等待 SQLite（会死锁）
                 if (State is PlaybackState.Ended or PlaybackState.Failed)
                     _ = QueueHistory(CaptureHistory());
+                if (State == PlaybackState.Ended && AutoNext && HasNextEpisode && _handledEndSession != evt.SessionId)
+                {
+                    _handledEndSession = evt.SessionId;
+                    _ = PlayPlaylistIndexAsync(PlaylistIndex + 1);
+                }
             });
         };
     }
@@ -64,7 +106,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     public void Play(PlaybackRequest request) => _ = PlayResolvedAsync(_ => Task.FromResult(request));
 
     /// <summary>解析也属于播放会话；新播放和关闭都会取消旧解析。</summary>
-    public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve)
+    public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve, IReadOnlyList<PlaylistEntry>? playlist = null, int index = -1)
     {
         long intent = 0;
         Task open = Task.CompletedTask;
@@ -73,6 +115,10 @@ public sealed partial class PlayerViewModel : ObservableObject
             await _main.RunOnUiAsync(() =>
             {
                 intent = ++_intent;
+                CancelSeek();
+                Playlist.Clear();
+                if (playlist is not null) foreach (var entry in playlist) Playlist.Add(entry);
+                PlaylistIndex = index;
                 // 在任何 await/清空进度之前截取旧会话；后续写库不再读取可变 VM。
                 var saved = QueueHistory(CaptureHistory());
                 _current = null;
@@ -91,6 +137,8 @@ public sealed partial class PlayerViewModel : ObservableObject
                         if (intent != _intent) throw new OperationCanceledException(ct);
                         _current = request;
                         Title = request.Title;
+                        Subtitle = index >= 0 && index < Playlist.Count
+                            ? $"{Playlist[index].Title} · {request.SourceName}" : request.SourceName;
                         Position = TimeSpan.Zero;
                         Duration = TimeSpan.Zero;
                     });
@@ -110,6 +158,16 @@ public sealed partial class PlayerViewModel : ObservableObject
             });
         }
     }
+
+    public Task PlayPlaylistIndexAsync(int index)
+    {
+        if (index < 0 || index >= Playlist.Count) return Task.CompletedTask;
+        var snapshot = Playlist.ToArray();
+        return PlayResolvedAsync(snapshot[index].Resolve, snapshot, index);
+    }
+
+    [RelayCommand] private Task PreviousEpisode() => PlayPlaylistIndexAsync(PlaylistIndex - 1);
+    [RelayCommand] private Task NextEpisode() => PlayPlaylistIndexAsync(PlaylistIndex + 1);
 
     public long CurrentSessionId => _intent;
 
@@ -152,8 +210,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         await _main.RunOnUiAsync(() =>
         {
             intent = ++_intent;
+            CancelSeek();
             saved = QueueHistory(CaptureHistory());
             _current = null;
+            Playlist.Clear();
+            PlaylistIndex = -1;
             stop = _coordinator.CloseAsync(); // 立即取消解析，不等待历史写入。
         });
         await Task.WhenAll(saved, stop);
@@ -163,6 +224,12 @@ public sealed partial class PlayerViewModel : ObservableObject
             Visible = false;
             State = PlaybackState.Idle;
         });
+    }
+
+    partial void OnAutoNextChanged(bool value)
+    {
+        try { _preferences?.Set("player.auto-next", value); }
+        catch (Exception error) { System.Diagnostics.Debug.WriteLine($"[preferences] {error.Message}"); }
     }
 
     partial void OnVolumeChanged(int value) => _ = _engine.SetVolumeAsync(value);
@@ -202,7 +269,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         Remarks = request.Remarks,
         LineId = request.LineId,
         EpisodeId = request.EpisodeId,
-        PositionMs = (long)Position.TotalMilliseconds,
+        PositionMs = State == PlaybackState.Ended ? 0 : (long)Position.TotalMilliseconds,
         DurationMs = (long)Duration.TotalMilliseconds,
         Rate = Rate,
     } : null;
@@ -228,3 +295,6 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 }
+
+/// <summary>播放入口快照：不依赖仍可变化的详情页。</summary>
+public sealed record PlaylistEntry(string Id, string Title, Func<CancellationToken, Task<PlaybackRequest>> Resolve);

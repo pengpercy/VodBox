@@ -292,7 +292,7 @@ public sealed class ViewModelRaceTests
         write.SetException(new IOException("storage unavailable"));
         await Done(next);
         Assert.Equal(2, context.Store.Saved.Count);
-        Assert.Equal(11000, context.Store.Saved[^1].PositionMs);
+        Assert.Equal(0, context.Store.Saved[^1].PositionMs);
         Assert.Equal("ep2", vm.Title);
         Assert.Null(vm.Error);
     }
@@ -336,6 +336,109 @@ public sealed class ViewModelRaceTests
         await Done(Task.Run(() => context.Main.Player.Close()));
         Assert.NotEmpty(onUi);
         Assert.All(onUi, Assert.True);
+    }
+
+    [AvaloniaFact]
+    public async Task Playlist_ManualNavigationUsesCapturedEntriesAndBoundaries()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+        };
+        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
+        Assert.False(vm.HasPreviousEpisode);
+        Assert.True(vm.HasNextEpisode);
+        await Done(vm.PlayPlaylistIndexAsync(1));
+        Assert.Equal("ep2", context.Engine.Opened[^1].Request.EpisodeId);
+        Assert.True(vm.HasPreviousEpisode);
+        Assert.False(vm.HasNextEpisode);
+        await Done(vm.PlayPlaylistIndexAsync(2));
+        Assert.Equal(2, context.Engine.Opened.Count);
+        await Done(vm.Close());
+        Assert.Empty(vm.Playlist);
+        Assert.Equal(-1, vm.PlaylistIndex);
+    }
+
+    [AvaloniaFact]
+    public async Task Playlist_EofAdvancesOnceButFailureAndLastEpisodeDoNotAdvance()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+        };
+        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
+        context.Engine.EmitCurrent(PlaybackState.Failed, 5000, 90000);
+        Assert.Single(context.Engine.Opened);
+        var firstSession = context.Engine.Opened[0].Session;
+        context.Engine.Emit(firstSession, PlaybackState.Ended, 90000, 90000);
+        context.Engine.Emit(firstSession, PlaybackState.Ended, 90000, 90000);
+        for (var i = 0; i < 30 && context.Engine.Opened.Count < 2; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(5);
+        }
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, context.Engine.Opened.Count);
+        Assert.Equal("ep2", context.Engine.Opened[1].Request.EpisodeId);
+        context.Engine.EmitCurrent(PlaybackState.Ended, 90000, 90000);
+        Assert.Equal(2, context.Engine.Opened.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task Playlist_DisabledAutoNextSavesCompletionWithoutAdvancing()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        vm.AutoNext = false;
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+        };
+        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
+        context.Engine.EmitCurrent(PlaybackState.Ended, 90000, 90000);
+        Assert.Single(context.Engine.Opened);
+        Assert.Equal(0, context.Store.Saved[^1].PositionMs);
+        Assert.Equal(90000, context.Store.Saved[^1].DurationMs);
+    }
+
+    [AvaloniaFact]
+    public async Task Player_SeekPreviewSurvivesProgressEventsAndCommitsOnlyOnce()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        await Done(vm.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+        context.Engine.EmitCurrent(PlaybackState.Playing, 10000, 90000);
+        Assert.Equal(10, vm.SeekPositionSeconds);
+        Assert.Empty(context.Engine.Seeks);
+        vm.BeginSeek();
+        vm.SeekPositionSeconds = 45;
+        context.Engine.EmitCurrent(PlaybackState.Playing, 11000, 90000);
+        Assert.Equal(45, vm.SeekPositionSeconds);
+        vm.CommitSeek();
+        Assert.Equal(TimeSpan.FromSeconds(45), Assert.Single(context.Engine.Seeks));
+        vm.CommitSeek();
+        Assert.Single(context.Engine.Seeks);
+    }
+
+    [AvaloniaFact]
+    public async Task Player_SwitchingDiscardsAnOldSeekGesture()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        await Done(vm.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+        context.Engine.EmitCurrent(PlaybackState.Playing, 10000, 90000);
+        vm.BeginSeek();
+        vm.SeekPositionSeconds = 45;
+        await Done(vm.PlayResolvedAsync(_ => Task.FromResult(Request("ep2"))));
+        vm.CommitSeek();
+        Assert.Empty(context.Engine.Seeks);
     }
 
     private sealed class Context : IDisposable
@@ -423,7 +526,8 @@ public sealed class ViewModelRaceTests
         public Task StopAsync(CancellationToken ct = default) { Stops++; return Task.CompletedTask; }
         public Task PlayAsync(CancellationToken ct = default) => Task.CompletedTask;
         public Task PauseAsync(CancellationToken ct = default) => Task.CompletedTask;
-        public Task SeekToAsync(TimeSpan position, CancellationToken ct = default) => Task.CompletedTask;
+        public List<TimeSpan> Seeks { get; } = [];
+        public Task SeekToAsync(TimeSpan position, CancellationToken ct = default) { Seeks.Add(position); return Task.CompletedTask; }
         public Task SeekByAsync(TimeSpan delta, CancellationToken ct = default) => Task.CompletedTask;
         public Task SetRateAsync(double rate, CancellationToken ct = default) => Task.CompletedTask;
         public Task SetVolumeAsync(int volume, CancellationToken ct = default) => Task.CompletedTask;
