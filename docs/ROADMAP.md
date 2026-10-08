@@ -129,9 +129,21 @@ VM 骨架可直接复用，**协议层必须重写**：旧宿主跑私有 VodBox
 - **聚合搜索静默吞异常已修**：`SearchWithFailuresAsync` 返回逐源失败原因 + 每站独立 25s 超时
 - 测试 71 → 90 全绿（B 站离线回归 19 项，含真实抓取的 popular/nav/spi fixture）
 
-⏭️ **下一个**：`csp_AppGet`（排名第 3，宝盒 4 条目）。注意旧实现吃的是预解析 options
-字典，**从未实现 TVBox `ext` 管道格式**（`url|key|version|ua`）解析，需新写；且旧验证
-记录仅咕咕(V119)真机通过，一碗/蔬菜/首发均失败，Qiji-v122 仅 fixture——ROI 低于 Bilibili。
+✅ **`csp_AppGet` 完成**（2026-10-08，AppGetSource ~470 行 + 26 项离线测试）：
+- **TVBox ext 管道格式已实现**（老实现从未写过的部分）：`url|key[|version|ua]` 1~4 段；
+  真实宝盒 4 条目实测全是此形态；版本段 `V119/V122` 即协议选择器
+ （V119→form 签名 initV119/searchList/vodDetail；V122→JSON initV122/searchList4/vodDetail2）；
+  URL 非根地址（xxx.txt）自动发现模式；JSON ext（host/key/get_type/path）同步支持
+ （公开协议参考 AppGet.py/金牌APP.js 形态）
+- **真实验收 2/4 全链路通过**：咕咕（V119，分类3/首页95/详情4集/真实 mp4/搜索20）、
+  一碗（两字段→v119，分类5/首页159/8线路/m3u8/搜索20，**比老验证进步**——老记录失败）；
+  首发（V122）发现文件解析正确但 API 服务器 111.42.67.221:8004 停机、
+  蔬菜 OSS 域名本机网络不可达（DNS 劫持+TCP 拒绝，协议同构于已通的一碗）——均站点/网络侧
+- 测试 140 → 166 全绿（含 OpenSSL 加密向量、双分支端点序列、外部解析器头隔离、
+  并发槽位与取消、非法信封/重定向拒绝）
+
+⏭️ **下一个**：`csp_App99`（排名第 5，宝盒 2 条目）。旧实现 App99Provider 282 行 + 161 行
+测试（`git show 78c8147`），双星仅 JIT 验证、AOT 未记录。
 
 原始范围表：
 实测 69 个独立 `csp_` 入口中**仅 11 个出现 ≥2 次（覆盖 38% 条目）**，**58 个只出现 1 次**；
@@ -142,7 +154,7 @@ VM 骨架可直接复用，**协议层必须重写**：旧宿主跑私有 VodBox
 |---|---|---|---|---|---|
 | 1 | `csp_Bili` | 9 | BilibiliProvider (329行) | **真机 JIT+AOT** | M |
 | 2 | `csp_BiliGuard` | 7 | 同上（需核对 Guard 参数） | 未核实等价 | M |
-| 3 | `csp_AppGet` | 4 | AppGetProvider (328行) | **咕咕真机 JIT+AOT**；Qiji-v122 仅 fixture | M/L |
+| 3 | `csp_AppGet` | 4 | AppGetProvider (328行) | ✅ **已移植**（咕咕+一碗真机全通；ext 管道已实现；V122 仅 fixture） | ~~M/L~~ |
 | 5 | `csp_App99` | 2 | App99Provider (282行) | 双星**仅 JIT**，AOT 未记录 | M |
 | 6 | `csp_AppDrama` | 2 | 无（旧文档：公开引用是空占位，从未注册） | 未验证 | M/L |
 | 7 | `csp_AppSxGuard` | 2 | 无 | 未验证 | M |

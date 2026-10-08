@@ -39,7 +39,7 @@
 | Provider (行数) | 实现内容 | 注册名 | 旧文档验证状态 | 工作量 |
 |---|---|---|---|---|
 | **BilibiliProvider** (329) | 公开投稿、WBI 签名搜索（MD5 over 置换 `wbi_img`）、view→cid 分集、`qn=16` 单段 durl、自动 cid XML 弹幕、匿名 buvid3/4、6h 会话、128/10min 详情缓存 | `bilibili`,`csp_Bili` | **真机验证**：JIT+AOT 取热门20/搜索20/一集/1200弹幕，VideoToolbox 解码 H.264（测试 `BV1WSHL66EdZ`） | M |
-| **AppGetProvider** (328) | v119（表单+时间戳 AES-128-CBC/PKCS7 签名）与 qiji-v122（JSON body、独立 IV、验证码状态）双分支；分类/筛选/搜索/多线路/直接媒体/vodParse/`player_parse_type=2` 外部 JSON | `appget`,`csp_AppGet` | **咕咕真机验证**（JIT 3.40s 216/387块；AOT 3.16s 200/367块）；一碗/蔬菜/首发未过；**Qiji-v122 仅 fixture** | M/L |
+| **AppGetProvider** (328) | v119（表单+时间戳 AES-128-CBC/PKCS7 签名）与 qiji-v122（JSON body、独立 IV、验证码状态）双分支；分类/筛选/搜索/多线路/直接媒体/vodParse/`player_parse_type=2` 外部 JSON | `appget`,`csp_AppGet` | **咕咕真机验证**（JIT 3.40s 216/387块；AOT 3.16s 200/367块）；一碗/蔬菜/首发未过；**Qiji-v122 仅 fixture** | ✅ **已移植 AppGetSource**（2026-10-08：ext 管道新写、咕咕+一碗真机全通、166 测试全绿） |
 | **App99Provider** (282) | bn-v2：AES-256-CBC（key=去连字符 UUID 前32 ASCII）、随机16B IV 前置、SHA-256 签 `body:ts:nonce::appkey`、zlib-or-raw JSON | `app99`,`csp_App99` | **双星仅 JIT**（187视频/470音频块）；**AOT 明确未记录**（403/404）；`csp_App99Guard` 未核实 | M |
 | **AudioSiteProvider** (205) | audio-zblog-v1（xsmp3/psmp3）：Z-Blog HTML 分页、受限 C# 读静态 APlayer 数组、专辑→分集、UA+专辑 Referer；**搜索显式 NotSupported** | `audio-site`,`csp_XBPQ` | **评书 AOT 验证**（3.21s/332音频块）；相声 AOT 未过（TLS 超时），JIT 过 | M |
 | **HuyaProvider** (94) | 6 分类、`cache.php?m=LiveList`、`mp.huya.com profileRoom` 多 CDN、**匿名 FLV 签名** MD5(`{prefix}_0_{stream}_{seqid}_{wsTime}`) | `huya` | **真机 AOT 验证** | S/M |

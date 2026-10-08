@@ -26,6 +26,7 @@ public static class NativeSpiders
             ["csp_YGP"] = info => new TrailerSource(info),
             ["csp_YGPGuard"] = info => new TrailerSource(info),
             ["csp_Huya"] = info => new HuyaSource(info),
+            ["csp_AppGet"] = info => new AppGetSource(info),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>
