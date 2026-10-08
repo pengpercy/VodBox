@@ -55,8 +55,8 @@ public sealed class SourceRegistry : IDisposable
     public IContentSource? Default() => Sources.FirstOrDefault(s => Get(s.Key) is not null) is { } info ? Get(info.Key) : null;
 
     /// <summary>并发聚合搜索全部 searchable 源，结果带站点来源标记。</summary>
-    public Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>> SearchAllAsync(string query, CancellationToken ct = default) =>
-        SearchWithFailuresAsync(query, ct).ContinueWith(t => (IReadOnlyList<(SourceInfo, MediaItem)>)t.Result.Results, ct);
+    public async Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>> SearchAllAsync(string query, CancellationToken ct = default) =>
+        (await SearchWithFailuresAsync(query, ct).ConfigureAwait(false)).Results;
 
     /// <summary>
     /// 并发聚合搜索，同时返回逐源失败原因。单站失败不影响其他站点，但失败必须可见——

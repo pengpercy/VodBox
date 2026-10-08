@@ -506,6 +506,38 @@ public sealed class ViewModelRaceTests
         Assert.Equal("item119", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
+    [AvaloniaFact]
+    public async Task Home_LateLoadCannotReplaceNewRecommendationsOrHero()
+    {
+        using var context = new Context();
+        var oldPage = Gate<MediaPage>();
+        var calls = 0;
+        context.Source.Home = _ => ++calls == 1 ? oldPage.Task : Task.FromResult(new MediaPage([new MediaItem { Id = "new", Title = "新推荐", Poster = "https://example/new.jpg" }], 1, 1));
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var old = home.LoadAsync();
+        await Done(home.LoadAsync());
+        oldPage.SetResult(new MediaPage([new MediaItem { Id = "old", Title = "旧推荐" }], 1, 1));
+        await Done(old);
+        Assert.Equal("new", Assert.Single(home.Recommendations).Id);
+        Assert.Equal("新推荐", home.HeroTitle);
+        Assert.Equal("https://example/new.jpg", home.HeroPoster);
+        Assert.Equal(context.Source.Name, home.SourceName);
+        Assert.False(home.Loading);
+    }
+
+    [AvaloniaFact]
+    public async Task Home_HeroUsesTheSourceThatProvidedRecommendations()
+    {
+        using var context = new Context();
+        var loaded = Gate<string>();
+        context.Source.Load = (id, _) => { loaded.TrySetResult(id); return Task.FromResult(Detail(id)); };
+        context.Source.Home = _ => Task.FromResult(new MediaPage([new MediaItem { Id = "hero", Title = "首页推荐" }], 1, 1));
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        await Done(home.LoadAsync());
+        home.OpenHeroCommand.Execute(null);
+        Assert.Equal("hero", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
     private sealed class Context : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), $"vodbox-vm-race-{Guid.NewGuid():N}");
@@ -544,7 +576,8 @@ public sealed class ViewModelRaceTests
             return Task.FromResult(Request(episodeId) with { MediaId = mediaId });
         }
         public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Func<CancellationToken, Task<MediaPage>> Home { get; set; } = _ => Task.FromResult(new MediaPage([], 1, 1));
+        public Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => Home(ct);
         public Task<MediaPage> GetItemsAsync(string categoryId, int page, IReadOnlyDictionary<string, string>? filters, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<MediaPage> SearchAsync(string query, int page, CancellationToken ct = default) => throw new NotSupportedException();
     }

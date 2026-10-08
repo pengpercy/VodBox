@@ -115,7 +115,7 @@
         <StackPanel Orientation="Horizontal" Spacing="8">
           <PathIcon Data="{StaticResource Icon.Sparkles}" Width="18" Height="18" VerticalAlignment="Center" />
           <TextBlock FontSize="16" FontWeight="SemiBold" Text="站点推荐" />
-          <TextBlock Text=" · 泥巴影视" FontSize="12.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding SourceName}" FontSize="12.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
           <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand"
                       PointerPressed="OnSwitchSource">
             <TextBlock Text="换源" FontSize="12" VerticalAlignment="Center" />
