@@ -7,18 +7,66 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <Grid RowDefinitions="Auto,Auto,*,Auto" DataContext="{Binding Vod}" Margin="28,12,28,20">
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" DataContext="{Binding Vod}" Margin="28,12,28,20">
 
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="14" Margin="0,0,0,16">
-      <TextBlock Text="点播" FontSize="24" FontWeight="SemiBold" />
-      <Button Content="📡 换源 ▾" CornerRadius="15" Background="#264CC2FF" Foreground="#4CC2FF"
-              BorderBrush="#4CC2FF" BorderThickness="1" Padding="12,5" Click="OnSwitchSource" Cursor="Hand" />
-      <TextBlock Text="网格" FontSize="12.5" Foreground="#4CC2FF" VerticalAlignment="Center" />
-      <TextBlock Text="列表" FontSize="12.5" Foreground="#85FFFFFF" VerticalAlignment="Center" Opacity="0.6" />
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,14">
+      <TextBlock Text="点播" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <!-- 当前站点（下拉换源）+ 可用站点计数，对齐设计稿 p-vod -->
+      <Button CornerRadius="15" Background="#264CC2FF" Foreground="#4CC2FF"
+              BorderBrush="#4CC2FF" BorderThickness="1" Padding="14,5" Click="OnSwitchSource" Cursor="Hand">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="📡" />
+          <TextBlock Text="泥巴影视" />
+          <TextBlock Text="▾" FontSize="10" />
+        </StackPanel>
+      </Button>
+      <TextBlock Text="共 12 个可用站点" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" Opacity="0.75" />
+      <Panel HorizontalAlignment="Right" />
+      <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
+        <Border CornerRadius="6" Background="#264CC2FF" Padding="10,4">
+          <TextBlock Text="▦ 网格" FontSize="11.5" Foreground="#4CC2FF" />
+        </Border>
+        <Border CornerRadius="6" Background="#12FFFFFF" Padding="10,4">
+          <TextBlock Text="≡ 列表" FontSize="11.5" Foreground="#85FFFFFF" />
+        </Border>
+      </StackPanel>
     </StackPanel>
 
-    <!-- 分类 Tab -->
-    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Hidden" Margin="0,0,0,12">
+    <!-- 筛选面板（类型/地区/年份/排序，对应 Filter/Value 模型；S5 接站点动态下发） -->
+    <Border Grid.Row="1" CornerRadius="10" Background="#0FAAAAAA" BorderBrush="#17FFFFFF" BorderThickness="1" Padding="16,12" Margin="0,0,0,12">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="类型" FontSize="11.5" Foreground="#85FFFFFF" Width="34" VerticalAlignment="Center" />
+          <Border CornerRadius="12" BorderBrush="#4CC2FF" BorderThickness="1" Background="#1A4CC2FF" Padding="10,3"><TextBlock Text="全部" FontSize="11.5" Foreground="#4CC2FF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="动作" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="喜剧" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="爱情" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="科幻" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="地区" FontSize="11.5" Foreground="#85FFFFFF" Width="34" VerticalAlignment="Center" />
+          <Border CornerRadius="12" BorderBrush="#4CC2FF" BorderThickness="1" Background="#1A4CC2FF" Padding="10,3"><TextBlock Text="全部" FontSize="11.5" Foreground="#4CC2FF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="大陆" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="香港" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="美国" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="年份" FontSize="11.5" Foreground="#85FFFFFF" Width="34" VerticalAlignment="Center" />
+          <Border CornerRadius="12" BorderBrush="#4CC2FF" BorderThickness="1" Background="#1A4CC2FF" Padding="10,3"><TextBlock Text="全部" FontSize="11.5" Foreground="#4CC2FF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="2026" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="2025" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="更早" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="排序" FontSize="11.5" Foreground="#85FFFFFF" Width="34" VerticalAlignment="Center" />
+          <Border CornerRadius="12" BorderBrush="#4CC2FF" BorderThickness="1" Background="#1A4CC2FF" Padding="10,3"><TextBlock Text="最新" FontSize="11.5" Foreground="#4CC2FF" /></Border>
+          <Border CornerRadius="12" Background="#12FFFFFF" Padding="10,3"><TextBlock Text="最热" FontSize="11.5" Foreground="#C7FFFFFF" /></Border>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- 分类 Tab（来自当前站点 Class 列表，横向滚动） -->
+    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Hidden" Margin="0,0,0,12">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <ItemsControl ItemsSource="{Binding Categories}">
           <ItemsControl.ItemsPanel>
@@ -39,7 +87,7 @@
     </ScrollViewer>
 
     <!-- 海报网格 -->
-    <ScrollViewer Grid.Row="2">
+    <ScrollViewer Grid.Row="3">
       <ItemsControl ItemsSource="{Binding Items}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
@@ -69,7 +117,7 @@
     </ScrollViewer>
 
     <!-- 分页 -->
-    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,16,0,0">
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,16,0,0">
       <Button Content="‹" Command="{Binding PrevPageCommand}" Width="30" Height="30" CornerRadius="6"
               Background="#12FFFFFF" BorderThickness="0" Foreground="#C7FFFFFF" />
       <Border CornerRadius="6" Background="#264CC2FF" Width="30" Height="30">

@@ -48,41 +48,138 @@ public static class DesignData
 
     private static void FillHome(MainViewModel main)
     {
+        // 英雄区（对齐设计稿 p-home：剧情简介两行截断，运行时为元信息，S5 接真简介）
         main.Home.HeroTitle = "庆余年 第二季";
         main.Home.HeroRemarks = "更新至 36 集 · 豆瓣 8.2";
-        main.Home.HeroDescription = "2024 · 大陆 · 古装 / 权谋";
-        foreach (var entry in History(3))
-            main.Home.Recent.Add(entry);
-        foreach (var item in Items(12))
-            main.Home.Recommendations.Add(item);
+        main.Home.HeroDescription = "身世神秘的少年范闲，历经家族、江湖、庙堂的种种考验与锤炼，书写出一段人生传奇。张若昀、李沁领衔主演。";
+
+        // 最近观看：6 张多样化卡（看剧中/已看完/直播回放，进度各异）——对齐设计稿
+        var recent = new (string title, string remarks, long pos, long dur)[]
+        {
+            ("庆余年 第二季", "看到 第12集 · 23:41", 1281_000, 45 * 60_000),
+            ("狐妖小红娘月红篇", "看到 第3集 · 08:12", 492_000, 45 * 60_000),
+            ("九龙城寨之围城", "已看完", 45 * 60_000, 45 * 60_000),
+            ("歌手 2024 直播回放", "看到 45:30", 2730_000, 90 * 60_000),
+            ("与凤行", "看到 第8集", 2100_000, 45 * 60_000),
+            ("承欢记", "看到 第1集", 300_000, 45 * 60_000),
+        };
+        for (var i = 0; i < recent.Length; i++)
+        {
+            var r = recent[i];
+            main.Home.Recent.Add(new HistoryEntry
+            {
+                SourceKey = "lzi",
+                SourceName = "量子资源",
+                MediaId = $"recent{i + 1}",
+                Title = r.title,
+                Poster = null,
+                Remarks = r.remarks,
+                LineId = "lzm3u8",
+                EpisodeId = $"ep{i + 1}",
+                PositionMs = r.pos,
+                DurationMs = r.dur,
+                UpdatedAt = DateTimeOffset.Now.AddHours(-i),
+            });
+        }
+
+        // 站点推荐：12 张（两行 × 6），徽标覆盖 更至/HD/完结/综艺/4K/动漫
+        var recommendations = new (string title, string remarks, string year, string area)[]
+        {
+            ("庆余年 第二季", "更至36集", "2024", "大陆"),
+            ("沙丘2", "HD", "2024", "欧美"),
+            ("狐妖小红娘月红篇", "更至14集", "2024", "大陆"),
+            ("九龙城寨之围城", "完结", "2024", "香港"),
+            ("歌手 2024", "综艺", "2024", "大陆"),
+            ("流浪地球3", "4K", "2027", "大陆"),
+            ("凡人修仙传", "更至128集", "2024", "大陆"),
+            ("繁花", "完结", "2023", "大陆"),
+            ("与凤行", "更至36集", "2024", "大陆"),
+            ("火星救援", "HD", "2015", "欧美"),
+            ("中国奇谭", "动漫", "2023", "大陆"),
+            ("周处除三害", "4K", "2024", "台湾"),
+        };
+        foreach (var r in recommendations)
+            main.Home.Recommendations.Add(new MediaItem
+            {
+                Id = $"rec{main.Home.Recommendations.Count + 1}",
+                Title = r.title,
+                Poster = null,
+                Remarks = r.remarks,
+                Year = r.year,
+                Area = r.area,
+                TypeName = "剧集",
+            });
     }
 
     private static void FillVod(MainViewModel main)
     {
-        foreach (var (id, name) in new[] { ("1", "全部"), ("2", "电影"), ("6", "连续剧"), ("3", "综艺"), ("4", "动漫") })
+        // 分类（对齐设计稿 p-vod：10 个分类横向滚动）
+        foreach (var (id, name) in new[]
+        {
+            ("1", "全部"), ("2", "电影"), ("6", "电视剧"), ("3", "综艺"), ("4", "动漫"),
+            ("5", "纪录片"), ("7", "短剧"), ("8", "少儿"), ("9", "美剧"), ("10", "韩剧"),
+        })
             main.Vod.Categories.Add(new Category(id, name));
         main.Vod.SelectedCategory = main.Vod.Categories[0];
-        foreach (var item in Items(12))
-            main.Vod.Items.Add(item);
+
+        // 12 张多样化卡片（徽标 + 年份/地区/类型各异——对齐设计稿）
+        var items = new (string title, string remarks, string year, string area, string type)[]
+        {
+            ("庆余年 第二季", "更至36集", "2024", "大陆", "古装"),
+            ("狐妖小红娘月红篇", "更至40集", "2024", "大陆", "奇幻"),
+            ("九龙城寨之围城", "HD", "2024", "香港", "动作"),
+            ("沙丘2", "4K", "2024", "美国", "科幻"),
+            ("与凤行", "完结", "2024", "大陆", "仙侠"),
+            ("承欢记", "更至28集", "2024", "大陆", "都市"),
+            ("凡人修仙传", "更至20集", "2024", "大陆", "动漫"),
+            ("繁花", "HD", "2023", "大陆", "剧情"),
+            ("歌手 2024", "综艺", "2024", "大陆", "音乐"),
+            ("我的后半生", "更至14集", "2024", "大陆", "都市"),
+            ("中国奇谭", "动漫", "2023", "大陆", "动画"),
+            ("周处除三害", "完结", "2024", "台湾", "动作"),
+        };
+        foreach (var it in items)
+            main.Vod.Items.Add(new MediaItem
+            {
+                Id = $"vod{main.Vod.Items.Count + 1}",
+                Title = it.title,
+                Poster = null,
+                Remarks = it.remarks,
+                Year = it.year,
+                Area = it.area,
+                TypeName = it.type,
+            });
         main.Vod.Page = 1;
         main.Vod.PageCount = 99;
     }
 
     private static void FillDetail(MainViewModel main)
     {
-        var episodes = Enumerable.Range(1, 12)
-            .Select(i => new Episode($"ep{i}", $"第{i:D2}集", $"https://cdn.example.com/s{i}.m3u8"))
+        // 36 集（设计稿：分段 1-20，倒序/分段控件为静态演示；DataTemplate 已带已看勾）
+        var episodes = Enumerable.Range(1, 36)
+            .Select(i => new Episode($"ep{i}", $"{i:D2}", $"https://cdn.example.com/s{i}.m3u8"))
             .ToList();
         main.Detail.Detail = new MediaDetail
         {
-            Item = Items(1)[0],
-            Description = "该剧改编自猫腻同名畅销小说。范闲率领使团北齐归来后，依然身处京都尔虞我诈的棋局之中……",
+            Item = new MediaItem
+            {
+                Id = "vod1",
+                Title = "庆余年 第二季",
+                Poster = null,
+                Remarks = "更新至 36 集 · 豆瓣 8.2",
+                Year = "2024",
+                Area = "中国大陆",
+                TypeName = "古装 / 权谋",
+            },
+            Description = "该剧改编自猫腻同名畅销小说，承接上季，范闲率领使团回归途中，二皇子以费介、范思辙以及滕家遗孤的安危来威胁范闲，逼他向自己俯首称臣……",
             Director = "孙皓",
-            Actor = "张若昀 / 李沁 / 陈道明 / 吴刚",
+            Actor = "张若昀 / 李沁 / 陈道明 / 吴刚 / 郭麒麟",
             Lines =
             [
-                new PlaybackLine("lzm3u8", "量子专线", episodes),
-                new PlaybackLine("yunque", "云雀备用", episodes),
+                new PlaybackLine("lzm3u8", "主线 ①", episodes),
+                new PlaybackLine("yunque", "主线 ②", episodes),
+                new PlaybackLine("bk4k", "备用 4K", episodes),
+                new PlaybackLine("hw", "海外专线", episodes),
             ],
         };
         foreach (var line in main.Detail.Detail.Lines) main.Detail.Lines.Add(line);

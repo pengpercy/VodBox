@@ -10,17 +10,26 @@
   <ScrollViewer Padding="28,12,28,28">
     <StackPanel Spacing="26" DataContext="{Binding Home}">
 
-      <!-- 英雄区 -->
-      <Border CornerRadius="12" Height="300" ClipToBounds="True" Background="#3A2F4A"
-              PointerPressed="OnHeroPressed" Cursor="Hand">
+      <!-- 英雄区（蓝紫渐变 + 左侧文字遮罩 + 按钮组 + 轮播指示器，对齐设计稿 p-home） -->
+      <Border CornerRadius="12" Height="300" ClipToBounds="True" PointerPressed="OnHeroPressed" Cursor="Hand">
         <Panel>
-          <Border Background="#2B3242" />
+          <!-- 蓝紫渐变底 -->
+          <Border>
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Color="#1E3A5F" Offset="0" />
+                <GradientStop Color="#2D1B4E" Offset="0.6" />
+                <GradientStop Color="#4A1B4E" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+          </Border>
+          <!-- 左侧文字可读性遮罩 -->
           <Border>
             <Border.Background>
               <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
-                <GradientStop Color="#E6161620" Offset="0" />
-                <GradientStop Color="#73161620" Offset="0.55" />
-                <GradientStop Color="#00161620" Offset="1" />
+                <GradientStop Color="#E00E0E14" Offset="0" />
+                <GradientStop Color="#990E0E14" Offset="0.55" />
+                <GradientStop Color="#000E0E14" Offset="1" />
               </LinearGradientBrush>
             </Border.Background>
           </Border>
@@ -28,13 +37,22 @@
             <TextBlock Text="今日推荐 · TOP 1" FontSize="11.5" Foreground="#4CC2FF" LetterSpacing="2" />
             <TextBlock Text="{Binding HeroTitle}" FontSize="30" FontWeight="SemiBold" />
             <TextBlock Text="{Binding HeroRemarks}" FontSize="13" Foreground="#4CC2FF" />
-            <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" />
+            <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" MaxLines="2" TextTrimming="CharacterEllipsis" />
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
               <Button Content="▶ 立即播放" Background="#0078D4" Foreground="White" BorderThickness="0"
                       CornerRadius="7" Padding="18,9" Click="OnHeroPlay" Cursor="Hand" />
+              <Button Content="详情" Background="#12FFFFFF" Foreground="White" BorderThickness="1"
+                      BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
               <Button Content="⭐ 收藏" Background="#12FFFFFF" Foreground="White" BorderThickness="1"
                       BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
             </StackPanel>
+          </StackPanel>
+          <!-- 轮播指示器（右下角，当前位为胶囊） -->
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24">
+            <Border CornerRadius="4" Width="22" Height="7" Background="#4CC2FF" />
+            <Border CornerRadius="3.5" Width="7" Height="7" Background="#59FFFFFF" />
+            <Border CornerRadius="3.5" Width="7" Height="7" Background="#59FFFFFF" />
+            <Border CornerRadius="3.5" Width="7" Height="7" Background="#59FFFFFF" />
           </StackPanel>
         </Panel>
       </Border>
@@ -79,7 +97,8 @@
       <!-- 推荐 -->
       <StackPanel Spacing="14">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="✨ 站点推荐" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock FontSize="16" FontWeight="SemiBold" Text="✨ 站点推荐" />
+          <TextBlock Text=" · 泥巴影视" FontSize="12.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
           <TextBlock Text="换源 ▾" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand"
                      PointerPressed="OnSwitchSource" />
         </StackPanel>

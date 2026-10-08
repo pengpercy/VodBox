@@ -19,15 +19,22 @@
         <StackPanel Grid.Column="1" Spacing="12" VerticalAlignment="Top">
           <TextBlock Text="{Binding Detail.Item.Title}" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="13" Foreground="#4CC2FF" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
+          <!-- 元信息行：站源 + 年份 + 地区 + 类型 + 时长（对齐设计稿 p-detail） -->
+          <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <TextBlock FontSize="12" Foreground="#85FFFFFF">
+              <Run Text="站源：" /><Run Text="泥巴影视" Foreground="#C7FFFFFF" />
+            </TextBlock>
             <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
-              <TextBlock Text="2024" FontSize="12" Foreground="#C7FFFFFF" />
+              <TextBlock Text="{Binding Detail.Item.Year}" FontSize="12" Foreground="#C7FFFFFF" />
             </Border>
             <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
               <TextBlock Text="{Binding Detail.Item.Area}" FontSize="12" Foreground="#C7FFFFFF" />
             </Border>
             <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
               <TextBlock Text="{Binding Detail.Item.TypeName}" FontSize="12" Foreground="#C7FFFFFF" />
+            </Border>
+            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4">
+              <TextBlock Text="45 分钟/集" FontSize="12" Foreground="#C7FFFFFF" />
             </Border>
           </StackPanel>
           <TextBlock FontSize="12.5" Foreground="#85FFFFFF" TextWrapping="Wrap">
@@ -39,13 +46,22 @@
           <TextBlock Text="{Binding Detail.Description}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9"
                      TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
           <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
-            <Button Content="▶ 立即播放" Command="{Binding PlayCommand}" Background="#0078D4"
-                    Foreground="White" BorderThickness="0" CornerRadius="7" Padding="18,9" Cursor="Hand" />
+            <!-- 主按钮智能显示续播集数（读取历史进度，S2 接运行时逻辑；设计稿为「续播 第12集」） -->
+            <Button Command="{Binding PlayCommand}" Background="#0078D4"
+                    Foreground="White" BorderThickness="0" CornerRadius="7" Padding="18,9" Cursor="Hand">
+              <TextBlock><Run Text="▶ 续播 第12集" /></TextBlock>
+            </Button>
             <Button Command="{Binding ToggleFavoriteCommand}" Background="#12FFFFFF" Foreground="White"
                     BorderThickness="1" BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Cursor="Hand">
-              <TextBlock>
-                <Run Text="⭐ " /><Run Text="{Binding IsFavorite, Mode=OneWay}" />
-              </TextBlock>
+              <TextBlock><Run Text="⭐ 收藏" /></TextBlock>
+            </Button>
+            <Button Background="#12FFFFFF" Foreground="White" BorderThickness="1" BorderBrush="#17FFFFFF"
+                    CornerRadius="7" Padding="18,9" Cursor="Hand">
+              <TextBlock><Run Text="🔍 换源" /></TextBlock>
+            </Button>
+            <Button Background="#12FFFFFF" Foreground="White" BorderThickness="1" BorderBrush="#17FFFFFF"
+                    CornerRadius="7" Padding="18,9" Cursor="Hand">
+              <TextBlock><Run Text="📱 推送" /></TextBlock>
             </Button>
           </StackPanel>
         </StackPanel>
@@ -54,18 +70,40 @@
         <!-- TODO(S5 影院模式)：若需要内嵌小窗播放，此处可挂第二个 MpvVideoSurface（需独立 MpvClient，mpv 单实例只能一个 render context 时共享渲染面）。
              当前产品决策：播放统一走全局浮层，此窗只作提示。 -->
         <StackPanel Grid.Column="3" Spacing="10">
-          <Border CornerRadius="12" Height="193" Background="#000000" ClipToBounds="True">
-            <TextBlock Text="播放中 · 请看底部浮层" FontSize="11.5" Foreground="#85FFFFFF"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          <!-- 内嵌试看播放器（影院模式占位：S5 接第二个 MpvVideoSurface；当前产品决策为全局浮层） -->
+          <Border CornerRadius="12" Height="193" ClipToBounds="True" Cursor="Hand">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Color="#1E3A5F" Offset="0" />
+                <GradientStop Color="#2D1B4E" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+            <Panel>
+              <!-- 中央播放按钮 -->
+              <Border CornerRadius="28" Width="56" Height="56" Background="#66000000" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="▶" FontSize="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <!-- 右上清晰度标 -->
+              <Border CornerRadius="4" Background="#66000000" Padding="7,3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
+                <TextBlock Text="1080P" FontSize="10" Foreground="#4CC2FF" FontWeight="SemiBold" />
+              </Border>
+              <!-- 左下试看提示 -->
+              <Border Background="#66000000" Padding="10,5" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,10" CornerRadius="0,8,8,0">
+                <TextBlock Text="试看模式 · 点击全屏播放" FontSize="10.5" Foreground="#C7FFFFFF" />
+              </Border>
+            </Panel>
           </Border>
-          <TextBlock Text="播放画面显示在全局播放浮层中" FontSize="11" Foreground="#85FFFFFF"
+          <TextBlock Text="鼠标双击画面 / 按 Enter 进入全屏播放窗口" FontSize="10.5" Foreground="#85FFFFFF"
                      HorizontalAlignment="Center" />
         </StackPanel>
       </Grid>
 
-      <!-- 线路 -->
+      <!-- 线路（vod_play_from 拆分；播放失败时可切换其他线路） -->
       <StackPanel Spacing="10">
-        <TextBlock Text="线路" FontSize="14" FontWeight="SemiBold" />
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="线路" FontSize="14" FontWeight="SemiBold" />
+          <TextBlock Text="播放失败时可切换其他线路" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+        </StackPanel>
         <ItemsControl ItemsSource="{Binding Lines}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -82,11 +120,20 @@
         </ItemsControl>
       </StackPanel>
 
-      <!-- 剧集 -->
+      <!-- 剧集（分段 >20 集自动分页；倒序；已看带勾；当前集高亮） -->
       <StackPanel Spacing="10">
         <StackPanel Orientation="Horizontal" Spacing="10">
           <TextBlock Text="剧集" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="选择集数开始播放" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <TextBlock Text="共 36 集" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <Panel />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Border CornerRadius="6" Background="#12FFFFFF" Padding="10,4" Cursor="Hand">
+              <TextBlock Text="⇅ 倒序" FontSize="11.5" Foreground="#C7FFFFFF" />
+            </Border>
+            <Border CornerRadius="6" Background="#12FFFFFF" Padding="10,4" Cursor="Hand">
+              <TextBlock Text="1 — 20 ▾" FontSize="11.5" Foreground="#C7FFFFFF" />
+            </Border>
+          </StackPanel>
         </StackPanel>
         <ItemsControl ItemsSource="{Binding SelectedLine.Episodes}">
           <ItemsControl.ItemsPanel>
@@ -96,12 +143,38 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Button Content="{Binding Title}" Click="OnPickEpisode" Tag="{Binding}" Margin="0,0,8,8"
-                      CornerRadius="7" Padding="0,9" FontSize="12.5" Cursor="Hand"
-                      Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
+              <Grid Margin="0,0,8,8">
+                <Button Content="{Binding Title}" Click="OnPickEpisode" Tag="{Binding}"
+                        CornerRadius="7" Padding="0,9" FontSize="12.5" Cursor="Hand"
+                        Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
+                <!-- 已看小勾（右上角，S2 接真实观看历史） -->
+                <TextBlock Text="✓" FontSize="9" Foreground="#4CAF50" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,3,4,0" />
+              </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+      </StackPanel>
+
+      <!-- 快捷换站（同名内容在其他站点的结果，点击即切换） -->
+      <StackPanel Spacing="10">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="快捷换站" FontSize="14" FontWeight="SemiBold" />
+          <TextBlock Text="同名内容在其他站点的结果，点击即切换" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Border CornerRadius="8" Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" Padding="14,7" Cursor="Hand">
+            <TextBlock FontSize="12"><Run Text="🎬 " /><Run Text="金牌影院 · 更至36集" Foreground="#C7FFFFFF" /></TextBlock>
+          </Border>
+          <Border CornerRadius="8" Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" Padding="14,7" Cursor="Hand">
+            <TextBlock FontSize="12"><Run Text="🎬 " /><Run Text="量子影视 · 更至36集" Foreground="#C7FFFFFF" /></TextBlock>
+          </Border>
+          <Border CornerRadius="8" Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" Padding="14,7" Cursor="Hand">
+            <TextBlock FontSize="12"><Run Text="🎬 " /><Run Text="天堂影视 · 更至30集" Foreground="#C7FFFFFF" /></TextBlock>
+          </Border>
+          <Border CornerRadius="8" Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" Padding="14,7" Cursor="Hand">
+            <TextBlock FontSize="12"><Run Text="🎬 " /><Run Text="卧龙视频 · HD" Foreground="#C7FFFFFF" /></TextBlock>
+          </Border>
+        </StackPanel>
       </StackPanel>
     </StackPanel>
   </ScrollViewer>
