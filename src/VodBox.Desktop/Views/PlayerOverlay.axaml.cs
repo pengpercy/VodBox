@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
+using VodBox.Core;
 using VodBox.Playback.Mpv;
 
 namespace VodBox.Desktop.Views;
@@ -131,7 +132,39 @@ public partial class PlayerOverlay : UserControl
 
     private void OnToggleSettings(object? sender, RoutedEventArgs e)
     {
-        if (VM is { } vm) vm.FlashToast("播放设置（S2 接）");
+        if (VM is not { } vm || sender is not Button button) return;
+        var menu = new ContextMenu();
+        foreach (var (kind, label) in new[] { (TrackKind.Audio, "音轨"), (TrackKind.Subtitle, "字幕") })
+        {
+            var group = new MenuItem { Header = label };
+            var items = new List<MenuItem>();
+            var tracks = vm.GetTracks(kind);
+            foreach (var track in tracks)
+            {
+                var item = new MenuItem { Header = (track.IsSelected ? "当前 · " : "") + track.Name };
+                var sessionId = vm.CurrentSessionId;
+                item.Click += async (_, _) =>
+                {
+                    if (vm.CurrentSessionId == sessionId) await vm.SelectTrackAsync(kind, track.Id);
+                };
+                items.Add(item);
+            }
+            if (kind == TrackKind.Subtitle)
+            {
+                var off = new MenuItem { Header = "关闭字幕" };
+                var sessionId = vm.CurrentSessionId;
+                off.Click += async (_, _) =>
+                {
+                    if (vm.CurrentSessionId == sessionId) await vm.SelectTrackAsync(kind, "no");
+                };
+                items.Add(off);
+            }
+            if (items.Count == 0) items.Add(new MenuItem { Header = "暂无可用轨道", IsEnabled = false });
+            group.ItemsSource = items;
+            menu.Items.Add(group);
+        }
+        button.ContextMenu = menu;
+        menu.Open(button);
     }
 
     private void OnToggleAspectRatio(object? sender, RoutedEventArgs e)

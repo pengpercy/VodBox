@@ -111,6 +111,23 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
+    public long CurrentSessionId => _intent;
+
+    public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) => _engine.GetTracks(kind);
+
+    public async Task SelectTrackAsync(TrackKind kind, string id)
+    {
+        var intent = _intent;
+        try { await _engine.SelectTrackAsync(kind, id); }
+        catch (Exception error)
+        {
+            await _main.RunOnUiAsync(() =>
+            {
+                if (intent == _intent) FlashToast($"切换轨道失败：{error.Message}");
+            });
+        }
+    }
+
     [RelayCommand]
     public void TogglePlayPause()
     {
