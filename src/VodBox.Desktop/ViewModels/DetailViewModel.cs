@@ -14,6 +14,9 @@ public sealed partial class DetailViewModel : ObservableObject
 
     public ObservableCollection<PlaybackLine> Lines { get; } = [];
 
+    /// <summary>剧集行集合（每行 10 集，虚拟化网格数据源；切线路时重建）。</summary>
+    public ObservableCollection<EpisodeRow> EpisodeRows { get; } = [];
+
     [ObservableProperty] private MediaDetail? _detail;
     [ObservableProperty] private PlaybackLine? _selectedLine;
     [ObservableProperty] private Episode? _selectedEpisode;
@@ -34,7 +37,18 @@ public sealed partial class DetailViewModel : ObservableObject
 
     partial void OnSelectedLineChanged(PlaybackLine? value)
     {
+        RebuildEpisodeRows();
         SelectedEpisode = value?.Episodes.FirstOrDefault();
+    }
+
+    /// <summary>当前线路剧集按 10 集/行分块（虚拟化网格）。</summary>
+    private void RebuildEpisodeRows()
+    {
+        EpisodeRows.Clear();
+        if (SelectedLine is null) return;
+        var episodes = SelectedLine.Episodes;
+        for (var i = 0; i < episodes.Count; i += 10)
+            EpisodeRows.Add(new EpisodeRow(episodes.Skip(i).Take(10).ToList()));
     }
 
     /// <summary>从卡片进入详情。</summary>
@@ -172,4 +186,11 @@ public sealed partial class DetailViewModel : ObservableObject
         IsFavorite = !IsFavorite;
         await _services.Store.SetFavoriteAsync(entry, IsFavorite);
     }
+}
+
+/// <summary>剧集网格行（10 集）。</summary>
+public sealed class EpisodeRow
+{
+    public IReadOnlyList<Episode> Items { get; }
+    public EpisodeRow(IReadOnlyList<Episode> items) => Items = items;
 }

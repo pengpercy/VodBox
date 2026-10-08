@@ -135,24 +135,32 @@
             </Border>
           </StackPanel>
         </StackPanel>
-        <ItemsControl ItemsSource="{Binding SelectedLine.Episodes}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <UniformGrid Columns="10" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
+        <!-- 剧集网格：分块行虚拟化（长剧 500+ 集只渲染可见行）；独立滚动区 260 高 -->
+        <ListBox ItemsSource="{Binding EpisodeRows}" Background="Transparent" BorderThickness="0"
+                 MaxHeight="260" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
             <DataTemplate>
-              <Grid Margin="0,0,8,8">
-                <Button Content="{Binding Title}" Click="OnPickEpisode" Tag="{Binding}"
-                        CornerRadius="7" Padding="0,9" FontSize="12.5" Cursor="Hand"
-                        Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
-                <!-- 已看小勾（右上角，S2 接真实观看历史） -->
-                <TextBlock Text="✓" FontSize="9" Foreground="#4CAF50" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,3,4,0" />
-              </Grid>
+              <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Grid Margin="0,0,8,8" Width="72">
+                      <Button Content="{Binding Title}" Click="OnPickEpisode" Tag="{Binding}"
+                              CornerRadius="7" Padding="0,9" FontSize="12.5" Cursor="Hand"
+                              Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
+                      <!-- 已看小勾（右上角，S2 接真实观看历史） -->
+                      <TextBlock Text="✓" FontSize="9" Foreground="#4CAF50" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,3,4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
             </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+          </ListBox.ItemTemplate>
+        </ListBox>
       </StackPanel>
 
       <!-- 快捷换站（同名内容在其他站点的结果，点击即切换） -->

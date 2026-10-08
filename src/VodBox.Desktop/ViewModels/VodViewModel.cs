@@ -15,6 +15,9 @@ public sealed partial class VodViewModel : ObservableObject
     public ObservableCollection<Category> Categories { get; } = [];
     public ObservableCollection<MediaItem> Items { get; } = [];
 
+    /// <summary>海报行集合（每行 6 张，虚拟化网格数据源）。</summary>
+    public ObservableCollection<MediaRow> Rows { get; } = [];
+
     [ObservableProperty] private Category? _selectedCategory;
     [ObservableProperty] private int _page = 1;
     [ObservableProperty] private int _pageCount = 1;
@@ -55,6 +58,7 @@ public sealed partial class VodViewModel : ObservableObject
             var result = await source.GetItemsAsync(SelectedCategory.Id, Page, null);
             Items.Clear();
             foreach (var item in result.Items) Items.Add(item);
+            RebuildRows();
             PageCount = Math.Max(1, result.PageCount);
         }
         catch (Exception error)
@@ -85,4 +89,19 @@ public sealed partial class VodViewModel : ObservableObject
         var key = _services.Registry.Sources.FirstOrDefault(s => s.Runtime == SourceRuntime.MacCms)?.Key ?? "";
         _main.Detail.Open(key, item);
     }
+
+    /// <summary>海报按 6 张/行分块（虚拟化网格数据源）。</summary>
+    private void RebuildRows()
+    {
+        Rows.Clear();
+        for (var i = 0; i < Items.Count; i += 6)
+            Rows.Add(new MediaRow(Items.Skip(i).Take(6).ToList()));
+    }
+}
+
+/// <summary>海报网格行（6 张卡）。</summary>
+public sealed class MediaRow
+{
+    public IReadOnlyList<MediaItem> Items { get; }
+    public MediaRow(IReadOnlyList<MediaItem> items) => Items = items;
 }

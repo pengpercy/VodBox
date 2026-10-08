@@ -65,8 +65,8 @@
       <!-- 更早 -->
       <TextBlock Text="更早" FontSize="16" FontWeight="SemiBold"
                  IsVisible="{Binding Earlier.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
-      <ItemsControl ItemsSource="{Binding Earlier}">
-        <ItemsControl.ItemTemplate>
+      <ListBox ItemsSource="{Binding Earlier}" Background="Transparent" BorderThickness="0" Padding="0">
+        <ListBox.ItemTemplate>
           <DataTemplate>
             <Border CornerRadius="8" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1"
                     Padding="14" Margin="0,0,0,10" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
@@ -95,8 +95,8 @@
               </Grid>
             </Border>
           </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+        </ListBox.ItemTemplate>
+      </ListBox>
 
       <TextBlock Text="暂无观看记录" FontSize="12.5" Foreground="#85FFFFFF" HorizontalAlignment="Center"
                  Margin="0,20,0,0" IsVisible="{Binding Entries.Count, Converter={x:Static views:CountConverters.IsZero}}" />

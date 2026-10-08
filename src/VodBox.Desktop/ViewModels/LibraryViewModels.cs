@@ -15,6 +15,9 @@ public sealed partial class FavoritesViewModel : ObservableObject
     public ObservableCollection<FavoriteEntry> Vod { get; } = [];
     public ObservableCollection<FavoriteEntry> Live { get; } = [];
 
+    /// <summary>收藏网格行集合（每行 6 张，虚拟化数据源；LoadAsync 后重建）。</summary>
+    public ObservableCollection<FavoriteRow> VodRows { get; } = [];
+
     [ObservableProperty] private int _tab; // 0=点播 1=直播
     /// <summary>管理模式（多选删除，设计稿 ①）。S5 接批量删除。</summary>
     [ObservableProperty] private bool _managing;
@@ -33,6 +36,15 @@ public sealed partial class FavoritesViewModel : ObservableObject
         foreach (var entry in await _services.Store.GetFavoritesAsync(FavoriteKind.Vod)) Vod.Add(entry);
         Live.Clear();
         foreach (var entry in await _services.Store.GetFavoritesAsync(FavoriteKind.Live)) Live.Add(entry);
+        RebuildVodRows();
+    }
+
+    /// <summary>收藏按 6 张/行分块（虚拟化网格）。</summary>
+    public void RebuildVodRows()
+    {
+        VodRows.Clear();
+        for (var i = 0; i < Vod.Count; i += 6)
+            VodRows.Add(new FavoriteRow(Vod.Skip(i).Take(6).ToList()));
     }
 
     [RelayCommand]
@@ -56,6 +68,7 @@ public sealed partial class FavoritesViewModel : ObservableObject
     {
         await _services.Store.SetFavoriteAsync(entry, false);
         (entry.Kind == FavoriteKind.Vod ? Vod : Live).Remove(entry);
+        RebuildVodRows();
     }
 }
 
@@ -115,4 +128,11 @@ public sealed partial class HistoryViewModel : ObservableObject
         await _services.Store.ClearHistoryAsync();
         Entries.Clear();
     }
+}
+
+/// <summary>收藏网格行（6 张卡）。</summary>
+public sealed class FavoriteRow
+{
+    public IReadOnlyList<FavoriteEntry> Items { get; }
+    public FavoriteRow(IReadOnlyList<FavoriteEntry> items) => Items = items;
 }

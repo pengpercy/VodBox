@@ -7,10 +7,13 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <ScrollViewer Padding="28,16,28,28">
-    <StackPanel Spacing="18" DataContext="{Binding Search}">
+  <!-- 两行布局：搜索区固定在顶部，结果区独立滚动。
+       结果网格用 ListBox（自带 VirtualizingStackPanel）按行分块渲染——
+       数据量大时只实例化可见行，不再全量铺开（性能关键）。 -->
+  <Grid RowDefinitions="Auto,*" Margin="28,16,28,28" DataContext="{Binding Search}">
 
-      <!-- 中央大搜索框 + 搜索按钮（对齐设计稿 ①：输入即联想，Enter 聚合搜索） -->
+    <!-- 上：搜索框 + 联想 + 汇总行 -->
+    <StackPanel Grid.Row="0" Spacing="18">
       <StackPanel Spacing="10" HorizontalAlignment="Center" Margin="0,8,0,0" Width="640">
         <StackPanel Orientation="Horizontal" Spacing="12">
           <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="500" Height="44"
@@ -21,7 +24,7 @@
                   BorderThickness="0" FontSize="13.5" FontWeight="SemiBold" Cursor="Hand" />
         </StackPanel>
 
-        <!-- 联想列表（输入中显示；热词带 🔥） -->
+        <!-- 联想列表（热词带 🔥） -->
         <Border CornerRadius="10" Background="#E6161616" BorderBrush="#17FFFFFF" BorderThickness="1"
                 IsVisible="{Binding ShowSuggestions}" ClipToBounds="True">
           <ItemsControl ItemsSource="{Binding Suggestions}">
@@ -40,7 +43,7 @@
         </Border>
       </StackPanel>
 
-      <!-- 结果说明 + 搜索历史（设计稿：8 个站点找到结果 · 历史×可删） -->
+      <!-- 结果说明 + 搜索历史 -->
       <Grid ColumnDefinitions="*,Auto" MinHeight="24">
         <TextBlock Grid.Column="0" Text="{Binding Summary}" FontSize="13" Foreground="#85FFFFFF"
                    VerticalAlignment="Center" />
@@ -65,54 +68,62 @@
           </ItemsControl>
         </StackPanel>
       </Grid>
+    </StackPanel>
 
-      <!-- 左站点列表（徽标=结果数/转圈/0，设计稿 ②）+ 右结果网格 -->
-      <Grid ColumnDefinitions="210,20,*">
-        <Border Grid.Column="0" CornerRadius="10" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
-                BorderThickness="1" Padding="6">
-          <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0"
-                   SelectionChanged="OnSiteChanged">
-            <ListBox.ItemTemplate>
-              <DataTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="4,6" Cursor="Hand">
-                  <TextBlock Text="{Binding SiteName}" FontSize="13" />
-                  <TextBlock Text="{Binding Items.Count}" FontSize="11.5" Foreground="#4CC2FF"
-                             VerticalAlignment="Center" FontWeight="SemiBold" />
-                  <TextBlock Text="⟳" FontSize="13" Foreground="#4CC2FF" VerticalAlignment="Center"
-                             IsVisible="{Binding Loading}" />
-                </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-        </Border>
-
-        <ItemsControl Grid.Column="2" ItemsSource="{Binding AllResults}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <UniformGrid Columns="5" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
+    <!-- 下：站点列表 + 虚拟化结果网格 -->
+    <Grid Grid.Row="1" ColumnDefinitions="210,20,*" Margin="0,14,0,0">
+      <Border Grid.Column="0" CornerRadius="10" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
+              BorderThickness="1" Padding="6">
+        <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0"
+                 SelectionChanged="OnSiteChanged">
+          <ListBox.ItemTemplate>
             <DataTemplate>
-              <StackPanel Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
-                <Border CornerRadius="8" Height="216" Background="#274064" ClipToBounds="True">
-                  <Panel>
-                    <TextBlock Text="🎬" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
-                            VerticalAlignment="Top" Margin="6">
-                      <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />
-                    </Border>
-                  </Panel>
-                </Border>
-                <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-                <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
-                  <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
-                </TextBlock>
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="4,6" Cursor="Hand">
+                <TextBlock Text="{Binding SiteName}" FontSize="13" />
+                <TextBlock Text="{Binding Items.Count}" FontSize="11.5" Foreground="#4CC2FF"
+                           VerticalAlignment="Center" FontWeight="SemiBold" />
+                <TextBlock Text="⟳" FontSize="13" Foreground="#4CC2FF" VerticalAlignment="Center"
+                           IsVisible="{Binding Loading}" />
               </StackPanel>
             </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </Grid>
-    </StackPanel>
-  </ScrollViewer>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+
+      <!-- 结果网格：按行分块（ResultRowVM.Items = 5 张卡），ListBox 垂直虚拟化 -->
+      <ListBox Grid.Column="2" ItemsSource="{Binding ResultRows}" Background="Transparent"
+               BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Width="170" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
+                    <Border CornerRadius="8" Height="216" Background="#274064" ClipToBounds="True">
+                      <Panel>
+                        <TextBlock Text="🎬" FontSize="32" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
+                                VerticalAlignment="Top" Margin="6">
+                          <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />
+                        </Border>
+                      </Panel>
+                    </Border>
+                    <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                      <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
+                    </TextBlock>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Grid>
+  </Grid>
 </UserControl>

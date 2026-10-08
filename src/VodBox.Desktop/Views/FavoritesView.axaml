@@ -48,16 +48,20 @@
         </StackPanel>
       </Grid>
 
-      <!-- 收藏网格（设计稿：6 张 + 徽标 + 站点·时间） -->
-      <ItemsControl ItemsSource="{Binding Vod}">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate>
-            <UniformGrid Columns="6" />
-          </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
+      <!-- 收藏网格：分块行虚拟化（6 张/行，收藏无上限时只渲染可见行） -->
+      <ListBox ItemsSource="{Binding VodRows}" Background="Transparent" BorderThickness="0"
+               Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" MaxHeight="480">
+        <ListBox.ItemTemplate>
           <DataTemplate>
-            <StackPanel Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenFavorite" Tag="{Binding}">
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Width="158" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenFavorite" Tag="{Binding}">
               <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
                 <Panel>
                   <TextBlock Text="🎬" FontSize="34" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -74,10 +78,13 @@
               <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                 <Run Text="{Binding SourceName}" /><Run Text=" · " /><Run Text="{Binding CreatedAt, Converter={x:Static views:TimeAgoConverters.ToAgo}, Mode=OneWay}" />
               </TextBlock>
-            </StackPanel>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+        </ListBox.ItemTemplate>
+      </ListBox>
 
       <TextBlock Text="暂无收藏 — 在详情页点击 ⭐ 收藏" FontSize="12.5" Foreground="#85FFFFFF"
                  HorizontalAlignment="Center" Margin="0,20,0,0"

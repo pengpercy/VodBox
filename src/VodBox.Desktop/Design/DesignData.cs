@@ -154,6 +154,10 @@ public static class DesignData
             });
         main.Vod.Page = 1;
         main.Vod.PageCount = 99;
+        // 分块行（6 张/行，虚拟化网格数据源）
+        for (var i = 0; i < main.Vod.Items.Count; i += 6)
+            main.Vod.Rows.Add(new MediaRow(main.Vod.Items.Skip(i).Take(6).ToList()));
+
     }
 
     private static void FillDetail(MainViewModel main)
@@ -245,6 +249,9 @@ public static class DesignData
             main.Search.SiteResults.Add(site);
         }
         foreach (var item in Items(10)) main.Search.AllResults.Add(item);
+        // 分块行（5 张/行）
+        for (var i = 0; i < main.Search.AllResults.Count; i += 5)
+            main.Search.ResultRows.Add(new ResultRow(main.Search.AllResults.Skip(i).Take(5).ToList()));
         // 联想列表（热词带 🔥）
         foreach (var (text, hot) in new[] { ("庆余年 第二季", true), ("庆余年 第一季", false), ("庆余年 动画版", false), ("庆余年 有声书", false) })
             main.Search.Suggestions.Add(new SuggestItem { Text = text, Hot = hot });
@@ -277,6 +284,7 @@ public static class DesignData
             MediaId = "cctv1", Title = "CCTV-1 综合", Remarks = "常看",
             CreatedAt = DateTimeOffset.Now.AddDays(-1),
         });
+        main.Favorites.RebuildVodRows();
     }
 
     private static void FillHistory(MainViewModel main)

@@ -19,6 +19,9 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>搜索历史胶囊（点击回搜、× 删除）。</summary>
     public ObservableCollection<string> SearchHistory { get; } = [];
 
+    /// <summary>结果行集合：每行 5 张卡（虚拟化网格的数据源，行容器数 = 可见行数）。</summary>
+    public ObservableCollection<ResultRow> ResultRows { get; } = [];
+
     [ObservableProperty] private string _keyword = "";
     [ObservableProperty] private bool _searching;
     [ObservableProperty] private string _summary = "";
@@ -43,7 +46,8 @@ public sealed partial class SearchViewModel : ObservableObject
         {
             var results = await _services.Registry.SearchAllAsync(Keyword);
             AllResults.Clear();
-            foreach (var (_, item) in results.Take(60)) AllResults.Add(item);
+            foreach (var (_, item) in results.Take(500)) AllResults.Add(item);
+            RebuildResultRows();
             var bySite = results.GroupBy(r => r.Site).ToList();
             foreach (var group in bySite)
             {
@@ -78,6 +82,14 @@ public sealed partial class SearchViewModel : ObservableObject
         if (site is null) return;
         _main.Detail.Open(site.SourceKey, item);
     }
+
+    /// <summary>把 AllResults 按 5 张/行分块（网格外观 + 垂直虚拟化的折中方案）。</summary>
+    private void RebuildResultRows()
+    {
+        ResultRows.Clear();
+        for (var i = 0; i < AllResults.Count; i += 5)
+            ResultRows.Add(new ResultRow(AllResults.Skip(i).Take(5).ToList()));
+    }
 }
 
 /// <summary>单站点搜索结果组。</summary>
@@ -104,4 +116,11 @@ public sealed class SuggestItem
 {
     public string Text { get; init; } = "";
     public bool Hot { get; init; }
+}
+
+/// <summary>结果网格行（5 张卡）。</summary>
+public sealed class ResultRow
+{
+    public IReadOnlyList<MediaItem> Items { get; }
+    public ResultRow(IReadOnlyList<MediaItem> items) => Items = items;
 }
