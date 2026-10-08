@@ -14,10 +14,17 @@ public sealed partial class SearchViewModel : ObservableObject
 
     public ObservableCollection<SearchSiteResult> SiteResults { get; } = [];
     public ObservableCollection<MediaItem> AllResults { get; } = [];
+    /// <summary>输入联想（站点 suggest 接口 / 本地历史混合，S5 接真接口）。</summary>
+    public ObservableCollection<SuggestItem> Suggestions { get; } = [];
+    /// <summary>搜索历史胶囊（点击回搜、× 删除）。</summary>
+    public ObservableCollection<string> SearchHistory { get; } = [];
 
     [ObservableProperty] private string _keyword = "";
     [ObservableProperty] private bool _searching;
     [ObservableProperty] private string _summary = "";
+    [ObservableProperty] private bool _showSuggestions;
+    /// <summary>当前选中的站点结果组（右侧网格随它切换）；null = 全部结果。</summary>
+    [ObservableProperty] private SearchSiteResult? _selectedSite;
 
     public SearchViewModel(AppServices services, MainViewModel main)
     {
@@ -45,7 +52,14 @@ public sealed partial class SearchViewModel : ObservableObject
                 foreach (var (_, item) in group.Take(40))
                     site.Items.Add(item);
             }
-            Summary = $"「{Keyword}」在 {bySite.Count} 个站点找到 {results.Count} 条结果";
+            SelectedSite = null;
+            Summary = $"「{Keyword}」在 {bySite.Count} 个站点找到结果";
+            ShowSuggestions = false;
+            if (!SearchHistory.Contains(Keyword))
+            {
+                SearchHistory.Insert(0, Keyword);
+                if (SearchHistory.Count > 8) SearchHistory.RemoveAt(SearchHistory.Count - 1);
+            }
         }
         catch (Exception error)
         {
@@ -74,6 +88,8 @@ public sealed partial class SearchSiteResult : ObservableObject
     public ObservableCollection<MediaItem> Items { get; } = [];
 
     [ObservableProperty] private bool _selected;
+    /// <summary>该站点是否仍在并行搜索（列表行显示转圈）。</summary>
+    [ObservableProperty] private bool _loading;
 
     public SearchSiteResult(string siteName, string sourceKey)
     {
@@ -81,4 +97,11 @@ public sealed partial class SearchSiteResult : ObservableObject
         SourceKey = sourceKey;
         Selected = true;
     }
+}
+
+/// <summary>搜索联想行（热词/历史）。</summary>
+public sealed class SuggestItem
+{
+    public string Text { get; init; } = "";
+    public bool Hot { get; init; }
 }

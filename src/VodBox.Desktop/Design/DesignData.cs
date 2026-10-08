@@ -224,11 +224,30 @@ public static class DesignData
     private static void FillSearch(MainViewModel main)
     {
         main.Search.Keyword = "庆余年";
-        main.Search.Summary = "「庆余年」在 3 个站点找到 12 条结果";
-        var site = new SearchSiteResult("量子资源", "lzi");
-        foreach (var item in Items(6)) site.Items.Add(item);
-        main.Search.SiteResults.Add(site);
+        main.Search.Summary = "「庆余年」在 8 个站点找到结果";
+        // 站点列表：数量/加载中/0 三态（对齐设计稿 ②）
+        var sites = new (string name, string key, int count, bool loading)[]
+        {
+            ("泥巴影视", "niba", 12, false),
+            ("金牌影院", "jinpa", 9, false),
+            ("量子影视", "lzi", 7, false),
+            ("天堂影视", "tiantang", 5, false),
+            ("卧龙资源", "wolong", 0, true),
+            ("天天视频", "tiantian", 0, false),
+        };
+        foreach (var s in sites)
+        {
+            var site = new SearchSiteResult(s.name, s.key) { Loading = s.loading };
+            foreach (var item in Items(Math.Min(s.count, 6))) site.Items.Add(item);
+            main.Search.SiteResults.Add(site);
+        }
         foreach (var item in Items(10)) main.Search.AllResults.Add(item);
+        // 联想列表（热词带 🔥）
+        foreach (var (text, hot) in new[] { ("庆余年 第二季", true), ("庆余年 第一季", false), ("庆余年 动画版", false), ("庆余年 有声书", false) })
+            main.Search.Suggestions.Add(new SuggestItem { Text = text, Hot = hot });
+        main.Search.ShowSuggestions = true;
+        foreach (var word in new[] { "庆余年", "繁花", "歌手" })
+            main.Search.SearchHistory.Add(word);
     }
 
     private static void FillFavorites(MainViewModel main)

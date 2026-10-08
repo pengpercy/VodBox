@@ -2,34 +2,84 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.SearchView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <ScrollViewer Padding="28,16,28,28">
-    <StackPanel Spacing="20" DataContext="{Binding Search}">
+    <StackPanel Spacing="18" DataContext="{Binding Search}">
 
-      <StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center" Margin="0,10,0,0">
-        <TextBlock Text="🔍" FontSize="18" VerticalAlignment="Center" />
-        <TextBox Text="{Binding Keyword}" PlaceholderText="搜索影片、剧集、综艺…" Width="480" Height="42"
-                 CornerRadius="21" FontSize="14" VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
-        <Button Content="搜索 ⏎" Command="{Binding RunSearchCommand}" Click="OnSearchClick"
-                CornerRadius="18" Padding="16,8" Background="#0078D4" Foreground="White"
-                BorderThickness="0" FontSize="13" Cursor="Hand" />
+      <!-- 中央大搜索框 + 搜索按钮（对齐设计稿 ①：输入即联想，Enter 聚合搜索） -->
+      <StackPanel Spacing="10" HorizontalAlignment="Center" Margin="0,8,0,0" Width="640">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="500" Height="44"
+                   CornerRadius="22" FontSize="14.5" Padding="16,0"
+                   VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
+          <Button Content="🔍 搜索 ⏎" Command="{Binding RunSearchCommand}" Click="OnSearchClick"
+                  CornerRadius="18" Padding="18,10" Height="44" Background="#0078D4" Foreground="White"
+                  BorderThickness="0" FontSize="13.5" FontWeight="SemiBold" Cursor="Hand" />
+        </StackPanel>
+
+        <!-- 联想列表（输入中显示；热词带 🔥） -->
+        <Border CornerRadius="10" Background="#E6161616" BorderBrush="#17FFFFFF" BorderThickness="1"
+                IsVisible="{Binding ShowSuggestions}" ClipToBounds="True">
+          <ItemsControl ItemsSource="{Binding Suggestions}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="14,9" Cursor="Hand"
+                            PointerPressed="OnPickSuggestion" Tag="{Binding}">
+                  <TextBlock Text="{Binding Text}" FontSize="13" />
+                  <Border CornerRadius="4" Background="#33FFB900" Padding="6,1" IsVisible="{Binding Hot}">
+                    <TextBlock Text="🔥 热" FontSize="10" Foreground="#FFB900" />
+                  </Border>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
       </StackPanel>
 
-      <TextBlock Text="{Binding Summary}" FontSize="13" Foreground="#85FFFFFF" />
+      <!-- 结果说明 + 搜索历史（设计稿：8 个站点找到结果 · 历史×可删） -->
+      <Grid ColumnDefinitions="*,Auto" MinHeight="24">
+        <TextBlock Grid.Column="0" Text="{Binding Summary}" FontSize="13" Foreground="#85FFFFFF"
+                   VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="搜索历史：" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <ItemsControl ItemsSource="{Binding SearchHistory}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border CornerRadius="10" Background="#12FFFFFF" Padding="10,4" Cursor="Hand"
+                        PointerPressed="OnPickHistory" Tag="{Binding}">
+                  <TextBlock FontSize="11.5" Foreground="#C7FFFFFF">
+                    <Run Text="{Binding Mode=OneWay}" /><Run Text=" ×" Foreground="#85FFFFFF" />
+                  </TextBlock>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Grid>
 
-      <Grid ColumnDefinitions="200,20,*">
-        <Border Grid.Column="0" CornerRadius="8" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
-                BorderThickness="1" Padding="8">
-          <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0">
+      <!-- 左站点列表（徽标=结果数/转圈/0，设计稿 ②）+ 右结果网格 -->
+      <Grid ColumnDefinitions="210,20,*">
+        <Border Grid.Column="0" CornerRadius="10" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
+                BorderThickness="1" Padding="6">
+          <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0"
+                   SelectionChanged="OnSiteChanged">
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,4">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="4,6" Cursor="Hand">
                   <TextBlock Text="{Binding SiteName}" FontSize="13" />
-                  <TextBlock Text="{Binding Items.Count}" FontSize="11" Foreground="#85FFFFFF"
-                             VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Items.Count}" FontSize="11.5" Foreground="#4CC2FF"
+                             VerticalAlignment="Center" FontWeight="SemiBold" />
+                  <TextBlock Text="⟳" FontSize="13" Foreground="#4CC2FF" VerticalAlignment="Center"
+                             IsVisible="{Binding Loading}" />
                 </StackPanel>
               </DataTemplate>
             </ListBox.ItemTemplate>
