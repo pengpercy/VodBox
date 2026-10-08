@@ -36,7 +36,10 @@ public static class DesignData
     {
         // Player 在设计时构造之后再赋值：保证 Detail/播放相关 XAML 能绑定到非空 VM。
         var player = new PlayerViewModel(AppServices.CreateDesignTime(), main);
-        player.Title = "庆余年 第二季 · 第03集";
+        player.Title = "庆余年 第二季";
+        player.Subtitle = "第12集 · 抱月楼风波";
+        player.ShowToast = true;
+        player.ToastText = "已开启 1.5x 倍速 · 片头跳过 00:00—01:30";
         player.Visible = true;
         player.State = PlaybackState.Paused;
         player.Duration = TimeSpan.FromMinutes(45);

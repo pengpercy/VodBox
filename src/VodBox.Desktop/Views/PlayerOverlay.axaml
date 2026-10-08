@@ -12,17 +12,44 @@
     <Rectangle Fill="#000000" />
     <Panel x:Name="VideoHost" />
 
-    <!-- 控制层 -->
-    <Grid RowDefinitions="*,Auto">
-      <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+    <!-- 控制层（对齐设计稿 p-play：顶栏 + 进度 + 完整控制行） -->
+    <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding Visible}">
+      <!-- 顶栏：返回 + 标题（集数）+ 分辨率角标 + 小窗 -->
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="16,12,16,0">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+          <Button Content="←" Click="OnClose" Background="#66000000" Foreground="White" BorderThickness="0"
+                  CornerRadius="8" Width="34" Height="34" FontSize="15" Cursor="Hand" />
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+            <TextBlock Text="{Binding Title}" FontSize="15.5" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Foreground="#85FFFFFF" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Border Background="#66000000" CornerRadius="5" Padding="8,3">
+            <TextBlock Text="1920x1080 · HEVC" FontSize="10.5" Foreground="#C7FFFFFF" />
+          </Border>
+          <Button Content="⛶ 小窗" Background="#66000000" Foreground="#C7FFFFFF" BorderThickness="0"
+                  CornerRadius="7" Padding="10,5" FontSize="11.5" Cursor="Hand" />
+        </StackPanel>
+      </Grid>
+
+      <!-- 中央：错误信息（无视频时）+ 倍速提示 toast（演示） -->
+      <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
         <TextBlock Text="{Binding Error}" FontSize="13" Foreground="#FF6B6B" HorizontalAlignment="Center"
                    TextWrapping="Wrap" MaxWidth="520" IsVisible="{Binding Error, Converter={x:Static v:StringConverters.IsNotNullOrEmpty}}" />
+        <Border Background="#CC000000" CornerRadius="9" Padding="14,8" VerticalAlignment="Center"
+                HorizontalAlignment="Center" IsVisible="{Binding ShowToast}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="▶" Foreground="White" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding ToastText}" FontSize="12" Foreground="White" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
       </StackPanel>
 
-      <Border Grid.Row="1" Padding="22,12,22,16">
-        <StackPanel Spacing="10">
-          <!-- 进度条 -->
+      <!-- 底部：进度条 + 完整控制行（设计稿 ② 全量 action 行） -->
+      <Border Grid.Row="2" Padding="22,10,22,14">
+        <StackPanel Spacing="8">
+          <!-- 进度条：缓冲（浅灰）+ 已播（蓝）+ 时间（片头片尾刻度 S2 接） -->
           <Grid ColumnDefinitions="Auto,*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="12" Foreground="#C7FFFFFF" VerticalAlignment="Center" Margin="0,0,10,0" />
@@ -32,7 +59,7 @@
                        FontSize="12" Foreground="#C7FFFFFF" VerticalAlignment="Center" Margin="10,0,0,0" />
           </Grid>
 
-          <!-- 控制行 -->
+          <!-- 控制行：上下集/暂停/剧集/倍速/音量/关闭（TV action 行子集，其余 S2 接） -->
           <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
             <Button Content="⏮" Click="OnBack10" Background="#66000000" Foreground="#C7FFFFFF"
                     BorderThickness="0" CornerRadius="7" Width="34" Height="34" Cursor="Hand" />
@@ -40,19 +67,24 @@
                     BorderThickness="0" CornerRadius="7" Width="40" Height="40" FontSize="17" Cursor="Hand" />
             <Button Content="⏭" Click="OnForward10" Background="#66000000" Foreground="#C7FFFFFF"
                     BorderThickness="0" CornerRadius="7" Width="34" Height="34" Cursor="Hand" />
-            <TextBlock Text="倍速" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Margin="16,0,6,0" />
-            <ComboBox SelectedIndex="3" SelectionChanged="OnRateChanged" MinWidth="80" Height="30">
+            <TextBlock Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay} / {Binding Duration, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
+                       FontSize="12" Foreground="#C7FFFFFF" VerticalAlignment="Center" Margin="8,0,14,0" />
+            <Button Content="📁 剧集" Background="#66000000" Foreground="#C7FFFFFF" BorderThickness="0"
+                    CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+            <TextBlock Text="倍速" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Margin="10,0,4,0" />
+            <ComboBox SelectedIndex="2" SelectionChanged="OnRateChanged" MinWidth="72" Height="28">
               <ComboBoxItem Content="0.5x" />
-              <ComboBoxItem Content="0.75x" />
               <ComboBoxItem Content="1.0x" />
-              <ComboBoxItem Content="1.25x" />
               <ComboBoxItem Content="1.5x" />
               <ComboBoxItem Content="2.0x" />
             </ComboBox>
-            <TextBlock Text="音量" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" Margin="16,0,6,0" />
-            <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" Width="100" VerticalAlignment="Center" />
+            <Button Content="🔊" Background="#66000000" Foreground="#C7FFFFFF" BorderThickness="0"
+                    CornerRadius="7" Width="34" Height="30" Cursor="Hand" />
+            <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" Width="90" VerticalAlignment="Center" />
+            <Button Content="⛶ 全屏" Click="OnToggleFullscreen" Background="#66000000" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Margin="10,0,0,0" Cursor="Hand" />
             <Button Content="✕ 关闭" Click="OnClose" Background="#66000000" Foreground="#FF6B6B"
-                    BorderThickness="0" CornerRadius="7" Padding="12,7" Margin="16,0,0,0" Cursor="Hand" />
+                    BorderThickness="0" CornerRadius="7" Padding="12,7" Margin="10,0,0,0" Cursor="Hand" />
           </StackPanel>
         </StackPanel>
       </Border>

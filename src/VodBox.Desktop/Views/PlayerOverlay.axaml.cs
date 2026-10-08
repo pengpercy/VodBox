@@ -93,13 +93,22 @@ public partial class PlayerOverlay : UserControl
 
     private void OnRateChanged(object? sender, SelectionChangedEventArgs e)
     {
-        // XAML 装载期（SelectedIndex="3" 在 EndInit 时触发）DataContext 尚未来得及赋值，直接忽略。
+        // XAML 装载期（SelectedIndex 在 EndInit 时触发）DataContext 尚未来得及赋值，直接忽略。
         if (sender is ComboBox { SelectedIndex: var index } && VM is { } vm)
         {
             vm.Rate = index switch
             {
-                0 => 0.5, 1 => 0.75, 2 => 1.0, 3 => 1.25, 4 => 1.5, 5 => 2.0, _ => 1.0,
+                0 => 0.5, 1 => 1.0, 2 => 1.5, 3 => 2.0, _ => 1.0,
             };
         }
+    }
+
+    private void OnToggleFullscreen(object? sender, RoutedEventArgs e)
+    {
+        // 全屏由宿主 Window 处理（VM 不持控件引用）
+        if (Avalonia.Controls.TopLevel.GetTopLevel(this) is Avalonia.Controls.Window window)
+            window.WindowState = window.WindowState == Avalonia.Controls.WindowState.FullScreen
+                ? Avalonia.Controls.WindowState.Normal
+                : Avalonia.Controls.WindowState.FullScreen;
     }
 }

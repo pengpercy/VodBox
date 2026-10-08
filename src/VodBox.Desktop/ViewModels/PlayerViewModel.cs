@@ -23,6 +23,11 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private double _rate = 1.0;
     [ObservableProperty] private bool _visible;
     [ObservableProperty] private string? _error;
+    /// <summary>顶栏副标题（集数 · 站源）。</summary>
+    [ObservableProperty] private string _subtitle = "";
+    /// <summary>中央 toast（倍速/跳片头提示），3 秒自动消失。</summary>
+    [ObservableProperty] private bool _showToast;
+    [ObservableProperty] private string _toastText = "";
 
     public PlayerViewModel(AppServices services, MainViewModel main)
     {
@@ -98,7 +103,30 @@ public sealed partial class PlayerViewModel : ObservableObject
     }
 
     partial void OnVolumeChanged(int value) => _ = _services.Player.SetVolumeAsync(value);
-    partial void OnRateChanged(double value) => _ = _services.Player.SetRateAsync(value);
+    partial void OnRateChanged(double value)
+    {
+        _ = _services.Player.SetRateAsync(value);
+        FlashToast($"{value:0.##}x 倍速");
+    }
+
+    /// <summary>展示中央 toast（自动 3 秒隐藏）。</summary>
+    public async void FlashToast(string text)
+    {
+        ToastText = text;
+        ShowToast = true;
+        await Task.Delay(3000);
+        if (ToastText == text) ShowToast = false;
+    }
+
+    [RelayCommand]
+    private void ToggleFullscreen()
+    {
+        // 全屏切换由 View 层转发（VM 不持控件引用）；此处仅设计演示态翻转。
+        RequestFullscreen?.Invoke();
+    }
+
+    /// <summary>请求主窗口切换全屏（PlayerOverlay 订阅转发给 Window）。</summary>
+    public event Action? RequestFullscreen;
 
     /// <summary>落库观看历史（含线路/选集/海报上下文）。异常在此吞掉，避免存储故障中断播放或崩溃。</summary>
     private async Task SaveHistoryAsync()

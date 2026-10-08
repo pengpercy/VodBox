@@ -28,7 +28,8 @@ public sealed class DesignPreviewTests
         var main = DesignData.Main;
         Assert.NotNull(main.Player);
         Assert.DoesNotContain(main.Files.Entries, e => e.IsDirectory && e.Name == ".."); // 停在空根目录，未枚举真实文件系统
-        Assert.Equal("庆余年 第二季 · 第03集", main.Player.Title);
+        Assert.Equal("庆余年 第二季", main.Player.Title);
+        Assert.Equal("第12集 · 抱月楼风波", main.Player.Subtitle);
         Assert.Equal(TimeSpan.FromMinutes(45), main.Player.Duration);
         Assert.NotEmpty(main.Home.Recommendations);
         Assert.NotNull(main.Detail.Detail);
