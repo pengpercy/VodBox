@@ -49,42 +49,26 @@
       <Border Grid.Row="2" Background="#A6000000" CornerRadius="14"
               BorderBrush="#1AFFFFFF" BorderThickness="1"
               Margin="24,0,24,16" Padding="16,10,16,12" HorizontalAlignment="Center"
-              MinWidth="560">
+              MinWidth="720">
         <StackPanel Spacing="8">
 
-          <!-- 上行：音量(左) · 跳过(中) · 小图标组(右) -->
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <!-- 左：喇叭+音量滑杆 -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Button Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="音量">
-                <Path Data="{DynamicResource Icon.VolumeHigh}" Fill="#C7FFFFFF" Width="16" Height="16"
-                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Button>
-              <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" VerticalAlignment="Center" />
-            </StackPanel>
+          <!-- 上行：左音量贴边 + 右图标组贴边（底层）；播放三键整面板绝对居中（上层） -->
+          <Panel>
+            <Grid ColumnDefinitions="*,*">
+              <!-- 左：喇叭+音量滑杆 -->
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                          HorizontalAlignment="Left">
+                <Button Background="Transparent" BorderThickness="0" CornerRadius="6"
+                        Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="音量">
+                  <Path Data="{DynamicResource Icon.VolumeHigh}" Fill="#C7FFFFFF" Width="16" Height="16"
+                        Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" VerticalAlignment="Center" />
+              </StackPanel>
 
-            <!-- 中：跳过/播放/快进三键 -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Button Click="OnBack10" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="后退 10 秒">
-                <Path Data="{DynamicResource Icon.SkipPrevious}" Fill="#D0FFFFFF" Width="18" Height="18"
-                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Button>
-              <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="20"
-                      Width="40" Height="40" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
-                <Path Data="{DynamicResource Icon.Pause}" Fill="White" Width="20" Height="20"
-                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Button>
-              <Button Click="OnForward10" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="前进 10 秒">
-                <Path Data="{DynamicResource Icon.SkipNext}" Fill="#D0FFFFFF" Width="18" Height="18"
-                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Button>
-            </StackPanel>
-
-            <!-- 右：剧集/比例/字幕/音轨/弹幕/设置（全图标，参考图小图标组） -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+              <!-- 右：剧集/比例/小窗/字幕/音轨/全屏/设置（全图标，参考图小图标组） -->
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                          HorizontalAlignment="Right">
               <Button Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="剧集">
                 <Path Data="{DynamicResource Icon.Playlist}" Fill="#D0FFFFFF" Width="16" Height="16"
@@ -110,6 +94,16 @@
                 <Path Data="{DynamicResource Icon.AudioTrack}" Fill="#D0FFFFFF" Width="16" Height="16"
                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
+              <!-- 倍速：表盘图标 + 当前倍速蓝字，点击弹选单 -->
+              <Button Click="OnCycleRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Padding="5,0" Height="30" Cursor="Hand" ToolTip.Tip="倍速">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <Path Data="{DynamicResource Icon.Speed}" Fill="#D0FFFFFF" Width="15" Height="15"
+                        Stretch="Uniform" VerticalAlignment="Center" />
+                  <TextBlock x:Name="RateBadge" Text="1.5x" FontSize="10.5" Foreground="#4CC2FF"
+                             VerticalAlignment="Center" FontWeight="SemiBold" />
+                </StackPanel>
+              </Button>
               <Button Click="OnToggleFullscreen" Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="全屏">
                 <Path Data="{DynamicResource Icon.Fullscreen}" Fill="#D0FFFFFF" Width="16" Height="16"
@@ -120,8 +114,28 @@
                 <Path Data="{DynamicResource Icon.Settings}" Fill="#D0FFFFFF" Width="16" Height="16"
                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
+              </StackPanel>
+            </Grid>
+
+            <!-- 上层：跳过/播放/快进三键（相对整个面板绝对居中） -->
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Button Click="OnBack10" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="后退 10 秒">
+                <Path Data="{DynamicResource Icon.SkipPrevious}" Fill="#D0FFFFFF" Width="18" Height="18"
+                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Button>
+              <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="20"
+                      Width="40" Height="40" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
+                <Path Data="{DynamicResource Icon.Pause}" Fill="White" Width="20" Height="20"
+                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Button>
+              <Button Click="OnForward10" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="前进 10 秒">
+                <Path Data="{DynamicResource Icon.SkipNext}" Fill="#D0FFFFFF" Width="18" Height="18"
+                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Button>
             </StackPanel>
-          </Grid>
+          </Panel>
 
           <!-- 下行：时间 + 进度条 + 总时长 -->
           <Grid ColumnDefinitions="Auto,*,Auto">

@@ -103,6 +103,17 @@ public partial class PlayerOverlay : UserControl
         }
     }
 
+    private static readonly double[] Rates = [0.5, 1.0, 1.25, 1.5, 2.0];
+
+    private void OnCycleRate(object? sender, RoutedEventArgs e)
+    {
+        if (VM is not { } vm) return;
+        var index = Array.IndexOf(Rates, vm.Rate);
+        vm.Rate = Rates[(index + 1) % Rates.Length];
+        if (this.FindControl<TextBlock>("RateBadge") is { } badge)
+            badge.Text = $"{vm.Rate:0.##}x";
+    }
+
     private void OnToggleWindowSmall(object? sender, RoutedEventArgs e)
     {
         if (VM is { } vm) vm.FlashToast("小窗模式（S2 接）");
