@@ -139,8 +139,13 @@ public sealed partial class DetailViewModel : ObservableObject
         {
             try
             {
-                var resolved = await resolver.ResolvePlaybackAsync(Detail.Item.Id, SelectedEpisode.Id);
-                _main.Player.Play(resolved with { StartPositionMs = resumeMs });
+                var mediaId = Detail.Item.Id;
+                var episodeId = SelectedEpisode.Id;
+                await _main.Player.PlayResolvedAsync(async ct =>
+                {
+                    var resolved = await resolver.ResolvePlaybackAsync(mediaId, episodeId, ct);
+                    return resolved with { StartPositionMs = resumeMs };
+                });
             }
             catch (Exception error)
             {

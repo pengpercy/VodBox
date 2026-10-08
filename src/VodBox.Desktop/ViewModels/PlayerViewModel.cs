@@ -11,7 +11,8 @@ public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly AppServices _services;
     private readonly MainViewModel _main;
-    private long _sessionId;
+    private readonly PlaybackCoordinator _coordinator;
+    private long _intent;
 
     public ObservableCollection<MediaTrack> Tracks { get; } = [];
 
@@ -34,10 +35,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         _services = services;
         _main = main;
         var engine = services.Player;
+        _coordinator = new PlaybackCoordinator(engine);
         engine.StateChanged += (_, evt) =>
         {
+            var intent = _intent;
             _main.RunOnUi(() =>
             {
+                if (intent != _intent || evt.SessionId != _coordinator.SessionId) return;
                 State = evt.Snapshot.State;
                 Position = evt.Snapshot.Position;
                 Duration = evt.Snapshot.Duration;
@@ -51,29 +55,37 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private PlaybackRequest? _current;
 
-    public void Play(PlaybackRequest request)
+    public void Play(PlaybackRequest request) => _ = PlayResolvedAsync(_ => Task.FromResult(request));
+
+    /// <summary>解析也属于播放会话；新播放和关闭都会取消旧解析。</summary>
+    public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve)
     {
-        _current = request;
-        Title = request.Title;
+        var intent = ++_intent;
         Visible = true;
         Error = null;
-        _sessionId = DateTime.UtcNow.Ticks;
-        _ = OpenSafeAsync(request);
-    }
-
-    /// <summary>异步打开媒体并兜底：libmpv 缺失/渲染面失败/代理头拒绝等异常落到 Error，而不是未观察任务。</summary>
-    private async Task OpenSafeAsync(PlaybackRequest request)
-    {
+        State = PlaybackState.Resolving;
         try
         {
-            await _services.Player.OpenAsync(request, _sessionId);
+            await _coordinator.OpenAsync(async ct =>
+            {
+                var request = await resolve(ct);
+                ct.ThrowIfCancellationRequested();
+                if (intent == _intent)
+                {
+                    _current = request;
+                    Title = request.Title;
+                    Position = TimeSpan.Zero;
+                    Duration = TimeSpan.Zero;
+                }
+                return request;
+            });
         }
+        catch (OperationCanceledException) { /* 新请求/关闭取消旧会话，不显示失败。 */ }
         catch (Exception error)
         {
+            if (intent != _intent) return;
             State = PlaybackState.Failed;
-            Error = error is DllNotFoundException or InvalidOperationException or NotSupportedException
-                ? $"无法播放：{error.Message}（libmpv 缺失时请安装 mpv 或设置 VODBOX_MPV_LIB 指向 libmpv 动态库）"
-                : $"无法播放：{error.Message}";
+            Error = $"无法播放：{error.Message}";
         }
     }
 
@@ -95,8 +107,11 @@ public sealed partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     public async Task Close()
     {
-        await SaveHistoryAsync(); // 关闭前落库，保证最后一次进度不丢
-        await _services.Player.StopAsync();
+        var intent = ++_intent;
+        var stop = _coordinator.CloseAsync(); // 先取消解析，避免保存历史期间旧结果打开。
+        await SaveHistoryAsync();
+        await stop;
+        if (intent != _intent) return;
         Visible = false;
         State = PlaybackState.Idle;
         _current = null;

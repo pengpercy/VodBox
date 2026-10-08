@@ -79,6 +79,11 @@
 - 真机验收工装：UiSmoke 支持网络地址 + Referer/UA + mpv 内部日志；PreviewTests 支持 VODBOX_PREVIEW_SHOT=1 对拍设计稿
 
 ### S2 · 播放体验（P0–P1，3–5 天）
+**进行中（2026-10-08）**：新增 PlaybackCoordinator 并接 PlayerViewModel/详情解析。
+新播放与关闭取消旧解析；解析忽略取消时，迟到结果也不能打开；引擎 open/stop 转移串行；
+播放事件按 SessionId 门控。新增3条离线竞争回归（迟到解析、新请求、关闭取消/串行）。
+主测试206/206、预览12/12通过。仍待：详情加载请求竞争、切片时旧会话进度保存、完播检测、
+快捷键、轨道UI、自动下一集和真实UI连续切换验收。
 **已决策纳入**：移植旧 `PlaybackCoordinator.cs`(88行) + `PlaylistSession.cs`(43行)（ADAPT）。
 协调器提供代次计数会话隔离、取消过期解析、串行化原生状态转移、`SaveProgress` 完播检测
 （不会把已看完的一集续播在最后一帧）+ 无痕；S0 那几个续播 bug 的根源正是缺协调器
