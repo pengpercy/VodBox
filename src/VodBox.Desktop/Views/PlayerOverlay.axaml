@@ -16,7 +16,7 @@
     <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding Visible}">
 
       <!-- 顶栏：返回箭头 + 标题 + 副标题 · 右侧分辨率角标 -->
-      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="16,12,16,0">
+      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="16,12,16,0">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
           <Button Click="OnClose" Background="#66000000" BorderThickness="0"
                   CornerRadius="8" Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="返回">
@@ -41,7 +41,7 @@
       </Border>
 
       <!-- 底部：单个半透明圆角面板（参考图紧凑控制条） -->
-      <Border Grid.Row="2" Background="#A6000000" CornerRadius="14"
+      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#A6000000" CornerRadius="14"
               BorderBrush="#1AFFFFFF" BorderThickness="1"
               Margin="52,0,52,16" Padding="20,12,20,14" HorizontalAlignment="Stretch">
         <StackPanel Spacing="8">

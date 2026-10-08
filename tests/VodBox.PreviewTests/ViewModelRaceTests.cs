@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using VodBox.Core;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
+using VodBox.Desktop.Views;
 using Xunit;
 
 namespace VodBox.PreviewTests;
@@ -439,6 +440,30 @@ public sealed class ViewModelRaceTests
         await Done(vm.PlayResolvedAsync(_ => Task.FromResult(Request("ep2"))));
         vm.CommitSeek();
         Assert.Empty(context.Engine.Seeks);
+    }
+
+    [AvaloniaFact]
+    public async Task Player_ControlsHideOnlyDuringUnattendedPlayback()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        var view = new PlayerOverlay { DataContext = context.Main };
+        await Done(vm.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+        context.Engine.EmitCurrent(PlaybackState.Playing, 10000, 90000);
+        view.UpdateControls(TimeSpan.FromSeconds(4));
+        Assert.False(vm.ControlsVisible);
+        view.UpdateControls(TimeSpan.FromSeconds(1));
+        Assert.True(vm.ControlsVisible);
+        vm.BeginSeek();
+        view.UpdateControls(TimeSpan.FromSeconds(4));
+        Assert.True(vm.ControlsVisible);
+        vm.CancelSeek();
+        context.Engine.EmitCurrent(PlaybackState.Paused, 10000, 90000);
+        view.UpdateControls(TimeSpan.FromSeconds(4));
+        Assert.True(vm.ControlsVisible);
+        await Done(vm.Close());
+        view.UpdateControls(TimeSpan.FromSeconds(4));
+        Assert.True(vm.ControlsVisible);
     }
 
     private sealed class Context : IDisposable

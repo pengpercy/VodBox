@@ -30,6 +30,8 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     public ObservableCollection<MediaTrack> Tracks { get; } = [];
 
+    [ObservableProperty] private bool _controlsVisible = true;
+    public bool IsSeeking => _seekIntent is not null;
     public bool IsPlaying => State is PlaybackState.Playing or PlaybackState.Buffering;
     partial void OnStateChanged(PlaybackState value) => OnPropertyChanged(nameof(IsPlaying));
     [ObservableProperty] private PlaybackState _state = PlaybackState.Idle;

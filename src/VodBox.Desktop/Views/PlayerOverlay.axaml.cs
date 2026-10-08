@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -35,6 +36,11 @@ public static class TimeConverters
 public partial class PlayerOverlay : UserControl
 {
     private MpvVideoSurface? _surface;
+    private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private long _lastActivity = Environment.TickCount64;
+    private bool _menuOpen;
+    private static readonly Cursor HiddenCursor = new(StandardCursorType.None);
+
 
     public PlayerOverlay()
     {
@@ -54,6 +60,10 @@ public partial class PlayerOverlay : UserControl
             progress.LostFocus += (_, _) => VM?.CancelSeek();
         }
 
+        _controlsTimer.Tick += (_, _) => UpdateControls(TimeSpan.FromMilliseconds(Environment.TickCount64 - _lastActivity));
+        AddHandler(PointerMovedEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
+        AddHandler(PointerPressedEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
+        AddHandler(KeyDownEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
         AttachedToVisualTree += OnAttached;
         DetachedFromVisualTree += OnDetached;
     }
@@ -65,10 +75,46 @@ public partial class PlayerOverlay : UserControl
     /// <summary>当前 Player 子 VM；DataContext 未装载（XAML 初始化早期/设计时）时为 null，调用方需判空。</summary>
     private PlayerViewModel? VM => DataContext is MainViewModel main ? main.Player : null;
 
-    private void OnAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e) => TryInstallSurface();
+    private void OnAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        RevealControls();
+        TryInstallSurface();
+        if (Avalonia.Application.Current is App) _controlsTimer.Start();
+    }
+
+    private void RevealControls()
+    {
+        _lastActivity = Environment.TickCount64;
+        if (VM is { } vm) vm.ControlsVisible = true;
+        Cursor = null;
+    }
+
+    internal void UpdateControls(TimeSpan idle)
+    {
+        if (VM is not { } vm) return;
+        var hovering = this.FindControl<Control>("TopControls")?.IsPointerOver == true ||
+                       this.FindControl<Control>("BottomControls")?.IsPointerOver == true;
+        var show = !vm.Visible || !IsVisible || vm.State != PlaybackState.Playing || vm.IsSeeking ||
+                   _menuOpen || hovering || idle < TimeSpan.FromSeconds(3);
+        vm.ControlsVisible = show;
+        Cursor = show ? null : HiddenCursor;
+        if (!vm.Visible || vm.State != PlaybackState.Playing) _lastActivity = Environment.TickCount64;
+    }
+
+    private void OpenControlMenu(Button button, ContextMenu menu)
+    {
+        _menuOpen = true;
+        RevealControls();
+        menu.Closed += (_, _) => { _menuOpen = false; RevealControls(); };
+        button.ContextMenu = menu;
+        menu.Open(button);
+    }
 
     private void OnDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        _controlsTimer.Stop();
+        VM?.CancelSeek();
+        RevealControls();
         // 控件卸载时丢渲染面；重新入树时重建（OpenGlControlBase 会重新走 Init 流程）。
         if (_surface is not null)
         {
@@ -155,8 +201,7 @@ public partial class PlayerOverlay : UserControl
             item.Click += async (_, _) => { if (session == vm.CurrentSessionId) await vm.PlayPlaylistIndexAsync(index); };
             menu.Items.Add(item);
         }
-        button.ContextMenu = menu;
-        menu.Open(button);
+        OpenControlMenu(button, menu);
     }
 
     private void OnToggleSettings(object? sender, RoutedEventArgs e)
@@ -195,8 +240,7 @@ public partial class PlayerOverlay : UserControl
             group.ItemsSource = items;
             menu.Items.Add(group);
         }
-        button.ContextMenu = menu;
-        menu.Open(button);
+        OpenControlMenu(button, menu);
     }
 
     private void OnToggleAspectRatio(object? sender, RoutedEventArgs e)
