@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Input;
 using VodBox.Core;
 using VodBox.Desktop.Services;
 
@@ -18,6 +19,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _liveConfigUrl = "";
     [ObservableProperty] private bool _applying;
     [ObservableProperty] private string _message = "";
+
+    // ---- 设置分组导航（设计稿 p-setting 左栏） ----
+    /// <summary>当前设置分组：0=源与订阅 1=播放 2=数据 3=关于。</summary>
+    [ObservableProperty] private int _section = 0;
+
+    // ---- 更改点播配置弹窗（设计稿 ②） ----
+    [ObservableProperty] private bool _configDialogOpen;
+    [ObservableProperty] private string _dialogUrl = "";
+    /// <summary>历史配置（当前 + 可切换/删除），S5 持久化到 Config 表。</summary>
+    public ObservableCollection<ConfigHistoryEntry> ConfigHistory { get; } = [];
 
     public SettingsViewModel(AppServices services, MainViewModel main)
     {
@@ -89,6 +100,73 @@ public sealed partial class SettingsViewModel : ObservableObject
         _ = _services.Store.ClearHistoryAsync();
         Message = "观看历史已清空";
     }
+
+    // ---- 弹窗动作 ----
+
+    /// <summary>打开「更改点播配置」弹窗（带历史配置列表）。</summary>
+    [RelayCommand]
+    public void OpenConfigDialog()
+    {
+        DialogUrl = VodConfigUrl;
+        ConfigDialogOpen = true;
+    }
+
+    /// <summary>从剪贴板读取配置地址。</summary>
+    [RelayCommand]
+    public async Task PasteFromClipboard()
+    {
+        try
+        {
+            var clipboard = Avalonia.Application.Current?.TryGetFeature(typeof(Avalonia.Input.Platform.IClipboard))
+                as Avalonia.Input.Platform.IClipboard;
+            if (clipboard is null) return;
+            var data = await clipboard.TryGetDataAsync() as Avalonia.Input.IDataTransfer;
+            if (data?.TryGetText() is not { Length: > 0 } text) return;
+            DialogUrl = text.Trim();
+
+            if (!string.IsNullOrWhiteSpace(text)) DialogUrl = text.Trim();
+        }
+        catch
+        {
+            Message = "剪贴板读取失败";
+        }
+    }
+
+    /// <summary>弹窗确定：加载配置并写历史。</summary>
+    [RelayCommand]
+    public async Task ConfirmConfigDialog()
+    {
+        ConfigDialogOpen = false;
+        VodConfigUrl = DialogUrl;
+        await ApplyVodConfig();
+        if (!ConfigHistory.Any(c => c.Url == DialogUrl))
+            ConfigHistory.Insert(0, new ConfigHistoryEntry { Url = DialogUrl, Name = DialogUrl, Current = true });
+    }
+
+    /// <summary>取消弹窗。</summary>
+    [RelayCommand]
+    private void CancelConfigDialog() => ConfigDialogOpen = false;
+
+    /// <summary>切换到历史配置。</summary>
+    [RelayCommand]
+    public async Task SwitchConfig(ConfigHistoryEntry entry)
+    {
+        ConfigDialogOpen = false;
+        VodConfigUrl = entry.Url;
+        await ApplyVodConfig();
+    }
+
+    /// <summary>删除历史配置。</summary>
+    [RelayCommand]
+    private void DeleteConfig(ConfigHistoryEntry entry) => ConfigHistory.Remove(entry);
+}
+
+/// <summary>历史配置行（tvbox.json（当前）/ 使用中角标）。</summary>
+public sealed class ConfigHistoryEntry
+{
+    public string Name { get; init; } = "";
+    public string Url { get; init; } = "";
+    public bool Current { get; set; }
 }
 
 /// <summary>本地文件：目录浏览 + 直接播放。</summary>

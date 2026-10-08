@@ -2,100 +2,181 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <Grid ColumnDefinitions="220,*">
-    <!-- 设置导航 -->
-    <Border Grid.Column="0" BorderBrush="#17FFFFFF" BorderThickness="0,0,1,0" Padding="12,18">
-      <StackPanel Spacing="2">
-        <Border CornerRadius="7" Padding="13,9" Background="#264CC2FF">
-          <TextBlock Text="📡 源与订阅" FontSize="13" Foreground="#4CC2FF" />
-        </Border>
-        <Border CornerRadius="7" Padding="13,9">
-          <TextBlock Text="▶ 播放" FontSize="13" Foreground="#C7FFFFFF" Opacity="0.7" />
-        </Border>
-        <Border CornerRadius="7" Padding="13,9">
-          <TextBlock Text="💾 数据" FontSize="13" Foreground="#C7FFFFFF" Opacity="0.7" />
-        </Border>
-        <Border CornerRadius="7" Padding="13,9">
-          <TextBlock Text="ℹ 关于" FontSize="13" Foreground="#C7FFFFFF" Opacity="0.7" />
-        </Border>
-      </StackPanel>
-    </Border>
+  <Panel>
+    <Grid ColumnDefinitions="220,*">
+      <!-- 左侧设置分组导航（设计稿） -->
+      <Border Grid.Column="0" BorderBrush="#17FFFFFF" BorderThickness="0,0,1,0" Padding="12,18"
+              DataContext="{Binding Settings}">
+        <StackPanel Spacing="2">
+          <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionSources"
+                  Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=0}">
+            <TextBlock Text="📡 源与订阅" FontSize="13"
+                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=0}" />
+          </Border>
+          <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionPlayback"
+                  Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=1}">
+            <TextBlock Text="▶ 播放" FontSize="13"
+                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=1}" />
+          </Border>
+          <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionData"
+                  Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=2}">
+            <TextBlock Text="💾 数据" FontSize="13"
+                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=2}" />
+          </Border>
+          <Border CornerRadius="7" Padding="13,9" Cursor="Hand" PointerPressed="OnSectionAbout"
+                  Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=3}">
+            <TextBlock Text="ℹ 关于" FontSize="13"
+                       Foreground="{Binding Section, Converter={x:Static views:SectionConverters.NavForeground}, ConverterParameter=3}" />
+          </Border>
+        </StackPanel>
+      </Border>
 
-    <!-- 表单 -->
-    <ScrollViewer Grid.Column="1" Padding="32,24,32,28">
-      <StackPanel Spacing="18" DataContext="{Binding Settings}">
-        <TextBlock Text="源与订阅" FontSize="20" FontWeight="SemiBold" />
+      <!-- 表单 -->
+      <ScrollViewer Grid.Column="1" Padding="32,24,32,28">
+        <StackPanel Spacing="18" DataContext="{Binding Settings}">
+          <TextBlock Text="源与订阅" FontSize="20" FontWeight="SemiBold" />
 
-        <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1">
-          <StackPanel Margin="20,4,20,4">
-            <Grid ColumnDefinitions="*,Auto" MinHeight="64">
-              <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
-                <TextBlock Text="点播配置（TVBox JSON）" FontSize="13.5" />
-                <TextBlock Text="远程订阅地址，支持 MacCMS 采集站" FontSize="11.5" Foreground="#85FFFFFF" />
-              </StackPanel>
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBox Text="{Binding VodConfigUrl}" Width="300" Height="32" CornerRadius="6"
-                         PlaceholderText="https://…/tvbox.json" />
-                <Button Content="加载" Command="{Binding ApplyVodConfigCommand}" CornerRadius="6" Padding="14,7"
-                        Background="#0078D4" Foreground="White" BorderThickness="0" Cursor="Hand" />
+          <!-- 点播配置卡片（点「更改」开弹窗，设计稿 ②） -->
+          <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1">
+            <StackPanel Margin="20,4,20,4">
+              <Grid ColumnDefinitions="*,Auto" MinHeight="64">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                  <TextBlock Text="点播配置（TVBox JSON）" FontSize="13.5" />
+                  <TextBlock Text="{Binding VodConfigUrl}" FontSize="11.5" Foreground="#4CC2FF"
+                             TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="更改配置…" Command="{Binding OpenConfigDialogCommand}"
+                        CornerRadius="6" Padding="14,7" Background="#0078D4" Foreground="White"
+                        BorderThickness="0" Cursor="Hand" VerticalAlignment="Center" />
+              </Grid>
+              <Separator Background="#17FFFFFF" Height="1" />
+              <Grid ColumnDefinitions="*,Auto" MinHeight="64">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                  <TextBlock Text="直播配置（m3u / txt）" FontSize="13.5" />
+                  <TextBlock Text="IPTV 直播源地址" FontSize="11.5" Foreground="#85FFFFFF" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBox Text="{Binding LiveConfigUrl}" Width="280" Height="32" CornerRadius="6"
+                           PlaceholderText="https://…/live.m3u" />
+                  <Button Content="加载" Command="{Binding ApplyLiveConfigCommand}" CornerRadius="6" Padding="14,7"
+                          Background="#0078D4" Foreground="White" BorderThickness="0" Cursor="Hand" />
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="站点列表" FontSize="20" FontWeight="SemiBold" />
+          <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" MinHeight="120">
+            <ItemsControl ItemsSource="{Binding Sites}" Margin="20,12">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                      <TextBlock Text="{Binding Name}" FontSize="13" />
+                      <Border CornerRadius="5" Background="#264CC2FF" Padding="6,1">
+                        <TextBlock Text="{Binding Runtime}" FontSize="10.5" Foreground="#4CC2FF" />
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding Api}" FontSize="11" Foreground="#85FFFFFF"
+                               TextTrimming="CharacterEllipsis" MaxWidth="380" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+
+          <TextBlock Text="{Binding Message}" FontSize="12.5" Foreground="#4CC2FF" TextWrapping="Wrap" />
+
+          <TextBlock Text="数据" FontSize="20" FontWeight="SemiBold" />
+          <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1">
+            <StackPanel Margin="20,12" Spacing="10">
+              <Button Content="清空观看历史" Command="{Binding ClearHistoryCommand}" CornerRadius="6"
+                      Padding="14,7" Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" Cursor="Hand" />
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="VodBox 0.2.0 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" Foreground="#85FFFFFF" />
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- 更改点播配置弹窗（亚克力黑 + 圆角 12 + 历史配置 + 扫码推送，设计稿 ②③） -->
+    <Panel IsVisible="{Binding Settings.ConfigDialogOpen}">
+      <Rectangle Fill="#88000000" />
+      <Border Width="560" CornerRadius="12" Background="#F2202020" BorderBrush="#26FFFFFF" BorderThickness="1"
+              VerticalAlignment="Center" HorizontalAlignment="Center" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <!-- 弹窗头 -->
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="20,16,16,10">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="📡" FontSize="15" VerticalAlignment="Center" />
+              <TextBlock Text="更改点播配置" FontSize="15.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="✕" Command="{Binding Settings.CancelConfigDialogCommand}"
+                    Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0" CornerRadius="6"
+                    Width="28" Height="28" FontSize="13" Cursor="Hand" />
+          </Grid>
+          <!-- 弹窗体 -->
+          <StackPanel Grid.Row="1" Margin="20,4,20,12" Spacing="12">
+            <TextBlock Text="输入 TVBox 配置地址，或从剪贴板读取 / 扫码推送" FontSize="11.5" Foreground="#85FFFFFF" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Grid.Column="0" Text="{Binding Settings.DialogUrl}" Height="34" CornerRadius="7"
+                       Watermark="https://…/tvbox.json" />
+              <Button Grid.Column="1" Content="📋 粘贴" Command="{Binding Settings.PasteFromClipboardCommand}"
+                      CornerRadius="7" Padding="12,6" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                      BorderThickness="0" Margin="8,0,0,0" FontSize="12" Cursor="Hand" />
+            </Grid>
+
+            <TextBlock Text="历史配置" FontSize="12" Margin="0,4,0,0" />
+            <Border CornerRadius="8" BorderBrush="#1FFFFFFF" BorderThickness="1" MaxHeight="170">
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Settings.ConfigHistory}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,8" Background="#0AFFFFFF">
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                   MaxWidth="300" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
+                                Padding="7,1" VerticalAlignment="Center" Margin="0,0,8,0"
+                                IsVisible="{Binding Current}">
+                          <TextBlock Text="使用中" FontSize="10" Foreground="#4CC2FF" />
+                        </Border>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                          <Button Content="切换" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.SwitchConfigCommand}"
+                                  CommandParameter="{Binding}" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                                  BorderThickness="0" CornerRadius="6" Padding="10,4" FontSize="11.5" Cursor="Hand" />
+                          <Button Content="删除" Foreground="#FF6B6B" Background="Transparent" BorderThickness="0"
+                                  CommandParameter="{Binding}" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.DeleteConfigCommand}"
+                                  CornerRadius="6" Padding="10,4" FontSize="11.5" Cursor="Hand" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Border>
+          </StackPanel>
+          <!-- 弹窗脚 -->
+          <Border Grid.Row="2" BorderBrush="#17FFFFFF" BorderThickness="0,1,0,0" Padding="20,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Button Grid.Column="0" Content="📱 手机扫码推送" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                      BorderThickness="0" CornerRadius="7" Padding="12,7" FontSize="12" Cursor="Hand" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button Content="取消" Command="{Binding Settings.CancelConfigDialogCommand}" Background="#12FFFFFF"
+                        Foreground="#C7FFFFFF" BorderThickness="0" CornerRadius="7" Padding="16,7" FontSize="12.5" Cursor="Hand" />
+                <Button Content="确定加载" Command="{Binding Settings.ConfirmConfigDialogCommand}"
+                        Background="#0078D4" Foreground="White" BorderThickness="0" CornerRadius="7"
+                        Padding="16,7" FontSize="12.5" FontWeight="SemiBold" Cursor="Hand" />
               </StackPanel>
             </Grid>
-            <Separator Background="#17FFFFFF" Height="1" />
-            <Grid ColumnDefinitions="*,Auto" MinHeight="64">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
-                <TextBlock Text="直播配置（m3u / txt）" FontSize="13.5" />
-                <TextBlock Text="IPTV 直播源地址" FontSize="11.5" Foreground="#85FFFFFF" />
-              </StackPanel>
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBox Text="{Binding LiveConfigUrl}" Width="300" Height="32" CornerRadius="6"
-                         PlaceholderText="https://…/live.m3u" />
-                <Button Content="加载" Command="{Binding ApplyLiveConfigCommand}" CornerRadius="6" Padding="14,7"
-                        Background="#0078D4" Foreground="White" BorderThickness="0" Cursor="Hand" />
-              </StackPanel>
-            </Grid>
-          </StackPanel>
-        </Border>
-
-        <TextBlock Text="站点列表" FontSize="20" FontWeight="SemiBold" />
-        <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" MinHeight="120">
-          <ItemsControl ItemsSource="{Binding Sites}" Margin="20,12">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="{Binding Name}" FontSize="13" />
-                    <Border CornerRadius="5" Background="#264CC2FF" Padding="6,1">
-                      <TextBlock Text="{Binding Runtime}" FontSize="10.5" Foreground="#4CC2FF" />
-                    </Border>
-                  </StackPanel>
-                  <TextBlock Grid.Column="1" Text="{Binding Api}" FontSize="11" Foreground="#85FFFFFF"
-                             TextTrimming="CharacterEllipsis" MaxWidth="380" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </Border>
-
-        <TextBlock Text="{Binding Message}" FontSize="12.5" Foreground="#4CC2FF" TextWrapping="Wrap" />
-
-        <TextBlock Text="数据" FontSize="20" FontWeight="SemiBold" />
-        <Border CornerRadius="12" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1">
-          <StackPanel Margin="20,12" Spacing="10">
-            <Button Content="清空观看历史" Command="{Binding ClearHistoryCommand}" CornerRadius="6"
-                    Padding="14,7" Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" Cursor="Hand" />
-          </StackPanel>
-        </Border>
-
-        <TextBlock Text="VodBox 0.2.0 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" Foreground="#85FFFFFF" />
-      </StackPanel>
-    </ScrollViewer>
-  </Grid>
+          </Border>
+        </Grid>
+      </Border>
+    </Panel>
+  </Panel>
 </UserControl>

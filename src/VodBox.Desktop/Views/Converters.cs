@@ -176,3 +176,32 @@ public static class TimeAgoConverters
             => throw new NotSupportedException();
     }
 }
+
+/// <summary>设置页分组导航（int 对比 parameter）→ 样式。</summary>
+public static class SectionConverters
+{
+    public static readonly IValueConverter NavBackground = new NavBackgroundConverter();
+    public static readonly IValueConverter NavForeground = new NavForegroundConverter();
+
+    private sealed class NavBackgroundConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is int section && int.TryParse(parameter?.ToString(), out var p) && section == p
+                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x264CC2FF))
+                : Avalonia.Media.Brushes.Transparent;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class NavForegroundConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is int section && int.TryParse(parameter?.ToString(), out var p) && section == p
+                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0xFF4CC2FF))
+                : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x99FFFFFF));
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+}
