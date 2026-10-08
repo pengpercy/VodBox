@@ -95,7 +95,7 @@
 
     <!-- 海报网格 -->
     <!-- 海报网格：分块行 + ListBox 虚拟化（数据量大时只实例化可见行） -->
-    <ListBox Grid.Row="3" ItemsSource="{Binding Rows}" Background="Transparent" BorderThickness="0"
+    <ListBox Classes="virtualRows" Grid.Row="3" ItemsSource="{Binding Rows}" Background="Transparent" BorderThickness="0"
              Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListBox.ItemTemplate>
         <DataTemplate>

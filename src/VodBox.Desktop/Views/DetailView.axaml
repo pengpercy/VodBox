@@ -7,19 +7,7 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <UserControl.Styles>
-    <Style Selector="ListBox.episodeRows > ListBoxItem">
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Focusable" Value="False" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" />
-        </ControlTemplate>
-      </Setter>
-    </Style>
-  </UserControl.Styles>
+
   <ScrollViewer Padding="28,12,28,28">
     <StackPanel Spacing="22" DataContext="{Binding Detail}">
 
@@ -165,7 +153,7 @@
           </StackPanel>
         </StackPanel>
         <!-- 剧集网格：分块行虚拟化（长剧 500+ 集只渲染可见行）；独立滚动区 260 高 -->
-        <ListBox Classes="episodeRows" ItemsSource="{Binding EpisodeRows}" Background="Transparent" BorderThickness="0"
+        <ListBox Classes="virtualRows" ItemsSource="{Binding EpisodeRows}" Background="Transparent" BorderThickness="0"
                  MaxHeight="260" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
           <ListBox.ItemTemplate>
             <DataTemplate>

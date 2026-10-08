@@ -46,5 +46,6 @@
       <Setter Property="CornerRadius" Value="8" />
     </Style>
     <FluentTheme />
+    <StyleInclude Source="avares://VodBox.Desktop/Views/VirtualRows.axaml" />
   </Application.Styles>
 </Application>

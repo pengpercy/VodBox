@@ -77,7 +77,7 @@
       <!-- 更早 -->
       <TextBlock Text="更早" FontSize="16" FontWeight="SemiBold"
                  IsVisible="{Binding Earlier.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
-      <ListBox ItemsSource="{Binding Earlier}" Background="Transparent" BorderThickness="0" Padding="0">
+      <ListBox Classes="virtualRows" ItemsSource="{Binding Earlier}" Background="Transparent" BorderThickness="0" Padding="0">
         <ListBox.ItemTemplate>
           <DataTemplate>
             <Border CornerRadius="8" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1"

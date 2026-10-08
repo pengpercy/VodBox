@@ -7,19 +7,7 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <UserControl.Styles>
-    <Style Selector="ListBox.resultRows > ListBoxItem">
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="Focusable" Value="False" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" />
-        </ControlTemplate>
-      </Setter>
-    </Style>
-  </UserControl.Styles>
+
   <!-- 两行布局：搜索区固定在顶部，结果区独立滚动。
        结果网格用 ListBox（自带 VirtualizingStackPanel）按行分块渲染——
        数据量大时只实例化可见行，不再全量铺开（性能关键）。 -->
@@ -117,7 +105,7 @@
       </Border>
 
       <!-- 结果网格：按行分块（ResultRowVM.Items = 5 张卡），ListBox 垂直虚拟化 -->
-      <ListBox x:Name="ResultsList" Classes="resultRows" SizeChanged="OnResultsSizeChanged" Grid.Column="2" ItemsSource="{Binding ResultRows}" Background="Transparent"
+      <ListBox x:Name="ResultsList" Classes="virtualRows" SizeChanged="OnResultsSizeChanged" Grid.Column="2" ItemsSource="{Binding ResultRows}" Background="Transparent"
                BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.ItemTemplate>
           <DataTemplate>

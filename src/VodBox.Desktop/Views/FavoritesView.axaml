@@ -66,7 +66,7 @@
       </Grid>
 
       <!-- 收藏网格：分块行虚拟化（6 张/行，收藏无上限时只渲染可见行） -->
-      <ListBox ItemsSource="{Binding VodRows}" Background="Transparent" BorderThickness="0"
+      <ListBox Classes="virtualRows" ItemsSource="{Binding VodRows}" Background="Transparent" BorderThickness="0"
                Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" MaxHeight="480">
         <ListBox.ItemTemplate>
           <DataTemplate>
