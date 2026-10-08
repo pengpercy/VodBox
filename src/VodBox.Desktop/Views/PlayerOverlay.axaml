@@ -68,7 +68,7 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
               <Button Click="OnBack10" Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="后退 10 秒">
-                <Path Data="{DynamicResource Icon.Rewind10}" Fill="#D0FFFFFF" Width="18" Height="18"
+                <Path Data="{DynamicResource Icon.SkipPrevious}" Fill="#D0FFFFFF" Width="18" Height="18"
                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="20"
@@ -78,7 +78,7 @@
               </Button>
               <Button Click="OnForward10" Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="前进 10 秒">
-                <Path Data="{DynamicResource Icon.Forward10}" Fill="#D0FFFFFF" Width="18" Height="18"
+                <Path Data="{DynamicResource Icon.SkipNext}" Fill="#D0FFFFFF" Width="18" Height="18"
                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
             </StackPanel>
@@ -93,6 +93,11 @@
               <Button Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="6"
                       Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="画面比例">
                 <Path Data="{DynamicResource Icon.AspectRatio}" Fill="#D0FFFFFF" Width="16" Height="16"
+                      Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Button>
+              <Button Click="OnToggleWindowSmall" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="小窗">
+                <Path Data="{DynamicResource Icon.WindowSmall}" Fill="#D0FFFFFF" Width="16" Height="16"
                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Background="Transparent" BorderThickness="0" CornerRadius="6"

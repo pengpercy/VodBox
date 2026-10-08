@@ -103,6 +103,11 @@ public partial class PlayerOverlay : UserControl
         }
     }
 
+    private void OnToggleWindowSmall(object? sender, RoutedEventArgs e)
+    {
+        if (VM is { } vm) vm.FlashToast("小窗模式（S2 接）");
+    }
+
     private void OnToggleAspectRatio(object? sender, RoutedEventArgs e)
     {
         if (VM is { } vm) vm.FlashToast("画面比例（S2 接）");
