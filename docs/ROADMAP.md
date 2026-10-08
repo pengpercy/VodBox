@@ -71,6 +71,13 @@
 - 验证缺口（如实记录）：HLS 直播源与全屏往返未验证；Windows/Linux 未跑（无环境，靠 CI）；详情页内嵌影院模式播放器留 TODO（设计为全局浮层播放）
 - 验收：本地 mp4 能看到画面、暂停、seek ✅；HLS + 全屏 ⏳ 待 S2 控制条完善后补验
 
+**真机验收（2026-10-08，commit `11143eb`）**：
+- 爬虫层 8/8：6 个爬虫（Bili/FirstAid/Trailer/Huya/Tuxiaobei/Douyu）在饭太硬+宝盒真实源各解出真实播放地址
+- libmpv 真实渲染：B 站真实网络流 frames=227 / position=7.57s / h264 360x640 30fps + aac。**渲染层完好**——
+  此前"卡死"是探针三层连环 bug（旧二进制 abort 的 UE 态、CDN 要 Referer、参数解析不认 --key=value），与渲染无关
+- 结论：真实站点 CDN 普遍要求 Referer/UA 请求头，播放时必须带（引擎已支持透传）
+- 真机验收工装：UiSmoke 支持网络地址 + Referer/UA + mpv 内部日志；PreviewTests 支持 VODBOX_PREVIEW_SHOT=1 对拍设计稿
+
 ### S2 · 播放体验（P0–P1，3–5 天）
 **已决策纳入**：移植旧 `PlaybackCoordinator.cs`(88行) + `PlaylistSession.cs`(43行)（ADAPT）。
 协调器提供代次计数会话隔离、取消过期解析、串行化原生状态转移、`SaveProgress` 完播检测
