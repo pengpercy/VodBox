@@ -52,9 +52,12 @@
               <!-- 左：喇叭+音量滑杆 -->
               <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                           HorizontalAlignment="Left">
-                <Button Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="音量">
-                  <PathIcon Data="{DynamicResource Icon.VolumeHigh}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Button Command="{Binding ToggleMuteCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                        Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="静音 / 恢复音量">
+                  <Panel>
+                    <PathIcon Data="{DynamicResource Icon.VolumeHigh}" IsVisible="{Binding IsMuted, Converter={x:Static v:BoolConverters.Not}}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.VolumeOff}" IsVisible="{Binding IsMuted}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Panel>
                 </Button>
                 <Slider Classes="md" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" />
               </StackPanel>

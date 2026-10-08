@@ -12,6 +12,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly IPlaybackEngine _engine;
     private readonly ILibraryStore _store;
     private readonly IPreferences? _preferences;
+    private int _audibleVolume = 100;
+    public bool IsMuted => Volume == 0;
     private readonly MainViewModel _main;
     private readonly PlaybackCoordinator _coordinator;
     private long _intent;
@@ -78,6 +80,10 @@ public sealed partial class PlayerViewModel : ObservableObject
         _store = store;
         _preferences = preferences;
         _autoNext = preferences?.GetBool("player.auto-next", true) ?? true;
+        _volume = Math.Clamp(preferences?.GetInt("player.volume", 100) ?? 100, 0, 100);
+        var savedRate = preferences?.GetDouble("player.rate", 1) ?? 1;
+        _rate = double.IsFinite(savedRate) ? Math.Clamp(savedRate, .25, 4) : 1;
+        if (_volume > 0) _audibleVolume = _volume;
         _main = main;
         _coordinator = new PlaybackCoordinator(engine);
         engine.StateChanged += (_, evt) =>
@@ -133,9 +139,13 @@ public sealed partial class PlayerViewModel : ObservableObject
                     ct.ThrowIfCancellationRequested();
                     await saved.WaitAsync(ct);
                     ct.ThrowIfCancellationRequested();
+                    int volume = 100;
+                    double rate = 1;
                     await _main.RunOnUiAsync(() =>
                     {
                         ct.ThrowIfCancellationRequested();
+                        volume = Volume;
+                        rate = Rate;
                         if (intent != _intent) throw new OperationCanceledException(ct);
                         _current = request;
                         Title = request.Title;
@@ -144,6 +154,9 @@ public sealed partial class PlayerViewModel : ObservableObject
                         Position = TimeSpan.Zero;
                         Duration = TimeSpan.Zero;
                     });
+                    await _engine.SetVolumeAsync(volume, ct);
+                    await _engine.SetRateAsync(rate, ct);
+                    ct.ThrowIfCancellationRequested();
                     return request;
                 });
             });
@@ -234,11 +247,40 @@ public sealed partial class PlayerViewModel : ObservableObject
         catch (Exception error) { System.Diagnostics.Debug.WriteLine($"[preferences] {error.Message}"); }
     }
 
-    partial void OnVolumeChanged(int value) => _ = _engine.SetVolumeAsync(value);
+    [RelayCommand] private void ToggleMute() => Volume = Volume == 0 ? _audibleVolume : 0;
+
+    partial void OnVolumeChanged(int value)
+    {
+        var bounded = Math.Clamp(value, 0, 100);
+        if (value != bounded) { Volume = bounded; return; }
+        if (value > 0) _audibleVolume = value;
+        OnPropertyChanged(nameof(IsMuted));
+        SavePreference(() => _preferences?.Set("player.volume", value));
+        _ = ApplyControlAsync(() => _engine.SetVolumeAsync(value));
+    }
     partial void OnRateChanged(double value)
     {
-        _ = _engine.SetRateAsync(value);
+        var bounded = double.IsFinite(value) ? Math.Clamp(value, .25, 4) : 1;
+        if (!value.Equals(bounded)) { Rate = bounded; return; }
+        SavePreference(() => _preferences?.Set("player.rate", value));
+        _ = ApplyControlAsync(() => _engine.SetRateAsync(value));
         FlashToast($"{value:0.##}x 倍速");
+    }
+
+    private static void SavePreference(Action save)
+    {
+        try { save(); }
+        catch (Exception error) { System.Diagnostics.Debug.WriteLine($"[preferences] {error.Message}"); }
+    }
+
+    private async Task ApplyControlAsync(Func<Task> apply)
+    {
+        var intent = _intent;
+        try { await apply(); }
+        catch (Exception error)
+        {
+            await _main.RunOnUiAsync(() => { if (intent == _intent) FlashToast($"播放设置失败：{error.Message}"); });
+        }
     }
 
     /// <summary>展示中央 toast（自动 3 秒隐藏）。</summary>

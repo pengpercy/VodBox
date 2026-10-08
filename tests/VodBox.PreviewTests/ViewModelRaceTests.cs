@@ -538,6 +538,33 @@ public sealed class ViewModelRaceTests
         Assert.Equal("hero", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
+    [AvaloniaFact]
+    public async Task Player_RestoresPreferencesBeforeOpeningAndPersistsMuteAndRate()
+    {
+        using var context = new Context();
+        context.Preferences.Set("player.volume", 35);
+        context.Preferences.Set("player.rate", 1.5);
+        context.Preferences.Set("player.auto-next", false);
+        var vm = new PlayerViewModel(context.Engine, context.Store, context.Main, context.Preferences);
+        Assert.Equal(35, vm.Volume);
+        Assert.Equal(1.5, vm.Rate);
+        Assert.False(vm.AutoNext);
+        await Done(vm.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+        Assert.Equal(35, context.Engine.AppliedVolume);
+        Assert.Equal(1.5, context.Engine.AppliedRate);
+        vm.ToggleMuteCommand.Execute(null);
+        Assert.True(vm.IsMuted);
+        Assert.Equal(0, context.Engine.AppliedVolume);
+        vm.ToggleMuteCommand.Execute(null);
+        Assert.Equal(35, vm.Volume);
+        vm.Rate = 2;
+        vm.AutoNext = true;
+        var restored = new PlayerViewModel(new Engine(), context.Store, context.Main, context.Preferences);
+        Assert.Equal(35, restored.Volume);
+        Assert.Equal(2, restored.Rate);
+        Assert.True(restored.AutoNext);
+    }
+
     private sealed class Context : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), $"vodbox-vm-race-{Guid.NewGuid():N}");
@@ -545,6 +572,7 @@ public sealed class ViewModelRaceTests
         public Source Source { get; } = new();
         public Store Store { get; } = new();
         public Engine Engine { get; } = new();
+        public IPreferences Preferences => _services.Prefs;
         public MainViewModel Main { get; }
         public Context()
         {
@@ -627,8 +655,10 @@ public sealed class ViewModelRaceTests
         public List<TimeSpan> Seeks { get; } = [];
         public Task SeekToAsync(TimeSpan position, CancellationToken ct = default) { Seeks.Add(position); return Task.CompletedTask; }
         public Task SeekByAsync(TimeSpan delta, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SetRateAsync(double rate, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SetVolumeAsync(int volume, CancellationToken ct = default) => Task.CompletedTask;
+        public double AppliedRate { get; private set; } = 1;
+        public Task SetRateAsync(double rate, CancellationToken ct = default) { AppliedRate = rate; return Task.CompletedTask; }
+        public int AppliedVolume { get; private set; } = 80;
+        public Task SetVolumeAsync(int volume, CancellationToken ct = default) { AppliedVolume = volume; return Task.CompletedTask; }
         public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) => [];
         public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
