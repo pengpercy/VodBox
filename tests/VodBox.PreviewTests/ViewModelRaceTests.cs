@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using VodBox.Core;
 using VodBox.Desktop.Services;
@@ -563,6 +564,27 @@ public sealed class ViewModelRaceTests
         Assert.Equal(35, restored.Volume);
         Assert.Equal(2, restored.Rate);
         Assert.True(restored.AutoNext);
+    }
+
+    [AvaloniaFact]
+    public void Player_CompactWindowRestoresSizeConstraintsAndTopmost()
+    {
+        using var context = new Context();
+        var view = new PlayerOverlay { DataContext = context.Main };
+        var window = new Window { Width = 1280, Height = 800, MinWidth = 960, MinHeight = 600 };
+        view.ToggleCompactWindow(window);
+        Assert.True(window.Topmost);
+        Assert.Equal(640, window.Width);
+        Assert.Equal(400, window.Height);
+        Assert.True(context.Main.Player.CompactMode);
+        view.ToggleCompactWindow(window);
+        Assert.False(window.Topmost);
+        Assert.Equal(1280, window.Width);
+        Assert.Equal(800, window.Height);
+        Assert.Equal(960, window.MinWidth);
+        Assert.Equal(600, window.MinHeight);
+        Assert.False(context.Main.Player.CompactMode);
+        window.Close();
     }
 
     private sealed class Context : IDisposable

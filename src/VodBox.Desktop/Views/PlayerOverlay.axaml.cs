@@ -36,6 +36,8 @@ public static class TimeConverters
 public partial class PlayerOverlay : UserControl
 {
     private MpvVideoSurface? _surface;
+    private Window? _compactWindow;
+    private (double Width, double Height, double MinWidth, double MinHeight, Avalonia.PixelPoint Position, bool Topmost, WindowState State) _windowSnapshot;
     private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private long _lastActivity = Environment.TickCount64;
     private bool _menuOpen;
@@ -112,6 +114,7 @@ public partial class PlayerOverlay : UserControl
 
     private void OnDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        RestoreWindow();
         _controlsTimer.Stop();
         VM?.CancelSeek();
         RevealControls();
@@ -154,7 +157,52 @@ public partial class PlayerOverlay : UserControl
 
     private void OnBack10(object? sender, RoutedEventArgs e) => VM?.SeekByCommand.Execute(-10d);
     private void OnForward10(object? sender, RoutedEventArgs e) => VM?.SeekByCommand.Execute(10d);
-    private void OnClose(object? sender, RoutedEventArgs e) => VM?.CloseCommand.Execute(null);
+    private void OnClose(object? sender, RoutedEventArgs e)
+    {
+        RestoreWindow();
+        if (TopLevel.GetTopLevel(this) is Window window && window.WindowState == WindowState.FullScreen)
+            window.WindowState = WindowState.Normal;
+        VM?.CloseCommand.Execute(null);
+    }
+
+    protected override void OnPropertyChanged(Avalonia.AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsVisibleProperty && !IsVisible) RestoreWindow();
+    }
+
+    internal void ToggleCompactWindow(Window window)
+    {
+        if (_compactWindow is not null) { RestoreWindow(); return; }
+        _windowSnapshot = (window.Width, window.Height, window.MinWidth, window.MinHeight, window.Position, window.Topmost, window.WindowState);
+        _compactWindow = window;
+        window.WindowState = WindowState.Normal;
+        window.MinWidth = 540;
+        window.MinHeight = 300;
+        window.Width = 640;
+        window.Height = 400;
+        window.Topmost = true;
+        if (window.Screens.ScreenFromWindow(window) is { } screen)
+            window.Position = new Avalonia.PixelPoint(screen.WorkingArea.Right - (int)(640 * screen.Scaling) - 24,
+                screen.WorkingArea.Bottom - (int)(400 * screen.Scaling) - 24);
+        if (VM is { } vm) vm.CompactMode = true;
+        RevealControls();
+    }
+
+    internal void RestoreWindow()
+    {
+        if (_compactWindow is not { } window) return;
+        _compactWindow = null;
+        var saved = _windowSnapshot;
+        window.MinWidth = saved.MinWidth;
+        window.MinHeight = saved.MinHeight;
+        window.Width = saved.Width;
+        window.Height = saved.Height;
+        window.Position = saved.Position;
+        window.Topmost = saved.Topmost;
+        window.WindowState = saved.State;
+        if (VM is { } vm) vm.CompactMode = false;
+    }
 
     private void OnRateChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -180,7 +228,7 @@ public partial class PlayerOverlay : UserControl
 
     private void OnTogglePip(object? sender, RoutedEventArgs e)
     {
-        if (VM is { } vm) vm.FlashToast("画中画（S2 接）");
+        if (TopLevel.GetTopLevel(this) is Window window) ToggleCompactWindow(window);
     }
 
     private void OnTogglePlugin(object? sender, RoutedEventArgs e)
@@ -245,7 +293,16 @@ public partial class PlayerOverlay : UserControl
 
     private void OnToggleAspectRatio(object? sender, RoutedEventArgs e)
     {
-        if (VM is { } vm) vm.FlashToast("画面比例（S2 接）");
+        if (VM is not { } vm || sender is not Button button) return;
+        var menu = new ContextMenu();
+        var session = vm.CurrentSessionId;
+        foreach (var (label, ratio) in new (string, double?)[] { ("原始比例", null), ("16:9", 16d / 9), ("4:3", 4d / 3), ("1:1", 1d) })
+        {
+            var item = new MenuItem { Header = label };
+            item.Click += async (_, _) => { if (session == vm.CurrentSessionId) await vm.SetAspectRatioAsync(ratio); };
+            menu.Items.Add(item);
+        }
+        OpenControlMenu(button, menu);
     }
 
     private void OnToggleFullscreen(object? sender, RoutedEventArgs e)

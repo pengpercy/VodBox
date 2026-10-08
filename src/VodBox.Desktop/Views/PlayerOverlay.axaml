@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              xmlns:v="clr-namespace:VodBox.Desktop.Views"
@@ -16,9 +17,9 @@
     <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding Visible}">
 
       <!-- 顶栏：返回箭头 + 标题 + 副标题 · 右侧分辨率角标 -->
-      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="16,12,16,0">
+      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="{OnPlatform Default='16,12,16,0', macOS='90,12,16,0'}" chrome:WindowDecorationProperties.ElementRole="TitleBar">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-          <Button Click="OnClose" Background="#66000000" BorderThickness="0"
+          <Button chrome:WindowDecorationProperties.ElementRole="User" Click="OnClose" Background="#66000000" BorderThickness="0"
                   CornerRadius="8" Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="返回">
             <PathIcon Data="{DynamicResource Icon.Back}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
@@ -65,15 +66,15 @@
               <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
                           HorizontalAlignment="Right">
-                <Button Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="画面比例">
                   <PathIcon Data="{DynamicResource Icon.AspectRatio}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnTogglePip" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="画中画">
+                        Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="置顶小窗 / 恢复窗口">
                   <PathIcon Data="{DynamicResource Icon.PiP}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="插件">
                   <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>

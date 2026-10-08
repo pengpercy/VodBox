@@ -71,8 +71,6 @@
           <views:FilesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" />
           <views:SettingsView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" />
           <views:DetailView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsDetail}, ConverterParameter=0, Mode=OneWay}" />
-          <!-- 播放器浮层（任意页面之上） -->
-          <views:PlayerOverlay IsVisible="{Binding Player.Visible}" />
         </Panel>
       </Grid>
 
@@ -85,6 +83,8 @@
       <Border x:Name="SidebarDivider" Grid.RowSpan="2" Grid.Column="0" Width="1"
               HorizontalAlignment="Right" Background="{DynamicResource StrokeBrush}"
               IsHitTestVisible="False" />
+      <!-- 播放占满客户区，小窗模式无需给导航栏保留宽度。 -->
+      <views:PlayerOverlay Grid.RowSpan="2" Grid.ColumnSpan="2" IsVisible="{Binding Player.Visible}" />
     </Grid>
   </Panel>
 </Window>

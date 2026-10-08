@@ -32,6 +32,9 @@ public interface IPlaybackEngine : IAsyncDisposable
     Task SeekByAsync(TimeSpan delta, CancellationToken ct = default);
     Task SetRateAsync(double rate, CancellationToken ct = default);
     Task SetVolumeAsync(int volume, CancellationToken ct = default);
+    /// <summary>null 恢复媒体原始比例，其余为宽/高比值。</summary>
+    Task SetAspectRatioAsync(double? ratio, CancellationToken ct = default) =>
+        Task.FromException(new NotSupportedException("当前引擎不支持画面比例切换。"));
     IReadOnlyList<MediaTrack> GetTracks(TrackKind kind);
     Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default);
 }

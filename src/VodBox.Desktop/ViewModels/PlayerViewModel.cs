@@ -32,6 +32,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     public ObservableCollection<MediaTrack> Tracks { get; } = [];
 
+    [ObservableProperty] private bool _compactMode;
     [ObservableProperty] private bool _controlsVisible = true;
     public bool IsSeeking => _seekIntent is not null;
     public bool IsPlaying => State is PlaybackState.Playing or PlaybackState.Buffering;
@@ -183,6 +184,11 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     [RelayCommand] private Task PreviousEpisode() => PlayPlaylistIndexAsync(PlaylistIndex - 1);
     [RelayCommand] private Task NextEpisode() => PlayPlaylistIndexAsync(PlaylistIndex + 1);
+
+    public async Task SetAspectRatioAsync(double? ratio)
+    {
+        await ApplyControlAsync(() => _engine.SetAspectRatioAsync(ratio));
+    }
 
     public long CurrentSessionId => _intent;
 

@@ -19,6 +19,7 @@ public sealed class MpvEngine : IPlaybackEngine
     private bool _loaded, _paused, _buffering;
     private int _volume = 80;
     private double _rate = 1;
+    private double _aspect = -1;
     private IReadOnlyList<MediaTrack> _tracks = [];
     private PlaybackSnapshot _snapshot = new(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false);
 
@@ -132,6 +133,7 @@ public sealed class MpvEngine : IPlaybackEngine
             client.Command("set", "user-agent", agent); client.Command("set", "referrer", referer);
             client.Command("set", "pause", "no"); client.Command("set", "volume", _volume.ToString(CultureInfo.InvariantCulture));
             client.Command("set", "speed", Number(_rate));
+            client.Command("set", "video-aspect-override", Number(_aspect));
             try { client.Command("loadfile", uri.AbsoluteUri, "replace"); }
             catch (Exception error) { SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message }); throw; }
         }, token);
@@ -167,6 +169,17 @@ public sealed class MpvEngine : IPlaybackEngine
 
     public Task SetVolumeAsync(int volume, CancellationToken token = default) => ExecuteAsync(() =>
     { _volume = Math.Clamp(volume, 0, 100); _client?.Command("set", "volume", _volume.ToString(CultureInfo.InvariantCulture)); }, token);
+
+    public Task SetAspectRatioAsync(double? ratio, CancellationToken token = default)
+    {
+        if (ratio is { } value && (!double.IsFinite(value) || value <= 0))
+            throw new ArgumentOutOfRangeException(nameof(ratio));
+        return ExecuteAsync(() =>
+        {
+            _aspect = ratio ?? -1;
+            _client?.Command("set", "video-aspect-override", Number(_aspect));
+        }, token);
+    }
 
     public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) =>
         Volatile.Read(ref _tracks).Where(x => x.Kind == kind).ToArray();

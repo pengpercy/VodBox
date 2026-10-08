@@ -10,6 +10,20 @@ namespace VodBox.Tests;
 public sealed class MpvEngineTests
 {
     [Fact]
+    public async Task AspectRatioIsAppliedOnOpenRestoredAndValidated()
+    {
+        var client = new Client();
+        await using var engine = new MpvEngine(factory: () => client);
+        await engine.SetAspectRatioAsync(16d / 9);
+        await engine.OpenAsync(new PlaybackRequest { Uri = "https://media.example/video" }, 1);
+        Assert.Equal(16d / 9, double.Parse(client.Properties["video-aspect-override"], CultureInfo.InvariantCulture), 12);
+        await engine.SetAspectRatioAsync(null);
+        Assert.Equal("-1", client.Properties["video-aspect-override"]);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => engine.SetAspectRatioAsync(double.NaN));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => engine.SetAspectRatioAsync(0));
+    }
+
+    [Fact]
     public async Task VideoSurfaceHandshakePreventsPrematureLoadAndAllowsCancelledRetry()
     {
         var client = new Client(); await using var engine = new MpvEngine(factory: () => client, waitForVideoSurface: true);
