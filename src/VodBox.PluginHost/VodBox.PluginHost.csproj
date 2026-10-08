@@ -8,4 +8,8 @@
   <ItemGroup>
     <ProjectReference Include="..\VodBox.Core\VodBox.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- drpy 依赖库随包分发（模块加载器按 assets://js/... 解析） -->
+    <Content Include="Assets/js/**/*.js" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
 </Project>

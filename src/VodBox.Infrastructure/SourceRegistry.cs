@@ -28,6 +28,7 @@ public sealed class SourceRegistry : IDisposable
 
     private void Rebuild()
     {
+        foreach (var source in _sources.Values.OfType<IDisposable>()) source.Dispose();
         _sources.Clear();
         foreach (var info in Sources)
         {
@@ -39,7 +40,10 @@ public sealed class SourceRegistry : IDisposable
                 case SourceRuntime.NativeSpider:
                     if (NativeSpiders.Create(info) is { } native) _sources[info.Key] = native;
                     break;
-                // QuickJs/Python/Node 尚无桌面运行时，保持不在册（Get 返回 null，UI 提示不支持）
+                case SourceRuntime.QuickJs:
+                    _sources[info.Key] = new DrpySource(info);
+                    break;
+                // Python/Node（含未适配 csp_）不在册。
             }
         }
         SourcesChanged?.Invoke();
@@ -90,7 +94,12 @@ public sealed class SourceRegistry : IDisposable
     /// <summary>单站聚合搜索超时（独立于调用方 ct）。</summary>
     public static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(25);
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        foreach (var source in _sources.Values.OfType<IDisposable>()) source.Dispose();
+        _sources.Clear();
+        _http.Dispose();
+    }
 }
 
 /// <summary>聚合搜索结果：命中条目 + 逐源失败原因。</summary>

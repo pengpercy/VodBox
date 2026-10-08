@@ -30,12 +30,18 @@ internal static unsafe partial class QuickJsNative
         var overridePath = Environment.GetEnvironmentVariable("VODBOX_QUICKJS_LIB");
         if (!string.IsNullOrWhiteSpace(overridePath)) yield return overridePath;
         var baseDir = AppContext.BaseDirectory;
-        var ext = OperatingSystem.IsOSPlatform("OSX") ? "dylib"
-            : OperatingSystem.IsWindows() ? "dll" : "so";
-        yield return Path.Combine(baseDir, $"libvodbox_quickjs.{ext}");
-        yield return Path.Combine(baseDir, "runtimes", "osx-x64", "native", $"libvodbox_quickjs.{ext}");
-        yield return Path.Combine(baseDir, "..", "..", "build", "quickjs", $"libvodbox_quickjs.{ext}");
-        if (OperatingSystem.IsOSPlatform("OSX")) yield return "/usr/local/lib/libvodbox_quickjs.dylib";
+        var platform = OperatingSystem.IsMacOS() ? "osx" : OperatingSystem.IsWindows() ? "win" : "linux";
+        var arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+        var filename = OperatingSystem.IsWindows() ? "vodbox_quickjs.dll"
+            : OperatingSystem.IsMacOS() ? "libvodbox_quickjs.dylib" : "libvodbox_quickjs.so";
+        yield return Path.Combine(baseDir, filename);
+        yield return Path.Combine(baseDir, "runtimes", platform + "-" + arch, "native", filename);
+        yield return Path.Combine(baseDir, "..", "Resources", filename);
+        if (OperatingSystem.IsMacOS())
+        {
+            yield return "/usr/local/lib/libvodbox_quickjs.dylib";
+            yield return "/opt/homebrew/lib/libvodbox_quickjs.dylib";
+        }
     }
 
     // 回调经 nint 传（函数指针在 QuickJsEngine 里转型），LibraryImport 不认 delegate* 参数
@@ -58,6 +64,10 @@ internal static unsafe partial class QuickJsNative
     [LibraryImport(Library, EntryPoint = "vb_set_host_async")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static partial void SetHostAsync(nint vm, nint hostAsync);
+
+    [LibraryImport(Library, EntryPoint = "vb_set_interrupt")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    internal static partial void SetInterrupt(nint vm, nint isCancelled);
 
     [LibraryImport(Library, EntryPoint = "vb_resolve", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

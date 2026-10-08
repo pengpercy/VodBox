@@ -36,6 +36,7 @@ typedef struct VM
     /* 异步宿主：op + payload + requestId → 0=受理，非 0=未受理（同步失败） */
     int (*host_async)(const char *, const char *, int request_id);
     double deadline;
+    int (*is_cancelled)(void);
     int next_request_id;
 } VM;
 
@@ -53,7 +54,8 @@ static double now(void)
 static int interrupt(JSRuntime *rt, void *opaque)
 {
     (void)rt;
-    return now() > ((VM *)opaque)->deadline;
+    VM *vm = opaque;
+    return now() > vm->deadline || (vm->is_cancelled && vm->is_cancelled());
 }
 
 static char *copy_string(const char *s)
@@ -155,10 +157,7 @@ static JSModuleDef *module_loader(JSContext *ctx, const char *module_name, void 
     }
     JSModuleDef *module = JS_VALUE_GET_PTR(func_val);
     JS_FreeValue(ctx, func_val);
-    if (JS_SetModuleExport(ctx, module, "*", JS_UNDEFINED) < 0)
-    {
-        /* noop */
-    }
+    /* CompileOnly 已产出模块自带 exports（含 default）——不得覆盖。 */
     return module;
 }
 
@@ -240,6 +239,12 @@ EXPORT void vb_set_host_async(VM *vm, int (*host_async)(const char *, const char
     vm->host_async = host_async;
 }
 
+/* 中断检查始终在引擎线程调用；无需跨线程写 VM 指针。 */
+EXPORT void vb_set_interrupt(VM *vm, int (*is_cancelled)(void))
+{
+    vm->is_cancelled = is_cancelled;
+}
+
 /* C# 完成异步宿主操作后回填：is_error != 0 → reject(result) */
 EXPORT void vb_resolve(VM *vm, int request_id, const char *result, int is_error)
 {
@@ -258,7 +263,14 @@ EXPORT void vb_resolve(VM *vm, int request_id, const char *result, int is_error)
     /* 引用语义：Get 持有新引用 → FreeValue 释放它；
        SetPropertyInt64(…, UNDEFINED) 窃取一个新 undefined 引用并释放表内旧 fn。
        两步都保留（各自独立合法），不再重复 Free fn 之外的东西。 */
-    JS_SetPropertyInt64(vm->ctx, table, request_id, JS_UNDEFINED);
+    JSValue resolves = JS_GetPropertyStr(vm->ctx, global, "__resolves");
+    JSValue rejects = JS_GetPropertyStr(vm->ctx, global, "__rejects");
+    JSAtom key = JS_NewAtomUInt32(vm->ctx, (uint32_t)request_id);
+    JS_DeleteProperty(vm->ctx, resolves, key, 0);
+    JS_DeleteProperty(vm->ctx, rejects, key, 0);
+    JS_FreeAtom(vm->ctx, key);
+    JS_FreeValue(vm->ctx, resolves);
+    JS_FreeValue(vm->ctx, rejects);
     JS_FreeValue(vm->ctx, fn);
     JS_FreeValue(vm->ctx, table);
     JS_FreeValue(vm->ctx, global);

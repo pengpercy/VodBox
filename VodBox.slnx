@@ -1,12 +1,15 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/VodBox.Core/VodBox.Core.csproj" />
+    <Project Path="src/VodBox.PluginHost/VodBox.PluginHost.csproj" />
     <Project Path="src/VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
     <Project Path="src/VodBox.Playback.Mpv/VodBox.Playback.Mpv.csproj" />
     <Project Path="src/VodBox.Desktop/VodBox.Desktop.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VodBox.Tests/VodBox.Tests.csproj" />
+    <Project Path="tests/VodBox.QuickJs.Smoke/VodBox.QuickJs.Smoke.csproj" />
+    <Project Path="tests/VodBox.Drpy.Smoke/VodBox.Drpy.Smoke.csproj" />
     <Project Path="tests/VodBox.Mpv.Smoke/VodBox.Mpv.Smoke.csproj" />
     <Project Path="tests/VodBox.Mpv.UiSmoke/VodBox.Mpv.UiSmoke.csproj" />
     <Project Path="tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj" />

@@ -94,6 +94,15 @@
 ### S3 · 内容源运行时扩展（P1，最重）
 **范围已决策（2026-10-08）**：
 
+### S3a 当前验收记录（2026-10-08）
+- QuickJS 引擎与 drpy 内容源已接入工作树：每站独立 VM、延迟加载、调用串行、取消/异常后重建。
+- 主测试最近验证 203/203；预览 12/12。
+- 原生 QuickJS 冒烟 12/12：定时器、Promise、ES modules、循环取消、释放期间回填、GBK、URL 拼接等。
+- drpy 冒烟 12/12：显式 DrpySource 路径（非原生 key 兜底），兔小贝分类4/分类列表30/搜索4/详情/稳定续播身份/播放解析；实际 CDN MP4 字节读取 HTTP 206。
+- 新修正：异步回调 requestId 的 C#/C ABI 使用 int 对齐；原生库搜索按当前平台/架构生成 RID。
+- **尚未完成**：更多真实规则兼容、六 RID 原生库构建/打包、NativeAOT 发布验收、逐文件依赖许可与上游版本固定。
+- QuickJS 不支持 Java csp_；那些仍需 C# 原生适配。以上成果不等于 S3a 全范围验收完成。
+
 **S3a · QuickJS drpy 运行时** —— ⚠️ **不用 QuickJS.NET NuGet，复用旧自建 CMake bridge**
 实测 `QuickJS.NET` v0.0.3（2021-05-24）包内 `runtimes/` 只有 win-x64/win-x86/linux-x64，
 **缺 macOS 与全部 arm64（4/6 RID）**，且包装 bellard 经典 QuickJS（非 quickjs-ng）、
