@@ -131,7 +131,8 @@ public sealed class HuyaSource : IResolvingContentSource, IDisposable
 
         return new MediaDetail
         {
-            Item = new MediaItem { Id = Id(mediaId), Title = Required(live, "roomName"), Poster = Url(Required(live, "screenshot")) },
+            // 直播标题可能为空（部分房间不设标题）：回退到「房间号」兜底，而不是报错（Gson 宽容行为对齐）
+            Item = new MediaItem { Id = Id(mediaId), Title = RoomTitle(live, mediaId), Poster = Url(Required(live, "screenshot")) },
             Description = Field(live, "contentIntro"),
             Lines = playbackLines,
         };
@@ -155,7 +156,7 @@ public sealed class HuyaSource : IResolvingContentSource, IDisposable
         return new PlaybackRequest
         {
             Uri = media,
-            Title = Required(data.GetProperty("liveData"), "roomName"),
+            Title = RoomTitle(data.GetProperty("liveData"), mediaId),
             SourceKey = Key,
             SourceName = Name,
             MediaId = mediaId,
@@ -236,6 +237,13 @@ public sealed class HuyaSource : IResolvingContentSource, IDisposable
 
     private static string Field(JsonElement item, string key) =>
         item.TryGetProperty(key, out var value) ? value.ToString() : "";
+
+    /// <summary>直播标题：空标题时用房间号兜底（部分房间不设标题，Gson 宽容行为对齐）。</summary>
+    internal static string RoomTitle(JsonElement live, string fallback)
+    {
+        var title = Field(live, "roomName");
+        return string.IsNullOrWhiteSpace(title) ? $"房间 {fallback}" : title;
+    }
 
     private static string Required(JsonElement item, string key) =>
         Field(item, key) is { Length: > 0 } value ? value : throw new InvalidDataException($"虎牙缺少 {key}。");

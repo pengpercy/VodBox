@@ -168,6 +168,42 @@ public class HuyaSourceTests
         Assert.Contains("Referer", play.Headers.Keys);
     }
 
+    /// <summary>
+    /// 实测发现：部分虎牙房间的 liveData.roomName 是空字符串（直播标题未设）。
+    /// 此前用 Required(roomName) 会在这种房间直接报错，导致整个列表无法打开。
+    /// 空标题应回退到房间号兜底，而不是报错（Gson 宽容行为对齐）。
+    /// </summary>
+    [Fact]
+    public async Task Detail_ToleratesEmptyRoomName()
+    {
+        var fm = Convert.ToBase64String(Encoding.UTF8.GetBytes("hls_0_0_0"));
+        var liveUrl = $"https://al.flv.huya.com/src/11995132.flv?fm={Uri.EscapeDataString(fm)}&wsTime=abc&ctype=huya_webh5";
+        var routes = new Dictionary<string, string>
+        {
+            ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "", true, ("AL", liveUrl)),
+        };
+        using var source = Create(key => routes[key]);
+        var detail = await source.GetDetailAsync("11995132");
+
+        Assert.False(string.IsNullOrWhiteSpace(detail.Item.Title), "空标题应回退为房间号兜底");
+        Assert.Contains("11995132", detail.Item.Title);
+        Assert.NotEmpty(detail.Lines);
+    }
+
+    [Fact]
+    public async Task ResolvePlayback_ToleratesEmptyRoomName()
+    {
+        var fm = Convert.ToBase64String(Encoding.UTF8.GetBytes("hls_0_0_0"));
+        var liveUrl = $"https://al.flv.huya.com/src/11995132.flv?fm={Uri.EscapeDataString(fm)}&wsTime=abc&ctype=huya_webh5";
+        var routes = new Dictionary<string, string>
+        {
+            ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "", true, ("AL", liveUrl)),
+        };
+        using var source = Create(key => routes[key]);
+        var play = await source.ResolvePlaybackAsync("11995132", "0");
+        Assert.Contains("11995132", play.Title);
+    }
+
     [Fact]
     public void Id_ValidatesRoomNumber()
     {
