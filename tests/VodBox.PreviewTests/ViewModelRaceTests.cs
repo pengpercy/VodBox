@@ -466,6 +466,46 @@ public sealed class ViewModelRaceTests
         Assert.True(vm.ControlsVisible);
     }
 
+    private static IReadOnlyList<(SourceInfo Site, MediaItem Item)> SearchResults(string id, int count = 1)
+    {
+        var site = new SourceInfo { Key = "source", Name = "站点", Runtime = SourceRuntime.MacCms };
+        return Enumerable.Range(0, count).Select(i => (site, new MediaItem { Id = id + i, Title = id + i })).ToArray();
+    }
+
+    [AvaloniaFact]
+    public async Task Search_LateResultsCannotReplaceNewQuery()
+    {
+        using var context = new Context();
+        var late = Gate<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>();
+        var search = new SearchViewModel((query, _) => query == "旧" ? late.Task : Task.FromResult(SearchResults("新")), context.Main);
+        search.Keyword = "旧";
+        var old = search.RunSearchAsync();
+        search.Keyword = "新";
+        await Done(search.RunSearchAsync());
+        late.SetResult(SearchResults("旧"));
+        await Done(old);
+        Assert.Equal("新0", Assert.Single(search.AllResults).Id);
+        Assert.Contains("新", search.Summary);
+        Assert.False(search.Searching);
+        Assert.Equal(["新"], search.SearchHistory);
+    }
+
+    [AvaloniaFact]
+    public async Task Search_ResultsAfterFortiethItemRetainTheirSourceAndOpen()
+    {
+        using var context = new Context();
+        var loaded = Gate<string>();
+        context.Source.Load = (id, _) => { loaded.TrySetResult(id); return Task.FromResult(Detail(id)); };
+        var search = new SearchViewModel((_, _) => Task.FromResult(SearchResults("item", 120)), context.Main) { Keyword = "测试" };
+        await Done(search.RunSearchAsync());
+        var site = Assert.Single(search.SiteResults);
+        Assert.Equal(120, site.Items.Count);
+        search.SelectedSite = site;
+        Assert.Equal(120, search.ResultRows.Sum(row => row.Items.Count));
+        search.OpenItemCommand.Execute(search.AllResults[119]);
+        Assert.Equal("item119", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
     private sealed class Context : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), $"vodbox-vm-race-{Guid.NewGuid():N}");

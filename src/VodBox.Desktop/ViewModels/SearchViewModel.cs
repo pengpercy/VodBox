@@ -9,7 +9,10 @@ namespace VodBox.Desktop.ViewModels;
 /// <summary>搜索：多站点并发聚合 + 按站点切换结果。</summary>
 public sealed partial class SearchViewModel : ObservableObject
 {
-    private readonly AppServices _services;
+    private readonly Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> _search;
+    private readonly Dictionary<MediaItem, string> _sourceKeys = new(ReferenceEqualityComparer.Instance);
+    private CancellationTokenSource? _request;
+    private long _generation;
     private readonly MainViewModel _main;
 
     public ObservableCollection<SearchSiteResult> SiteResults { get; } = [];
@@ -19,7 +22,7 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>搜索历史胶囊（点击回搜、× 删除）。</summary>
     public ObservableCollection<string> SearchHistory { get; } = [];
 
-    /// <summary>结果行集合：每行 5 张卡（虚拟化网格的数据源，行容器数 = 可见行数）。</summary>
+    /// <summary>结果行集合：按可用宽度分块（虚拟化网格的数据源，行容器数 = 可见行数）。</summary>
     public ObservableCollection<ResultRow> ResultRows { get; } = [];
 
     [ObservableProperty] private string _keyword = "";
@@ -29,58 +32,95 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>当前选中的站点结果组（右侧网格随它切换）；null = 全部结果。</summary>
     [ObservableProperty] private SearchSiteResult? _selectedSite;
 
-    public SearchViewModel(AppServices services, MainViewModel main)
+    public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main) { }
+
+    internal SearchViewModel(Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> search, MainViewModel main)
     {
-        _services = services;
+        _search = search;
         _main = main;
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     public async Task RunSearchAsync()
     {
-        if (string.IsNullOrWhiteSpace(Keyword)) return;
-        Searching = true;
-        Summary = $"「{Keyword}」搜索中…";
-        SiteResults.Clear();
+        string query = "";
+        long generation = 0;
+        CancellationTokenSource? scope = null;
+        await _main.RunOnUiAsync(() =>
+        {
+            query = Keyword.Trim();
+            if (query.Length == 0) return;
+            _request?.Cancel();
+            scope = new CancellationTokenSource();
+            _request = scope;
+            generation = ++_generation;
+            Searching = true;
+            Summary = $"「{query}」搜索中…";
+            SelectedSite = null;
+            SiteResults.Clear();
+            AllResults.Clear();
+            _sourceKeys.Clear();
+            RebuildResultRows();
+        });
+        if (scope is null) return;
+        var ct = scope.Token;
         try
         {
-            var results = await _services.Registry.SearchAllAsync(Keyword);
-            AllResults.Clear();
-            foreach (var (_, item) in results.Take(500)) AllResults.Add(item);
-            RebuildResultRows();
-            var bySite = results.GroupBy(r => r.Site).ToList();
-            foreach (var group in bySite)
+            var results = await _search(query, ct);
+            ct.ThrowIfCancellationRequested();
+            await _main.RunOnUiAsync(() =>
             {
-                var site = new SearchSiteResult(group.Key.Name, group.Key.Key);
-                SiteResults.Add(site);
-                foreach (var (_, item) in group.Take(40))
-                    site.Items.Add(item);
-            }
-            SelectedSite = null;
-            Summary = $"「{Keyword}」在 {bySite.Count} 个站点找到结果";
-            ShowSuggestions = false;
-            if (!SearchHistory.Contains(Keyword))
-            {
-                SearchHistory.Insert(0, Keyword);
-                if (SearchHistory.Count > 8) SearchHistory.RemoveAt(SearchHistory.Count - 1);
-            }
+                if (generation != _generation || ct.IsCancellationRequested) return;
+                // 单一结果集合用于卡片、站点过滤及归属映射，避免展示可见却打不开的卡片。
+                var retained = results.Take(500).ToArray();
+                foreach (var (site, item) in retained)
+                {
+                    AllResults.Add(item);
+                    _sourceKeys[item] = site.Key;
+                }
+                foreach (var group in retained.GroupBy(r => r.Site.Key))
+                {
+                    var first = group.First().Site;
+                    var site = new SearchSiteResult(first.Name, first.Key);
+                    foreach (var (_, item) in group) site.Items.Add(item);
+                    SiteResults.Add(site);
+                }
+                RebuildResultRows();
+                Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {retained.Length} 条结果";
+                ShowSuggestions = false;
+                if (!SearchHistory.Contains(query))
+                {
+                    SearchHistory.Insert(0, query);
+                    if (SearchHistory.Count > 8) SearchHistory.RemoveAt(SearchHistory.Count - 1);
+                }
+            });
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception error)
         {
-            Summary = $"搜索失败：{error.Message}";
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation == _generation && !ct.IsCancellationRequested) Summary = $"搜索失败：{error.Message}";
+            });
         }
         finally
         {
-            Searching = false;
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation != _generation) return;
+                _request = null;
+                Searching = false;
+            });
+            scope.Dispose();
         }
     }
 
     [RelayCommand]
     private void OpenItem(MediaItem item)
     {
-        var site = SiteResults.FirstOrDefault(s => s.Items.Contains(item));
-        if (site is null) return;
-        _main.Detail.Open(site.SourceKey, item);
+        if (!_sourceKeys.TryGetValue(item, out var key))
+            key = SiteResults.FirstOrDefault(s => s.Items.Contains(item))?.SourceKey;
+        if (key is not null) _main.Detail.Open(key, item);
     }
 
     private int _columns = 5;
@@ -131,7 +171,7 @@ public sealed class SuggestItem
     public bool Hot { get; init; }
 }
 
-/// <summary>结果网格行（5 张卡）。</summary>
+/// <summary>结果网格行（动态列数）。</summary>
 public sealed class ResultRow
 {
     public IReadOnlyList<MediaItem> Items { get; }

@@ -172,7 +172,7 @@ public sealed partial class DetailViewModel : ObservableObject
         SelectedEpisode = Detail.FindEpisode(SelectedLine, history.EpisodeId);
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task PlayAsync()
     {
         if (Loading || Detail is null || SelectedLine is null || SelectedEpisode is null)
