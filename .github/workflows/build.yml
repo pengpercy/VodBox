@@ -39,7 +39,9 @@ jobs:
         if: startsWith(matrix.rid, 'linux')
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang zlib1g-dev libicu-dev libmpv-dev libmpv2
+          sudo apt-get install -y clang zlib1g-dev libicu-dev
+          # libmpv is resolved at runtime and its package name varies (libmpv1 on 22.04, libmpv2 on 24.04).
+          sudo apt-get install -y libmpv-dev || sudo apt-get install -y libmpv1 || true
       - name: Restore and test
         shell: bash
         run: |

@@ -45,6 +45,13 @@ internal static partial class MpvNative
         else if (OperatingSystem.IsLinux())
         {
             yield return Path.Combine(AppContext.BaseDirectory, "libmpv.so");
+            // Distro packages expose versioned sonames; Ubuntu 22.04 ships libmpv.so.1, 24.04 ships libmpv.so.2.
+            yield return "libmpv.so.2";
+            yield return "libmpv.so.1";
+            yield return "/usr/lib/x86_64-linux-gnu/libmpv.so.2";
+            yield return "/usr/lib/aarch64-linux-gnu/libmpv.so.2";
+            yield return "/usr/lib/x86_64-linux-gnu/libmpv.so.1";
+            yield return "/usr/lib/aarch64-linux-gnu/libmpv.so.1";
         }
     }
 

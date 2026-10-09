@@ -140,7 +140,8 @@ public sealed class MpvEngineTests
         await using var engine = new MpvEngine(factory: () => { initialized++; return client; }, waitForVideoSurface: true);
         Assert.False(engine.Available); // 探测可能失败，必须在渲染面安装后再判定
         var opening = engine.OpenAsync(new PlaybackRequest { Uri = "https://media.example/video" }, 1, default);
-        await Until(() => initialized == 1);
+        // The factory running is not the same as the client being published; wait for both to avoid a load-dependent race.
+        await Until(() => initialized == 1 && engine.Available);
         Assert.True(engine.Available);
         engine.NotifyVideoSurfaceReady(); await opening;
         await Until(() => engine.Snapshot.State == PlaybackState.Playing);

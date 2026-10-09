@@ -50,10 +50,12 @@ public sealed class LibraryStoreTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var target = Path.Combine(_directory, "atomic.db");
         using var store = new LibraryStore(target);
-        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + target);
-        connection.Open();
-        using (var trigger = connection.CreateCommand())
+        // Pooling keeps a file handle alive after Dispose, which Windows rejects as a cross-process lock.
+        var builder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = target, Pooling = false };
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection(builder.ToString()))
         {
+            connection.Open();
+            using var trigger = connection.CreateCommand();
             trigger.CommandText = "CREATE TRIGGER reject_restore BEFORE INSERT ON prefs WHEN NEW.key='reject' BEGIN SELECT RAISE(ABORT,'test restore failure'); END";
             trigger.ExecuteNonQuery();
         }
