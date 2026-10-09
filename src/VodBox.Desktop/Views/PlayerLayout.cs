@@ -14,14 +14,18 @@ public static class PlayerLayout
     public const double TitleBarButtonSize = 28;
 
     // ── 图标键（比例/小窗/插件/列表/倍速/全屏/设置/静音）────────────────────
-    /// <summary>图标键边长，宽高必须相等。20px 图标居中，四周各留 2px。</summary>
-    public const double IconButtonSize = 20;
+    /// <summary>图标键边长，宽高必须相等。22px 图标居中，四周各留 4px。</summary>
+    public const double IconButtonSize = 22;
     /// <summary>图标键内的图标尺寸。</summary>
-    public const double IconGlyphSize = 18;
+    public const double IconGlyphSize = 14;
     /// <summary>图标键之间的间距；0 表示按键宽紧贴排列。</summary>
     public const double IconButtonSpacing = 0;
-    /// <summary>倍速键宽度（装“1.25x”角标的自适应结果）；实测值，参与最小宽度算式。</summary>
-    public const double RateButtonWidth = 56;
+    /// <summary>
+    /// 倍速键在全倍速档位下的最大宽度（实测：0.5x~2x 遍历取最大值）。
+    /// 倍速键本身按内容自适应（这样图标不会离邻键太远），此值仅作为最小宽度算式的最坏情况上界，
+    /// 保证切到任意倍速都不会与三键重叠。回归会遍历全部档位校验该上界。
+    /// </summary>
+    public const double RateButtonMaxWidth = 52;
 
     // ── 左侧音量 ────────────────────────────────────────────────────────────
     public const double VolumeSliderWidth = 64;
@@ -45,13 +49,13 @@ public static class PlayerLayout
     /// <summary>左侧组：静音键 + 间距 + 音量滑杆。</summary>
     public const double LeftGroupWidth = IconButtonSize + VolumeSpacing + VolumeSliderWidth;
     /// <summary>右侧组：六个等宽图标键 + 自适应的倍速键。</summary>
-    public const double RightGroupWidth = 6 * IconButtonSize + RateButtonWidth;
+    public const double RightGroupWidth = 6 * IconButtonSize + RateButtonMaxWidth;
     /// <summary>中央三键整组宽度。</summary>
     public const double TransportWidth = 3 * TransportButtonSize + 2 * TransportSpacing;
     /// <summary>紧凑模式左侧只剩静音键。</summary>
     public const double CompactLeftGroupWidth = IconButtonSize;
     /// <summary>紧凑模式右侧只剩小窗/列表/倍速/全屏/设置。</summary>
-    public const double CompactRightGroupWidth = 4 * IconButtonSize + RateButtonWidth;
+    public const double CompactRightGroupWidth = 4 * IconButtonSize + RateButtonMaxWidth;
     /// <summary>紧凑模式中央只剩播放键。</summary>
     public const double CompactTransportWidth = TransportButtonSize;
     /// <summary>三键与左右组之间必须保留的最小空隙。</summary>
@@ -60,6 +64,22 @@ public static class PlayerLayout
     public const double HorizontalPadding = 16 + 16;
     /// <summary>控制条相对窗口左右各留出的余量。</summary>
     public const double WindowMargin = 20;
+
+    // ── 播放列表抽屉 ────────────────────────────────────────────────────────
+    /// <summary>抽屉最大宽度。</summary>
+    public const double PlaylistDrawerMaxWidth = 300;
+    /// <summary>抽屉最小宽度（窗口很窄时仍可用）。</summary>
+    public const double PlaylistDrawerMinWidth = 200;
+    /// <summary>抽屉占窗口宽度的比例。</summary>
+    public const double PlaylistDrawerRatio = .62;
+    /// <summary>抽屉滑动动画时长（毫秒）；延迟隐藏需比它略长。</summary>
+    public const double PlaylistDrawerSlideMs = 220;
+
+    /// <summary>按可用宽度求抽屉宽度：窄窗口自动收窄，不超出上限。</summary>
+    public static double PlaylistDrawerWidth(double availableWidth) =>
+        double.IsFinite(availableWidth) && availableWidth > 0
+            ? Math.Min(PlaylistDrawerMaxWidth, Math.Max(PlaylistDrawerMinWidth, availableWidth * PlaylistDrawerRatio))
+            : PlaylistDrawerMinWidth;
 
     /// <summary>
     /// 面板内容宽 C 需满足：三键居中占 [C/2−半宽, C/2+半宽]，两侧组不得与其相交，

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -9,6 +10,8 @@ using Avalonia.Data;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Avalonia.Markup.Xaml;
+using Avalonia.Layout;
+using Avalonia.Media;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
 using VodBox.Core;
@@ -51,6 +54,9 @@ public partial class PlayerOverlay : UserControl
     private long _lastActivity = Environment.TickCount64;
     private bool _pointerOutside;
     private bool _menuOpen;
+    private bool _drawerOpen;
+    private readonly DispatcherTimer _drawerHideTimer =
+        new() { Interval = TimeSpan.FromMilliseconds(PlayerLayout.PlaylistDrawerSlideMs + 40) };
     private ContextMenu? _activeMenu;
     private PlayerViewModel? _observedPlayer;
     private static readonly Cursor HiddenCursor = new(StandardCursorType.None);
@@ -81,6 +87,11 @@ public partial class PlayerOverlay : UserControl
         PointerEntered += (_, _) => { _pointerOutside = false; RevealControls(); };
         PointerExited += (_, _) => { _pointerOutside = true; _lastActivity = Environment.TickCount64; Cursor = null; };
         AddHandler(KeyDownEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
+        _drawerHideTimer.Tick += (_, _) =>
+        {
+            _drawerHideTimer.Stop();
+            this.FindControl<Border>("PlaylistDrawer")?.IsVisible = false;
+        };
         AttachedToVisualTree += OnAttached;
         DetachedFromVisualTree += OnDetached;
     }
@@ -105,7 +116,7 @@ public partial class PlayerOverlay : UserControl
         if(e.PropertyName==nameof(PlayerViewModel.Visible)&&VM?.Visible==false)RestorePlayerWindow();
         if(e.PropertyName is nameof(PlayerViewModel.PlaylistIndex) or nameof(PlayerViewModel.Visible) or nameof(PlayerViewModel.Title))
         {
-            _activeMenu?.Close();_activeMenu=null;_menuOpen=false;
+            _activeMenu?.Close();_activeMenu=null;_menuOpen=false;ClosePlaylistDrawer(animate:false);
         }
         if (e.PropertyName is nameof(PlayerViewModel.Position) or nameof(PlayerViewModel.Danmaku) or nameof(PlayerViewModel.DanmakuEnabled) or nameof(PlayerViewModel.DanmakuOpacity) or nameof(PlayerViewModel.DanmakuLimit) or nameof(PlayerViewModel.Visible))
             this.FindControl<DanmakuLayer>("DanmakuCanvas")?.InvalidateVisual();
@@ -136,7 +147,7 @@ public partial class PlayerOverlay : UserControl
         if (VM is not { } vm) return;
         var hovering = this.FindControl<Control>("TopControls")?.IsPointerOver == true ||
                        this.FindControl<Control>("BottomControls")?.IsPointerOver == true;
-        var show = !vm.Visible || !IsVisible || vm.IsSeeking || _menuOpen || hovering ||
+        var show = !vm.Visible || !IsVisible || vm.IsSeeking || _menuOpen || _drawerOpen || hovering ||
                    (!_pointerOutside && vm.State != PlaybackState.Playing) ||
                    idle < (_pointerOutside ? TimeSpan.FromMilliseconds(350) : TimeSpan.FromMilliseconds(1500));
         vm.ControlsVisible = show;
@@ -151,6 +162,12 @@ public partial class PlayerOverlay : UserControl
             TopLevel.GetTopLevel(this) is not Window window) return;
         if (e.Source is Avalonia.Visual visual &&
             (visual is Button or Slider or MenuItem || visual.GetVisualAncestors().Any(v => v is Button or Slider or MenuItem))) return;
+        if (_drawerOpen && !IsInsidePlaylistDrawer(e.Source as Avalonia.Visual))
+        {
+            ClosePlaylistDrawer();
+            e.Handled = true;
+            return;
+        }
         if (e.ClickCount == 2)
         {
             window.WindowState = window.WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
@@ -188,7 +205,7 @@ public partial class PlayerOverlay : UserControl
         _observedEngine=null;
         if (_observedPlayer is not null) _observedPlayer.PropertyChanged -= OnPlayerChanged;
         _observedPlayer = null;
-        _activeMenu?.Close();_activeMenu=null;_menuOpen=false;
+        _activeMenu?.Close();_activeMenu=null;_menuOpen=false;ClosePlaylistDrawer(animate:false);
         RestoreWindow();RestorePlayerWindow();
         _controlsTimer.Stop();
         VM?.CancelSeek();
@@ -361,18 +378,94 @@ public partial class PlayerOverlay : UserControl
 
     private void OnTogglePlaylist(object? sender, RoutedEventArgs e)
     {
-        if (VM is not { } vm || sender is not Button button) return;
-        var menu = new ContextMenu();
+        if (VM is null) return;
+        if (_drawerOpen) ClosePlaylistDrawer();
+        else OpenPlaylistDrawer();
+    }
+
+    /// <summary>从窗口右侧滑入播放列表抽屉。</summary>
+    internal void OpenPlaylistDrawer()
+    {
+        if (VM is not { } vm || this.FindControl<Border>("PlaylistDrawer") is not { } drawer) return;
+        _drawerHideTimer.Stop();
+        BuildPlaylistItems(vm);
+        // 先置于窗口外，显示后再滑到位移 0，过渡动画才会真正播放。
+        drawer.RenderTransform = new TranslateTransform(PlayerLayout.PlaylistDrawerWidth(Bounds.Width), 0);
+        drawer.IsVisible = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_drawerOpen && drawer.IsVisible) drawer.RenderTransform = new TranslateTransform(0, 0);
+        }, DispatcherPriority.Render);
+        _drawerOpen = true;
+        RevealControls();
+    }
+
+    /// <summary>滑出后隐藏抽屉；<paramref name="animate"/> 为假时立即隐藏（关闭播放器/卸载控件）。</summary>
+    internal void ClosePlaylistDrawer(bool animate = true)
+    {
+        if (!_drawerOpen) return;
+        _drawerOpen = false;
+        if (this.FindControl<Border>("PlaylistDrawer") is not { } drawer) return;
+        _drawerHideTimer.Stop();
+        if (!animate) { drawer.IsVisible = false; drawer.RenderTransform = new TranslateTransform(0, 0); return; }
+        drawer.RenderTransform = new TranslateTransform(PlayerLayout.PlaylistDrawerWidth(Bounds.Width), 0);
+        _drawerHideTimer.Start();
+    }
+
+    private void BuildPlaylistItems(PlayerViewModel vm)
+    {
+        if (this.FindControl<StackPanel>("PlaylistItems") is not { } items) return;
+        if (this.FindControl<TextBlock>("PlaylistCount") is { } count)
+            count.Text = vm.Playlist.Count > 0 ? $"共 {vm.Playlist.Count} 集" : "";
+        items.Children.Clear();
+        if (vm.Playlist.Count == 0)
+        {
+            items.Children.Add(new TextBlock
+            {
+                Text = "当前媒体没有剧集列表", FontSize = 12, Margin = new Thickness(8, 10, 8, 10),
+                Foreground = new SolidColorBrush(Color.Parse("#80FFFFFF")),
+            });
+            return;
+        }
         var session = vm.CurrentSessionId;
-        if (vm.Playlist.Count == 0) menu.Items.Add(new MenuItem { Header = "当前媒体没有剧集列表", IsEnabled = false });
         for (var i = 0; i < vm.Playlist.Count; i++)
         {
             var index = i;
-            var item = new MenuItem { Header = (i == vm.PlaylistIndex ? "当前 · " : "") + vm.Playlist[i].Title };
-            item.Click += async (_, _) => { if (session == vm.CurrentSessionId) await vm.PlayPlaylistIndexAsync(index); };
-            menu.Items.Add(item);
+            var current = i == vm.PlaylistIndex;
+            var item = new Button
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Background = new SolidColorBrush(Color.Parse(current ? "#2EFFFFFF" : "#00000000")),
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10, 6, 10, 6),
+                Cursor = new Cursor(StandardCursorType.Hand),
+                Content = new TextBlock
+                {
+                    Text = (current ? "正在播放 · " : "") + vm.Playlist[i].Title,
+                    FontSize = 12,
+                    FontWeight = current ? FontWeight.SemiBold : FontWeight.Normal,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    Foreground = new SolidColorBrush(Color.Parse(current ? "#FFFFFFFF" : "#D0FFFFFF")),
+                },
+            };
+            item.Click += async (_, _) =>
+            {
+                if (session != vm.CurrentSessionId) return;
+                ClosePlaylistDrawer();
+                await vm.PlayPlaylistIndexAsync(index);
+            };
+            items.Children.Add(item);
         }
-        OpenControlMenu(button, menu);
+    }
+
+    private bool IsInsidePlaylistDrawer(Avalonia.Visual? source)
+    {
+        if (source is null || this.FindControl<Border>("PlaylistDrawer") is not { } drawer) return false;
+        for (Avalonia.Visual? node = source; node is not null; node = node.GetVisualParent())
+            if (ReferenceEquals(node, drawer)) return true;
+        return false;
     }
 
     private void OnToggleSettings(object? sender, RoutedEventArgs e)
@@ -516,6 +609,18 @@ public partial class PlayerOverlay : UserControl
 
 public static class PlayerLayoutConverters
 {
+    /// <summary>播放列表抽屉宽度：按窗口宽度收窄，上下限见 PlayerLayout。</summary>
+    public static readonly IValueConverter PlaylistDrawerWidth = new DrawerWidthConverter();
+
+    private sealed class DrawerWidthConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => PlayerLayout.PlaylistDrawerWidth(value is double width ? width : 0);
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
     /// <summary>面板宽度 = max(视频宽 60%, 该模式下的内容需求)，且不超出视频宽度。</summary>
     public static readonly IMultiValueConverter ControlWidth = new ControlWidthConverter();
 

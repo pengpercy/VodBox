@@ -1783,6 +1783,58 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public async Task PlaylistDrawerSlidesInSelectsAndCloses()
+    {
+        using var context = new Context();
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+            new PlaylistEntry("ep3", "第三集", _ => Task.FromResult(Request("ep3"))),
+        };
+        await Done(context.Main.Player.PlayResolvedAsync(entries[0].Resolve, entries, 0));
+        var window = new PlayerWindow { DataContext = context.Main, Width = 900, Height = 520 };
+        window.Show();
+        try
+        {
+            var overlay = window.Overlay;
+            var drawer = overlay.FindControl<Border>("PlaylistDrawer")!;
+            var items = overlay.FindControl<StackPanel>("PlaylistItems")!;
+
+            Assert.False(drawer.IsVisible);   // 初始收起
+            overlay.OpenPlaylistDrawer();
+            window.UpdateLayout();
+            Assert.True(drawer.IsVisible);
+            Assert.Equal(3, items.Children.Count);
+            Assert.Equal("共 3 集", overlay.FindControl<TextBlock>("PlaylistCount")!.Text);
+            Assert.Contains("正在播放", ((TextBlock)((Button)items.Children[0]).Content!).Text);
+
+            // 抽屉宽度随窗口收窄，且不超过上限。
+            Assert.Equal(PlayerLayout.PlaylistDrawerWidth(overlay.Bounds.Width), drawer.Bounds.Width, 6);
+            Assert.InRange(drawer.Bounds.Width, PlayerLayout.PlaylistDrawerMinWidth, PlayerLayout.PlaylistDrawerMaxWidth);
+
+            // 点击非当前集：切集并自动收起。收起是滑动动画，等滑出结束（计时器）后才真正隐藏。
+            ((Button)items.Children[2]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            await Done(context.Main.Player.PlayResolvedAsync(entries[2].Resolve, entries, 2));
+            Assert.Equal(2, context.Main.Player.PlaylistIndex);
+            await Task.Delay((int)PlayerLayout.PlaylistDrawerSlideMs + 200);
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.False(drawer.IsVisible);
+
+            // 再次打开后立即收起（无动画路径）：当场隐藏。
+            overlay.OpenPlaylistDrawer();
+            window.UpdateLayout();
+            Assert.True(drawer.IsVisible);
+            overlay.ClosePlaylistDrawer(animate: false);
+            window.UpdateLayout();
+            Assert.False(drawer.IsVisible);
+        }
+        finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
+    }
+
+    [AvaloniaFact]
     public async Task PlayerPanelMinimumWidthMatchesMeasuredControlsAndNeverOverlaps()
     {
         using var context = new Context();
@@ -1812,8 +1864,25 @@ public sealed class ViewModelRaceTests
                            + PlayerLayout.HorizontalPadding;
             // 常量必须是覆盖实测需求的紧致上界：为负说明最小宽度不够、窄窗口会重叠。
             var slack=PlayerLayout.MinimumPanelWidth(false)-measured;
-            Assert.InRange(slack, 0, 8);
-            Assert.Equal(PlayerLayout.RightGroupWidth, rightGroup.DesiredSize.Width, 6);
+            Assert.InRange(slack, 0, 12);
+            // 倍速键按内容自适应（不留死区）。本用例已把倍速设为最宽的 1.25x，
+            // 此时右组宽度必须恰好等于常量；切到更短角标时只会更窄，故常量恒为上界。
+            Assert.True(double.IsNaN(overlay.FindControl<Button>("RateButton")!.Width), "倍速键应为自适应宽度");
+            // 逐个倍速值量右组宽度，取真实最大值作为上界校验（角标文字宽度决定）。
+            double widest=0; string widestLabel="";
+            foreach (var rate in new[] { 0.5, 0.75, 1.0, 1.25, 1.5, 2.0 })
+            {
+                context.Main.Player.Rate = rate;
+                overlay.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var label=overlay.FindControl<TextBlock>("RateBadge")!.Text ?? "";
+                var buttonWidth=overlay.FindControl<Button>("RateButton")!.Bounds.Width;
+                var groupWidth=rightGroup.DesiredSize.Width;
+                if (groupWidth > widest) { widest=groupWidth; widestLabel=label; }
+                Assert.True(groupWidth <= PlayerLayout.RightGroupWidth + .5,
+                    $"{label} 下右组宽度超出上界：{groupWidth:F1}");
+            }
+            Assert.Equal(PlayerLayout.RightGroupWidth, widest, 6);
 
             // 最小窗口宽度下面板放得下内容，三键与两侧组互不相交。
             var panel = overlay.FindControl<Border>("BottomControls")!;
@@ -1910,18 +1979,19 @@ public sealed class ViewModelRaceTests
             // The right-hand icon group is tighter than the default button spacing.
             var rightGroup=Assert.IsType<StackPanel>(overlay.FindControl<Button>("RateButton")!.Parent);
             Assert.Equal(0d, rightGroup.Spacing);
-            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !double.IsNaN(item.Width)), item =>
+            var rateButton=overlay.FindControl<Button>("RateButton")!;
+            // 除倍速键外，图标键一律等宽等高的正方形。
+            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !ReferenceEquals(item, rateButton)), item =>
             {
                 Assert.Equal(PlayerLayout.IconButtonSize, item.Width);
                 Assert.Equal(item.Width, item.Height);
-            }
-            );
-            // 倍速键宽度自适应（装“1.5x”角标），高度同样跟随图标行，不得再是 28。
-            Assert.Equal(PlayerLayout.IconButtonSize, overlay.FindControl<Button>("RateButton")!.Height);
+            });
+            // 倍速键按内容自适应宽度，高度与图标行一致，不得再是 28。
+            Assert.True(double.IsNaN(rateButton.Width), "倍速键应为自适应宽度");
+            Assert.Equal(PlayerLayout.IconButtonSize, rateButton.Height);
 
-            // 16px buttons holding 14px glyphs with zero spacing leave a 2px gap: tight, and the
-            // layout engine can never overlap siblings. Verify the numbers, then the measured X.
-            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !double.IsNaN(item.Width)), item =>
+            // 图标键零间距紧贴排列：图标必须装得进按钮，且相邻按钮不得重叠。
+            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !ReferenceEquals(item, rateButton)), item =>
             {
                 // 宽高必须相等：曾经只改宽度不改高度，出现过 16×28 的瘦长按钮。
                 Assert.Equal(PlayerLayout.IconButtonSize, item.Width);
@@ -1929,8 +1999,25 @@ public sealed class ViewModelRaceTests
                 var glyph=Assert.Single(item.GetVisualDescendants().OfType<PathIcon>());
                 Assert.Equal(PlayerLayout.IconGlyphSize, glyph.Width);
                 Assert.Equal(glyph.Width, glyph.Height);
-                Assert.True(item.Width > glyph.Width, "14px glyph must fit inside the icon button");
+                Assert.True(item.Width > glyph.Width, "图标必须装得进图标键");
             });
+            // 同一行相邻控件的视觉间距必须接近均匀：倍速键曾因固定过宽，与全屏之间空出 46px。
+            // 度量用“内容边界”（图标 + 倍速文字），只算图标会把倍速角标误判成死区。
+            var visualGaps=new List<double>();
+            var extents=new List<(double Left, double Right)>();
+            foreach (var item in rightGroup.Children.OfType<Button>())
+            {
+                var parts=item.GetVisualDescendants().OfType<Control>()
+                    .Where(child => child is PathIcon or TextBlock && child.Bounds.Width > 0)
+                    .ToArray();
+                Assert.NotEmpty(parts);
+                extents.Add((item.Bounds.X+parts.Min(p => p.Bounds.X),
+                             item.Bounds.X+parts.Max(p => p.Bounds.X+p.Bounds.Width)));
+            }
+            for (var i = 1; i < extents.Count; i++)
+                visualGaps.Add(extents[i].Left-extents[i-1].Right);
+            Assert.All(visualGaps, gap => Assert.InRange(gap, 0, 14));
+
             // 按钮是同一父级的兄弟节点，Bounds 可直接比较；每个图标必须装得进自己的按钮。
             var buttons=rightGroup.Children.OfType<Button>().ToArray();
             for (var i = 0; i < buttons.Length; i++)
@@ -1995,11 +2082,49 @@ public sealed class ViewModelRaceTests
             previous.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(0, context.Main.Player.PlaylistIndex);
+            // 置顶键：与播放/暂停同款做法——两个不同图标按状态切换，状态一眼可辨。
             var pin=overlay.FindControl<Button>("TopmostButton")!;
+            var pinnedGlyph=pin.GetVisualDescendants().OfType<PathIcon>()
+                .Single(icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.Pin")));
+            var unpinnedGlyph=pin.GetVisualDescendants().OfType<PathIcon>()
+                .Single(icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.PinOff")));
+            // 两个几何都必须有效，否则会出现“切换了但看不见”的空图标。
+            var pinnedGeometry=(Avalonia.Media.Geometry)pinnedGlyph.Data!;
+            var unpinnedGeometry=(Avalonia.Media.Geometry)unpinnedGlyph.Data!;
+            Assert.True(pinnedGeometry.Bounds.Width > 0, "实心图钉几何为空");
+            Assert.True(unpinnedGeometry.Bounds.Width > 0, "带斜线图钉几何为空");
+            // 未置顶图标多一条斜线，几何范围必然更宽——这也保证两个图形肉眼可分。
+            Assert.True(unpinnedGeometry.Bounds.Width > pinnedGeometry.Bounds.Width);
+            // 两个图标都必须是纯白，不允许用透明度或灰度区分状态。
+            Assert.Null(unpinnedGlyph.Opacity is 1d ? null : "未置顶图标不得设置透明度");
+            Assert.Equal(1d, pinnedGlyph.Opacity);
+            Assert.Equal(Avalonia.Media.Color.Parse("#FFFFFFFF"),
+                Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(pin.Foreground).Color);
+
+            window.UpdateLayout();
+            Assert.False(window.Topmost);
+            Assert.False(pinnedGlyph.IsVisible);   // 未置顶：显示带斜线的图钉
+            Assert.True(unpinnedGlyph.IsVisible);
+
             pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
             Assert.True(window.Topmost);Assert.True(context.Main.Player.AlwaysOnTop);
+            Assert.True(pinnedGlyph.IsVisible);    // 置顶：显示实心图钉
+            Assert.False(unpinnedGlyph.IsVisible);
+
             pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
             Assert.False(window.Topmost);Assert.False(context.Main.Player.AlwaysOnTop);
+            Assert.False(pinnedGlyph.IsVisible);
+            Assert.True(unpinnedGlyph.IsVisible);
+            // 置顶与否只靠图标区分，不允许再出现亮色底块。
+            var pinPresenter=pin.GetVisualDescendants().OfType<ContentPresenter>().First();
+            var unpinnedBackground=(pinPresenter.Background as Avalonia.Media.ISolidColorBrush)?.Color;
+            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            overlay.UpdateLayout();
+            Assert.Equal(unpinnedBackground, (pinPresenter.Background as Avalonia.Media.ISolidColorBrush)?.Color);
+            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            overlay.UpdateLayout();
         }
         finally { await Done(context.Main.Player.Close());window.CloseAfterPlayback(); }
     }

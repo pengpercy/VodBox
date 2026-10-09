@@ -55,7 +55,11 @@
     <Style Selector="Button.pin:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#66000000" />
     </Style>
-    <Style Selector="Button.pin.pinned"><Setter Property="Foreground" Value="#FFF0F1F3" /></Style>
+    <!-- 置顶与未置顶的图标都是纯白，仅靠图形区分状态。 -->
+    <Style Selector="Button.pin"><Setter Property="Foreground" Value="#FFFFFFFF" /></Style>
+    <Style Selector="Button.pin /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#66000000" />
+    </Style>
   </UserControl.Styles>
   <Panel DataContext="{Binding Player}">
     <!-- 黑底 + libmpv 渲染面 -->
@@ -64,7 +68,7 @@
     <v:DanmakuLayer x:Name="DanmakuCanvas" IsHitTestVisible="False" ClipToBounds="True" />
 
     <!-- 控制层：参考主流播放器（Earth 图）一比一布局 -->
-    <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding Visible}">
+    <Grid RowDefinitions="Auto,*,Auto" ClipToBounds="True" IsVisible="{Binding Visible}">
 
       <!-- 标题背景可拖拽；原生关闭按钮结束独立播放窗口，无返回按钮。 -->
       <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="*,Auto"
@@ -76,7 +80,16 @@
         <Button x:Name="TopmostButton" Grid.Column="1" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
                 Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="6"
                 Width="{x:Static v:PlayerLayout.TitleBarButtonSize}" Height="{x:Static v:PlayerLayout.TitleBarButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
-          <PathIcon Data="{DynamicResource Icon.Pin}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" />
+          <!-- 与播放/暂停同款做法：置顶态与未置顶态用两个不同图标，状态一眼可辨。 -->
+          <Panel>
+            <PathIcon x:Name="PinnedGlyph" Data="{DynamicResource Icon.Pin}" IsVisible="{Binding AlwaysOnTop}"
+                      Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <PathIcon x:Name="UnpinnedGlyph" Data="{DynamicResource Icon.PinOff}"
+                      IsVisible="{Binding AlwaysOnTop, Converter={x:Static v:BoolConverters.Not}}"
+                      Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Panel>
         </Button>
       </Grid>
 
@@ -186,6 +199,29 @@
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />
           </Grid>
         </StackPanel>
+      </Border>
+
+      <!-- 播放列表抽屉：从窗口右侧滑入，覆盖在视频之上；点空白处或再点列表按钮收起。 -->
+      <Border x:Name="PlaylistDrawer" Grid.RowSpan="3" HorizontalAlignment="Right" IsVisible="False"
+              Width="{Binding $parent[UserControl].Bounds.Width, Converter={x:Static v:PlayerLayoutConverters.PlaylistDrawerWidth}}"
+              Background="#F0121417" BorderBrush="#1AFFFFFF" BorderThickness="1,0,0,0">
+        <Border.RenderTransform>
+          <TranslateTransform />
+        </Border.RenderTransform>
+        <Border.Transitions>
+          <Transitions>
+            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut" />
+          </Transitions>
+        </Border.Transitions>
+        <Grid RowDefinitions="Auto,*">
+          <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="14,12,14,8">
+            <TextBlock Text="播放列表" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock x:Name="PlaylistCount" Grid.Column="2" FontSize="11" Foreground="#80FFFFFF" VerticalAlignment="Center" />
+          </Grid>
+          <ScrollViewer Grid.Row="1" Padding="8,0,8,10" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PlaylistItems" Spacing="2" />
+          </ScrollViewer>
+        </Grid>
       </Border>
     </Grid>
   </Panel>
