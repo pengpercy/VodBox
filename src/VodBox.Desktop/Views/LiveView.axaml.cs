@@ -103,13 +103,7 @@ public partial class LiveView : UserControl
         var tabs = new[] { groups, this.FindControl<Button>("TabFavorites"), this.FindControl<Button>("TabHistory")};
         for (var i = 0; i < tabs.Length; i++)
         {
-            tabs[i]!.BorderBrush = i == index ? Avalonia.Media.Brushes.Transparent : Avalonia.Media.Brushes.Transparent;
-            tabs[i]!.BorderThickness = new Avalonia.Thickness(0, 0, 0, i == index ? 2 : 0);
-            if (i == index) tabs[i]!.BorderBrush = Avalonia.Media.Brush.Parse("#4CC2FF");
-            var light=ActualThemeVariant==Avalonia.Styling.ThemeVariant.Light;
-            tabs[i]!.Foreground = i == index
-                ? (light?Avalonia.Media.Brushes.Black:Avalonia.Media.Brushes.White)
-                : Avalonia.Media.Brush.Parse(light?"#99202020":"#85FFFFFF");
+            tabs[i]!.Classes.Set("selected", i == index);
         }
     }
 }

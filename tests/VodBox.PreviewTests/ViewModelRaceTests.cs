@@ -1979,6 +1979,35 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public void LiveTabsHaveMatchingRoundedSurfacesAndIcons()
+    {
+        using var context = new Context();
+        var view = new LiveView { DataContext = context.Main };
+        var window = new Window { Content = view, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            var tabs = new[] { "TabGroups", "TabFavorites", "TabHistory" }
+                .Select(name => view.FindControl<Button>(name)!).ToArray();
+            Assert.All(tabs, tab =>
+            {
+                Assert.Equal(38, tab.Bounds.Height);
+                Assert.Equal(tabs[0].Bounds.Width, tab.Bounds.Width, 1);
+                Assert.Equal(new Avalonia.CornerRadius(8), tab.CornerRadius);
+                Assert.Equal(tabs[0].Padding, tab.Padding);
+                Assert.Equal(tabs[0].Margin, tab.Margin);
+                var icon = Assert.Single(tab.GetVisualDescendants().OfType<PathIcon>());
+                Assert.Equal(18, icon.Width); Assert.Equal(18, icon.Height);
+                var surface = tab.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "TabSurface");
+                Assert.Equal(tab.Bounds.Size, surface.Bounds.Size);
+                Assert.Equal(new Avalonia.CornerRadius(8), surface.CornerRadius);
+            });
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void LargeLiveGridRealizesOnlyViewportRowsAndRecyclesOnScroll()
     {
         using var context = new Context();
