@@ -6,17 +6,18 @@
         x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel"
         Title="VodBox" Icon="/Assets/Icons/linux/256/vodbox.png"
         Width="1280" Height="800" MinWidth="960" MinHeight="600"
-        TransparencyLevelHint="Mica"
+        TransparencyLevelHint="Mica,AcrylicBlur,Blur"
+        TransparencyBackgroundFallback="{DynamicResource PageBackgroundBrush}"
         Background="Transparent"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="44"
         WindowDecorations="Full"
         FontSize="13">
 
-  <!-- Mica 底色：桌面壁纸采样 + 深色叠加 -->
+  <!-- 原生窗口材质：Windows Mica，其他平台回退 Acrylic/Blur；底色仅轻度着色。 -->
   <Panel>
     <views:LocalWallpaper HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Path="{Binding WallpaperPath}" Stretch="UniformToFill" IsHitTestVisible="False" />
-    <Rectangle x:Name="PageBackdrop" Fill="{DynamicResource PageBackgroundBrush}" Opacity="0.86" />
+    <Rectangle x:Name="PageBackdrop" Fill="{DynamicResource PageBackgroundBrush}" Opacity="0.40" />
     <Grid RowDefinitions="44,*" ColumnDefinitions="216,*"
           chrome:WindowDecorationProperties.ElementRole="User">
 

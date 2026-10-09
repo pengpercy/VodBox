@@ -1978,6 +1978,29 @@ public sealed class ViewModelRaceTests
         Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
     }
 
+    [Fact]
+    public void LiveGroupsCollapseIndependentlyAndSearchTemporarilyExpands()
+    {
+        using var context = new Context();
+        var live = context.Main.Live;
+        var first = new LiveChannel { Name = "一组频道", Uris = ["https://example.com/1"] };
+        var second = new LiveChannel { Name = "二组频道", Uris = ["https://example.com/2"] };
+        live.Groups.Add(new LiveGroup("一组", [first], false, 1));
+        live.Groups.Add(new LiveGroup("二组", [second], false, 1));
+        live.ToggleGroup("一组");
+        Assert.False(live.VisibleChannels.OfType<LiveViewModel.LiveGroupHeader>().First().Expanded);
+        Assert.Same(second, Assert.Single(live.ChannelCards));
+        live.ToggleGroup("二组");
+        Assert.Empty(live.ChannelCards);
+        Assert.Equal(2, live.VisibleChannels.Count);
+        live.FilterText = "一组频道";
+        Assert.Same(first, Assert.Single(live.ChannelCards));
+        live.FilterText = "";
+        Assert.Empty(live.ChannelCards);
+        live.ToggleGroup("一组");
+        Assert.Same(first, Assert.Single(live.ChannelCards));
+    }
+
     [AvaloniaFact]
     public void LiveTabsHaveMatchingRoundedSurfacesAndIcons()
     {
@@ -2231,7 +2254,7 @@ public sealed class ViewModelRaceTests
     private static (StackPanel Left, StackPanel Right, StackPanel Transport) ControlGroups(PlayerOverlay overlay)
     {
         var bottom = overlay.FindControl<Border>("BottomControls")!;
-        var rows = Assert.IsType<StackPanel>(bottom.Child);
+        var rows = Assert.IsType<Panel>(bottom.Child).Children.OfType<StackPanel>().Single();
         var topRow = Assert.IsType<Panel>(rows.Children[0]);
         var grid = Assert.IsType<Grid>(topRow.Children[0]);
         return (Assert.IsType<StackPanel>(grid.Children[0]), Assert.IsType<StackPanel>(grid.Children[1]),

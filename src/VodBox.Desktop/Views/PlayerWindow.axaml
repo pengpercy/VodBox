@@ -5,7 +5,8 @@
         x:Class="VodBox.Desktop.Views.PlayerWindow" x:DataType="vm:MainViewModel"
         Title="{Binding Player.Title}" Icon="/Assets/Icons/linux/256/vodbox.png"
         Width="960" Height="540" MinWidth="480" MinHeight="270"
-        Background="Black" RequestedThemeVariant="Dark"
+        Background="Transparent" TransparencyLevelHint="Mica,AcrylicBlur,Blur"
+        TransparencyBackgroundFallback="Black" RequestedThemeVariant="Dark"
         ExtendClientAreaToDecorationsHint="True" ExtendClientAreaTitleBarHeightHint="44"
         WindowDecorations="Full" WindowStartupLocation="CenterScreen">
   <v:PlayerOverlay x:Name="PlayerView" />

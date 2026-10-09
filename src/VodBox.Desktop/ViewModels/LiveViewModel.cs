@@ -35,6 +35,15 @@ public sealed partial class LiveViewModel : ObservableObject
         Headers=new Dictionary<string,string>(channel.Headers),
     });
     private readonly HashSet<string> _unlockedGroups=new();
+    private readonly HashSet<string> _collapsedGroups = new(StringComparer.Ordinal);
+
+    public void ToggleGroup(string name)
+    {
+        if (Groups.Any(group => group.Name == name && group.Locked && !_unlockedGroups.Contains(name)))
+        { RequestGroupUnlock(name); return; }
+        if (!_collapsedGroups.Add(name)) _collapsedGroups.Remove(name);
+        ApplyFilter();
+    }
     private readonly Dictionary<string,(int Count,DateTimeOffset Start)> _unlockAttempts=new();
     [ObservableProperty] private bool _groupUnlockOpen;
     [ObservableProperty] private string _groupPassword="";
@@ -273,13 +282,15 @@ public sealed partial class LiveViewModel : ObservableObject
                 : group.Channels.Where(c => string.IsNullOrWhiteSpace(FilterText) ||
                        c.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase)).ToList();
             if (!string.IsNullOrWhiteSpace(FilterText) && matches.Count == 0) continue;
-            VisibleChannels.Add(new LiveGroupHeader(group.Name, group.Count, locked));
-            foreach (var channel in matches) VisibleChannels.Add(channel);
+            // 搜索时暂时展开命中的组，不改变用户保存的折叠状态。
+            var collapsed = locked || (string.IsNullOrWhiteSpace(FilterText) && _collapsedGroups.Contains(group.Name));
+            VisibleChannels.Add(new LiveGroupHeader(group.Name, group.Count, locked, !collapsed));
+            if (!collapsed) foreach (var channel in matches) VisibleChannels.Add(channel);
         }
     }
 
     /// <summary>频道面板组头行：名称、计数与锁定状态，图标由视图呈现。</summary>
-    public sealed record LiveGroupHeader(string Name, int Count, bool Locked);
+    public sealed record LiveGroupHeader(string Name, int Count, bool Locked, bool Expanded = true);
 
     public async Task RestoreProgrammeCacheAsync()
     {

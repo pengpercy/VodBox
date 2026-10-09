@@ -79,9 +79,9 @@
             <DataTemplate x:DataType="vm:LiveViewModel+LiveGroupHeader">
               <StackPanel PointerPressed="OnGroupHeader" Tag="{Binding}" Cursor="Hand" Orientation="Horizontal" Spacing="6" Margin="6,12,6,4" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                 <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12"
-                          IsVisible="{Binding Locked}" VerticalAlignment="Center" />
+                          IsVisible="{Binding Expanded, Converter={x:Static views:BoolConverters.Not}}" VerticalAlignment="Center" />
                 <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12"
-                          IsVisible="{Binding Locked, Converter={x:Static BoolConverters.Not}}" VerticalAlignment="Center" />
+                          IsVisible="{Binding Expanded}" VerticalAlignment="Center" />
                 <PathIcon Data="{StaticResource Icon.Lock}" Width="12" Height="12"
                           IsVisible="{Binding Locked}" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
@@ -93,17 +93,17 @@
             <DataTemplate x:DataType="core:LiveChannel">
               <!-- 频道行容器：选中态整行蓝灰底 -->
               <Border x:Name="Row" CornerRadius="7" Padding="2,4" Background="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}">
-                <StackPanel Orientation="Horizontal" Spacing="10" Cursor="Hand"
+                <Grid ColumnDefinitions="30,*,Auto" ColumnSpacing="8" Cursor="Hand"
                             PointerPressed="OnPlayChannel" Tag="{Binding}">
                   <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
-                             Width="30" VerticalAlignment="Center" />
+                             Grid.Column="0" VerticalAlignment="Center" />
                   <!--
                     台标与频道名占同一网格行，两者垂直居中对齐（此前“名称+EPG”整块居中会让名称高出
                     台标中心 6~8px）。台标本身不画背景色：品牌图多为透明 PNG，原来的彩色占位方块会
                     透出来变成“背景色”；占位只在没有台标或加载失败时显示。
                   -->
                   <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
-                        Width="{x:Static views:LiveLayout.RowWidth}" VerticalAlignment="Center">
+                        Grid.Column="1" VerticalAlignment="Center">
                     <Panel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
                            Width="{x:Static views:LiveLayout.BadgeWidth}" Height="{x:Static views:LiveLayout.BadgeHeight}">
                       <Border x:Name="BadgePlaceholder" CornerRadius="7"
@@ -123,11 +123,11 @@
                                IsVisible="{Binding EpgNow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                TextTrimming="CharacterEllipsis" />
                   </Grid>
-                  <Border Background="Transparent" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
+                  <Border Grid.Column="2" Background="Transparent" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
                           Padding="6,1" VerticalAlignment="Center" IsVisible="{Binding IsCurrent}">
                     <TextBlock Text="LIVE" FontSize="9.5" Foreground="#4CC2FF" FontWeight="SemiBold" />
                   </Border>
-                </StackPanel>
+                </Grid>
               </Border>
             </DataTemplate>
           </ListBox.DataTemplates>

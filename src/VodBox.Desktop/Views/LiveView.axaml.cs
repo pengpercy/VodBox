@@ -41,7 +41,9 @@ public partial class LiveView : UserControl
 
     private void OnGroupHeader(object? sender,PointerPressedEventArgs e)
     {
-        if(sender is Control{Tag:LiveViewModel.LiveGroupHeader header}&&header.Locked)VM.RequestGroupUnlock(header.Name);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (sender is Control { Tag: LiveViewModel.LiveGroupHeader header })
+        { VM.ToggleGroup(header.Name); e.Handled = true; }
     }
 
     private void OnPlayChannel(object? sender, PointerPressedEventArgs e)
