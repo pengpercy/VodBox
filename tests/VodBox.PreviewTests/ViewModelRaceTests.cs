@@ -1995,7 +1995,7 @@ public sealed class ViewModelRaceTests
         Assert.False(context.Main.Player.Visible);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void LiveGroupsCollapseIndependentlyAndSearchTemporarilyExpands()
     {
         using var context = new Context();
@@ -2111,7 +2111,7 @@ public sealed class ViewModelRaceTests
         finally { window.Close(); }
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void LiveCardGridTracksFilteringAndExcludesGroupHeaders()
     {
         using var context = new Context();
