@@ -58,21 +58,23 @@ public class App : Application
                                 var deadline=DateTime.UtcNow.AddSeconds(10);
                                 while(!condition()){if(DateTime.UtcNow>deadline)throw new TimeoutException("native player UI");await Task.Delay(50);}
                             }
-                            var overlay=window.GetVisualDescendants().OfType<VodBox.Desktop.Views.PlayerOverlay>().Single();
+                            var playerWindow=window.PlaybackWindow??throw new InvalidOperationException("Independent player window missing.");
+                            var overlay=playerWindow.Overlay;
+                            var shellWidth=window.Width;var shellHeight=window.Height;
                             try{await Wait(()=>overlay.RenderedFrames>10&&main.Player.Position.TotalSeconds>1);}
                             catch{Console.Error.WriteLine($"player diagnostics: frames={overlay.RenderedFrames}, state={main.Player.State}, position={main.Player.Position}, visible={overlay.IsVisible}, bounds={overlay.Bounds}, error={main.Player.Error}");throw;}
                             if(desktop.Args.Contains("--ratio-smoke"))
                             {
                                 await Wait(()=>main.Player.VideoAspectRatio is >0);
                                 var ratio=main.Player.VideoAspectRatio!.Value;
-                                if(Math.Abs(window.Width/window.Height-ratio)>.005)throw new InvalidOperationException($"window/video ratio mismatch: {window.Width}x{window.Height}, video={ratio}");
-                                var screen=window.Screens.ScreenFromWindow(window)??window.Screens.Primary;
-                                if(screen is not null&&(window.Width*screen.Scaling>screen.WorkingArea.Width||window.Height*screen.Scaling>screen.WorkingArea.Height))throw new InvalidOperationException("player window exceeds screen");
-                                var fittedWidth=window.Width;var fittedHeight=window.Height;
+                                if(Math.Abs(playerWindow.Width/playerWindow.Height-ratio)>.005)throw new InvalidOperationException($"window/video ratio mismatch: {playerWindow.Width}x{playerWindow.Height}, video={ratio}");
+                                var screen=playerWindow.Screens.ScreenFromWindow(playerWindow)??playerWindow.Screens.Primary;
+                                if(screen is not null&&(playerWindow.Width*screen.Scaling>screen.WorkingArea.Width||playerWindow.Height*screen.Scaling>screen.WorkingArea.Height))throw new InvalidOperationException("player window exceeds screen");
+                                var fittedWidth=playerWindow.Width;var fittedHeight=playerWindow.Height;
                                 overlay.ToggleCompactWindow(window);await Task.Delay(150);
-                                if(Math.Abs(window.Width/window.Height-ratio)>.005)throw new InvalidOperationException("compact window ratio mismatch");
+                                if(Math.Abs(playerWindow.Width/playerWindow.Height-ratio)>.005)throw new InvalidOperationException("compact window ratio mismatch");
                                 overlay.RestoreWindow();
-                                if(Math.Abs(window.Width-fittedWidth)>.5||Math.Abs(window.Height-fittedHeight)>.5)throw new InvalidOperationException("compact size restore mismatch");
+                                if(Math.Abs(playerWindow.Width-fittedWidth)>.5||Math.Abs(playerWindow.Height-fittedHeight)>.5)throw new InvalidOperationException("compact size restore mismatch");
                                 await main.Player.CloseCommand.ExecuteAsync(null);
                                 if(window.MinWidth!=960||window.MinHeight!=600)throw new InvalidOperationException("shell constraints not restored");
                                 Console.WriteLine($"Native player ratio: OK | video={ratio:F6}, window={fittedWidth:F1}x{fittedHeight:F1}, compact/bounds/restore");
@@ -80,22 +82,26 @@ public class App : Application
                             }
                             await Services.Player.PauseAsync();await Wait(()=>main.Player.State==VodBox.Core.PlaybackState.Paused);
                             main.Player.Seek(TimeSpan.FromSeconds(3));await Wait(()=>Math.Abs(main.Player.Position.TotalSeconds-3)<.2);
-                            window.WindowState=Avalonia.Controls.WindowState.FullScreen;
-                            await Wait(()=>window.WindowState==Avalonia.Controls.WindowState.FullScreen);await Task.Delay(1200);
-                            window.WindowState=Avalonia.Controls.WindowState.Normal;
-                            await Wait(()=>window.WindowState==Avalonia.Controls.WindowState.Normal);await Task.Delay(1200);
-                            var width=window.Width;overlay.ToggleCompactWindow(window);await Task.Delay(200);overlay.RestoreWindow();
-                            if(window.Width!=width||main.Player.CompactMode)throw new InvalidOperationException("compact restore mismatch");
+                            playerWindow.WindowState=Avalonia.Controls.WindowState.FullScreen;
+                            await Wait(()=>playerWindow.WindowState==Avalonia.Controls.WindowState.FullScreen);await Task.Delay(1200);
+                            playerWindow.WindowState=Avalonia.Controls.WindowState.Normal;
+                            await Wait(()=>playerWindow.WindowState==Avalonia.Controls.WindowState.Normal);await Task.Delay(1200);
+                            var width=playerWindow.Width;overlay.ToggleCompactWindow(window);await Task.Delay(200);overlay.RestoreWindow();
+                            if(playerWindow.Width!=width||main.Player.CompactMode)throw new InvalidOperationException("compact restore mismatch");
                             await Services.Player.PlayAsync();await Wait(()=>main.Player.State==VodBox.Core.PlaybackState.Playing);
                             var firstSession=main.Player.CurrentSessionId;
                             main.Player.Seek(main.Player.Duration);
                             try{await Wait(()=>main.Player.PlaylistIndex==1&&main.Player.CurrentSessionId!=firstSession&&main.Player.State==VodBox.Core.PlaybackState.Playing);}
                             catch{Console.Error.WriteLine($"auto-next diagnostics: index={main.Player.PlaylistIndex},session={main.Player.CurrentSessionId},old={firstSession},state={main.Player.State},pos={main.Player.Position},dur={main.Player.Duration},error={main.Player.Error}");throw;}
                             await Wait(()=>main.Player.Position.TotalSeconds>.2);
+                            if (!ReferenceEquals(window.PlaybackWindow,playerWindow)) throw new InvalidOperationException("Episode switch created another player window.");
+                            if (window.Width!=shellWidth||window.Height!=shellHeight) throw new InvalidOperationException("Player resized the main window.");
+                            var renderedFrames=overlay.RenderedFrames;
                             await main.Player.CloseCommand.ExecuteAsync(null);
+                            if(window.PlaybackWindow is not null)throw new InvalidOperationException("Player did not close independently.");
                             var history=await Services.Store.FindHistoryAsync("smoke","series");
                             if(history?.EpisodeId!="ep2")throw new InvalidOperationException("automatic next history episode mismatch");
-                            Console.WriteLine($"Native main player: OK | frames={overlay.RenderedFrames}, pause/seek/fullscreen/compact restore/resume/automatic-next/history");
+                            Console.WriteLine($"Native main player: OK | frames={renderedFrames}, independent single-window/main bounds/pause/seek/fullscreen/compact restore/resume/automatic-next/history");
                         }
                         await main.ShutdownAsync();
                         Console.WriteLine("Native desktop UI: OK | 8 pages, 8 settings sections, light/dark, graceful shutdown");

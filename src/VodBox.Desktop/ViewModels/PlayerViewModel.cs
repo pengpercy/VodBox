@@ -121,6 +121,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     public ObservableCollection<MediaTrack> Tracks { get; } = [];
 
+    [ObservableProperty] private bool _alwaysOnTop;
     [ObservableProperty] private bool _compactMode;
     [ObservableProperty] private bool _controlsVisible = true;
     public bool IsSeeking => _seekIntent is not null;

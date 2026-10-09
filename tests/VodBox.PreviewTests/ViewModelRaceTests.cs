@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using VodBox.Core;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
@@ -688,7 +689,8 @@ public sealed class ViewModelRaceTests
             new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
         };
         await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        var shell = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        var window = Assert.IsType<PlayerWindow>(shell.PlaybackWindow);
         try
         {
             var modified = new Avalonia.Input.KeyEventArgs
@@ -708,7 +710,7 @@ public sealed class ViewModelRaceTests
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, vm.PlaylistIndex);
         }
-        finally { window.Close(); }
+        finally { await Done(vm.Close()); shell.Close(); }
     }
 
     [AvaloniaFact]
@@ -1726,6 +1728,89 @@ public sealed class ViewModelRaceTests
         context.Engine.EmitCurrent(PlaybackState.Failed,0,0);Dispatcher.UIThread.RunJobs();Assert.Equal(3,context.Engine.Opened.Count);Assert.Contains("全部线路",context.Main.StatusMessage);
         await Done(context.Main.Player.CloseCommand.ExecuteAsync(null));
         context.Engine.EmitCurrent(PlaybackState.Failed,0,0);Dispatcher.UIThread.RunJobs();Assert.Equal(3,context.Engine.Opened.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task IndependentPlayerKeepsDetailUsableReusesWindowAndClosesWithoutShell()
+    {
+        using var context = new Context();
+        var shell = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        shell.Show();
+        try
+        {
+            context.Main.Navigate(AppPage.Detail);
+            var size = (shell.Width, shell.Height);
+            await Done(context.Main.Player.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+            var player = Assert.IsType<PlayerWindow>(shell.PlaybackWindow);
+            Assert.True(player.IsVisible);
+            Assert.Null(player.Owner);
+            Assert.Equal(AppPage.Detail, context.Main.Page);
+            Assert.DoesNotContain(shell.GetVisualDescendants(), v => v is PlayerOverlay);
+            await Done(context.Main.Player.PlayResolvedAsync(_ => Task.FromResult(Request("ep2"))));
+            Assert.Same(player, shell.PlaybackWindow);
+            Assert.Equal(size, (shell.Width, shell.Height));
+            Assert.Equal("ep2", context.Main.Player.Title);
+            await Done(context.Main.Player.Close());
+            Assert.Null(shell.PlaybackWindow);
+            Assert.True(shell.IsVisible);
+            Assert.Equal(AppPage.Detail, context.Main.Page);
+            await Done(context.Main.Player.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+            Assert.NotSame(player, shell.PlaybackWindow);
+            await Done(context.Main.Player.Close());
+        }
+        finally { shell.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task PlayerNativeCloseStopsPlaybackAndRetainsMainWindow()
+    {
+        using var context = new Context();
+        var shell = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        shell.Show();
+        try
+        {
+            await Done(context.Main.Player.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+            var player = Assert.IsType<PlayerWindow>(shell.PlaybackWindow);
+            player.Close();
+            await Done(context.Main.Player.CloseCommand.ExecutionTask ?? Task.CompletedTask);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(context.Main.Player.Visible);
+            Assert.Null(shell.PlaybackWindow);
+            Assert.True(shell.IsVisible);
+        }
+        finally { shell.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task PlayerPanelIsExactlyEightyPercentAndRatePopupDoesNotCycle()
+    {
+        using var context = new Context();
+        await Done(context.Main.Player.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+        var window = new PlayerWindow { DataContext = context.Main, Width = 1000, Height = 600 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var overlay=window.Overlay;
+            var panel=overlay.FindControl<Border>("BottomControls")!;
+            Assert.Equal(overlay.Bounds.Width * .8, panel.Bounds.Width, 5);
+            Assert.InRange(panel.Bounds.Height, 50, 74);
+            var button=overlay.FindControl<Button>("RateButton")!;
+            button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(1, context.Main.Player.Rate);
+            var menu=Assert.IsType<ContextMenu>(button.ContextMenu);
+            Assert.True(menu.IsOpen);
+            var choice=menu.Items.OfType<MenuItem>().Single(item=>item.Header?.ToString()=="1.5×");
+            choice.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Equal(1.5,context.Main.Player.Rate);
+            menu.Close();
+            var pin=overlay.FindControl<Button>("TopmostButton")!;
+            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.True(window.Topmost);Assert.True(context.Main.Player.AlwaysOnTop);
+            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.False(window.Topmost);Assert.False(context.Main.Player.AlwaysOnTop);
+        }
+        finally { await Done(context.Main.Player.Close());window.CloseAfterPlayback(); }
     }
 
     private sealed class Context : IDisposable

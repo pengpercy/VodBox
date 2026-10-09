@@ -1,6 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              xmlns:v="clr-namespace:VodBox.Desktop.Views"
@@ -8,6 +7,43 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
+  <UserControl.Resources>
+    <ControlTheme x:Key="PlayerTrackButton" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Height" Value="3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate><Border Background="{TemplateBinding Background}" CornerRadius="2" /></ControlTemplate>
+      </Setter>
+    </ControlTheme>
+    <ControlTheme x:Key="PlayerThumb" TargetType="Thumb">
+      <Setter Property="Width" Value="10" /><Setter Property="Height" Value="10" />
+      <Setter Property="Background" Value="#C8C8C8" />
+      <Setter Property="Template">
+        <ControlTemplate><Border Background="{TemplateBinding Background}" CornerRadius="5" /></ControlTemplate>
+      </Setter>
+    </ControlTheme>
+    <ControlTheme x:Key="PlayerSlider" TargetType="Slider">
+      <Setter Property="MinHeight" Value="18" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="Transparent" Height="18">
+            <Track Name="PART_Track" Orientation="Horizontal"
+                   Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                   Value="{TemplateBinding Value, Mode=TwoWay}" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+              <Track.DecreaseButton><RepeatButton Name="PART_DecreaseButton" Theme="{StaticResource PlayerTrackButton}" Background="{DynamicResource AccentBrush}" /></Track.DecreaseButton>
+              <Track.Thumb><Thumb Name="PART_Thumb" Theme="{StaticResource PlayerThumb}" /></Track.Thumb>
+              <Track.IncreaseButton><RepeatButton Name="PART_IncreaseButton" Theme="{StaticResource PlayerTrackButton}" Background="#686B70" /></Track.IncreaseButton>
+            </Track>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="Button.pin.pinned"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /></Style>
+  </UserControl.Styles>
   <Panel DataContext="{Binding Player}">
     <!-- 黑底 + libmpv 渲染面 -->
     <Rectangle Fill="#000000" />
@@ -17,19 +53,18 @@
     <!-- 控制层：参考主流播放器（Earth 图）一比一布局 -->
     <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding Visible}">
 
-      <!-- 顶栏：返回箭头 + 标题 + 副标题 · 右侧分辨率角标 -->
-      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="{OnPlatform Default='16,12,16,0', macOS='90,12,16,0'}" chrome:WindowDecorationProperties.ElementRole="TitleBar">
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-          <Button chrome:WindowDecorationProperties.ElementRole="User" Click="OnClose" Background="#66000000" BorderThickness="0"
-                  CornerRadius="8" Width="32" Height="32" Padding="0" Cursor="Hand" ToolTip.Tip="返回">
-            <PathIcon Data="{DynamicResource Icon.Back}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Button>
-          <StackPanel VerticalAlignment="Center" Spacing="1">
-            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Foreground="#80FFFFFF" />
-          </StackPanel>
+      <!-- 标题背景可拖拽；原生关闭按钮结束独立播放窗口，无返回按钮。 -->
+      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="*,Auto"
+            Background="Transparent" Margin="{OnPlatform Default='16,10,132,0', macOS='90,10,16,0'}">
+        <StackPanel VerticalAlignment="Center" Spacing="1" IsHitTestVisible="False">
+          <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#80FFFFFF" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-
+        <Button x:Name="TopmostButton" Grid.Column="1" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
+                Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="6"
+                Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
+          <PathIcon Data="{DynamicResource Icon.Pin}" Width="18" Height="18" />
+        </Button>
       </Grid>
 
       <!-- 中央 toast（倍速/跳片头提示） -->
@@ -45,8 +80,9 @@
       <!-- 底部：单个半透明圆角面板（参考图紧凑控制条） -->
       <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#A6000000" CornerRadius="14"
               BorderBrush="#1AFFFFFF" BorderThickness="1"
-              Margin="52,0,52,16" Padding="20,12,20,14" HorizontalAlignment="Stretch">
-        <StackPanel Spacing="8">
+              Margin="0,0,0,12" Padding="14,7,14,8" HorizontalAlignment="Center"
+              Width="{Binding $parent[UserControl].Bounds.Width, Converter={x:Static v:PlayerLayoutConverters.ControlWidth}}">
+        <StackPanel Spacing="4">
 
           <!-- 上行：左音量贴边 + 右图标组贴边（底层）；播放三键整面板绝对居中（上层） -->
           <Panel>
@@ -61,7 +97,7 @@
                     <PathIcon Data="{DynamicResource Icon.VolumeOff}" IsVisible="{Binding IsMuted}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Panel>
                 </Button>
-                <Slider Classes="md" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="80" />
+                <Slider Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="64" IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" />
               </StackPanel>
 
               <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
@@ -83,11 +119,11 @@
                         Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">
                   <PathIcon Data="{DynamicResource Icon.Playlist}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OnCycleRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button x:Name="RateButton" Click="OnSelectRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Padding="5,0" Height="30" Cursor="Hand" ToolTip.Tip="倍速">
                   <StackPanel Orientation="Horizontal" Spacing="3">
                     <PathIcon Data="{DynamicResource Icon.Speed}" Width="18" Height="18" VerticalAlignment="Center" />
-                    <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="#4CC2FF"
+                    <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="{DynamicResource AccentBrush}"
                                VerticalAlignment="Center" FontWeight="SemiBold" />
                   </StackPanel>
                 </Button>
@@ -102,21 +138,21 @@
               </StackPanel>
             </Grid>
 
-            <!-- 上层：跳过/播放/快进三键（等大 34px，图标统一 18px）。 -->
+            <!-- 上层：上一集/播放/下一集三键（等大 30px，图标统一 18px）。 -->
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Button Command="{Binding PreviousEpisodeCommand}" IsEnabled="{Binding HasPreviousEpisode}" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="上一集">
+              <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Command="{Binding PreviousEpisodeCommand}" IsEnabled="{Binding HasPreviousEpisode}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="上一集">
                 <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="7"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
+                      Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
                 <Panel>
                   <PathIcon Data="{DynamicResource Icon.Pause}" IsVisible="{Binding IsPlaying}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   <PathIcon Data="{DynamicResource Icon.Play}" IsVisible="{Binding IsPlaying, Converter={x:Static v:BoolConverters.Not}}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Panel>
               </Button>
-              <Button Command="{Binding NextEpisodeCommand}" IsEnabled="{Binding HasNextEpisode}" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="下一集">
+              <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Command="{Binding NextEpisodeCommand}" IsEnabled="{Binding HasNextEpisode}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                      Width="30" Height="30" Padding="0" Cursor="Hand" ToolTip.Tip="下一集">
                 <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
             </StackPanel>
@@ -126,7 +162,7 @@
           <Grid ColumnDefinitions="Auto,*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="2,0,8,0" />
-            <Slider x:Name="ProgressSlider" Grid.Column="1" Classes="md" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
+            <Slider x:Name="ProgressSlider" Grid.Column="1" Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
                     Value="{Binding SeekPositionSeconds, Mode=TwoWay}" />
             <TextBlock Grid.Column="2" Text="{Binding Duration, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />

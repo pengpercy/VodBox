@@ -6,6 +6,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using Avalonia.Markup.Xaml;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
@@ -45,8 +46,9 @@ public partial class PlayerOverlay : UserControl
     private double? _appliedVideoRatio;
     private (double Width,double Height,double MinWidth,double MinHeight,double MaxWidth,double MaxHeight) _compactSize;
     private (double Width, double Height, double MinWidth, double MinHeight, Avalonia.PixelPoint Position, bool Topmost, WindowState State) _windowSnapshot;
-    private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private long _lastActivity = Environment.TickCount64;
+    private bool _pointerOutside;
     private bool _menuOpen;
     private ContextMenu? _activeMenu;
     private PlayerViewModel? _observedPlayer;
@@ -74,7 +76,9 @@ public partial class PlayerOverlay : UserControl
 
         _controlsTimer.Tick += (_, _) => UpdateControls(TimeSpan.FromMilliseconds(Environment.TickCount64 - _lastActivity));
         AddHandler(PointerMovedEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
-        AddHandler(PointerPressedEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
+        AddHandler(PointerPressedEvent, OnVideoPointerPressed, RoutingStrategies.Tunnel, true);
+        PointerEntered += (_, _) => { _pointerOutside = false; RevealControls(); };
+        PointerExited += (_, _) => { _pointerOutside = true; _lastActivity = Environment.TickCount64; Cursor = null; };
         AddHandler(KeyDownEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
         AttachedToVisualTree += OnAttached;
         DetachedFromVisualTree += OnDetached;
@@ -131,11 +135,38 @@ public partial class PlayerOverlay : UserControl
         if (VM is not { } vm) return;
         var hovering = this.FindControl<Control>("TopControls")?.IsPointerOver == true ||
                        this.FindControl<Control>("BottomControls")?.IsPointerOver == true;
-        var show = !vm.Visible || !IsVisible || vm.State != PlaybackState.Playing || vm.IsSeeking ||
-                   _menuOpen || hovering || idle < TimeSpan.FromSeconds(3);
+        var show = !vm.Visible || !IsVisible || vm.IsSeeking || _menuOpen || hovering ||
+                   (!_pointerOutside && vm.State != PlaybackState.Playing) ||
+                   idle < (_pointerOutside ? TimeSpan.FromMilliseconds(350) : TimeSpan.FromMilliseconds(1500));
         vm.ControlsVisible = show;
         Cursor = show ? null : HiddenCursor;
-        if (!vm.Visible || vm.State != PlaybackState.Playing) _lastActivity = Environment.TickCount64;
+        if (!vm.Visible || (!_pointerOutside && vm.State != PlaybackState.Playing)) _lastActivity = Environment.TickCount64;
+    }
+
+    private void OnVideoPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        RevealControls();
+        if (e.Handled || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed ||
+            TopLevel.GetTopLevel(this) is not Window window) return;
+        if (e.Source is Avalonia.Visual visual &&
+            (visual is Button or Slider or MenuItem || visual.GetVisualAncestors().Any(v => v is Button or Slider or MenuItem))) return;
+        if (e.ClickCount == 2)
+        {
+            window.WindowState = window.WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
+            e.Handled = true;
+        }
+        else if (window.WindowState != WindowState.FullScreen)
+        {
+            window.BeginMoveDrag(e);
+            e.Handled = true;
+        }
+    }
+
+    private void OnToggleTopmost(object? sender, RoutedEventArgs e)
+    {
+        if (VM is not { } vm || TopLevel.GetTopLevel(this) is not Window window) return;
+        window.Topmost = !window.Topmost;
+        vm.AlwaysOnTop = window.Topmost;
     }
 
     private void OpenControlMenu(Button button, ContextMenu menu)
@@ -269,7 +300,7 @@ public partial class PlayerOverlay : UserControl
         window.WindowState = WindowState.Normal;
         ApplyVideoSize(window,VM?.VideoAspectRatio??16d/9,true);
         window.Topmost=true;
-        if (VM is { } vm) vm.CompactMode = true;
+        if (VM is { } vm) { vm.CompactMode = true; vm.AlwaysOnTop = window.Topmost; }
         RevealControls();
     }
 
@@ -291,7 +322,7 @@ public partial class PlayerOverlay : UserControl
         catch(ObjectDisposedException) { /* native window already closed */ }
         window.Topmost = saved.Topmost;
         window.WindowState = saved.State;
-        if (VM is { } vm) vm.CompactMode = false;
+        if (VM is { } vm) { vm.CompactMode = false; vm.AlwaysOnTop = window.Topmost; }
     }
 
     internal static Avalonia.PixelPoint ClampRestoredPosition(Avalonia.PixelPoint position,Avalonia.PixelRect area,double width,double height,double scaling)
@@ -302,26 +333,19 @@ public partial class PlayerOverlay : UserControl
         return new Avalonia.PixelPoint(x,y);
     }
 
-    private void OnRateChanged(object? sender, SelectionChangedEventArgs e)
+    private static readonly double[] Rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+    private void OnSelectRate(object? sender, RoutedEventArgs e)
     {
-        // XAML 装载期（SelectedIndex 在 EndInit 时触发）DataContext 尚未来得及赋值，直接忽略。
-        if (sender is ComboBox { SelectedIndex: var index } && VM is { } vm)
+        if (VM is not { } vm || sender is not Button button) return;
+        var menu = new ContextMenu();
+        foreach (var rate in Rates)
         {
-            vm.Rate = index switch
-            {
-                0 => 0.5, 1 => 1.0, 2 => 1.5, 3 => 2.0, _ => 1.0,
-            };
+            var item = new MenuItem { Header = (Math.Abs(vm.Rate - rate) < .001 ? "当前 · " : "") + $"{rate:0.##}×" };
+            item.Click += (_, _) => vm.Rate = rate;
+            menu.Items.Add(item);
         }
-    }
-
-    private static readonly double[] Rates = [0.5, 1.0, 1.25, 1.5, 2.0];
-
-    private void OnCycleRate(object? sender, RoutedEventArgs e)
-    {
-        if (VM is not { } vm) return;
-        var index = Array.IndexOf(Rates, vm.Rate);
-        vm.Rate = Rates[(index + 1) % Rates.Length];
-
+        OpenControlMenu(button, menu);
     }
 
     private void OnTogglePip(object? sender, RoutedEventArgs e)
@@ -486,5 +510,17 @@ public partial class PlayerOverlay : UserControl
             window.WindowState = window.WindowState == Avalonia.Controls.WindowState.FullScreen
                 ? Avalonia.Controls.WindowState.Normal
                 : Avalonia.Controls.WindowState.FullScreen;
+    }
+}
+
+public static class PlayerLayoutConverters
+{
+    public static readonly IValueConverter ControlWidth = new WidthConverter();
+    private sealed class WidthConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is double width && double.IsFinite(width) ? Math.Max(0, width * .8) : 0d;
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
     }
 }

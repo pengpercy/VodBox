@@ -10,12 +10,14 @@ namespace VodBox.Desktop;
 
 public partial class MainWindow : Window
 {
+    private PlayerViewModel? _observedPlayer;
+    internal Views.PlayerWindow? PlaybackWindow { get; private set; }
     private bool _shutdownStarted;
     private bool _shutdownComplete;
     public MainWindow()
     {
         InitializeComponent();
-        AddHandler(KeyDownEvent, OnPlaybackKeyDown, RoutingStrategies.Bubble);
+        Closed += (_, _) => StopObservingPlayer();
         Closing+=OnClosing;
     }
 
@@ -44,7 +46,14 @@ public partial class MainWindow : Window
 
     protected override void OnDataContextChanged(EventArgs e)
     {
+        StopObservingPlayer();
         base.OnDataContextChanged(e);
+        if (DataContext is MainViewModel playerOwner)
+        {
+            _observedPlayer = playerOwner.Player;
+            _observedPlayer.PropertyChanged += OnPlayerVisibilityChanged;
+            SyncPlayerWindow();
+        }
         if (DataContext is MainViewModel vm && Avalonia.Application.Current is App)
         {
             vm.AttachDispatcher(Avalonia.Threading.Dispatcher.UIThread);
@@ -72,46 +81,29 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnPlaybackKeyDown(object? sender, KeyEventArgs e)
+    private void StopObservingPlayer()
     {
-        if (e.Handled || DataContext is not MainViewModel main || !main.Player.Visible) return;
-        // 输入框和下拉框的按键属于编辑/选择，不能触发播放操作。
-        if (e.Source is Avalonia.Visual visual &&
-            (visual is TextBox or ComboBox || visual.GetVisualAncestors().Any(v => v is TextBox or ComboBox))) return;
-        if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0) return;
-        var player = main.Player;
-        var episodeNumber = e.Key switch
-        {
-            Key.D1 or Key.NumPad1 => 1, Key.D2 or Key.NumPad2 => 2, Key.D3 or Key.NumPad3 => 3,
-            Key.D4 or Key.NumPad4 => 4, Key.D5 or Key.NumPad5 => 5, Key.D6 or Key.NumPad6 => 6,
-            Key.D7 or Key.NumPad7 => 7, Key.D8 or Key.NumPad8 => 8, Key.D9 or Key.NumPad9 => 9,
-            _ => 0,
-        };
-        if (episodeNumber > 0)
-        {
-            if (e.KeyModifiers != KeyModifiers.None || episodeNumber > player.Playlist.Count) return;
-            _ = player.SelectEpisodeNumberAsync(episodeNumber);
-            e.Handled = true;
-            return;
-        }
-        switch (e.Key)
-        {
-            case Key.Space: player.TogglePlayPauseCommand.Execute(null); break;
-            case Key.Left: player.SeekBy(-5); break;
-            case Key.Right: player.SeekBy(5); break;
-            case Key.Up: player.Volume = Math.Clamp(player.Volume + 5, 0, 100); break;
-            case Key.Down: player.Volume = Math.Clamp(player.Volume - 5, 0, 100); break;
-            case Key.F:
-            case Key.Enter:
-                WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
-                break;
-            case Key.Escape:
-                if (WindowState == WindowState.FullScreen) WindowState = WindowState.Normal;
-                else player.CloseCommand.Execute(null);
-                break;
-            default: return;
-        }
-        e.Handled = true;
+        if (_observedPlayer is not null) _observedPlayer.PropertyChanged -= OnPlayerVisibilityChanged;
+        _observedPlayer = null;
+        PlaybackWindow?.CloseAfterPlayback();
+        PlaybackWindow = null;
+    }
+
+    private void OnPlayerVisibilityChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PlayerViewModel.Visible)) SyncPlayerWindow();
+    }
+
+    private void SyncPlayerWindow()
+    {
+        if (DataContext is not MainViewModel main) return;
+        if (!main.Player.Visible) { PlaybackWindow?.CloseAfterPlayback(); return; }
+        if (PlaybackWindow is not null) return;
+        var player = new Views.PlayerWindow { DataContext = main, Topmost = main.Player.AlwaysOnTop };
+        PlaybackWindow = player;
+        player.Closed += (_, _) => { if (ReferenceEquals(PlaybackWindow, player)) PlaybackWindow = null; };
+        // Non-modal and unowned: the main/detail window remains independently interactive.
+        player.Show();
     }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
