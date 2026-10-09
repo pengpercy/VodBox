@@ -104,7 +104,7 @@
       </Border>
 
       <!-- 底部：单个半透明圆角面板（参考图紧凑控制条） -->
-      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="Transparent" CornerRadius="14"
+      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#A6000000" CornerRadius="14"
               BorderBrush="#1AFFFFFF" BorderThickness="1"
               Margin="{x:Static v:PlayerLayout.PanelMargin}" Padding="{x:Static v:PlayerLayout.PanelPadding}" HorizontalAlignment="Center">
         <Border.Width>
@@ -113,14 +113,6 @@
             <Binding Path="CompactMode" />
           </MultiBinding>
         </Border.Width>
-        <Panel>
-          <ExperimentalAcrylicBorder x:Name="ControlPanelMaterial" CornerRadius="13" IsHitTestVisible="False"
-                                     Margin="-16,-12,-16,-13">
-            <ExperimentalAcrylicBorder.Material>
-              <ExperimentalAcrylicMaterial BackgroundSource="Digger" TintColor="#181A1E" TintOpacity="0.18"
-                                           MaterialOpacity="0.25" FallbackColor="#80181A1E" />
-            </ExperimentalAcrylicBorder.Material>
-          </ExperimentalAcrylicBorder>
         <StackPanel Spacing="{x:Static v:PlayerLayout.RowSpacing}">
 
           <!-- 上行：左音量贴边 + 右图标组贴边（底层）；播放三键整面板绝对居中（上层） -->
@@ -207,7 +199,6 @@
                        FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />
           </Grid>
         </StackPanel>
-        </Panel>
       </Border>
 
       <!-- 播放列表抽屉：从窗口右侧滑入，覆盖在视频之上；点空白处或再点列表按钮收起。 -->

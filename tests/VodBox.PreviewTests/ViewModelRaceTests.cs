@@ -1978,6 +1978,23 @@ public sealed class ViewModelRaceTests
         Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
     }
 
+    [AvaloniaFact]
+    public async Task ClosingPlaybackClearsLiveChannelAndCardMarkers()
+    {
+        using var context = new Context();
+        var channel = new LiveChannel { Name = "关闭测试", Uris = ["https://example.com/live"] };
+        context.Main.Live.Groups.Add(new LiveGroup("测试", [channel], false, 1));
+        context.Main.Live.FilterText = "关闭测试";
+        context.Main.Live.PlayChannel(channel);
+        Assert.True(channel.IsCurrent);
+        Assert.Same(channel, context.Main.Live.CurrentChannel);
+        await context.Main.Player.CloseCommand.ExecuteAsync(null);
+        Assert.False(channel.IsCurrent);
+        Assert.Null(context.Main.Live.CurrentChannel);
+        Assert.All(context.Main.Live.ChannelCards, card => Assert.False(card.IsCurrent));
+        Assert.False(context.Main.Player.Visible);
+    }
+
     [Fact]
     public void LiveGroupsCollapseIndependentlyAndSearchTemporarilyExpands()
     {
@@ -2270,7 +2287,7 @@ public sealed class ViewModelRaceTests
     private static (StackPanel Left, StackPanel Right, StackPanel Transport) ControlGroups(PlayerOverlay overlay)
     {
         var bottom = overlay.FindControl<Border>("BottomControls")!;
-        var rows = Assert.IsType<Panel>(bottom.Child).Children.OfType<StackPanel>().Single();
+        var rows = Assert.IsType<StackPanel>(bottom.Child);
         var topRow = Assert.IsType<Panel>(rows.Children[0]);
         var grid = Assert.IsType<Grid>(topRow.Children[0]);
         return (Assert.IsType<StackPanel>(grid.Children[0]), Assert.IsType<StackPanel>(grid.Children[1]),

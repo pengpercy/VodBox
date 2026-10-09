@@ -359,11 +359,14 @@ public sealed partial class PlayerViewModel : ObservableObject
         catch (OperationCanceledException) { /* 新请求/关闭取消旧会话，不显示失败。 */ }
         catch (Exception error)
         {
+            // 播放失败必须留下原因：这是排查“点了没反应/放不出来”的唯一现场。
+            VodBox.Core.VodBoxLog.Error("player", $"播放失败 title={Title} uri={_current?.Uri}", error);
             await _main.RunOnUiAsync(() =>
             {
                 if (intent != _intent) return;
-                State = PlaybackState.Failed;
+                // 先写 Error 再切状态：状态变化会触发日志/界面读取 Error。
                 Error = $"无法播放：{error.Message}";
+                State = PlaybackState.Failed;
                 if(_current is {} failed)_main.Live.HandlePlaybackFailure(failed,intent);
             });
         }
@@ -482,6 +485,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         {
             if (intent != _intent) return;
             VodBox.Core.VodBoxLog.Info("player", $"播放已关闭：{Title}");
+            _main.Live.ClearPlaybackMarker();
             Visible = false;
             State = PlaybackState.Idle;
         });

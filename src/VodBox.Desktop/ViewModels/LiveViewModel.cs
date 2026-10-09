@@ -435,6 +435,20 @@ public sealed partial class LiveViewModel : ObservableObject
     }
 
     /// <summary>仅更新选中态与 EPG 时间轴，不触播放（设计数据 / 无 URI 频道复用）。</summary>
+    /// <summary>关闭播放后清除频道、收藏、历史和卡片的播放标识。</summary>
+    public void ClearPlaybackMarker()
+    {
+        if (CurrentChannel is { } current) current.IsCurrent = false;
+        foreach (var channel in Groups.SelectMany(group => group.Channels)
+                     .Concat(Favorites).Concat(RecentChannels).Concat(ChannelCards))
+            channel.IsCurrent = false;
+        CurrentChannel = null;
+        EpgTimeline.Clear();
+        _lineIndex = 0;
+        _failedLines = 0;
+        OnPropertyChanged(nameof(CurrentLineLabel));
+    }
+
     public void SetCurrent(LiveChannel channel)
     {
         foreach (var item in Groups.SelectMany(group => group.Channels)) item.IsCurrent = false;
