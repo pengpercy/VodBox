@@ -11,6 +11,10 @@ on:
       source_sha:
         description: Commit to package and tag.
         required: true
+      package_run:
+        description: Existing run with six successful packages; skips building and packaging.
+        required: false
+        default: ''
 permissions:
   contents: write
   actions: read
@@ -38,22 +42,54 @@ jobs:
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
   build:
+    if: inputs.package_run == ''
     needs: version
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.value }}
       source_sha: ${{ needs.version.outputs.sha }}
   package:
+    if: inputs.package_run == ''
     needs: [version, build]
     uses: ./.github/workflows/package.yml
     with:
       version: ${{ needs.version.outputs.value }}
   release:
+    if: always() && needs.version.result == 'success' && (needs.package.result == 'success' || inputs.package_run != '')
     needs: [version, package]
     runs-on: ubuntu-22.04
     steps:
+      - name: Verify existing package metadata
+        if: inputs.package_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN: ${{ inputs.package_run }}
+          SOURCE_SHA: ${{ needs.version.outputs.sha }}
+          VERSION: ${{ needs.version.outputs.value }}
+        shell: bash
+        run: |
+          case "$PACKAGE_RUN" in ''|*[!0-9]*) exit 1;; esac
+          mkdir -p artifacts/meta
+          gh run view "$PACKAGE_RUN" --repo "$GITHUB_REPOSITORY" --json jobs > artifacts/jobs.json
+          for rid in win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64; do
+            gh run download "$PACKAGE_RUN" --repo "$GITHUB_REPOSITORY" -n "vodbox-meta.$rid" -D artifacts/meta
+          done
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          rids = {'win-x64','win-arm64','osx-x64','osx-arm64','linux-x64','linux-arm64'}
+          jobs = json.loads(Path('artifacts/jobs.json').read_text())['jobs']
+          for rid in rids:
+              meta = json.loads((Path('artifacts/meta') / (rid + '.json')).read_text())
+              if meta.get('version') != os.environ['VERSION'] or meta.get('sourceSha') != os.environ['SOURCE_SHA']:
+                  raise SystemExit('Package source/version mismatch: ' + rid)
+              if not any(j['conclusion']=='success' and j['name'].startswith('package / ') and j['name'].endswith(', ' + rid + ')') for j in jobs):
+                  raise SystemExit('Package job did not succeed: ' + rid)
+          PY
       - uses: actions/download-artifact@v8
         with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.package_run || github.run_id }}
           pattern: package.*
           merge-multiple: true
           path: artifacts/release
@@ -65,7 +101,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then tag="v${{ needs.version.outputs.value }}"; fi
           sha="${{ needs.version.outputs.sha }}"
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
-            gh release create "$tag" artifacts/release/* --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
+            gh release create "$tag" artifacts/release/* --repo "$GITHUB_REPOSITORY" --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
           else
-            gh release create "$tag" artifacts/release/* --target "$sha" --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
+            gh release create "$tag" artifacts/release/* --repo "$GITHUB_REPOSITORY" --target "$sha" --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
           fi
