@@ -143,7 +143,9 @@ public sealed class LiveSources
     public async Task<List<LiveGroup>> LoadAsync(string url, CancellationToken ct = default)
     {
         Warnings = [];
-        var text = File.Exists(url) ? await File.ReadAllTextAsync(url, ct) : await _fetch(url, null, ct);
+        var text = LocalMedia.TryResolveFile(url, out var localFile)
+            ? await File.ReadAllTextAsync(localFile, ct)
+            : await _fetch(url, null, ct);
         if (!text.TrimStart().StartsWith('{')) return Parse(text);
         var config = ConfigLoader.Parse(text) ?? throw new InvalidDataException("直播配置解析失败。");
         var groups = new List<LiveGroup>();
@@ -152,6 +154,21 @@ public sealed class LiveSources
         {
             if (string.IsNullOrWhiteSpace(source.Url)) continue;
             var address = source.Url;
+            // 本地播放列表（绝对路径或 file:// URI）直接读盘，远程地址才走 HTTP。
+            if (LocalMedia.TryResolveFile(address, out var localPath))
+            {
+                try
+                {
+                    var localGroups = Parse(await File.ReadAllTextAsync(localPath, ct));
+                    if (localGroups.Count > 0) groups.AddRange(localGroups);
+                    else failures.Add((source.Name is { Length: > 0 } n ? n : "本地播放列表") + ": 没有可播放频道");
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    failures.Add((source.Name is { Length: > 0 } n2 ? n2 : "本地播放列表") + ": " + error.Message);
+                }
+                continue;
+            }
             if (!Uri.TryCreate(address, UriKind.Absolute, out _))
                 address = Uri.TryCreate(url, UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"
                     ? new Uri(baseUri, address).AbsoluteUri : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(url))!, address);
@@ -187,7 +204,8 @@ public sealed class LiveSources
 }
 
 /// <summary>M3U 直播列表解析（#EXTINF + group-title + tvg-logo / tvg-id）。
-/// 支持 EXT VLC 的 http-user-agent/http-referrer 与 Kodi stream_headers；其余指令和 catchup 尚未消费。</summary>
+/// 支持 EXT VLC 的 http-user-agent/http-referrer、Kodi stream_headers、#EXTGRP 分组，
+/// 并还原 HTML 实体（<c>&amp;amp;</c>）；其余指令和 catchup 尚未消费。</summary>
 public static class M3uParser
 {
     public static bool IsM3u(string text) => text.Contains("#EXTM3U", StringComparison.OrdinalIgnoreCase);
@@ -213,7 +231,7 @@ public static class M3uParser
                 var attrs = comma > 0 ? line[..comma] : line;
                 if (comma > 0 && comma + 1 < line.Length) pendingName = line[(comma + 1)..].Trim();
                 pendingGroup = Attr(attrs, "group-title") ?? pendingGroup;
-                pendingLogo = Attr(attrs, "tvg-logo");
+                pendingLogo = UnescapeOrNull(Attr(attrs, "tvg-logo"));
                 pendingTvg = Attr(attrs, "tvg-id");
             }
             else if (line.StartsWith("#EXTVLCOPT:", StringComparison.OrdinalIgnoreCase))
@@ -221,6 +239,11 @@ public static class M3uParser
                 var option = line[11..];
                 var equals = option.IndexOf('=');
                 if (equals > 0) AddHeader(pendingHeaders, option[..equals], option[(equals + 1)..]);
+            }
+            else if (line.StartsWith("#EXTGRP:", StringComparison.OrdinalIgnoreCase))
+            {
+                var group = line[8..].Trim();
+                if (group.Length > 0) pendingGroup = group;
             }
             else if (line.StartsWith("#KODIPROP:inputstream.adaptive.stream_headers=", StringComparison.OrdinalIgnoreCase))
             {
@@ -237,7 +260,7 @@ public static class M3uParser
                 channels.Add(new LiveChannel
                 {
                     Name = name,
-                    Uris = [line],
+                    Uris = [Unescape(line)],
                     Headers = new Dictionary<string, string>(pendingHeaders, StringComparer.OrdinalIgnoreCase),
                     Logo = pendingLogo,
                     Group = pendingGroup,
@@ -249,6 +272,17 @@ public static class M3uParser
         }
         return Group(channels);
     }
+
+    /// <summary>
+    /// 还原网页导出的 m3u 中的 HTML 实体（<c>&amp;amp;</c> → <c>&amp;</c>）。
+    /// 直播地址常带查询串，未还原会让播放请求落到错误路径。
+    /// </summary>
+    private static string Unescape(string value) =>
+        value.Contains('&') ? System.Net.WebUtility.HtmlDecode(value) : value;
+
+    /// <summary>可空版本：null / 空串原样返回。</summary>
+    private static string? UnescapeOrNull(string? value) =>
+        string.IsNullOrEmpty(value) ? value : Unescape(value);
 
     private static void AddHeader(Dictionary<string, string> headers, string key, string value)
     {
@@ -279,6 +313,34 @@ public static class M3uParser
         return dot > 0 ? tail[..dot] : tail;
     }
 
+    /// <summary>
+    /// 台标占位文字（台标图片缺失或 404 时显示）。
+    /// CCTV-N 系列取“台号”（CCTV-5体育 → 5、CCTV5+体育赛事 → 5+），否则十几个央视频道
+    /// 会全部显示成同一个 “CCT”；其余取前 2 个汉字或前 3 个拉丁字符。
+    /// </summary>
+    internal static string BadgeFor(string name)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0) return "TV";
+        var cctv = System.Text.RegularExpressions.Regex.Match(trimmed, @"^(?:CCTV|CGTN)[-\s]?(\d+)(\+)?", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (cctv.Success) return cctv.Groups[1].Value + cctv.Groups[2].Value;
+        if (char.IsAscii(trimmed[0]))
+        {
+            var ascii = new string(trimmed.Where(c => char.IsAsciiLetterOrDigit(c)).Take(3).ToArray());
+            return ascii.Length > 0 ? ascii.ToUpperInvariant() : "TV";
+        }
+        return trimmed[..Math.Min(2, trimmed.Length)];
+    }
+
+    /// <summary>铭牌底色：按名称稳定取色，同一频道每次都得到同一种颜色。</summary>
+    internal static string BadgeColorFor(string name)
+    {
+        string[] palette = ["#C0392B", "#1F6FB2", "#2E7D5B", "#7B4FA8", "#C77C1E", "#2C6E7F", "#A6406B", "#4A6FA5"];
+        var hash = 17;
+        foreach (var ch in name) hash = unchecked(hash * 31 + ch);
+        return palette[(hash & 0x7fffffff) % palette.Length];
+    }
+
     internal static List<LiveGroup> Group(IReadOnlyList<LiveChannel> channels)
     {
         var number = 0;
@@ -295,7 +357,13 @@ public static class M3uParser
                     hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name[(separator+1)..])));
                     name=name[..separator];
                 }
-                return new LiveGroup(name,g.Select(c=>c with{Number=++number,Group=name}).ToList(),hash is not null){PasswordHash=hash};
+                return new LiveGroup(name,g.Select(c=>c with
+                {
+                    Number = ++number,
+                    Group = name,
+                    Badge = BadgeFor(c.Name),
+                    BadgeColor = BadgeColorFor(c.Name),
+                }).ToList(),hash is not null){PasswordHash=hash};
             })
             .ToList();
     }
@@ -324,7 +392,11 @@ public static class TxtLiveParser
             if (right.Length == 0) continue;
             var uris = right.Split('$').Where(u => !string.IsNullOrWhiteSpace(u) && u.Contains("://")).Select(u => u.Trim()).ToArray();
             if (uris.Length == 0) continue;
-            channels.Add(new LiveChannel { Name = left, Uris = uris, Group = group });
+            channels.Add(new LiveChannel
+            {
+                Name = left, Uris = uris, Group = group,
+                Badge = M3uParser.BadgeFor(left), BadgeColor = M3uParser.BadgeColorFor(left),
+            });
         }
         return M3uParser.Group(channels);
     }

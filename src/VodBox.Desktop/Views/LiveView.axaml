@@ -66,10 +66,17 @@
                             PointerPressed="OnPlayChannel" Tag="{Binding}">
                   <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
                              Width="30" VerticalAlignment="Center" />
-                  <Border CornerRadius="7" Width="32" Height="32" Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}">
-                    <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
-                               VerticalAlignment="Center" FontWeight="SemiBold" />
-                  </Border>
+                  <!-- 台标：底层是文字占位，logo 加载成功后覆盖；清单里没有的频道或图片 404 时自动露出占位。 -->
+                  <Panel Width="32" Height="32">
+                    <Border CornerRadius="7" Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}">
+                      <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
+                                 VerticalAlignment="Center" FontWeight="SemiBold" />
+                    </Border>
+                    <Border CornerRadius="7" Background="#14FFFFFF"
+                            IsVisible="{Binding Logo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                      <views:RemotePoster Url="{Binding Logo}" Stretch="Uniform" Margin="2" />
+                    </Border>
+                  </Panel>
                   <StackPanel VerticalAlignment="Center" Spacing="2" Width="176">
                     <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding EpgNow}" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}"

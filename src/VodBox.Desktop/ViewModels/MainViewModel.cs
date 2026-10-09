@@ -62,7 +62,39 @@ public sealed partial class MainViewModel : ObservableObject
                 SourceKey = "local",
                 MediaId = entry.FullPath,
             });
+            // 本地 m3u 播放列表 → 直播视图（文件名会作为直播源标签显示）。
+            Files.OpenLiveRequested += path => _ = OpenLivePlaylistAsync(path);
             UpdateSourceName();
+        }
+    }
+
+    /// <summary>直接播放一个本地媒体文件（拖放与文件列表共用）。</summary>
+    public void PlayLocalFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
+        Player.Play(new PlaybackRequest
+        {
+            Uri = new Uri(path).AbsoluteUri,
+            Title = Path.GetFileName(path),
+            SourceKey = "local",
+            MediaId = path,
+        });
+    }
+
+    /// <summary>把本地播放列表应用为当前直播源并切到直播页；失败时把原因写进状态栏。</summary>
+    public async Task OpenLivePlaylistAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            var loaded = await Live.ApplyConfigurationAsync(path);
+            if (!loaded) return;
+            Navigate(AppPage.Live);
+            StatusMessage = $"已打开直播播放列表：{Path.GetFileName(path)}";
+        }
+        catch (Exception error)
+        {
+            StatusMessage = $"打开直播播放列表失败：{error.Message}";
         }
     }
 

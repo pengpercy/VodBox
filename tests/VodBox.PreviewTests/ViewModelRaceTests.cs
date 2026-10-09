@@ -1921,6 +1921,67 @@ public sealed class ViewModelRaceTests
         Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
     }
 
+    [AvaloniaFact]
+    public async Task RealPlaylistLoadsIntoLiveViewWithLogos()
+    {
+        using var context = new Context();
+        var path = "/Users/percy/Downloads/channels_101.72.126.26_9901.m3u";
+        if (!File.Exists(path)) return;
+        // 端到端：本地 m3u → 直播加载器 → 频道列表 → 渲染，检查台标与分组。
+        var loaded = await context.Main.Live.ApplyConfigurationAsync(path);
+        Assert.True(loaded);
+        Assert.Equal(52, context.Main.Live.Groups.Sum(g => g.Channels.Count));
+        Assert.Single(context.Main.Live.Groups);
+        Assert.Contains("channels_101", context.Main.Live.LiveSourceLabel);
+        Assert.All(context.Main.Live.Groups[0].Channels, c => Assert.False(string.IsNullOrWhiteSpace(c.Badge)));
+        Assert.Equal(48, context.Main.Live.Groups[0].Channels.Count(c => !string.IsNullOrWhiteSpace(c.Logo)));
+
+        context.Main.Navigate(AppPage.Live);
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1180, Height = 760 };
+        window.Show();
+        try
+        {
+            // 数据层是可靠断言：列表数据与台标解析不依赖渲染时机。
+            Assert.Equal(53, context.Main.Live.VisibleChannels.Count); // 1 组头 + 52 频道
+            Assert.Equal("河北保定酒店 河北联通", context.Main.Live.Groups[0].Name);
+
+            // 先强制渲染再取控件：ListBox 虚拟化，行要在布局完成后才存在。
+            var frame = await Force(context, window);
+            Assert.NotNull(frame);
+            var view = window.GetVisualDescendants().OfType<LiveView>().Single();
+            var posters = view.GetVisualDescendants().OfType<RemotePoster>().ToArray();
+            Assert.NotEmpty(posters);
+            Assert.All(posters, poster =>
+            {
+                Assert.StartsWith("https://", poster.Url);
+                Assert.Contains("taksssss/tv/icon/", poster.Url);
+            });
+            // 台标是异步加载的：等所有可见行的 RemotePoster 完成加载后再断言图片真的出来了。
+            await Task.WhenAll(posters.Select(p => p.LoadingTask.WaitAsync(TimeSpan.FromSeconds(20))));
+            Assert.All(posters, p => Assert.NotNull(p.Source));
+            // 无台标的频道仍显示文字台标占位（不是空白行）。
+            Assert.Equal(4, context.Main.Live.Groups[0].Channels.Count(c => string.IsNullOrWhiteSpace(c.Logo)));
+            Assert.All(context.Main.Live.Groups[0].Channels.Where(c => c.Logo is null),
+                c => Assert.False(string.IsNullOrWhiteSpace(c.Badge)));
+        }
+        finally { window.Close(); }
+    }
+
+    private static async Task<Avalonia.Media.Imaging.Bitmap?> Force(Context context, VodBox.Desktop.MainWindow window)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
+            Dispatcher.UIThread.RunJobs();
+            var f = Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(window);
+            if (f is not null) return f;
+            await Task.Delay(50);
+        }
+        return null;
+    }
+
     private static (StackPanel Left, StackPanel Right, StackPanel Transport) ControlGroups(PlayerOverlay overlay)
     {
         var bottom = overlay.FindControl<Border>("BottomControls")!;

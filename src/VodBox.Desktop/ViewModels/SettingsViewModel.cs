@@ -525,8 +525,9 @@ public sealed partial class FilesViewModel : ObservableObject
                 Entries.Add(new FileEntry { Name = dir.Name, FullPath = dir.FullName, IsDirectory = true });
             foreach (var file in directory.GetFiles().OrderBy(f => f.Name))
             {
-                var ext = file.Extension.ToLowerInvariant();
-                if (ext is ".mp4" or ".mkv" or ".avi" or ".mov" or ".flv" or ".ts" or ".m3u8" or ".webm" or ".mp3" or ".m4a" or ".flac" or ".wav")
+                // 扩展名清单集中在 LocalMedia：新增格式不会再出现“列表看得见、右键却没有”的错位。
+                if (VodBox.Infrastructure.LocalMedia.Classify(file.FullName) is VodBox.Infrastructure.LocalFileKind.Playlist
+                    or VodBox.Infrastructure.LocalFileKind.Media)
                     Entries.Add(new FileEntry { Name = file.Name, FullPath = file.FullName, IsDirectory = false });
             }
             Status = $"{Entries.Count} 项";
@@ -545,11 +546,34 @@ public sealed partial class FilesViewModel : ObservableObject
             Navigate(entry.FullPath);
             return;
         }
-        // 文件播放经全局命令（由 MainWindow 转给 PlayerViewModel）
+        // 播放列表当作直播源打开，其余媒体交给播放器。
+        Play(entry);
+    }
+
+    /// <summary>该条目能否作为直播播放列表打开（m3u / m3u8）。</summary>
+    public static bool CanOpenAsLive(FileEntry entry) =>
+        !entry.IsDirectory &&
+        VodBox.Infrastructure.LocalMedia.Classify(entry.FullPath) == VodBox.Infrastructure.LocalFileKind.Playlist;
+
+    [RelayCommand]
+    public void OpenAsLive(FileEntry entry)
+    {
+        if (!CanOpenAsLive(entry)) return;
+        OpenLiveRequested?.Invoke(entry.FullPath);
+    }
+
+    /// <summary>直接交给播放器播该文件（右键“播放”用；播放列表会转成直播源）。</summary>
+    public void Play(FileEntry entry)
+    {
+        if (entry.IsDirectory) return;
+        if (CanOpenAsLive(entry)) { OpenAsLive(entry); return; }
         PlayRequested?.Invoke(entry);
     }
 
     public event Action<FileEntry>? PlayRequested;
+
+    /// <summary>请求把本地播放列表作为直播源打开（由 MainViewModel 接手加载与跳转）。</summary>
+    public event Action<string>? OpenLiveRequested;
 }
 
 public sealed class FileEntry

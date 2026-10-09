@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.FilesView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
@@ -27,6 +28,16 @@
         <DataTemplate>
           <Border CornerRadius="7" Padding="10,6" Margin="0,1" Cursor="Hand"
                   Background="#0AFFFFFF" PointerPressed="OnOpen" Tag="{Binding}">
+            <Border.ContextMenu>
+              <!-- 右键：播放列表可“作为直播源打开”，媒体文件可直接播放；目录给“打开”。 -->
+              <ContextMenu>
+                <MenuItem Header="播放" Click="OnMenuPlay" Tag="{Binding}" />
+                <MenuItem Header="作为直播源打开" Click="OnMenuOpenAsLive" Tag="{Binding}"
+                          IsVisible="{Binding $parent[Border].DataContext, Converter={x:Static views:FileMenuConverters.CanOpenAsLive}}" />
+                <MenuItem Header="打开" Click="OnMenuOpen" Tag="{Binding}"
+                          IsVisible="{Binding IsDirectory}" />
+              </ContextMenu>
+            </Border.ContextMenu>
             <StackPanel Orientation="Horizontal" Spacing="12">
               <PathIcon Data="{StaticResource Icon.FolderOpen}" Width="18" Height="18" VerticalAlignment="Center"
                         IsVisible="{Binding IsDirectory, Mode=OneWay}" />

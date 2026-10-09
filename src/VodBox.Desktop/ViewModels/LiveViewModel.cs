@@ -75,7 +75,18 @@ public sealed partial class LiveViewModel : ObservableObject
     private VodBox.Infrastructure.ProgrammeStore ProgrammeCache => new(Path.Combine(_services.DataDir, "programmes.xml"));
     private IReadOnlyList<Programme> _programmes = [];
     public string CurrentLineLabel => $"线路 {_lineIndex + 1}";
-    public string LiveSourceLabel => string.IsNullOrWhiteSpace(_services.CurrentLiveConfig) ? "未配置直播源" : "已配置直播源";
+    public string LiveSourceLabel
+    {
+        get
+        {
+            var config = _services.CurrentLiveConfig;
+            if (string.IsNullOrWhiteSpace(config)) return "未配置直播源";
+            // 本地播放列表显示文件名，方便确认当前用的是哪个文件。
+            return VodBox.Infrastructure.LocalMedia.TryResolveFile(config, out var path)
+                ? $"本地播放列表：{Path.GetFileName(path)}"
+                : "已配置直播源";
+        }
+    }
     public async Task RefreshEpgSubscriptionAsync(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var address) || address.Scheme is not ("http" or "https"))
