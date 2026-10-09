@@ -63,7 +63,7 @@ public class TrailerSourceTests
     public async Task Categories_IsSingleTrailerWorld()
     {
         using var source = Create(_ => ListPage(Card(1, "x", "https://i/p.jpg")));
-        var categories = await source.GetCategoriesAsync();
+        var categories = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         var category = Assert.Single(categories);
         Assert.Equal("trailers", category.Id);
         Assert.Equal("预告片世界", category.Name);
@@ -73,7 +73,7 @@ public class TrailerSourceTests
     public async Task GetHome_ParsesCardsWithPoster()
     {
         using var source = Create(path => ListPage(Card(1, "流浪地球", "https://i.example.com/p.jpg") + Card(2, "满江红", "https://i.example.com/q.jpg")));
-        var page = await source.GetHomeAsync();
+        var page = await source.GetHomeAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal("流浪地球", page.Items[0].Title);
         Assert.Equal("/movie/1", page.Items[0].Id);
@@ -89,9 +89,9 @@ public class TrailerSourceTests
             ["movlist/____2"] = ListPage(Card(2, "B", "https://i/b.jpg")), // 无下一页
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : ListPage(""));
-        var p1 = await source.GetItemsAsync("trailers", 1, null);
+        var p1 = await source.GetItemsAsync("trailers", 1, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, p1.PageCount);          // 有「下一页」→ 给下一页
-        var p2 = await source.GetItemsAsync("trailers", 2, null);
+        var p2 = await source.GetItemsAsync("trailers", 2, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, p2.PageCount);          // 末页保持当前页（不再伪造页数）
     }
 
@@ -99,8 +99,8 @@ public class TrailerSourceTests
     public async Task GetItems_RejectsInvalidCategoryAndPage()
     {
         using var source = Create(_ => ListPage(""));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("movies", 1, null));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("trailers", 0, null));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("movies", 1, null, ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("trailers", 0, null, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class TrailerSourceTests
             ["movie/1"] = DetailPage("流浪地球", "预告片", (10, "先导预告"), (11, "终极预告")),
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : ListPage(""));
-        var detail = await source.GetDetailAsync("/movie/1");
+        var detail = await source.GetDetailAsync("/movie/1", ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("流浪地球", detail.Item.Title);
         var line = Assert.Single(detail.Lines);
@@ -125,8 +125,8 @@ public class TrailerSourceTests
     public async Task Detail_RejectsInvalidMovieId()
     {
         using var source = Create(_ => ListPage(""));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("/show/1"));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("任意"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("/show/1", ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("任意", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class TrailerSourceTests
             ["show/10"] = ShowPage("https://vod.pipi.cn/x/v.mp4"),
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : ListPage(""));
-        var play = await source.ResolvePlaybackAsync("/movie/1", "/show/10");
+        var play = await source.ResolvePlaybackAsync("/movie/1", "/show/10", ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("https://vod.pipi.cn/x/v.mp4", play.Uri);
         Assert.Equal("流浪地球 · 先导预告", play.Title);
@@ -157,7 +157,7 @@ public class TrailerSourceTests
             ["show/10"] = "<html><body><p>no player</p></body></html>",
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : ListPage(""));
-        await Assert.ThrowsAsync<NotSupportedException>(() => source.ResolvePlaybackAsync("/movie/1", "/show/10"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => source.ResolvePlaybackAsync("/movie/1", "/show/10", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class TrailerSourceTests
             ["movie/1"] = DetailPage("流浪地球", "预告片", (10, "先导预告")),
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : ListPage(""));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("/movie/1", "/show/99"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("/movie/1", "/show/99", ct: TestContext.Current.CancellationToken));
     }
 
     // ---------- 解析辅助 ----------

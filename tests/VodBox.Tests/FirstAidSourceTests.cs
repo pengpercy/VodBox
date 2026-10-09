@@ -61,7 +61,7 @@ public class FirstAidSourceTests
     public async Task Categories_AreEightEmergencySections()
     {
         using var source = Create(_ => DirectoryPage());
-        var categories = await source.GetCategoriesAsync();
+        var categories = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(8, categories.Count);
         Assert.Equal("急救技能", categories[0].Name);
         Assert.Equal("意外事故", categories[^1].Name);
@@ -71,7 +71,7 @@ public class FirstAidSourceTests
     public async Task GetItems_SlicesDirectoryIntoEightSections()
     {
         using var source = Create(_ => DirectoryPage(perSection: 3));
-        var page = await source.GetItemsAsync("0", 1, null);
+        var page = await source.GetItemsAsync("0", 1, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(3, page.Items.Count);
         Assert.Equal("课程0_0", page.Items[0].Title);
         Assert.Equal("/jijiu/article/Art00X.html", page.Items[0].Id);
@@ -82,15 +82,15 @@ public class FirstAidSourceTests
     public async Task GetItems_RejectsInvalidCategoryAndExtraPage()
     {
         using var source = Create(_ => DirectoryPage());
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("99", 1, null));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("0", 2, null));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("99", 1, null, ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("0", 2, null, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Search_FiltersByTitleCaseInsensitive()
     {
         using var source = Create(_ => DirectoryPage(perSection: 2));
-        var page = await source.SearchAsync("课程3", 1);
+        var page = await source.SearchAsync("课程3", 1, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, page.Items.Count);
         Assert.All(page.Items, i => Assert.Contains("课程3", i.Title));
     }
@@ -99,8 +99,8 @@ public class FirstAidSourceTests
     public async Task Search_RejectsEmptyOrOverlong()
     {
         using var source = Create(_ => DirectoryPage());
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("", 1));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync(new string('x', 201), 1));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("", 1, ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync(new string('x', 201), 1, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class FirstAidSourceTests
             ["jijiu/article/Art00X.html"] = LessonPage("Art00X", "人工呼吸法", "https://vod.youlai.cn/a/b-sd.mp4", "https://i.example.com/p.jpg"),
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : DirectoryPage());
-        var detail = await source.GetDetailAsync("/jijiu/article/Art00X.html");
+        var detail = await source.GetDetailAsync("/jijiu/article/Art00X.html", ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("人工呼吸法", detail.Item.Title);
         Assert.Equal("https://i.example.com/p.jpg", detail.Item.Poster);
@@ -132,7 +132,7 @@ public class FirstAidSourceTests
         </body></html>
         """;
         using var source = Create(path => path == "jijiu/article/Heart9X.html" ? page : DirectoryPage());
-        var detail = await source.GetDetailAsync("/jijiu/article/Heart9X.html");
+        var detail = await source.GetDetailAsync("/jijiu/article/Heart9X.html", ct: TestContext.Current.CancellationToken);
         Assert.Equal("婴儿心脏骤停", detail.Item.Title);
     }
 
@@ -145,7 +145,7 @@ public class FirstAidSourceTests
             ["jijiu/article/Art00X.html"] = LessonPage("Art00X", "人工呼吸法", "https://vod.youlai.cn/a/b-sd.mp4"),
         };
         using var source = Create(path => routes.TryGetValue(path, out var p) ? p : DirectoryPage());
-        var play = await source.ResolvePlaybackAsync("/jijiu/article/Art00X.html", "/jijiu/article/Art00X.html");
+        var play = await source.ResolvePlaybackAsync("/jijiu/article/Art00X.html", "/jijiu/article/Art00X.html", ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("https://vod.youlai.cn/a/b-sd.mp4", play.Uri);
         Assert.Equal("csp_FirstAid", play.SourceKey);
@@ -160,7 +160,7 @@ public class FirstAidSourceTests
     {
         using var source = Create(_ => DirectoryPage());
         await Assert.ThrowsAsync<InvalidDataException>(
-            () => source.ResolvePlaybackAsync("/jijiu/article/Art00X.html", "/jijiu/article/Other9X.html"));
+            () => source.ResolvePlaybackAsync("/jijiu/article/Art00X.html", "/jijiu/article/Other9X.html", ct: TestContext.Current.CancellationToken));
     }
 
     // ---------- 解析辅助 ----------

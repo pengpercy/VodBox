@@ -17,15 +17,15 @@ public sealed class LibraryStoreTests : IDisposable
     [Fact]
     public async Task ActiveSubscriptionCannotSelectAnotherKindOrClearOnInvalidId()
     {
-        await _store.AddAsync(new ConfigSubscription { Url = "vod", Name = "点播", Kind = ConfigKind.Vod });
-        await _store.AddAsync(new ConfigSubscription { Url = "live", Name = "直播", Kind = ConfigKind.Live });
-        var vod = Assert.Single(await _store.ListAsync(ConfigKind.Vod));
-        var live = Assert.Single(await _store.ListAsync(ConfigKind.Live));
-        await _store.SetActiveAsync(ConfigKind.Vod, vod.Id);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.SetActiveAsync(ConfigKind.Vod, live.Id));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.SetActiveAsync(ConfigKind.Vod, -1));
-        Assert.True(Assert.Single(await _store.ListAsync(ConfigKind.Vod)).Active);
-        Assert.False(Assert.Single(await _store.ListAsync(ConfigKind.Live)).Active);
+        await _store.AddAsync(new ConfigSubscription { Url = "vod", Name = "点播", Kind = ConfigKind.Vod }, ct: TestContext.Current.CancellationToken);
+        await _store.AddAsync(new ConfigSubscription { Url = "live", Name = "直播", Kind = ConfigKind.Live }, ct: TestContext.Current.CancellationToken);
+        var vod = Assert.Single(await _store.ListAsync(ConfigKind.Vod, ct: TestContext.Current.CancellationToken));
+        var live = Assert.Single(await _store.ListAsync(ConfigKind.Live, ct: TestContext.Current.CancellationToken));
+        await _store.SetActiveAsync(ConfigKind.Vod, vod.Id, ct: TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.SetActiveAsync(ConfigKind.Vod, live.Id, ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.SetActiveAsync(ConfigKind.Vod, -1, ct: TestContext.Current.CancellationToken));
+        Assert.True(Assert.Single(await _store.ListAsync(ConfigKind.Vod, ct: TestContext.Current.CancellationToken)).Active);
+        Assert.False(Assert.Single(await _store.ListAsync(ConfigKind.Live, ct: TestContext.Current.CancellationToken)).Active);
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class LibraryStoreTests : IDisposable
             Subscriptions=[new ConfigSubscription{Kind=ConfigKind.Vod,Url="https://example.com/one",Name="一",Active=true},new ConfigSubscription{Kind=ConfigKind.Vod,Url="https://example.com/two",Name="二"}],
             Preferences=new(){["config_vod"]="https://example.com/two"},
         },ct);
-        var selected=Assert.Single((await _store.ListAsync(ConfigKind.Vod,ct)).Where(entry=>entry.Active));
+        var selected=Assert.Single(await _store.ListAsync(ConfigKind.Vod,ct), entry=>entry.Active);
         Assert.Equal("https://example.com/two",selected.Url);
         Assert.Equal(selected.Url,_store.GetString("config_vod"));
     }
@@ -178,11 +178,11 @@ public sealed class LibraryStoreTests : IDisposable
     public async Task HistoryUpsertsBySourceAndMedia()
     {
         var first = MakeHistory("src1", "m1", position: 1000);
-        await _store.SaveHistoryAsync(first);
-        await _store.SaveHistoryAsync(MakeHistory("src1", "m1", position: 5000));
-        await _store.SaveHistoryAsync(MakeHistory("src1", "m2", position: 100));
+        await _store.SaveHistoryAsync(first, ct: TestContext.Current.CancellationToken);
+        await _store.SaveHistoryAsync(MakeHistory("src1", "m1", position: 5000), ct: TestContext.Current.CancellationToken);
+        await _store.SaveHistoryAsync(MakeHistory("src1", "m2", position: 100), ct: TestContext.Current.CancellationToken);
 
-        var history = await _store.GetHistoryAsync();
+        var history = await _store.GetHistoryAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, history.Count); // (src1,m1) 覆盖而不是新增
         var resumed = history.Single(h => h.MediaId == "m1");
         Assert.Equal(5000, resumed.PositionMs);
@@ -251,11 +251,11 @@ public sealed class LibraryStoreTests : IDisposable
     [Fact]
     public async Task FindsHistoryBySourceAndMedia()
     {
-        await _store.SaveHistoryAsync(MakeHistory("s", "m", position: 42));
-        var found = await _store.FindHistoryAsync("s", "m");
+        await _store.SaveHistoryAsync(MakeHistory("s", "m", position: 42), ct: TestContext.Current.CancellationToken);
+        var found = await _store.FindHistoryAsync("s", "m", ct: TestContext.Current.CancellationToken);
         Assert.NotNull(found);
         Assert.Equal(42, found!.PositionMs);
-        Assert.Null(await _store.FindHistoryAsync("s", "missing"));
+        Assert.Null(await _store.FindHistoryAsync("s", "missing", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -266,25 +266,25 @@ public sealed class LibraryStoreTests : IDisposable
             Kind = FavoriteKind.Vod,
             SourceKey = "s", SourceName = "站点", MediaId = "m", Title = "片名",
         };
-        await _store.SetFavoriteAsync(entry, true);
-        Assert.True(await _store.IsFavoriteAsync("s", "m"));
-        var favorites = await _store.GetFavoritesAsync(FavoriteKind.Vod);
+        await _store.SetFavoriteAsync(entry, true, ct: TestContext.Current.CancellationToken);
+        Assert.True(await _store.IsFavoriteAsync("s", "m", ct: TestContext.Current.CancellationToken));
+        var favorites = await _store.GetFavoritesAsync(FavoriteKind.Vod, ct: TestContext.Current.CancellationToken);
         Assert.Single(favorites);
 
-        await _store.SetFavoriteAsync(entry, false);
-        Assert.False(await _store.IsFavoriteAsync("s", "m"));
-        Assert.Empty(await _store.GetFavoritesAsync(FavoriteKind.Vod));
+        await _store.SetFavoriteAsync(entry, false, ct: TestContext.Current.CancellationToken);
+        Assert.False(await _store.IsFavoriteAsync("s", "m", ct: TestContext.Current.CancellationToken));
+        Assert.Empty(await _store.GetFavoritesAsync(FavoriteKind.Vod, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task DeleteAndClearHistory()
     {
-        await _store.SaveHistoryAsync(MakeHistory("s", "a"));
-        await _store.SaveHistoryAsync(MakeHistory("s", "b"));
-        await _store.DeleteHistoryAsync("s", "a");
-        Assert.Single(await _store.GetHistoryAsync());
-        await _store.ClearHistoryAsync();
-        Assert.Empty(await _store.GetHistoryAsync());
+        await _store.SaveHistoryAsync(MakeHistory("s", "a"), ct: TestContext.Current.CancellationToken);
+        await _store.SaveHistoryAsync(MakeHistory("s", "b"), ct: TestContext.Current.CancellationToken);
+        await _store.DeleteHistoryAsync("s", "a", ct: TestContext.Current.CancellationToken);
+        Assert.Single(await _store.GetHistoryAsync(ct: TestContext.Current.CancellationToken));
+        await _store.ClearHistoryAsync(ct: TestContext.Current.CancellationToken);
+        Assert.Empty(await _store.GetHistoryAsync(ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]

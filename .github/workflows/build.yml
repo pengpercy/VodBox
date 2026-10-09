@@ -34,7 +34,7 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_NOLOGO: '1'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
       # Cheap by design: hashes the build inputs and looks for an already-green artifact of the same tree.
@@ -44,13 +44,17 @@ jobs:
         if: inputs.reuse_existing
         shell: bash
         run: |
-          python3 build/ci_reuse.py probe --rid ${{ matrix.rid }} --version "${{ inputs.version }}" \
+          # The helper is taken from the workflow commit, because the commit being built may predate it.
+          git fetch --depth=1 origin "${{ github.workflow_sha }}" >/dev/null 2>&1 || true
+          mkdir -p artifacts/meta "$RUNNER_TEMP/ci-tools"
+          git show "${{ github.workflow_sha }}:build/ci_reuse.py" > "$RUNNER_TEMP/ci-tools/ci_reuse.py"
+          python3 "$RUNNER_TEMP/ci-tools/ci_reuse.py" probe --rid ${{ matrix.rid }} --version "${{ inputs.version }}" \
             --repo ${{ github.repository }} --meta artifacts/meta/${{ matrix.rid }}.json >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         if: steps.reuse.outputs.skip != 'true'
         with:
           global-json-file: global.json
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         if: steps.reuse.outputs.skip != 'true'
         with:
           path: |
@@ -65,14 +69,16 @@ jobs:
           # libmpv is resolved at runtime and its package name varies (libmpv1 on 22.04, libmpv2 on 24.04).
           sudo apt-get install -y libmpv-dev || sudo apt-get install -y libmpv1 || true
       - name: Restore and test
-        if: steps.reuse.outputs.skip != 'true'
+        # Managed tests do not depend on CPU architecture; the arm64 legs stay on native verification only.
+        if: steps.reuse.outputs.skip != 'true' && !endsWith(matrix.rid, '-arm64')
         shell: bash
         run: |
           python3 build/test_bundle.py
           python3 build/test_package.py
           dotnet restore VodBox.slnx
-          dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore
-          dotnet test tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj -c Debug --no-restore
+          # Warnings are errors here so the CI log stays clean and no warning can creep back in.
+          dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore -p:TreatWarningsAsErrors=true
+          dotnet test tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj -c Debug --no-restore -p:TreatWarningsAsErrors=true
       - name: Publish Native AOT
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
@@ -84,6 +90,11 @@ jobs:
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+      - uses: actions/cache@v6
+        if: steps.reuse.outputs.skip != 'true'
+        with:
+          path: artifacts/quickjs/${{ matrix.rid }}
+          key: quickjs-${{ matrix.rid }}-${{ hashFiles('build/quickjs/CMakeLists.txt', 'build/quickjs/bridge.c') }}
       - name: Build and bundle pinned QuickJS bridge
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
@@ -118,13 +129,13 @@ jobs:
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/archive.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/build
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: steps.reuse.outputs.skip != 'true'
         with:
           name: vodbox.${{ matrix.rid }}
           path: artifacts/build/VodBox.${{ matrix.rid }}.tar.gz
           retention-days: 7
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: steps.reuse.outputs.skip != 'true'
         with:
           name: symbols.${{ matrix.rid }}
@@ -136,9 +147,11 @@ jobs:
         if: always()
         shell: bash
         run: |
-          mkdir -p artifacts/meta
-          python3 build/ci_reuse.py finalize --meta artifacts/meta/${{ matrix.rid }}.json --current-run ${{ github.run_id }}
-      - uses: actions/upload-artifact@v6
+          mkdir -p artifacts/meta "$RUNNER_TEMP/ci-tools"
+          git fetch --depth=1 origin "${{ github.workflow_sha }}" >/dev/null 2>&1 || true
+          git show "${{ github.workflow_sha }}:build/ci_reuse.py" > "$RUNNER_TEMP/ci-tools/ci_reuse.py"
+          python3 "$RUNNER_TEMP/ci-tools/ci_reuse.py" finalize --meta artifacts/meta/${{ matrix.rid }}.json --current-run ${{ github.run_id }}
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: vodbox-meta.${{ matrix.rid }}

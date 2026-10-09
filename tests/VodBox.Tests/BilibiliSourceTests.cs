@@ -109,13 +109,13 @@ public class BilibiliSourceTests
             SampleInfo("""{"json":"https://ext.example.com/c.json","cookie":""}"""),
             new HttpClient(handler));
 
-        var categories = await source.GetCategoriesAsync();
+        var categories = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal("popular", categories[0].Id);   // 「热门」始终置顶
         Assert.Equal("热门", categories[0].Name);
         Assert.Contains(categories, c => c.Id == "动漫合集" && c.Name == "动漫");
 
         // 分类结果被缓存：二次调用不再抓取 ext.json
-        var second = await source.GetCategoriesAsync();
+        var second = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(categories.Count, second.Count);
         Assert.Equal(1, handler.ExtRequests);
     }
@@ -124,7 +124,7 @@ public class BilibiliSourceTests
     public async Task GetCategories_WithoutExtYieldsPopularOnly()
     {
         using var source = Create(new RouteHandler(_ => "{}"));
-        var categories = await source.GetCategoriesAsync();
+        var categories = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(["popular"], categories.Select(c => c.Id).ToArray());
     }
 
@@ -152,7 +152,7 @@ public class BilibiliSourceTests
     {
         var handler = new RouteHandler(_ => Fixture("popular.json"));
         using var source = Create(handler);
-        var page = await source.GetHomeAsync();
+        var page = await source.GetHomeAsync(ct: TestContext.Current.CancellationToken);
         Assert.True(page.Items.Count > 0, "热门应解析出条目");
         Assert.Equal(1, page.Page);
         var first = page.Items[0];
@@ -168,7 +168,7 @@ public class BilibiliSourceTests
     {
         var handler = new RouteHandler(_ => Fixture("popular.json"));
         using var source = Create(handler);
-        await source.GetHomeAsync();
+        await source.GetHomeAsync(ct: TestContext.Current.CancellationToken);
         var req = Assert.Single(handler.Requests);
         Assert.Contains("bilibili", req.Headers.Referrer!.Host);
         Assert.True(req.Headers.UserAgent.ToString().Length > 0);
@@ -187,7 +187,7 @@ public class BilibiliSourceTests
             _ => "{}",
         });
         using var source = Create(handler);
-        await source.SearchAsync("演唱会", 1);
+        await source.SearchAsync("演唱会", 1, ct: TestContext.Current.CancellationToken);
 
         var search = handler.Requests.Last(r => r.RequestUri!.AbsolutePath.Contains("wbi/search/type"));
         var query = search.RequestUri!.Query;
@@ -208,7 +208,7 @@ public class BilibiliSourceTests
         // 重定向（3xx）应被拒绝
         var redirect = new RedirectHandler();
         using var source = new BilibiliSource(SampleInfo("""{"json":"","cookie":""}"""), new HttpClient(redirect));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("x", 1));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("x", 1, ct: TestContext.Current.CancellationToken));
     }
 
     private sealed class RedirectHandler : HttpMessageHandler
@@ -265,7 +265,7 @@ public class BilibiliSourceTests
             }
         });
         using var source = Create(handler);
-        var page = await source.SearchAsync("演唱会", 1);
+        var page = await source.SearchAsync("演唱会", 1, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal(3, attempts);
         var item = Assert.Single(page.Items);
@@ -284,7 +284,7 @@ public class BilibiliSourceTests
             _ => "{}",
         });
         using var source = Create(handler);
-        var error = await Assert.ThrowsAsync<NotSupportedException>(() => source.SearchAsync("演唱会", 1));
+        var error = await Assert.ThrowsAsync<NotSupportedException>(() => source.SearchAsync("演唱会", 1, ct: TestContext.Current.CancellationToken));
         Assert.Contains("风控", error.Message);
         Assert.Contains("Cookie", error.Message); // 给出可行的处置建议
     }
@@ -318,7 +318,7 @@ public class BilibiliSourceTests
             _ => "{}",
         });
         using var source = Create(handler);
-        var play = await source.ResolvePlaybackAsync("BV1WSHL66EdZ", "123456789");
+        var play = await source.ResolvePlaybackAsync("BV1WSHL66EdZ", "123456789", ct: TestContext.Current.CancellationToken);
 
         Assert.StartsWith("https://upos.example.com/video.m4s", play.Uri);
         Assert.Equal("https://comment.bilibili.com/123456789.xml", play.DanmakuUri);
@@ -341,7 +341,7 @@ public class BilibiliSourceTests
             _ => "{}",
         });
         using (var s1 = Create(preview))
-            await Assert.ThrowsAsync<NotSupportedException>(() => s1.ResolvePlaybackAsync("BV1WSHL66EdZ", "1"));
+            await Assert.ThrowsAsync<NotSupportedException>(() => s1.ResolvePlaybackAsync("BV1WSHL66EdZ", "1", ct: TestContext.Current.CancellationToken));
         // 多段（DASH 未接入）
         var multi = new RouteHandler(p => p switch
         {
@@ -350,7 +350,7 @@ public class BilibiliSourceTests
             _ => "{}",
         });
         using (var s2 = Create(multi))
-            await Assert.ThrowsAsync<NotSupportedException>(() => s2.ResolvePlaybackAsync("BV1WSHL66EdZ", "1"));
+            await Assert.ThrowsAsync<NotSupportedException>(() => s2.ResolvePlaybackAsync("BV1WSHL66EdZ", "1", ct: TestContext.Current.CancellationToken));
     }
 
     // ---------- 媒体标识校验 ----------
@@ -360,7 +360,7 @@ public class BilibiliSourceTests
     {
         var handler = new RouteHandler(_ => """{"code":0,"data":{"bvid":"BV1DIFFERENT","title":"t","desc":"d","pages":[{"cid":1,"part":"P1"}]}}""");
         using var source = Create(handler);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("BV1WSHL66EdZ"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("BV1WSHL66EdZ", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -368,13 +368,13 @@ public class BilibiliSourceTests
     {
         var handler = new RouteHandler(_ => """{"code":0,"data":{"bvid":"BV1WSHL66EdZ","title":"t","desc":"d","pages":[{"cid":5,"part":"P1"},{"cid":5,"part":"P2"}]}}""");
         using var source = Create(handler);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("BV1WSHL66EdZ"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("BV1WSHL66EdZ", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task InvalidMediaId_Throws()
     {
         using var source = Create(new RouteHandler(_ => "{}"));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("not-a-bvid"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("not-a-bvid", ct: TestContext.Current.CancellationToken));
     }
 }

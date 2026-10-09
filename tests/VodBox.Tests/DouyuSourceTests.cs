@@ -56,7 +56,7 @@ public class DouyuSourceTests
     public async Task Categories_AreEight()
     {
         using var source = Create(_ => ListJson("code"));
-        var categories = await source.GetCategoriesAsync();
+        var categories = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(8, categories.Count);
         Assert.Equal("一起看", categories[0].Name);
         Assert.Equal("正能量", categories[^1].Name);
@@ -66,7 +66,7 @@ public class DouyuSourceTests
     public async Task GetItems_ParsesRoomList()
     {
         using var source = Create(_ => ListJson("code", ("4549169", "港剧间"), ("123", "游戏厅")));
-        var page = await source.GetItemsAsync("yqk", 1, null);
+        var page = await source.GetItemsAsync("yqk", 1, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal("港剧间", page.Items[0].Title);
         Assert.Equal("4549169", page.Items[0].Id);
@@ -79,7 +79,7 @@ public class DouyuSourceTests
     public async Task GetItems_EmptyPageStops()
     {
         using var source = Create(_ => ListJson("code"));
-        var page = await source.GetItemsAsync("yqk", 2, null);
+        var page = await source.GetItemsAsync("yqk", 2, null, ct: TestContext.Current.CancellationToken);
         Assert.Empty(page.Items);
         Assert.Equal(2, page.PageCount); // 空页 → 保持当前页
     }
@@ -88,15 +88,15 @@ public class DouyuSourceTests
     public async Task GetItems_RejectsInvalidCategoryAndPage()
     {
         using var source = Create(_ => ListJson("code"));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("xxx", 1, null));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("yqk", 0, null));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("xxx", 1, null, ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("yqk", 0, null, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Search_ParsesLiveRoomResults()
     {
         using var source = Create(_ => ListJson("error", ("777", "英雄联盟"), ("888", "LPL")));
-        var page = await source.SearchAsync("英雄联盟", 1);
+        var page = await source.SearchAsync("英雄联盟", 1, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal("英雄联盟", page.Items[0].Title);
     }
@@ -110,7 +110,7 @@ public class DouyuSourceTests
             ["4549169"] = RoomPage("4549169", "港剧间", 1),
         };
         using var source = Create(path => routes.TryGetValue(path, out var v) ? v : ListJson("code"));
-        var detail = await source.GetDetailAsync("4549169");
+        var detail = await source.GetDetailAsync("4549169", ct: TestContext.Current.CancellationToken);
         Assert.Equal("港剧间", detail.Item.Title);
         Assert.Equal("https://i.douyu.com/4549169.jpg", detail.Item.Poster);
         var line = Assert.Single(detail.Lines);
@@ -126,7 +126,7 @@ public class DouyuSourceTests
             ["4549169"] = RoomPage("4549169", "港剧间", 0),
         };
         using var source = Create(path => routes.TryGetValue(path, out var v) ? v : ListJson("code"));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("4549169"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("4549169", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public class DouyuSourceTests
             ["4549169"] = RoomPage("4549169", "港剧间", 1),
         };
         using var source = Create(path => routes.TryGetValue(path, out var v) ? v : ListJson("code"));
-        var play = await source.ResolvePlaybackAsync("4549169", "4549169");
+        var play = await source.ResolvePlaybackAsync("4549169", "4549169", ct: TestContext.Current.CancellationToken);
         Assert.Equal(ResolutionKind.Sniff, play.Resolution);
         Assert.True(play.IsLive);
         Assert.Equal("斗鱼js", play.SourceKey);

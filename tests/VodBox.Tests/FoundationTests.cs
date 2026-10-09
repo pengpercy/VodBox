@@ -80,7 +80,7 @@ public sealed class BoundedContentTests
     {
         var data = new byte[1024];
         Random.Shared.NextBytes(data);
-        var result = await BoundedContent.ReadAsync(new MemoryStream(data), 4096);
+        var result = await BoundedContent.ReadAsync(new MemoryStream(data), 4096, token: TestContext.Current.CancellationToken);
         Assert.Equal(data, result);
     }
 
@@ -89,7 +89,7 @@ public sealed class BoundedContentTests
     {
         var data = new byte[10 * 1024 * 1024];
         var error = await Assert.ThrowsAsync<InvalidDataException>(
-            () => BoundedContent.ReadAsync(new MemoryStream(data), 1024 * 1024));
+            () => BoundedContent.ReadAsync(new MemoryStream(data), 1024 * 1024, token: TestContext.Current.CancellationToken));
         Assert.Contains("MiB", error.Message);
     }
 
@@ -111,25 +111,25 @@ public sealed class AtomicFileTests : IDisposable
     public async Task WriteAsync_CreatesParentDirectories()
     {
         var path = Path.Combine(_dir, "nested", "deep", "file.json");
-        await AtomicFile.WriteAsync(path, "{\"ok\":true}");
-        Assert.Equal("{\"ok\":true}", await File.ReadAllTextAsync(path));
+        await AtomicFile.WriteAsync(path, "{\"ok\":true}", token: TestContext.Current.CancellationToken);
+        Assert.Equal("{\"ok\":true}", await File.ReadAllTextAsync(path, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task WriteAsync_OverwritesExisting()
     {
         var path = Path.Combine(_dir, "file.txt");
-        await AtomicFile.WriteAsync(path, "first");
-        await AtomicFile.WriteAsync(path, "second");
-        Assert.Equal("second", await File.ReadAllTextAsync(path));
+        await AtomicFile.WriteAsync(path, "first", token: TestContext.Current.CancellationToken);
+        await AtomicFile.WriteAsync(path, "second", token: TestContext.Current.CancellationToken);
+        Assert.Equal("second", await File.ReadAllTextAsync(path, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task WriteAsync_LeavesNoTempFileBehind()
     {
         var path = Path.Combine(_dir, "clean.txt");
-        await AtomicFile.WriteAsync(path, "data");
-        Assert.Equal(["clean.txt"], Directory.GetFiles(_dir).Select(Path.GetFileName).ToArray());
+        await AtomicFile.WriteAsync(path, "data", token: TestContext.Current.CancellationToken);
+        Assert.Equal(["clean.txt"], Directory.GetFiles(_dir).Select(file => Path.GetFileName(file)!));
     }
 
     [Fact]
@@ -137,8 +137,8 @@ public sealed class AtomicFileTests : IDisposable
     {
         var path = Path.Combine(_dir, "blob.bin");
         byte[] data = [0xFF, 0xD8, 0xFF, 0x00, 0x01];
-        await AtomicFile.WriteBytesAsync(path, data);
-        Assert.Equal(data, await File.ReadAllBytesAsync(path));
+        await AtomicFile.WriteBytesAsync(path, data, token: TestContext.Current.CancellationToken);
+        Assert.Equal(data, await File.ReadAllBytesAsync(path, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     public void Dispose() { if (Directory.Exists(_dir)) Directory.Delete(_dir, true); }

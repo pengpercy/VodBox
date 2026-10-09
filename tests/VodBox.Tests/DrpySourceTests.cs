@@ -27,8 +27,8 @@ public sealed class DrpySourceTests
     public async Task HomeVodIsDistinctFromHomeAndMapsMetadata()
     {
         using var source = new DrpySource(Site, () => new FakeRuntime());
-        Assert.Equal(new Category("2", "儿歌"), Assert.Single(await source.GetCategoriesAsync()));
-        var home = await source.GetHomeAsync();
+        Assert.Equal(new Category("2", "儿歌"), Assert.Single(await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken)));
+        var home = await source.GetHomeAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal("home", Assert.Single(home.Items).Id);
         Assert.Equal("首页", home.Items[0].Title);
         Assert.Equal("https://cdn.example/poster.jpg", home.Items[0].Poster);
@@ -40,19 +40,19 @@ public sealed class DrpySourceTests
     public async Task CategoryFiltersAndSearchArgumentsReachRuntimeAndPagingIsLenient()
     {
         using var source = new DrpySource(Site, () => new FakeRuntime());
-        var page = await source.GetItemsAsync("2", 3, new Dictionary<string, string> { ["year"] = "2026" });
+        var page = await source.GetItemsAsync("2", 3, new Dictionary<string, string> { ["year"] = "2026" }, ct: TestContext.Current.CancellationToken);
         Assert.Equal("filtered", Assert.Single(page.Items).Id);
         Assert.Equal(3, page.Page);
         Assert.Equal(8, page.PageCount);
-        Assert.Equal("search", Assert.Single((await source.SearchAsync("C#\t中文", 2)).Items).Id);
+        Assert.Equal("search", Assert.Single((await source.SearchAsync("C#\t中文", 2, ct: TestContext.Current.CancellationToken)).Items).Id);
     }
 
     [Fact]
     public async Task DetailKeepsEmptyLineSlotsAndStableResumeIdsWhenSignedUrlsChange()
     {
         using var source = new DrpySource(Site, () => new FakeRuntime());
-        var first = await source.GetDetailAsync("7");
-        var second = await source.GetDetailAsync("7");
+        var first = await source.GetDetailAsync("7", ct: TestContext.Current.CancellationToken);
+        var second = await source.GetDetailAsync("7", ct: TestContext.Current.CancellationToken);
         Assert.Equal("简介\n下一行", first.Description);
         Assert.Equal("导演", first.Director);
         Assert.Equal(2, first.Lines.Count);
@@ -62,7 +62,7 @@ public sealed class DrpySourceTests
         Assert.Equal(first.Lines[0].Episodes[0].Id, second.Lines[0].Episodes[0].Id);
         Assert.NotEqual(first.Lines[0].Episodes[0].Id, first.Lines[1].Episodes[0].Id);
         Assert.Null(first.Lines[0].Episodes[0].Uri); // 必须点播时现取
-        var play = await source.ResolvePlaybackAsync("7", first.Lines[1].Episodes[0].Id);
+        var play = await source.ResolvePlaybackAsync("7", first.Lines[1].Episodes[0].Id, ct: TestContext.Current.CancellationToken);
         Assert.Equal("https://cdn.example/new.mp4", play.Uri);
         Assert.Equal(ResolutionKind.Direct, play.Resolution);
         Assert.Equal("脚本站点", play.SourceName);
@@ -84,18 +84,18 @@ public sealed class DrpySourceTests
     public async Task ParseAndJxNeverSilentlyPlayWebPages(int parse, int jx, string url, bool fails)
     {
         using var source = new DrpySource(Site, () => new FakeRuntime { PlayJson = "{\"parse\":" + parse + ",\"jx\":" + jx + ",\"url\":\"" + url + "\"}" });
-        var id = (await source.GetDetailAsync("7")).Lines[0].Episodes[0].Id;
-        if (fails) await Assert.ThrowsAnyAsync<Exception>(() => source.ResolvePlaybackAsync("7", id));
-        else Assert.Equal(jx==1?ResolutionKind.Json:ResolutionKind.Direct, (await source.ResolvePlaybackAsync("7", id)).Resolution);
+        var id = (await source.GetDetailAsync("7", ct: TestContext.Current.CancellationToken)).Lines[0].Episodes[0].Id;
+        if (fails) await Assert.ThrowsAnyAsync<Exception>(() => source.ResolvePlaybackAsync("7", id, ct: TestContext.Current.CancellationToken));
+        else Assert.Equal(jx==1?ResolutionKind.Json:ResolutionKind.Direct, (await source.ResolvePlaybackAsync("7", id, ct: TestContext.Current.CancellationToken)).Resolution);
     }
 
     [Fact]
     public async Task InvalidEpisodeFailsRatherThanPlayingFirstAndMalformedJsonIsVisible()
     {
         using var source = new DrpySource(Site, () => new FakeRuntime());
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "missing"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "missing", ct: TestContext.Current.CancellationToken));
         using var invalid = new DrpySource(Site, () => new FakeRuntime { HomeJson = "not-json" });
-        await Assert.ThrowsAnyAsync<JsonException>(() => invalid.GetCategoriesAsync());
+        await Assert.ThrowsAnyAsync<JsonException>(() => invalid.GetCategoriesAsync(ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -103,8 +103,8 @@ public sealed class DrpySourceTests
     {
         var runtime = new FakeRuntime { BlockSearch = true };
         using var source = new DrpySource(Site, () => runtime);
-        var first = source.SearchAsync("block", 1);
-        await runtime.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var first = source.SearchAsync("block", 1, ct: TestContext.Current.CancellationToken);
+        await runtime.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken: TestContext.Current.CancellationToken);
         using var ct = new CancellationTokenSource();
         var second = source.GetHomeAsync(ct.Token);
         ct.Cancel();
@@ -112,7 +112,7 @@ public sealed class DrpySourceTests
         Assert.False(first.IsCompleted);
         runtime.Release.TrySetResult();
         await first;
-        Assert.Single((await source.GetHomeAsync()).Items);
+        Assert.Single((await source.GetHomeAsync(ct: TestContext.Current.CancellationToken)).Items);
     }
 
     [Fact]
@@ -120,11 +120,11 @@ public sealed class DrpySourceTests
     {
         var runtime = new FakeRuntime { BlockSearch = true };
         var source = new DrpySource(Site, () => runtime);
-        var pending = source.SearchAsync("block", 1);
-        await runtime.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var pending = source.SearchAsync("block", 1, ct: TestContext.Current.CancellationToken);
+        await runtime.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken: TestContext.Current.CancellationToken);
         source.Dispose();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.GetHomeAsync());
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.GetHomeAsync(ct: TestContext.Current.CancellationToken));
         source.Dispose();
         Assert.True(runtime.Disposed);
     }
@@ -135,14 +135,14 @@ public sealed class DrpySourceTests
         var path = Path.GetTempFileName();
         try
         {
-            await File.WriteAllTextAsync(path, """{"sites":[{"key":"customjs","name":"自定义","type":3,"api":"drpy2.min.js","ext":"var rule={};"},{"key":"dr_兔小贝","name":"儿童","type":3,"api":"drpy2.min.js"}]}""");
+            await File.WriteAllTextAsync(path, """{"sites":[{"key":"customjs","name":"自定义","type":3,"api":"drpy2.min.js","ext":"var rule={};"},{"key":"dr_兔小贝","name":"儿童","type":3,"api":"drpy2.min.js"}]}""", cancellationToken: TestContext.Current.CancellationToken);
             using var registry = new SourceRegistry();
-            await registry.LoadConfigAsync(path);
+            await registry.LoadConfigAsync(path, ct: TestContext.Current.CancellationToken);
             Assert.IsType<DrpySource>(registry.Get("customjs"));
             Assert.IsType<TuxiaobeiSource>(registry.Get("dr_兔小贝"));
             var old = registry.Get("customjs")!;
-            await registry.LoadConfigAsync(path);
-            await Assert.ThrowsAsync<ObjectDisposedException>(() => old.GetHomeAsync());
+            await registry.LoadConfigAsync(path, ct: TestContext.Current.CancellationToken);
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => old.GetHomeAsync(ct: TestContext.Current.CancellationToken));
         }
         finally { File.Delete(path); }
     }
@@ -153,9 +153,9 @@ public sealed class DrpySourceTests
         var failed = new FakeRuntime { HomeVodError = new OperationCanceledException() };
         var instances = new Queue<IDrpyRuntime>([failed, new FakeRuntime()]);
         using var source = new DrpySource(Site, instances.Dequeue);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.GetHomeAsync());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.GetHomeAsync(ct: TestContext.Current.CancellationToken));
         Assert.True(failed.Disposed);
-        Assert.Equal("home", Assert.Single((await source.GetHomeAsync()).Items).Id);
+        Assert.Equal("home", Assert.Single((await source.GetHomeAsync(ct: TestContext.Current.CancellationToken)).Items).Id);
     }
 
     [Theory]
@@ -169,8 +169,8 @@ public sealed class DrpySourceTests
         {
             PlayJson = "{\"parse\":" + parse + ",\"jx\":" + jx + ",\"url\":\"https://cdn.example/video.mp4\"}"
         });
-        var id = (await source.GetDetailAsync("7")).Lines[0].Episodes[0].Id;
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", id));
+        var id = (await source.GetDetailAsync("7", ct: TestContext.Current.CancellationToken)).Lines[0].Episodes[0].Id;
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", id, ct: TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -184,8 +184,8 @@ public sealed class DrpySourceTests
         {
             PlayJson = "{\"parse\":0,\"url\":\"https://cdn.example/video.mp4\",\"header\":" + headers + "}"
         });
-        var id = (await source.GetDetailAsync("7")).Lines[0].Episodes[0].Id;
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", id));
+        var id = (await source.GetDetailAsync("7", ct: TestContext.Current.CancellationToken)).Lines[0].Episodes[0].Id;
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", id, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -196,21 +196,21 @@ public sealed class DrpySourceTests
         using var source = new DrpySource(Site, instances.Dequeue);
         using var ct = new CancellationTokenSource();
         var pending = source.GetHomeAsync(ct.Token);
-        await failed.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await failed.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken: TestContext.Current.CancellationToken);
         ct.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
         Assert.True(failed.Disposed);
-        Assert.Single((await source.GetHomeAsync()).Items);
+        Assert.Single((await source.GetHomeAsync(ct: TestContext.Current.CancellationToken)).Items);
     }
 
     [Fact]
     public async Task NullListsAreEmptyButWrongShapesRemainVisible()
     {
         using var source = new DrpySource(Site, () => new FakeRuntime { HomeJson = "{\"class\":null}", HomeVodJson = "{\"list\":null}" });
-        Assert.Empty(await source.GetCategoriesAsync());
-        Assert.Empty((await source.GetHomeAsync()).Items);
+        Assert.Empty(await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken));
+        Assert.Empty((await source.GetHomeAsync(ct: TestContext.Current.CancellationToken)).Items);
         using var invalid = new DrpySource(Site, () => new FakeRuntime { HomeVodJson = "{\"list\":{}}" });
-        await Assert.ThrowsAsync<InvalidDataException>(() => invalid.GetHomeAsync());
+        await Assert.ThrowsAsync<InvalidDataException>(() => invalid.GetHomeAsync(ct: TestContext.Current.CancellationToken));
     }
 
     private sealed class FakeRuntime : IDrpyRuntime

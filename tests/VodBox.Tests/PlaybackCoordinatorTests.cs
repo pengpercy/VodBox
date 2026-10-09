@@ -11,8 +11,8 @@ public sealed class PlaybackCoordinatorTests
         var engine = new FakeEngine();
         using var coordinator = new PlaybackCoordinator(engine);
         var late = new TaskCompletionSource<PlaybackRequest>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var old = coordinator.OpenAsync(_ => late.Task);
-        await coordinator.OpenAsync(new PlaybackRequest { Uri = "https://example/new.mp4" });
+        var old = coordinator.OpenAsync(_ => late.Task, ct: TestContext.Current.CancellationToken);
+        await coordinator.OpenAsync(new PlaybackRequest { Uri = "https://example/new.mp4" }, ct: TestContext.Current.CancellationToken);
         late.SetResult(new PlaybackRequest { Uri = "https://example/old.mp4" });
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => old);
         Assert.Equal(["https://example/new.mp4"], engine.Opened);
@@ -25,8 +25,8 @@ public sealed class PlaybackCoordinatorTests
         var engine = new FakeEngine();
         using var coordinator = new PlaybackCoordinator(engine);
         var late = new TaskCompletionSource<PlaybackRequest>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var open = coordinator.OpenAsync(_ => late.Task);
-        await coordinator.CloseAsync();
+        var open = coordinator.OpenAsync(_ => late.Task, ct: TestContext.Current.CancellationToken);
+        await coordinator.CloseAsync(ct: TestContext.Current.CancellationToken);
         late.SetResult(new PlaybackRequest { Uri = "https://example/old.mp4" });
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => open);
         Assert.Empty(engine.Opened);
@@ -38,9 +38,9 @@ public sealed class PlaybackCoordinatorTests
     {
         var engine = new FakeEngine { HoldFirst = true };
         using var coordinator = new PlaybackCoordinator(engine);
-        var first = coordinator.OpenAsync(new PlaybackRequest { Uri = "https://example/first.mp4" });
+        var first = coordinator.OpenAsync(new PlaybackRequest { Uri = "https://example/first.mp4" }, ct: TestContext.Current.CancellationToken);
         await engine.Started.Task;
-        var second = coordinator.OpenAsync(new PlaybackRequest { Uri = "https://example/second.mp4" });
+        var second = coordinator.OpenAsync(new PlaybackRequest { Uri = "https://example/second.mp4" }, ct: TestContext.Current.CancellationToken);
         engine.Release.SetResult();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
         await second;

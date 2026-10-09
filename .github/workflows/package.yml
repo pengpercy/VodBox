@@ -20,7 +20,7 @@ jobs:
           - { os: ubuntu-22.04, rid: linux-x64 }
           - { os: ubuntu-22.04-arm, rid: linux-arm64 }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # The binaries may come from this run or from an earlier green run of the same source tree.
       - name: Fetch build artifact
         shell: bash
@@ -42,7 +42,7 @@ jobs:
       - name: Package
         shell: bash
         run: python3 build/package.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/packages --version ${{ inputs.version }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: package.${{ matrix.rid }}
           path: |

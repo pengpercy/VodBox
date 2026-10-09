@@ -103,7 +103,7 @@ public class HuyaSourceTests
     public async Task GetItems_ParsesListWithPagination()
     {
         using var source = Create(_ => ListPage(1, 3, ("1001", "一起看《武林外传》"), ("1002", "一起看《西游记》")));
-        var page = await source.GetItemsAsync("2135", 1, null);
+        var page = await source.GetItemsAsync("2135", 1, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal("一起看《武林外传》", page.Items[0].Title);
         Assert.Equal("1001", page.Items[0].Id);
@@ -115,7 +115,7 @@ public class HuyaSourceTests
     public async Task GetItems_LastPageKeepsCurrent()
     {
         using var source = Create(_ => ListPage(3, 3, ("1001", "末页")));
-        var page = await source.GetItemsAsync("2135", 3, null);
+        var page = await source.GetItemsAsync("2135", 3, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(3, page.PageCount); // 末页保持当前页
     }
 
@@ -129,7 +129,7 @@ public class HuyaSourceTests
             ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "一起看《武林外传》", true, ("AL", liveUrl), ("TX", liveUrl)),
         };
         using var source = Create(key => routes.TryGetValue(key, out var v) ? v : throw new InvalidDataException("未命中路由 " + key));
-        var detail = await source.GetDetailAsync("11995132");
+        var detail = await source.GetDetailAsync("11995132", ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("一起看《武林外传》", detail.Item.Title);
         Assert.Equal(2, detail.Lines.Count);
@@ -145,7 +145,7 @@ public class HuyaSourceTests
             ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "x", live: false, ("AL", "https://x/v.flv?fm=YQ==&wsTime=t&ctype=c")),
         };
         using var source = Create(key => routes[key]);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("11995132"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("11995132", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class HuyaSourceTests
             ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "一起看《武林外传》", true, ("AL", liveUrl)),
         };
         using var source = Create(key => routes[key]);
-        var play = await source.ResolvePlaybackAsync("11995132", "0");
+        var play = await source.ResolvePlaybackAsync("11995132", "0", ct: TestContext.Current.CancellationToken);
 
         Assert.True(play.IsLive);
         Assert.Contains("wsSecret=", play.Uri);
@@ -183,7 +183,7 @@ public class HuyaSourceTests
             ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "", true, ("AL", liveUrl)),
         };
         using var source = Create(key => routes[key]);
-        var detail = await source.GetDetailAsync("11995132");
+        var detail = await source.GetDetailAsync("11995132", ct: TestContext.Current.CancellationToken);
 
         Assert.False(string.IsNullOrWhiteSpace(detail.Item.Title), "空标题应回退为房间号兜底");
         Assert.Contains("11995132", detail.Item.Title);
@@ -200,7 +200,7 @@ public class HuyaSourceTests
             ["cache.php?m=Live&do=profileRoom&roomid=11995132"] = RoomPage("11995132", "", true, ("AL", liveUrl)),
         };
         using var source = Create(key => routes[key]);
-        var play = await source.ResolvePlaybackAsync("11995132", "0");
+        var play = await source.ResolvePlaybackAsync("11995132", "0", ct: TestContext.Current.CancellationToken);
         Assert.Contains("11995132", play.Title);
     }
 

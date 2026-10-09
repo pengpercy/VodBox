@@ -89,8 +89,8 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Root(), http);
-        Assert.Equal("番剧", Assert.Single(await source.GetCategoriesAsync(default)).Name);
-        var home = await source.GetHomeAsync(default);
+        Assert.Equal("番剧", Assert.Single(await source.GetCategoriesAsync(TestContext.Current.CancellationToken)).Name);
+        var home = await source.GetHomeAsync(TestContext.Current.CancellationToken);
         Assert.Equal("7", Assert.Single(home.Items).Id);
         Assert.Equal(1, routes.HomeRequests); // 首页复用，不重复 init
     }
@@ -101,10 +101,10 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Root(), http);
-        var first = await source.GetItemsAsync("6", 1, new Dictionary<string, string> { ["year"] = "2026" }, default);
+        var first = await source.GetItemsAsync("6", 1, new Dictionary<string, string> { ["year"] = "2026" }, TestContext.Current.CancellationToken);
         Assert.Single(first.Items);
         Assert.Equal(2, first.PageCount); // PageCount=page+1 表示有下一页
-        var second = await source.GetItemsAsync("6", 2, null, default);
+        var second = await source.GetItemsAsync("6", 2, null, TestContext.Current.CancellationToken);
         Assert.Empty(second.Items);
         Assert.Equal(2, second.PageCount);
     }
@@ -115,10 +115,10 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Root(), http);
-        var page = await source.SearchAsync("动画 & 科技", 1, default);
+        var page = await source.SearchAsync("动画 & 科技", 1, TestContext.Current.CancellationToken);
         Assert.Single(page.Items);
         Assert.Equal(2, page.PageCount);
-        var last = await source.SearchAsync("动画 & 科技", 2, default);
+        var last = await source.SearchAsync("动画 & 科技", 2, TestContext.Current.CancellationToken);
         Assert.Equal(2, last.PageCount);
     }
 
@@ -128,10 +128,10 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Root(), http);
-        var detail = await source.GetDetailAsync("7", default);
+        var detail = await source.GetDetailAsync("7", TestContext.Current.CancellationToken);
         Assert.Equal(2, detail.Lines.Count);
         Assert.Equal("7", detail.Item.Id);
-        var direct = await source.ResolvePlaybackAsync("7", "0:0", default);
+        var direct = await source.ResolvePlaybackAsync("7", "0:0", TestContext.Current.CancellationToken);
         Assert.Equal("https://cdn.example/movie.m3u8", direct.Uri);
         Assert.Equal("Fixture Player", direct.Headers["User-Agent"]);
         Assert.Single(direct.Headers);
@@ -144,12 +144,12 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Root(), http);
-        var first = await source.ResolvePlaybackAsync("7", "1:0", default);
-        var second = await source.ResolvePlaybackAsync("7", "1:0", default);
+        var first = await source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken);
+        var second = await source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken);
         Assert.NotEqual(first.Uri, second.Uri);
         Assert.Equal(2, routes.DetailRequests); // 两次解析各刷一次详情（无前置 GetDetail）
         Assert.Equal(2, routes.ParseRequests);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "missing", default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "missing", TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -160,8 +160,8 @@ public sealed class AppGetSourceTests
         var routes = new Routes { External = true, Prepared = prepared };
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Root(), http);
-        var first = await source.ResolvePlaybackAsync("7", "1:0", default);
-        var second = await source.ResolvePlaybackAsync("7", "1:0", default);
+        var first = await source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken);
+        var second = await source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken);
         Assert.Equal("https://cdn.example/stream?generation=1", first.Uri);
         Assert.Equal("https://cdn.example/stream?generation=2", second.Uri);
         Assert.Equal(2, routes.ExternalRequests);
@@ -175,10 +175,10 @@ public sealed class AppGetSourceTests
         var routes = new QijiRoutes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Source("https://api.example|0123456789abcdef|V122|okhttp/3.10"), http);
-        Assert.Equal("6", Assert.Single(await source.GetCategoriesAsync(default)).Id);
-        Assert.Single((await source.SearchAsync("中文 & C#", 1, default)).Items);
-        Assert.Single((await source.GetItemsAsync("6", 1, null, default)).Items);
-        var request = await source.ResolvePlaybackAsync("7", "0:0", default);
+        Assert.Equal("6", Assert.Single(await source.GetCategoriesAsync(TestContext.Current.CancellationToken)).Id);
+        Assert.Single((await source.SearchAsync("中文 & C#", 1, TestContext.Current.CancellationToken)).Items);
+        Assert.Single((await source.GetItemsAsync("6", 1, null, TestContext.Current.CancellationToken)).Items);
+        var request = await source.ResolvePlaybackAsync("7", "0:0", TestContext.Current.CancellationToken);
         Assert.Equal("https://cdn.example/stream?id=7", request.Uri);
         Assert.Equal(["initV122", "searchList4", "typeFilterVodList", "vodDetail2"], routes.Actions);
     }
@@ -189,7 +189,7 @@ public sealed class AppGetSourceTests
         var routes = new QijiRoutes { Verification = true };
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Source("https://api.example|0123456789abcdef|V122"), http);
-        await Assert.ThrowsAsync<NotSupportedException>(() => source.SearchAsync("query", 1, default));
+        await Assert.ThrowsAsync<NotSupportedException>(() => source.SearchAsync("query", 1, TestContext.Current.CancellationToken));
         Assert.Equal(["initV122"], routes.Actions);
     }
 
@@ -203,7 +203,7 @@ public sealed class AppGetSourceTests
     {
         using var http = new HttpClient(new Routes { Envelope = json });
         using var source = new AppGetSource(Root(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -214,7 +214,7 @@ public sealed class AppGetSourceTests
     {
         using var http = new HttpClient(new Routes { External = true, ExternalResponse = response });
         using var source = new AppGetSource(Root(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "1:0", default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -222,7 +222,7 @@ public sealed class AppGetSourceTests
     {
         using var http = new HttpClient(new Routes { External = true, ExternalResponse = new string('x', 1024 * 1024 + 1) });
         using var source = new AppGetSource(Root(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "1:0", default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -231,10 +231,10 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         using var source = new AppGetSource(Source("https://discovery.example/entry.txt|0123456789abcdef"), http);
-        await source.GetCategoriesAsync(default);
+        await source.GetCategoriesAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, routes.Discoveries);
         routes.Redirect = true;
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("query", 1, default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("query", 1, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -245,7 +245,7 @@ public sealed class AppGetSourceTests
         using var source = new AppGetSource(Root(), http);
         using var cancellation = new CancellationTokenSource();
         var tasks = Enumerable.Range(0, 8).Select(_ => source.SearchAsync("query", 1, cancellation.Token)).ToArray();
-        await routes.FourStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await routes.FourStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(4, routes.Active);
         cancellation.Cancel();
         foreach (var task in tasks) await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await task);
@@ -258,12 +258,12 @@ public sealed class AppGetSourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         var source = new AppGetSource(Root(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("https://other.example", default));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("6", 1001, null, default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("https://other.example", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("6", 1001, null, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<NotSupportedException>(
-            () => source.GetItemsAsync("6", 1, new Dictionary<string, string> { ["unknown"] = "x" }, default));
+            () => source.GetItemsAsync("6", 1, new Dictionary<string, string> { ["unknown"] = "x" }, TestContext.Current.CancellationToken));
         source.Dispose();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.SearchAsync("query", 1, default));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.SearchAsync("query", 1, TestContext.Current.CancellationToken));
         Assert.Equal(0, routes.Requests);
         // 注册表路由
         var created = NativeSpiders.Create(Root());
@@ -282,7 +282,7 @@ public sealed class AppGetSourceTests
     private sealed class Routes : HttpMessageHandler
     {
         public int HomeRequests, DetailRequests, ParseRequests, Discoveries, Requests, Active, ExternalRequests;
-        public bool Wait, Redirect, External, Prepared, ExternalWait;
+        public bool Wait, Redirect, External, Prepared;
         public string? Envelope, ExternalResponse;
         public TaskCompletionSource FourStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -299,8 +299,7 @@ public sealed class AppGetSourceTests
                 Assert.False(request.Headers.Contains("app-user-device-id"));
                 Assert.Null(request.Content);
                 if (Interlocked.Increment(ref Active) == 4) FourStarted.TrySetResult();
-                try { if (ExternalWait) await Task.Delay(Timeout.InfiniteTimeSpan, token); }
-                finally { Interlocked.Decrement(ref Active); }
+                Interlocked.Decrement(ref Active);
                 return Json(ExternalResponse ?? "{\"data\":{\"url\":\"https://cdn.example/stream?generation=" + ExternalRequests + "\"}}");
             }
             if (uri.Host == "discovery.example")

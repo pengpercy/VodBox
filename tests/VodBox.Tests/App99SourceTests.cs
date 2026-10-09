@@ -76,28 +76,28 @@ public sealed class App99SourceTests
         var routes = new Routes { Compressed = compressed };
         using var http = new HttpClient(routes);
         using var source = new App99Source(Source(), http);
-        Assert.Equal("电影", Assert.Single(await source.GetCategoriesAsync(default)).Name);
-        var page = await source.GetItemsAsync("1", 1, new Dictionary<string, string> { ["year"] = "2026" }, default);
+        Assert.Equal("电影", Assert.Single(await source.GetCategoriesAsync(TestContext.Current.CancellationToken)).Name);
+        var page = await source.GetItemsAsync("1", 1, new Dictionary<string, string> { ["year"] = "2026" }, TestContext.Current.CancellationToken);
         Assert.Equal(2, page.PageCount);
         Assert.Equal("7", Assert.Single(page.Items).Id);
         Assert.Equal("https://cdn.example/poster.jpg", page.Items[0].Poster);
-        var next = await source.GetItemsAsync("1", 2, null, default);
+        var next = await source.GetItemsAsync("1", 2, null, TestContext.Current.CancellationToken);
         Assert.Equal(2, next.PageCount); // 空页停在当前页
-        Assert.Single((await source.SearchAsync("C# & 中文", 1, default)).Items);
-        var detail = await source.GetDetailAsync("7", default);
+        Assert.Single((await source.SearchAsync("C# & 中文", 1, TestContext.Current.CancellationToken)).Items);
+        var detail = await source.GetDetailAsync("7", TestContext.Current.CancellationToken);
         Assert.Equal(2, detail.Lines.Count);
-        await source.GetDetailAsync("7", default);
+        await source.GetDetailAsync("7", TestContext.Current.CancellationToken);
         Assert.Equal(1, routes.Details); // 详情缓存生效
-        var direct = await source.ResolvePlaybackAsync("7", "0:0", default);
+        var direct = await source.ResolvePlaybackAsync("7", "0:0", TestContext.Current.CancellationToken);
         Assert.Equal("https://cdn.example/movie.m3u8", direct.Uri);
         Assert.Single(direct.Headers);
-        var first = await source.ResolvePlaybackAsync("7", "1:0", default);
-        var second = await source.ResolvePlaybackAsync("7", "1:0", default);
+        var first = await source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken);
+        var second = await source.ResolvePlaybackAsync("7", "1:0", TestContext.Current.CancellationToken);
         Assert.NotEqual(first.Uri, second.Uri);
         Assert.Equal(4, routes.Details); // 老契约对齐：缓存1 + 断言1 + 解析刷新2
         Assert.Equal(1, routes.Initializations);
         Assert.DoesNotContain(routes.Paths, x => x.Contains("/app/log", StringComparison.Ordinal));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "missing", default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("7", "missing", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class App99SourceTests
             Raw = "ABEiM0RVZneImaq7zN3u/w9a71lnDqHHD7cn0Btn62LxHdPqdb83MHKv/Vue4VBDDUu9muudbbJ9o0AyS9rzgwhTKPNYk1Ec3ow4Ytuvhw4="
         });
         using var source = new App99Source(Source(), http);
-        Assert.Empty(await source.GetCategoriesAsync(default));
+        Assert.Empty(await source.GetCategoriesAsync(TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -118,7 +118,7 @@ public sealed class App99SourceTests
     {
         using var http = new HttpClient(new Routes { Raw = raw });
         using var source = new App99Source(Source(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class App99SourceTests
     {
         using var http = new HttpClient(new Routes { Bomb = true });
         using var source = new App99Source(Source(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -137,13 +137,13 @@ public sealed class App99SourceTests
         using var source = new App99Source(Source(), http);
         using var cancellation = new CancellationTokenSource();
         var tasks = Enumerable.Range(0, 8).Select(_ => source.SearchAsync("wait", 1, cancellation.Token)).ToArray();
-        await routes.FourStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await routes.FourStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(4, routes.Active);
         cancellation.Cancel();
         foreach (var task in tasks) await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await task);
         Assert.Equal(0, routes.Active);
         routes.Wait = false;
-        Assert.Single((await source.SearchAsync("next", 1, default)).Items);
+        Assert.Single((await source.SearchAsync("next", 1, TestContext.Current.CancellationToken)).Items);
     }
 
     [Fact]
@@ -152,14 +152,14 @@ public sealed class App99SourceTests
         var routes = new Routes();
         using var http = new HttpClient(routes);
         var source = new App99Source(Source(), http);
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("file:///tmp/video", default));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("query", 1001, default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetDetailAsync("file:///tmp/video", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.SearchAsync("query", 1001, TestContext.Current.CancellationToken));
         Assert.Empty(routes.Paths);
         Assert.IsType<App99Source>(NativeSpiders.Create(Source()));
         routes.Redirect = true;
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(default));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetCategoriesAsync(TestContext.Current.CancellationToken));
         source.Dispose();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.SearchAsync("query", 1, default));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.SearchAsync("query", 1, TestContext.Current.CancellationToken));
     }
 
     [Fact]

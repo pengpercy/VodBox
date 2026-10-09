@@ -21,7 +21,7 @@ jobs:
     outputs:
       value: ${{ steps.version.outputs.value }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: version
         run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
   # Structural gate: catches duplicate YAML keys and reuse guards silently disappearing.
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Lint workflows
         shell: bash
         run: |

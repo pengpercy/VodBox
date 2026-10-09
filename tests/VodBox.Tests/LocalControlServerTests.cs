@@ -41,7 +41,7 @@ public sealed class LocalControlServerTests
             var responses=await Task.WhenAll(Enumerable.Range(0,4).Select(_=>client.PostAsync("/upload?name=clip.mp4",new ByteArrayContent([1,2]),TestContext.Current.CancellationToken)));
             try
             {
-                Assert.Single(responses.Where(response=>response.StatusCode==HttpStatusCode.OK));
+                Assert.Single(responses, response=>response.StatusCode==HttpStatusCode.OK);
                 Assert.Equal(3,responses.Count(response=>response.StatusCode==HttpStatusCode.TooManyRequests));
                 Assert.Equal(100,Directory.GetFiles(directory).Length);
             }

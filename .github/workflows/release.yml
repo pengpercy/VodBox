@@ -21,7 +21,7 @@ jobs:
       value: ${{ steps.version.outputs.value }}
       sha: ${{ steps.version.outputs.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: version
         shell: bash
         run: |
@@ -52,7 +52,7 @@ jobs:
     needs: [version, package]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: package.*
           merge-multiple: true

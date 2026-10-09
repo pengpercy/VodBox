@@ -13,13 +13,13 @@ public sealed class XmlTvParserTests
         try
         {
             var store = new ProgrammeStore(path);
-            Assert.Empty(await store.LoadAsync());
+            Assert.Empty(await store.LoadAsync(ct: TestContext.Current.CancellationToken));
             var start = new DateTimeOffset(2026, 10, 9, 8, 0, 0, TimeSpan.FromHours(8));
             var entry = new VodBox.Core.Programme("央1", "新闻 & <综合>", start, start.AddHours(1), "央视综合");
-            await store.SaveAsync([entry]);
-            Assert.Equal(entry, Assert.Single(await new ProgrammeStore(path).LoadAsync()));
-            await store.SaveAsync([]);
-            Assert.Empty(await store.LoadAsync());
+            await store.SaveAsync([entry], ct: TestContext.Current.CancellationToken);
+            Assert.Equal(entry, Assert.Single(await new ProgrammeStore(path).LoadAsync(ct: TestContext.Current.CancellationToken)));
+            await store.SaveAsync([], ct: TestContext.Current.CancellationToken);
+            Assert.Empty(await store.LoadAsync(ct: TestContext.Current.CancellationToken));
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }

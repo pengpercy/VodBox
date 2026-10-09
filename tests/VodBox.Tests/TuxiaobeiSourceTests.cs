@@ -51,7 +51,7 @@ public class TuxiaobeiSourceTests
     public async Task Categories_AreFour()
     {
         using var source = Create(_ => ListJson(0));
-        var categories = await source.GetCategoriesAsync();
+        var categories = await source.GetCategoriesAsync(ct: TestContext.Current.CancellationToken);
         Assert.Equal(4, categories.Count);
         Assert.Equal(["儿歌", "故事", "国学", "启蒙"], categories.Select(c => c.Name).ToArray());
     }
@@ -60,7 +60,7 @@ public class TuxiaobeiSourceTests
     public async Task GetItems_ParsesMipJsonp()
     {
         using var source = Create(_ => ListJson(0, ("2662", "快乐小屋", "02:30"), ("2663", "小星星", "01:45")));
-        var page = await source.GetItemsAsync("2", 1, null);
+        var page = await source.GetItemsAsync("2", 1, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal("快乐小屋", page.Items[0].Title);
         Assert.Equal("2662", page.Items[0].Id);
@@ -73,7 +73,7 @@ public class TuxiaobeiSourceTests
     {
         var items = Enumerable.Range(1, 30).Select(i => (i.ToString(), $"第{i}集", "01:00")).ToArray();
         using var source = Create(_ => ListJson(0, items));
-        var page = await source.GetItemsAsync("2", 1, null);
+        var page = await source.GetItemsAsync("2", 1, null, ct: TestContext.Current.CancellationToken);
         Assert.Equal(30, page.Items.Count);
         Assert.Equal(2, page.PageCount); // 满 30 → 可能有下一页
     }
@@ -82,8 +82,8 @@ public class TuxiaobeiSourceTests
     public async Task GetItems_RejectsInvalidCategoryAndPage()
     {
         using var source = Create(_ => ListJson(0));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("99", 1, null));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("2", 0, null));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("99", 1, null, ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetItemsAsync("2", 0, null, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class TuxiaobeiSourceTests
             ["play/2662"] = PlayPage("快乐小屋", "https://resource-cdn.tuxiaobei.com/video/x.mp4"),
         };
         using var source = Create(path => routes.TryGetValue(path, out var v) ? v : ListJson(0));
-        var detail = await source.GetDetailAsync("2662");
+        var detail = await source.GetDetailAsync("2662", ct: TestContext.Current.CancellationToken);
         Assert.Equal("快乐小屋", detail.Item.Title);
         var line = Assert.Single(detail.Lines);
         Assert.Equal("兔小贝", line.Name);
@@ -110,7 +110,7 @@ public class TuxiaobeiSourceTests
             ["play/2662"] = PlayPage("快乐小屋", "https://resource-cdn.tuxiaobei.com/video/x.mp4"),
         };
         using var source = Create(path => routes.TryGetValue(path, out var v) ? v : ListJson(0));
-        var play = await source.ResolvePlaybackAsync("2662", "2662");
+        var play = await source.ResolvePlaybackAsync("2662", "2662", ct: TestContext.Current.CancellationToken);
         Assert.Equal("https://resource-cdn.tuxiaobei.com/video/x.mp4", play.Uri);
         Assert.Equal("dr_兔小贝", play.SourceKey);
         Assert.Equal("兔小贝", play.SourceName);
@@ -121,7 +121,7 @@ public class TuxiaobeiSourceTests
     public async Task ResolvePlayback_RejectsMismatchedEpisode()
     {
         using var source = Create(_ => ListJson(0));
-        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("2662", "2663"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.ResolvePlaybackAsync("2662", "2663", ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class TuxiaobeiSourceTests
     {
         const string html = "<html><body><div class=\"list-con\"></div></body></html>";
         using var source = Create(_ => html);
-        var page = await source.SearchAsync("儿歌", 1);
+        var page = await source.SearchAsync("儿歌", 1, ct: TestContext.Current.CancellationToken);
         Assert.Empty(page.Items);
     }
 
