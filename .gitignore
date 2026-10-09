@@ -11,3 +11,6 @@ build/native/
 .idea/
 **/packages.*.lock.json
 .alma-snapshots
+
+# Local acceptance logs, synthetic media, publish copies and private checkpoints
+.alma/

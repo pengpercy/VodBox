@@ -35,7 +35,7 @@ public static class DesignData
     private static void FillPlayer(MainViewModel main)
     {
         // Player 在设计时构造之后再赋值：保证 Detail/播放相关 XAML 能绑定到非空 VM。
-        var player = new PlayerViewModel(AppServices.CreateDesignTime(), main);
+        var player = main.Player;
         player.Title = "庆余年 第二季";
         player.Subtitle = "第12集 · 抱月楼风波";
         player.ShowToast = true;
@@ -46,7 +46,6 @@ public static class DesignData
         player.Position = TimeSpan.FromMinutes(12).Add(TimeSpan.FromSeconds(34));
         player.Volume = 80;
         player.Rate = 1.0;
-        main.Player = player;
     }
 
     private static void FillHome(MainViewModel main)
@@ -225,7 +224,11 @@ public static class DesignData
         main.Live.SelectedGroup = main.Live.Groups[0];
         // 选中 CCTV-1 并点亮 LIVE 徽标 + EPG 时间轴
         var first = main.Live.Groups[0].Channels[0];
-        main.Live.SetCurrent(first); // 同步 VisibleChannels 选中态 + EPG，不触播放
+        main.Live.SetCurrent(first); // 仅预览填充示例节目，运行时不生成假 EPG。
+        var now = DateTimeOffset.Now;
+        main.Live.EpgTimeline.Add(new LiveEpgCard { Title = "新闻联播", Start = now.AddMinutes(-45), End = now.AddMinutes(-15), IsPast = true });
+        main.Live.EpgTimeline.Add(new LiveEpgCard { Title = "焦点访谈", Start = now.AddMinutes(-15), End = now.AddMinutes(15), IsNow = true });
+        main.Live.EpgTimeline.Add(new LiveEpgCard { Title = "黄金档剧场", Start = now.AddMinutes(15), End = now.AddMinutes(105) });
     }
 
     private static void FillSearch(MainViewModel main)

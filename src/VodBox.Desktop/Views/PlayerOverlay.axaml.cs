@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
@@ -36,17 +37,26 @@ public static class TimeConverters
 public partial class PlayerOverlay : UserControl
 {
     private MpvVideoSurface? _surface;
+    private MpvEngine? _observedEngine;
+    internal long RenderedFrames=>_surface?.RenderedFrames??0;
     private Window? _compactWindow;
+    private Window? _sizedWindow;
+    private (double Width,double Height,double MinWidth,double MinHeight,double MaxWidth,double MaxHeight,Avalonia.PixelPoint Position) _originalWindow;
+    private double? _appliedVideoRatio;
+    private (double Width,double Height,double MinWidth,double MinHeight,double MaxWidth,double MaxHeight) _compactSize;
     private (double Width, double Height, double MinWidth, double MinHeight, Avalonia.PixelPoint Position, bool Topmost, WindowState State) _windowSnapshot;
     private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private long _lastActivity = Environment.TickCount64;
     private bool _menuOpen;
+    private ContextMenu? _activeMenu;
+    private PlayerViewModel? _observedPlayer;
     private static readonly Cursor HiddenCursor = new(StandardCursorType.None);
 
 
     public PlayerOverlay()
     {
         InitializeComponent();
+        DataContextChanged += (_, _) => ObservePlayer();
         if (this.FindControl<Slider>("ProgressSlider") is { } progress)
         {
             progress.AddHandler(PointerPressedEvent, (_, _) => VM?.BeginSeek(), RoutingStrategies.Tunnel, true);
@@ -77,10 +87,35 @@ public partial class PlayerOverlay : UserControl
     /// <summary>当前 Player 子 VM；DataContext 未装载（XAML 初始化早期/设计时）时为 null，调用方需判空。</summary>
     private PlayerViewModel? VM => DataContext is MainViewModel main ? main.Player : null;
 
+    private void ObservePlayer()
+    {
+        if (_observedPlayer is not null) _observedPlayer.PropertyChanged -= OnPlayerChanged;
+        _observedPlayer = VM;
+        if (_observedPlayer is not null) _observedPlayer.PropertyChanged += OnPlayerChanged;
+    }
+
+    private void OnPlayerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if(e.PropertyName==nameof(PlayerViewModel.VideoAspectRatio))FitWindowToVideo();
+        if(e.PropertyName==nameof(PlayerViewModel.Visible)&&VM?.Visible==false)RestorePlayerWindow();
+        if(e.PropertyName is nameof(PlayerViewModel.PlaylistIndex) or nameof(PlayerViewModel.Visible) or nameof(PlayerViewModel.Title))
+        {
+            _activeMenu?.Close();_activeMenu=null;_menuOpen=false;
+        }
+        if (e.PropertyName is nameof(PlayerViewModel.Position) or nameof(PlayerViewModel.Danmaku) or nameof(PlayerViewModel.DanmakuEnabled) or nameof(PlayerViewModel.DanmakuOpacity) or nameof(PlayerViewModel.DanmakuLimit) or nameof(PlayerViewModel.Visible))
+            this.FindControl<DanmakuLayer>("DanmakuCanvas")?.InvalidateVisual();
+    }
+
     private void OnAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        ObservePlayer();
         RevealControls();
+        if(Avalonia.Application.Current is App)
+        {
+            _observedEngine=App.Services.Player;_observedEngine.Initialized+=OnEngineInitialized;
+        }
         TryInstallSurface();
+        FitWindowToVideo();
         if (Avalonia.Application.Current is App) _controlsTimer.Start();
     }
 
@@ -105,16 +140,24 @@ public partial class PlayerOverlay : UserControl
 
     private void OpenControlMenu(Button button, ContextMenu menu)
     {
+        _activeMenu?.Close();_activeMenu=menu;
         _menuOpen = true;
         RevealControls();
-        menu.Closed += (_, _) => { _menuOpen = false; RevealControls(); };
+        menu.Closed += (_, _) => { if(ReferenceEquals(_activeMenu,menu))_activeMenu=null;_menuOpen = false; RevealControls(); };
         button.ContextMenu = menu;
         menu.Open(button);
     }
 
+    private void OnEngineInitialized(object? sender,EventArgs e)=>Dispatcher.UIThread.Post(TryInstallSurface);
+
     private void OnDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
-        RestoreWindow();
+        if(_observedEngine is not null)_observedEngine.Initialized-=OnEngineInitialized;
+        _observedEngine=null;
+        if (_observedPlayer is not null) _observedPlayer.PropertyChanged -= OnPlayerChanged;
+        _observedPlayer = null;
+        _activeMenu?.Close();_activeMenu=null;_menuOpen=false;
+        RestoreWindow();RestorePlayerWindow();
         _controlsTimer.Stop();
         VM?.CancelSeek();
         RevealControls();
@@ -123,7 +166,7 @@ public partial class PlayerOverlay : UserControl
         {
             _surface.Ready -= OnSurfaceReady;
             _surface.Failed -= OnSurfaceFailed;
-            VideoHost.Children.Remove(_surface);
+            this.FindControl<Panel>("VideoHost")?.Children.Remove(_surface);
             _surface = null;
         }
     }
@@ -134,10 +177,16 @@ public partial class PlayerOverlay : UserControl
         if (_surface is not null || Avalonia.Application.Current is not App) return;
         var engine = App.Services.Player;
         if (engine.Client is not MpvClient client) return;
+        var host=this.FindControl<Panel>("VideoHost");
+        if(host is null)
+        {
+            var error=new InvalidOperationException("播放器视频宿主未加载。");
+            engine.NotifyVideoSurfaceFailure(error);if(VM is {} vm)vm.Error=error.Message;return;
+        }
         _surface = new MpvVideoSurface(client);
         _surface.Ready += OnSurfaceReady;
         _surface.Failed += OnSurfaceFailed;
-        VideoHost.Children.Add(_surface);
+        host.Children.Add(_surface);
     }
 
     private void OnSurfaceReady(object? sender, EventArgs e)
@@ -168,23 +217,58 @@ public partial class PlayerOverlay : UserControl
     protected override void OnPropertyChanged(Avalonia.AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == IsVisibleProperty && !IsVisible) RestoreWindow();
+        if (change.Property == IsVisibleProperty && !IsVisible) { RestoreWindow();RestorePlayerWindow(); }
+    }
+
+    private void FitWindowToVideo()
+    {
+        if(VM is not {Visible:true,VideoAspectRatio: >0} vm||TopLevel.GetTopLevel(this) is not Window window||window.WindowState!=WindowState.Normal)return;
+        var ratio=vm.VideoAspectRatio!.Value;
+        if(_appliedVideoRatio==ratio)return;
+        if(_sizedWindow is null)
+        {
+            _sizedWindow=window;_originalWindow=(window.Width,window.Height,window.MinWidth,window.MinHeight,window.MaxWidth,window.MaxHeight,window.Position);
+        }
+        ApplyVideoSize(window,ratio,_compactWindow is not null);
+        _appliedVideoRatio=ratio;
+    }
+
+    private void ApplyVideoSize(Window window,double ratio,bool compact)
+    {
+        var screen=window.Screens.ScreenFromWindow(window)??window.Screens.Primary;
+        var width=screen is null?1280:Math.Max(1,screen.WorkingArea.Width/screen.Scaling-32);
+        var height=screen is null?800:Math.Max(1,screen.WorkingArea.Height/screen.Scaling-48);
+        var fit=PlayerWindowSizing.Fit(ratio,width,height,compact);
+        window.MinWidth=0;window.MinHeight=0;window.MaxWidth=double.PositiveInfinity;window.MaxHeight=double.PositiveInfinity;
+        window.Width=fit.Size.Width;window.Height=fit.Size.Height;
+        window.MinWidth=fit.Minimum.Width;window.MinHeight=fit.Minimum.Height;window.MaxWidth=fit.Maximum.Width;window.MaxHeight=fit.Maximum.Height;
+        if(screen is not null)window.Position=ClampRestoredPosition(window.Position,screen.WorkingArea,fit.Size.Width,fit.Size.Height,screen.Scaling);
+    }
+
+    private void RestorePlayerWindow()
+    {
+        if(_sizedWindow is not {} window)return;
+        RestoreWindow();_sizedWindow=null;_appliedVideoRatio=null;
+        var saved=_originalWindow;
+        window.MinWidth=0;window.MinHeight=0;window.MaxWidth=double.PositiveInfinity;window.MaxHeight=double.PositiveInfinity;
+        window.Width=saved.Width;window.Height=saved.Height;window.MinWidth=saved.MinWidth;window.MinHeight=saved.MinHeight;window.MaxWidth=saved.MaxWidth;window.MaxHeight=saved.MaxHeight;
+        try
+        {
+            var screen=window.Screens.ScreenFromWindow(window)??window.Screens.Primary;
+            window.Position=screen is null?saved.Position:ClampRestoredPosition(saved.Position,screen.WorkingArea,saved.Width,saved.Height,screen.Scaling);
+        }
+        catch(ObjectDisposedException) { /* native close already released the screen owner */ }
     }
 
     internal void ToggleCompactWindow(Window window)
     {
         if (_compactWindow is not null) { RestoreWindow(); return; }
         _windowSnapshot = (window.Width, window.Height, window.MinWidth, window.MinHeight, window.Position, window.Topmost, window.WindowState);
+        _compactSize=(window.Width,window.Height,window.MinWidth,window.MinHeight,window.MaxWidth,window.MaxHeight);
         _compactWindow = window;
         window.WindowState = WindowState.Normal;
-        window.MinWidth = 540;
-        window.MinHeight = 300;
-        window.Width = 640;
-        window.Height = 400;
-        window.Topmost = true;
-        if (window.Screens.ScreenFromWindow(window) is { } screen)
-            window.Position = new Avalonia.PixelPoint(screen.WorkingArea.Right - (int)(640 * screen.Scaling) - 24,
-                screen.WorkingArea.Bottom - (int)(400 * screen.Scaling) - 24);
+        ApplyVideoSize(window,VM?.VideoAspectRatio??16d/9,true);
+        window.Topmost=true;
         if (VM is { } vm) vm.CompactMode = true;
         RevealControls();
     }
@@ -194,14 +278,28 @@ public partial class PlayerOverlay : UserControl
         if (_compactWindow is not { } window) return;
         _compactWindow = null;
         var saved = _windowSnapshot;
-        window.MinWidth = saved.MinWidth;
-        window.MinHeight = saved.MinHeight;
-        window.Width = saved.Width;
-        window.Height = saved.Height;
-        window.Position = saved.Position;
+        window.MinWidth=0;window.MinHeight=0;window.MaxWidth=double.PositiveInfinity;window.MaxHeight=double.PositiveInfinity;
+        window.Width=_compactSize.Width;window.Height=_compactSize.Height;
+        window.MinWidth=_compactSize.MinWidth;window.MinHeight=_compactSize.MinHeight;window.MaxWidth=_compactSize.MaxWidth;window.MaxHeight=_compactSize.MaxHeight;
+        try
+        {
+            var screens=window.Screens.All;
+            var target=screens.FirstOrDefault(screen=>saved.Position.X>=screen.WorkingArea.X&&saved.Position.X<screen.WorkingArea.Right&&saved.Position.Y>=screen.WorkingArea.Y&&saved.Position.Y<screen.WorkingArea.Bottom)
+                ??window.Screens.Primary;
+            window.Position=target is null?saved.Position:ClampRestoredPosition(saved.Position,target.WorkingArea,saved.Width,saved.Height,target.Scaling);
+        }
+        catch(ObjectDisposedException) { /* native window already closed */ }
         window.Topmost = saved.Topmost;
         window.WindowState = saved.State;
         if (VM is { } vm) vm.CompactMode = false;
+    }
+
+    internal static Avalonia.PixelPoint ClampRestoredPosition(Avalonia.PixelPoint position,Avalonia.PixelRect area,double width,double height,double scaling)
+    {
+        var pixelWidth=(int)Math.Ceiling(width*scaling);var pixelHeight=(int)Math.Ceiling(height*scaling);
+        var x=Math.Clamp(position.X,area.X,Math.Max(area.X,area.Right-pixelWidth));
+        var y=Math.Clamp(position.Y,area.Y,Math.Max(area.Y,area.Bottom-pixelHeight));
+        return new Avalonia.PixelPoint(x,y);
     }
 
     private void OnRateChanged(object? sender, SelectionChangedEventArgs e)
@@ -259,6 +357,46 @@ public partial class PlayerOverlay : UserControl
         var autoNext = new MenuItem { Header = vm.AutoNext ? "自动下一集：开" : "自动下一集：关" };
         autoNext.Click += (_, _) => vm.AutoNext = !vm.AutoNext;
         menu.Items.Add(autoNext);
+        var incognito = new MenuItem { Header = vm.Incognito ? "不记录播放历史：开" : "不记录播放历史：关" };
+        incognito.Click += (_, _) => vm.Incognito = !vm.Incognito;
+        menu.Items.Add(incognito);
+        var danmaku = new MenuItem { Header = vm.DanmakuEnabled ? "弹幕：开" : "弹幕：关" };
+        danmaku.Click += (_, _) => vm.DanmakuEnabled = !vm.DanmakuEnabled;
+        menu.Items.Add(danmaku);
+        if (vm.AvailableParsers.Count > 0)
+        {
+            var parsers = new MenuItem { Header = "优先解析线路（下次播放生效）" };
+            var options = new List<MenuItem>();
+            var automatic = new MenuItem { Header = vm.PreferredParser.Length == 0 ? "当前 · 自动" : "自动" };
+            automatic.Click += (_, _) => vm.PreferredParser = "";
+            options.Add(automatic);
+            foreach (var parse in vm.AvailableParsers)
+            {
+                var option = new MenuItem { Header = (vm.PreferredParser == parse.Url ? "当前 · " : "") + parse.Name };
+                option.Click += (_, _) => vm.PreferredParser = parse.Url;
+                options.Add(option);
+            }
+            parsers.ItemsSource = options;
+            menu.Items.Add(parsers);
+        }
+        foreach (var opening in new[] { true, false })
+        {
+            var group = new MenuItem { Header = opening ? "跳过片头" : "跳过片尾" };
+            var options = new List<MenuItem>();
+            foreach (var seconds in new[] { 0, 30, 60, 90, 120 })
+            {
+                var current = opening ? vm.OpeningSkipSeconds : vm.EndingSkipSeconds;
+                var option = new MenuItem { Header = (current == seconds ? "当前 · " : "") + (seconds == 0 ? "关闭" : $"{seconds} 秒") };
+                option.Click += (_, _) =>
+                {
+                    if (opening) vm.OpeningSkipSeconds = seconds;
+                    else vm.EndingSkipSeconds = seconds;
+                };
+                options.Add(option);
+            }
+            group.ItemsSource = options;
+            menu.Items.Add(group);
+        }
         foreach (var (kind, label) in new[] { (TrackKind.Audio, "音轨"), (TrackKind.Subtitle, "字幕") })
         {
             var group = new MenuItem { Header = label };
@@ -283,6 +421,42 @@ public partial class PlayerOverlay : UserControl
                     if (vm.CurrentSessionId == sessionId) await vm.SelectTrackAsync(kind, "no");
                 };
                 items.Add(off);
+                var load = new MenuItem { Header = "加载本地字幕…" };
+                load.Click += async (_, _) =>
+                {
+                    var top = TopLevel.GetTopLevel(this);
+                    if (top?.StorageProvider.CanOpen != true) { vm.FlashToast("当前环境不能选择本地文件"); return; }
+                    try
+                    {
+                        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                        {
+                            Title = "选择字幕文件", AllowMultiple = false,
+                            FileTypeFilter = [new FilePickerFileType("字幕") { Patterns = ["*.srt", "*.ass", "*.ssa", "*.vtt", "*.sub"] }],
+                        });
+                        if (files.Count == 0 || sessionId != vm.CurrentSessionId) return;
+                        var path = files[0].TryGetLocalPath();
+                        if (path is null) { vm.FlashToast("请选择本地字幕文件"); return; }
+                        await vm.LoadSubtitleAsync(path, sessionId);
+                    }
+                    catch (Exception error)
+                    {
+                        if (sessionId == vm.CurrentSessionId) vm.FlashToast($"选择字幕失败：{error.Message}");
+                    }
+                };
+                items.Add(load);
+                var earlier = new MenuItem { Header = "字幕提前 0.5 秒" };
+                earlier.Click += (_, _) => {if(sessionId==vm.CurrentSessionId)vm.SubtitleDelay -= .5;};
+                var later = new MenuItem { Header = "字幕延后 0.5 秒" };
+                later.Click += (_, _) => {if(sessionId==vm.CurrentSessionId)vm.SubtitleDelay += .5;};
+                var reset = new MenuItem { Header = $"恢复同步（当前 {vm.SubtitleDelay:+0.0;-0.0;0.0}s）" };
+                reset.Click += (_, _) => {if(sessionId==vm.CurrentSessionId)vm.SubtitleDelay = 0;};
+                items.Add(earlier); items.Add(later); items.Add(reset);
+                foreach (var size in new[] { 28, 40, 52 })
+                {
+                    var style = new MenuItem { Header = (vm.SubtitleFontSize == size ? "当前 · " : "") + $"字幕字号 {size}" };
+                    style.Click += (_, _) => {if(sessionId==vm.CurrentSessionId)vm.SubtitleFontSize = size;};
+                    items.Add(style);
+                }
             }
             if (items.Count == 0) items.Add(new MenuItem { Header = "暂无可用轨道", IsEnabled = false });
             group.ItemsSource = items;
@@ -298,7 +472,7 @@ public partial class PlayerOverlay : UserControl
         var session = vm.CurrentSessionId;
         foreach (var (label, ratio) in new (string, double?)[] { ("原始比例", null), ("16:9", 16d / 9), ("4:3", 4d / 3), ("1:1", 1d) })
         {
-            var item = new MenuItem { Header = label };
+            var item = new MenuItem { Header = (vm.AspectRatio == ratio ? "当前 · " : "") + label };
             item.Click += async (_, _) => { if (session == vm.CurrentSessionId) await vm.SetAspectRatioAsync(ratio); };
             menu.Items.Add(item);
         }

@@ -25,6 +25,12 @@ public static class AppPaths
     {
         get
         {
+            var isolated=Environment.GetEnvironmentVariable("VODBOX_DATA_DIR");
+            if(!string.IsNullOrWhiteSpace(isolated))
+            {
+                if(!Path.IsPathFullyQualified(isolated))throw new InvalidDataException("VODBOX_DATA_DIR必须为绝对路径。");
+                return isolated;
+            }
             var root = OperatingSystem.IsMacOS()
                 ? Path.Combine(Home, "Library", "Application Support")
                 : OperatingSystem.IsWindows()

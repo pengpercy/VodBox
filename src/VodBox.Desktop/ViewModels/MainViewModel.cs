@@ -11,12 +11,14 @@ public enum AppPage { Home, Vod, Live, Search, Favorites, History, Files, Settin
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly AppServices _services;
+    private readonly bool _designTime;
 
     [ObservableProperty] private AppPage _page = AppPage.Home;
     [ObservableProperty] private string _currentSourceName = "未配置";
     [ObservableProperty] private string _searchKeyword = "";
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private bool _busy;
+    [ObservableProperty] private string _wallpaperPath="";
 
     public HomeViewModel Home { get; }
     public VodViewModel Vod { get; }
@@ -38,6 +40,8 @@ public sealed partial class MainViewModel : ObservableObject
     internal MainViewModel(AppServices services, bool designTime, Func<string, IContentSource?> getSource, ILibraryStore store)
     {
         _services = services;
+        _designTime = designTime;
+        _wallpaperPath=designTime?"":services.Prefs.GetString("ui.wallpaper");
         Home = new HomeViewModel(services, this);
         Vod = new VodViewModel(services, this);
         Live = new LiveViewModel(services, this);
@@ -47,9 +51,9 @@ public sealed partial class MainViewModel : ObservableObject
         Settings = new SettingsViewModel(services, this);
         Files = new FilesViewModel(services, designTime);
         Detail = new DetailViewModel(getSource, store, this);
+        Player = new PlayerViewModel(services, this);
         if (!designTime)
         {
-            Player = new PlayerViewModel(services, this);
             // 本地文件 → 播放器。只在此处订阅一次（MainViewModel 与应用同生命周期），避免 View 层重复订阅泄漏。
             Files.PlayRequested += entry => Player.Play(new PlaybackRequest
             {
@@ -66,9 +70,17 @@ public sealed partial class MainViewModel : ObservableObject
     {
     }
 
+    public async Task ShutdownAsync()
+    {
+        Detail.CancelPending();Vod.CancelPending();Search.CancelPending();Live.CancelPending();Settings.CancelSubtitleSearch();
+        await _services.LocalControl.DisposeAsync();
+        Settings.ClearPairingPresentation();
+        await Player.CloseCommand.ExecuteAsync(null);
+    }
+
     public void UpdateSourceName() =>
-        CurrentSourceName = _services.Registry.Sources.Count > 0
-            ? $"当前源：{_services.Registry.Sources[0].Name}"
+        CurrentSourceName = _services.Registry.VisibleSources.Count > 0
+            ? $"当前源：{_services.Registry.VisibleSources[0].Name}"
             : "未配置";
 
     /// <summary>跨线程回 UI 线程（播放器事件线程 → UI）。</summary>
@@ -91,6 +103,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnPageChanged(AppPage value)
     {
         if (value != AppPage.Detail) Detail.CancelPending();
+        if (value == AppPage.Settings && !_designTime) Settings.RefreshSites();
     }
 
     public void Navigate(AppPage page) => Page = page;

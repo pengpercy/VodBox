@@ -60,7 +60,7 @@ public sealed class ConfigLoader(DefaultHttp http)
         raw = StripComments(raw);
         try
         {
-            return JsonSerializer.Deserialize<TvBoxConfig>(raw, Json.Options);
+            return JsonSerializer.Deserialize(raw, Json.TypeInfo<TvBoxConfig>());
         }
         catch (JsonException)
         {
@@ -87,7 +87,6 @@ public sealed class ConfigLoader(DefaultHttp http)
     private static string? ExtractBase64Tail(byte[] bytes)
     {
         // 从尾部向前找最长连续 base64 段
-        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=*$#";
         var start = -1;
         for (var i = bytes.Length - 1; i >= 0; i--)
         {
@@ -140,6 +139,7 @@ public sealed class ConfigLoader(DefaultHttp http)
                 Api = site.Api,
                 Ext = site.Ext is { ValueKind: JsonValueKind.String } s ? s.GetString() : site.Ext?.GetRawText(),
                 Type = site.Type,
+                PlayUrl=site.PlayUrl,
                 Searchable = site.Searchable != 0,
                 Changeable = site.Changeable != 0,
                 Categories = site.Categories,

@@ -3,6 +3,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="VodBox.Tests" />
     <ProjectReference Include="..\VodBox.Core\VodBox.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

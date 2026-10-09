@@ -10,10 +10,29 @@ namespace VodBox.Desktop;
 
 public partial class MainWindow : Window
 {
+    private bool _shutdownStarted;
+    private bool _shutdownComplete;
     public MainWindow()
     {
         InitializeComponent();
         AddHandler(KeyDownEvent, OnPlaybackKeyDown, RoutingStrategies.Bubble);
+        Closing+=OnClosing;
+    }
+
+    private async void OnClosing(object? sender,WindowClosingEventArgs e)
+    {
+        if(_shutdownComplete||Avalonia.Application.Current is not App||DataContext is not MainViewModel main)return;
+        e.Cancel=true;
+        if(_shutdownStarted)return;
+        _shutdownStarted=true;
+        try { await main.ShutdownAsync(); }
+        catch(Exception error) { System.Diagnostics.Debug.WriteLine($"[shutdown] {error.Message}"); }
+        finally
+        {
+            try { App.Services.Dispose(); }
+            catch(Exception error){System.Diagnostics.Debug.WriteLine($"[shutdown] release failed: {error.Message}");}
+            _shutdownComplete=true;Close();
+        }
     }
 
     private MainViewModel VM => (MainViewModel)DataContext!;
@@ -61,6 +80,20 @@ public partial class MainWindow : Window
             (visual is TextBox or ComboBox || visual.GetVisualAncestors().Any(v => v is TextBox or ComboBox))) return;
         if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0) return;
         var player = main.Player;
+        var episodeNumber = e.Key switch
+        {
+            Key.D1 or Key.NumPad1 => 1, Key.D2 or Key.NumPad2 => 2, Key.D3 or Key.NumPad3 => 3,
+            Key.D4 or Key.NumPad4 => 4, Key.D5 or Key.NumPad5 => 5, Key.D6 or Key.NumPad6 => 6,
+            Key.D7 or Key.NumPad7 => 7, Key.D8 or Key.NumPad8 => 8, Key.D9 or Key.NumPad9 => 9,
+            _ => 0,
+        };
+        if (episodeNumber > 0)
+        {
+            if (e.KeyModifiers != KeyModifiers.None || episodeNumber > player.Playlist.Count) return;
+            _ = player.SelectEpisodeNumberAsync(episodeNumber);
+            e.Handled = true;
+            return;
+        }
         switch (e.Key)
         {
             case Key.Space: player.TogglePlayPauseCommand.Execute(null); break;

@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using VodBox.Core;
@@ -48,8 +49,15 @@ public partial class SearchView : UserControl
     }
 
     /// <summary>点历史胶囊：回搜；点 × 区域删词（S5 接 Store）。</summary>
+    private void OnDeleteHistory(object? sender,Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if(sender is Button {Tag:string word})VM.DeleteSearchHistoryCommand.Execute(word);
+        e.Handled=true;
+    }
+
     private void OnPickHistory(object? sender, PointerPressedEventArgs e)
     {
+        if(e.Source is Avalonia.Visual visual && (visual is Button || visual.GetVisualAncestors().Any(parent=>parent is Button)))return;
         if ((sender as Control)?.Tag is string word)
         {
             VM.Keyword = word;

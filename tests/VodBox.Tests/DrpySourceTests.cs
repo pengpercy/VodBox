@@ -15,6 +15,15 @@ public sealed class DrpySourceTests
     };
 
     [Fact]
+    public void ParsesDynamicFiltersByCategoryWithoutMixingOtherCategories()
+    {
+        using var document=System.Text.Json.JsonDocument.Parse("{\"filters\":{\"1\":[{\"key\":\"year\",\"name\":\"年份\",\"init\":\"2026\",\"value\":[{\"n\":\"全部\",\"v\":\"\"},{\"n\":\"2026\",\"v\":\"2026\"}]}]}}");
+        var group=Assert.Single(DrpySource.ParseFilters(document.RootElement,"1"));
+        Assert.Equal("year",group.Key);Assert.Equal(2,group.Values.Count);Assert.Equal("2026",group.Init);
+        Assert.Empty(DrpySource.ParseFilters(document.RootElement,"2"));
+    }
+
+    [Fact]
     public async Task HomeVodIsDistinctFromHomeAndMapsMetadata()
     {
         using var source = new DrpySource(Site, () => new FakeRuntime());
@@ -68,7 +77,7 @@ public sealed class DrpySourceTests
     [InlineData(0, 0, "https://cdn.example/video", false)]
     [InlineData(1, 0, "https://cdn.example/video.mp4?token=1", false)]
     [InlineData(1, 0, "https://example.org/watch/7", true)]
-    [InlineData(0, 1, "https://cdn.example/video.mp4", true)]
+    [InlineData(0, 1, "https://cdn.example/video.mp4", false)]
     [InlineData(2, 0, "https://example.org/parser", true)]
     [InlineData(0, 0, "", true)]
     [InlineData(0, 0, "javascript:alert(1)", true)]
@@ -77,7 +86,7 @@ public sealed class DrpySourceTests
         using var source = new DrpySource(Site, () => new FakeRuntime { PlayJson = "{\"parse\":" + parse + ",\"jx\":" + jx + ",\"url\":\"" + url + "\"}" });
         var id = (await source.GetDetailAsync("7")).Lines[0].Episodes[0].Id;
         if (fails) await Assert.ThrowsAnyAsync<Exception>(() => source.ResolvePlaybackAsync("7", id));
-        else Assert.Equal(ResolutionKind.Direct, (await source.ResolvePlaybackAsync("7", id)).Resolution);
+        else Assert.Equal(jx==1?ResolutionKind.Json:ResolutionKind.Direct, (await source.ResolvePlaybackAsync("7", id)).Resolution);
     }
 
     [Fact]

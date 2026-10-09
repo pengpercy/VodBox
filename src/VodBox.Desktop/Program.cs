@@ -11,6 +11,7 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new AvaloniaNativePlatformOptions { RenderingMode=[AvaloniaNativeRenderingMode.OpenGl,AvaloniaNativeRenderingMode.Software] })
             .WithInterFont()
             .LogToTrace();
 }

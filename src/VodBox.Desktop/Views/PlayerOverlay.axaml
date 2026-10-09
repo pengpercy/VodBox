@@ -12,6 +12,7 @@
     <!-- 黑底 + libmpv 渲染面 -->
     <Rectangle Fill="#000000" />
     <Panel x:Name="VideoHost" />
+    <v:DanmakuLayer x:Name="DanmakuCanvas" IsHitTestVisible="False" ClipToBounds="True" />
 
     <!-- 控制层：参考主流播放器（Earth 图）一比一布局 -->
     <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding Visible}">

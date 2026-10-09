@@ -7,6 +7,8 @@ namespace VodBox.Core;
 /// <summary>应用统一 JSON 选项：AOT 源码生成、骆驼命名、中文化不转义。</summary>
 public static class Json
 {
+    public static JsonTypeInfo<T> TypeInfo<T>() => (JsonTypeInfo<T>)Options.GetTypeInfo(typeof(T));
+
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
     {
         TypeInfoResolver = AppJsonContext.Default,
@@ -15,10 +17,15 @@ public static class Json
     };
 }
 
+[JsonSerializable(typeof(RemotePlaybackStatus))]
+[JsonSerializable(typeof(List<string>))]
+[JsonSerializable(typeof(LibraryBackup))]
 [JsonSerializable(typeof(TvBoxConfig))]
 [JsonSerializable(typeof(TvBoxSite))]
 [JsonSerializable(typeof(TvBoxLive))]
 [JsonSerializable(typeof(TvBoxParse))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]

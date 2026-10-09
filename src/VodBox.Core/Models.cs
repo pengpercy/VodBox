@@ -27,6 +27,8 @@ public sealed class TvBoxLive
     public string? Url { get; set; }
     [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
     public string? Epg { get; set; }
+    public string? Ua { get; set; }
+    public int Timeout { get; set; }
 }
 
 /// <summary>TVBox 站点定义。字段名对应原 JSON（Gson @SerializedName）。</summary>
@@ -77,6 +79,7 @@ public sealed record SourceInfo
     public required SourceRuntime Runtime { get; init; }
     public string? Api { get; init; }
     public string? Ext { get; init; }
+    public string? PlayUrl {get;init;}
     public int Type { get; init; }
     public bool Searchable { get; init; } = true;
     public bool Changeable { get; init; } = true;
@@ -144,6 +147,7 @@ public sealed record PlaybackRequest
     public required string Uri { get; init; }
     public string Title { get; init; } = "媒体";
     public ResolutionKind Resolution { get; init; }
+    public string? ParseEndpoint {get;init;}
     public Dictionary<string, string> Headers { get; init; } = [];
     public long StartPositionMs { get; init; }
     public string SourceKey { get; init; } = "local";
@@ -163,13 +167,16 @@ public sealed record PlaybackRequest
 // ---------- 直播模型 ----------
 
 public sealed record LiveSource(string Id, string Name, string Uri);
-public sealed record LiveChannel
+public sealed record LiveChannel : System.ComponentModel.INotifyPropertyChanged
 {
     public required string Name { get; init; }
     public IReadOnlyList<string> Uris { get; init; } = [];
+    public Dictionary<string, string> Headers { get; init; } = [];
     public string? Logo { get; init; }
     public string Group { get; init; } = "未分组";
     public string? TvgId { get; init; }
+    public string? CatchupSource { get; init; }
+    public int CatchupDays { get; init; }
     public int Number { get; init; }
 
     // ---- 展示态（运行时可变；EPG/台标由 S4 直播中心刷新） ----
@@ -178,9 +185,19 @@ public sealed record LiveChannel
     /// <summary>台标底色（hex），演示期占位。</summary>
     public string BadgeColor { get; set; } = "#C0392B";
     /// <summary>当前节目（EPG now）。</summary>
-    public string EpgNow { get; set; } = "";
+    public string EpgNow
+    {
+        get => _epgNow;
+        set { if (_epgNow == value) return; _epgNow = value; PropertyChanged?.Invoke(this, new(nameof(EpgNow))); }
+    }
+    private string _epgNow = "";
     /// <summary>下一节目（EPG next）。</summary>
-    public string EpgNext { get; set; } = "";
+    public string EpgNext
+    {
+        get => _epgNext;
+        set { if (_epgNext == value) return; _epgNext = value; PropertyChanged?.Invoke(this, new(nameof(EpgNext))); }
+    }
+    private string _epgNext = "";
 
     /// <summary>是否正在播放（列表行 LIVE 角标 + 选中底色）。列表渲染后再赋值，需通知 UI。</summary>
     public bool IsCurrent
@@ -199,6 +216,7 @@ public sealed record LiveChannel
 }
 public sealed record LiveGroup(string Name, IReadOnlyList<LiveChannel> Channels, bool Locked, int DisplayCount = -1)
 {
+    [JsonIgnore] public string? PasswordHash {get;init;}
     /// <summary>面板显示的频道数（密码分组未解锁时也可显示总量的假计数）。</summary>
     public int Count => DisplayCount >= 0 ? DisplayCount : Channels.Count;
 }
@@ -239,5 +257,5 @@ public sealed record FavoriteEntry
 // ---------- 播放器 ----------
 
 public sealed record MediaTrack(string Id, string Name, TrackKind Kind, bool IsSelected);
-public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration, bool CanSeek, string? Error = null);
+public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration, bool CanSeek, string? Error = null,double? VideoAspectRatio=null);
 public sealed record PlaybackEvent(long SessionId, PlaybackSnapshot Snapshot);

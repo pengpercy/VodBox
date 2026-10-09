@@ -379,9 +379,10 @@
           "Avalonia.Fonts.Inter": "[12.1.3, )",
           "Avalonia.Themes.Fluent": "[12.1.3, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "VodBox.Core": "[0.2.0, )",
-          "VodBox.Infrastructure": "[0.2.0, )",
-          "VodBox.Playback.Mpv": "[0.2.0, )"
+          "QRCoder": "[1.6.0, )",
+          "VodBox.Core": "[0.2.1, )",
+          "VodBox.Infrastructure": "[0.2.1, )",
+          "VodBox.Playback.Mpv": "[0.2.1, )"
         }
       },
       "vodbox.infrastructure": {
@@ -389,14 +390,21 @@
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.0, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.2.0, )"
+          "VodBox.Core": "[0.2.1, )",
+          "VodBox.PluginHost": "[0.2.1, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.3, )",
-          "VodBox.Core": "[0.2.0, )"
+          "VodBox.Core": "[0.2.1, )"
+        }
+      },
+      "vodbox.pluginhost": {
+        "type": "Project",
+        "dependencies": {
+          "VodBox.Core": "[0.2.1, )"
         }
       },
       "Avalonia": {
@@ -456,6 +464,12 @@
         "dependencies": {
           "SQLitePCLRaw.core": "2.1.11"
         }
+      },
+      "QRCoder": {
+        "type": "CentralTransitive",
+        "requested": "[1.6.0, )",
+        "resolved": "1.6.0",
+        "contentHash": "XmPA81eo+oRxBuyVdswsSkTGTE1d3thfF11Z1PdD7oB56A6HU4G4AAOdySmGRMb/cljwlFTMWUtosGEnwpS6GA=="
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {
         "type": "CentralTransitive",

@@ -15,6 +15,164 @@ public sealed class LibraryStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ActiveSubscriptionCannotSelectAnotherKindOrClearOnInvalidId()
+    {
+        await _store.AddAsync(new ConfigSubscription { Url = "vod", Name = "点播", Kind = ConfigKind.Vod });
+        await _store.AddAsync(new ConfigSubscription { Url = "live", Name = "直播", Kind = ConfigKind.Live });
+        var vod = Assert.Single(await _store.ListAsync(ConfigKind.Vod));
+        var live = Assert.Single(await _store.ListAsync(ConfigKind.Live));
+        await _store.SetActiveAsync(ConfigKind.Vod, vod.Id);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.SetActiveAsync(ConfigKind.Vod, live.Id));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.SetActiveAsync(ConfigKind.Vod, -1));
+        Assert.True(Assert.Single(await _store.ListAsync(ConfigKind.Vod)).Active);
+        Assert.False(Assert.Single(await _store.ListAsync(ConfigKind.Live)).Active);
+    }
+
+    [Fact]
+    public async Task LogicalBackupRoundTripsHistoryPreferencesAndRejectsInvalidVersion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = "m", Title = "片" }, ct);
+        _store.Set("player.volume", 35);
+        var backup = await new LibraryBackupService(_store).ExportAsync(ct);
+        using var restored = new LibraryStore(Path.Combine(_directory, "restored.db"));
+        var service = new LibraryBackupService(restored);
+        await service.ImportMergeAsync(backup, ct);
+        Assert.Equal("片", Assert.Single(await restored.GetHistoryAsync(ct: ct)).Title);
+        Assert.Equal(35, restored.GetInt("player.volume"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => service.ImportMergeAsync("{\"version\":2}", ct));
+        Assert.Single(await restored.GetHistoryAsync(ct: ct));
+    }
+
+    [Fact]
+    public async Task BackupFailureRollsBackAllEarlierWritesAndKeepsNewerHistory()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var target = Path.Combine(_directory, "atomic.db");
+        using var store = new LibraryStore(target);
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + target);
+        connection.Open();
+        using (var trigger = connection.CreateCommand())
+        {
+            trigger.CommandText = "CREATE TRIGGER reject_restore BEFORE INSERT ON prefs WHEN NEW.key='reject' BEGIN SELECT RAISE(ABORT,'test restore failure'); END";
+            trigger.ExecuteNonQuery();
+        }
+        var backup = new LibraryBackup
+        {
+            History = [new HistoryEntry { SourceKey="s",SourceName="站",MediaId="new",Title="新记录" }],
+            Preferences = new() { ["safe"]="value", ["reject"]="value" },
+        };
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => store.ImportBackupAtomicAsync(backup,ct));
+        Assert.Empty(await store.GetHistoryAsync(ct:ct));
+        Assert.Equal("missing",store.GetString("safe","missing"));
+        var latest = new HistoryEntry { SourceKey="s",SourceName="站",MediaId="m",Title="最近",UpdatedAt=DateTimeOffset.Now };
+        await store.SaveHistoryAsync(latest,ct);
+        await store.ImportBackupAtomicAsync(new LibraryBackup { History=[latest with { Title="旧备份",UpdatedAt=latest.UpdatedAt.AddDays(-1) }] },ct);
+        Assert.Equal("最近",Assert.Single(await store.GetHistoryAsync(ct:ct)).Title);
+    }
+
+    [Fact]
+    public async Task WatchedEpisodesArePersistedAndIsolatedBySourceMediaAndLine()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await _store.MarkEpisodeWatchedAsync("s","m","line1","ep1",ct);
+        await _store.MarkEpisodeWatchedAsync("s","m","line1","ep1",ct);
+        Assert.Contains("ep1",await _store.GetWatchedEpisodesAsync("s","m","line1",ct));
+        Assert.Empty(await _store.GetWatchedEpisodesAsync("s","m","line2",ct));
+        Assert.Empty(await _store.GetWatchedEpisodesAsync("other","m","line1",ct));
+    }
+
+    [Fact]
+    public async Task WatchedRecordsRoundTripBackupAndClearWithHistory()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await _store.MarkEpisodeWatchedAsync("s","m","line","ep1",ct);
+        var backup=await new LibraryBackupService(_store).ExportAsync(ct);
+        using var restored=new LibraryStore(Path.Combine(_directory,"watched-restore.db"));
+        await new LibraryBackupService(restored).ImportMergeAsync(backup,ct);
+        Assert.Contains("ep1",await restored.GetWatchedEpisodesAsync("s","m","line",ct));
+        await restored.ClearHistoryAsync(ct);
+        Assert.Empty(await restored.GetWatchedEpisodesAsync("s","m","line",ct));
+    }
+
+    [Fact]
+    public async Task DeletingMediaHistoryAlsoDeletesOnlyItsWatchedEpisodes()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await _store.MarkEpisodeWatchedAsync("s","one","l","e",ct);
+        await _store.MarkEpisodeWatchedAsync("s","two","l","e",ct);
+        await _store.DeleteHistoryAsync("s","one",ct);
+        Assert.Empty(await _store.GetWatchedEpisodesAsync("s","one","l",ct));
+        Assert.Contains("e",await _store.GetWatchedEpisodesAsync("s","two","l",ct));
+    }
+
+    [Fact]
+    public async Task BackupRestoresActiveSubscriptionConsistentlyWithCurrentUrl()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await _store.ImportBackupAtomicAsync(new LibraryBackup
+        {
+            Subscriptions=[new ConfigSubscription{Kind=ConfigKind.Vod,Url="https://example.com/one",Name="一",Active=true},new ConfigSubscription{Kind=ConfigKind.Vod,Url="https://example.com/two",Name="二"}],
+            Preferences=new(){["config_vod"]="https://example.com/two"},
+        },ct);
+        var selected=Assert.Single((await _store.ListAsync(ConfigKind.Vod,ct)).Where(entry=>entry.Active));
+        Assert.Equal("https://example.com/two",selected.Url);
+        Assert.Equal(selected.Url,_store.GetString("config_vod"));
+    }
+
+    [Fact]
+    public async Task LegacyVersionOneBackupWithoutNewFieldsStillImports()
+    {
+        var json="{\"version\":1,\"history\":[],\"favorites\":[],\"subscriptions\":[],\"preferences\":{\"player.volume\":\"50\"}}";
+        var parsed=System.Text.Json.JsonSerializer.Deserialize(json,Json.TypeInfo<LibraryBackup>())!;
+        Assert.Equal(1,parsed.Version);
+        Assert.NotNull(parsed.History);Assert.NotNull(parsed.Preferences);
+        await new LibraryBackupService(_store).ImportMergeAsync(json,TestContext.Current.CancellationToken);
+        Assert.Equal(50,_store.GetInt("player.volume"));Assert.Empty(await _store.ExportWatchedAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ExplicitNullWatchedListAndMalformedBackupRootRemainRejected()
+    {
+        var service=new LibraryBackupService(_store);var ct=TestContext.Current.CancellationToken;
+        await Assert.ThrowsAsync<InvalidDataException>(()=>service.ImportMergeAsync("{\"version\":1,\"watched\":null,\"history\":[],\"favorites\":[],\"subscriptions\":[],\"preferences\":{}}",ct));
+        await Assert.ThrowsAsync<InvalidDataException>(()=>service.ImportMergeAsync("[]",ct));
+        Assert.Empty(await _store.GetHistoryAsync(ct:ct));Assert.Empty(await _store.ExportWatchedAsync(ct));
+    }
+
+    [Fact]
+    public async Task ProgrammeBackupValidatesBeforeTransactionAndRestoresWithPreferences()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        var start=new DateTimeOffset(2026,10,9,9,0,0,TimeSpan.FromHours(8));
+        var xml=ProgrammeStore.Serialize([new Programme("c1","节目",start,start.AddHours(1))]);
+        _store.Set("live.epg-xml",xml);
+        var backup=await new LibraryBackupService(_store).ExportAsync(ct);
+        using var restored=new LibraryStore(Path.Combine(_directory,"epg-backup.db"));var service=new LibraryBackupService(restored);
+        await service.ImportMergeAsync(backup,ct);Assert.Equal("节目",Assert.Single(XmlTvParser.Parse(restored.GetString("live.epg-xml"))).Title);
+        var corrupt=new LibraryBackup{Preferences=new(){["live.epg-xml"]="<html/>",["test-change"]="bad"}};
+        await Assert.ThrowsAsync<InvalidDataException>(()=>service.ImportMergeAsync(System.Text.Json.JsonSerializer.Serialize(corrupt,Json.TypeInfo<LibraryBackup>()),ct));
+        Assert.Equal("",restored.GetString("test-change"));Assert.Equal(xml,restored.GetString("live.epg-xml"));
+    }
+
+    [Fact]
+    public void DecimalPreferencesUseInvariantFormatAndRejectNonFiniteValues()
+    {
+        var original=System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture=System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+            _store.Set("rate",1.5);Assert.Equal("1.5",_store.GetString("rate"));Assert.Equal(1.5,_store.GetDouble("rate"));
+            _store.Set("legacy","1,5");Assert.Equal(1.5,_store.GetDouble("legacy"));
+            System.Globalization.CultureInfo.CurrentCulture=System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            Assert.Equal(1.5,_store.GetDouble("rate"));Assert.Equal(2,_store.GetDouble("legacy",2));
+            Assert.Throws<ArgumentOutOfRangeException>(()=>_store.Set("bad",double.NaN));
+            _store.Set("bad","Infinity");Assert.Equal(1,_store.GetDouble("bad",1));
+        }
+        finally{System.Globalization.CultureInfo.CurrentCulture=original;}
+    }
+
+    [Fact]
     public async Task HistoryUpsertsBySourceAndMedia()
     {
         var first = MakeHistory("src1", "m1", position: 1000);

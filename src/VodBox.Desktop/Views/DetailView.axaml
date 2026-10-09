@@ -26,26 +26,26 @@
           <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="13" Foreground="#4CC2FF" />
           <!-- 元信息行：站源 + 年份 + 地区 + 类型 + 时长（对齐设计稿 p-detail） -->
           <WrapPanel Orientation="Horizontal">
-            <TextBlock FontSize="12" Foreground="#85FFFFFF">
-              <Run Text="站源：" /><Run Text="{Binding SourceName}" Foreground="#C7FFFFFF" />
+            <TextBlock FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}">
+              <Run Text="站源：" /><Run Text="{Binding SourceName}" Foreground="{DynamicResource TextSecondaryBrush}" />
             </TextBlock>
-            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
-              <TextBlock Text="{Binding Detail.Item.Year}" FontSize="12" Foreground="#C7FFFFFF" />
+            <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
+              <TextBlock Text="{Binding Detail.Item.Year}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
             </Border>
-            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
-              <TextBlock Text="{Binding Detail.Item.Area}" FontSize="12" Foreground="#C7FFFFFF" />
+            <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
+              <TextBlock Text="{Binding Detail.Item.Area}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
             </Border>
-            <Border Background="#12FFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
-              <TextBlock Text="{Binding Detail.Item.TypeName}" FontSize="12" Foreground="#C7FFFFFF" />
+            <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
+              <TextBlock Text="{Binding Detail.Item.TypeName}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
             </Border>
           </WrapPanel>
-          <TextBlock FontSize="12.5" Foreground="#85FFFFFF" TextWrapping="Wrap">
-            <Run Text="导演：" /><Run Text="{Binding Detail.Director}" Foreground="#C7FFFFFF" />
+          <TextBlock FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap">
+            <Run Text="导演：" /><Run Text="{Binding Detail.Director}" Foreground="{DynamicResource TextSecondaryBrush}" />
           </TextBlock>
-          <TextBlock FontSize="12.5" Foreground="#85FFFFFF" TextWrapping="Wrap">
-            <Run Text="主演：" /><Run Text="{Binding Detail.Actor}" Foreground="#C7FFFFFF" />
+          <TextBlock FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap">
+            <Run Text="主演：" /><Run Text="{Binding Detail.Actor}" Foreground="{DynamicResource TextSecondaryBrush}" />
           </TextBlock>
-          <TextBlock Text="{Binding Detail.Description}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9"
+          <TextBlock Text="{Binding Detail.Description}" FontSize="12.5" Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.9"
                      TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
           <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
             <!-- 主按钮智能显示续播集数（读取历史进度，S2 接运行时逻辑；设计稿为「续播 第12集」） -->
@@ -56,25 +56,25 @@
                 <TextBlock Text="{Binding PlayLabel}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Command="{Binding ToggleFavoriteCommand}" Background="#12FFFFFF" Foreground="White"
-                    BorderThickness="1" BorderBrush="#17FFFFFF" CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+            <Button Command="{Binding ToggleFavoriteCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                    BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
                 <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Background="#12FFFFFF" Foreground="White" BorderThickness="1" BorderBrush="#17FFFFFF"
+            <Button Command="{Binding SearchOtherSourcesCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
                     CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" />
-                <TextBlock Text="换源" VerticalAlignment="Center" />
+                <TextBlock Text="跨站搜索" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Background="#12FFFFFF" Foreground="White" BorderThickness="1" BorderBrush="#17FFFFFF"
+            <Button Command="{Binding OpenRemoteControlCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
                     CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" />
-                <TextBlock Text="推送" VerticalAlignment="Center" />
+                <TextBlock Text="遥控设置" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </WrapPanel>
@@ -105,11 +105,11 @@
               </Border>
               <!-- 左下试看提示 -->
               <Border Background="#66000000" Padding="10,5" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,10" CornerRadius="0,8,8,0">
-                <TextBlock Text="试看模式 · 点击全屏播放" FontSize="10.5" Foreground="#C7FFFFFF" />
+                <TextBlock Text="试看模式 · 点击全屏播放" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" />
               </Border>
             </Panel>
           </Border>
-          <TextBlock Text="鼠标双击画面 / 按 Enter 进入全屏播放窗口" FontSize="10.5" Foreground="#85FFFFFF"
+          <TextBlock Text="鼠标双击画面 / 按 Enter 进入全屏播放窗口" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}"
                      HorizontalAlignment="Center" />
         </StackPanel>
       </Grid>
@@ -118,7 +118,7 @@
       <StackPanel Spacing="10">
         <StackPanel Orientation="Horizontal" Spacing="10">
           <TextBlock Text="线路" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="播放失败时可切换其他线路" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <TextBlock Text="播放失败时可切换其他线路" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
         </StackPanel>
         <ItemsControl ItemsSource="{Binding Lines}">
           <ItemsControl.ItemsPanel>
@@ -130,7 +130,7 @@
             <DataTemplate>
               <Button Content="{Binding Name}" Click="OnPickLine" Tag="{Binding}"
                       CornerRadius="16" Padding="14,6" FontSize="12.5" Cursor="Hand"
-                      Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF" />
+                      Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -140,11 +140,11 @@
       <StackPanel Spacing="10">
         <StackPanel Orientation="Horizontal" Spacing="10">
           <TextBlock Text="剧集" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding EpisodeCountLabel}" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding EpisodeCountLabel}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
           <Panel />
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button Command="{Binding ToggleEpisodeOrderCommand}" CornerRadius="6" Background="#12FFFFFF" Padding="10,4" Cursor="Hand">
-              <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#C7FFFFFF">
+            <Button Command="{Binding ToggleEpisodeOrderCommand}" CornerRadius="6" Background="{DynamicResource CardHoverBrush}" Padding="10,4" Cursor="Hand">
+              <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                 <PathIcon Data="{StaticResource Icon.SwapVertical}" Width="18" Height="18" VerticalAlignment="Center" />
                 <TextBlock Text="倒序" FontSize="11.5" VerticalAlignment="Center" />
               </StackPanel>
@@ -166,10 +166,10 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Grid Margin="0,0,8,10" Width="132">
-                      <Button Click="OnPickEpisode" Tag="{Binding}" ToolTip.Tip="{Binding Title}"
+                      <Button Click="OnPickEpisode" Tag="{Binding Episode}" ToolTip.Tip="{Binding Title}"
                               CornerRadius="7" Padding="10,9" FontSize="12.5" Cursor="Hand"
-                              Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="1" BorderBrush="#17FFFFFF">
-                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                              Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}">
+                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
                       </Button>
                     </Grid>
                   </DataTemplate>

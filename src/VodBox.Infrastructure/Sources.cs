@@ -13,6 +13,7 @@ public sealed class MacCmsSource : IContentSource
 
     public string Key => _site.Key;
     public string Name => _site.Name;
+    public string? ParseEndpoint=>_site.PlayUrl;
 
     public MacCmsSource(SourceInfo site, DefaultHttp http)
     {
@@ -33,7 +34,7 @@ public sealed class MacCmsSource : IContentSource
     {
         var url = Api("list", new Dictionary<string, string>());
         var response = await _http.GetStringAsync(url, ct: ct);
-        var parsed = JsonSerializer.Deserialize<MacCmsCategoryResponse>(response, Json.Options)
+        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsCategoryResponse>())
                      ?? throw new InvalidDataException("分类响应解析失败");
         return parsed.Classes
             .Where(c => !string.IsNullOrWhiteSpace(c.TypeId))
@@ -55,7 +56,7 @@ public sealed class MacCmsSource : IContentSource
             if (filters.TryGetValue("class", out var cls) && !string.IsNullOrEmpty(cls)) args["class"] = cls;
         }
         var response = await _http.GetStringAsync(Api("videolist", args), ct: ct);
-        var parsed = JsonSerializer.Deserialize<MacCmsListResponse>(response, Json.Options)
+        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsListResponse>())
                      ?? throw new InvalidDataException("列表响应解析失败");
         var page_ = parsed.Page <= 0 ? page : parsed.Page;
         return new MediaPage(parsed.List.Select(ToItem).ToList(), page_, parsed.PageCount);
@@ -64,7 +65,7 @@ public sealed class MacCmsSource : IContentSource
     public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
     {
         var response = await _http.GetStringAsync(Api("videolist", new Dictionary<string, string> { ["ids"] = mediaId }), ct: ct);
-        var parsed = JsonSerializer.Deserialize<MacCmsDetailResponse>(response, Json.Options)
+        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsDetailResponse>())
                      ?? throw new InvalidDataException("详情响应解析失败");
         var vod = parsed.List.FirstOrDefault() ?? throw new InvalidDataException($"未找到条目 {mediaId}");
         return ToDetail(vod);
@@ -74,7 +75,7 @@ public sealed class MacCmsSource : IContentSource
     {
         var args = new Dictionary<string, string> { ["wd"] = query, ["pg"] = page.ToString(CultureInfo.InvariantCulture) };
         var response = await _http.GetStringAsync(Api("videolist", args), ct: ct);
-        var parsed = JsonSerializer.Deserialize<MacCmsSearchResponse>(response, Json.Options)
+        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsSearchResponse>())
                      ?? throw new InvalidDataException("搜索响应解析失败");
         return new MediaPage(parsed.List.Select(ToItem).ToList(), page, page <= 1 ? 1 : page);
     }
@@ -131,23 +132,62 @@ public sealed class MacCmsSource : IContentSource
 }
 
 /// <summary>直播源工厂：把 TVBox lives 配置转为 LiveGroup 集合。</summary>
-public sealed class LiveSources(DefaultHttp http)
+public sealed class LiveSources
 {
+    private readonly Func<string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<string>> _fetch;
+    public IReadOnlyList<string> Warnings { get; private set; } = [];
+    public LiveSources(DefaultHttp http) : this(async (url, headers, ct) => DefaultHttp.Decode(await http.GetBoundedAsync(url, 8 * 1024 * 1024, ct, headers))) { }
+    public LiveSources(Func<string, CancellationToken, Task<string>> fetch) : this((url, _, ct) => fetch(url, ct)) { }
+    public LiveSources(Func<string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<string>> fetch) => _fetch = fetch;
+
     public async Task<List<LiveGroup>> LoadAsync(string url, CancellationToken ct = default)
     {
-        var text = url.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || await IsM3u(url)
-            ? await http.GetStringAsync(url, ct: ct)
-            : await http.GetStringAsync(url, ct: ct);
-        return M3uParser.IsM3u(text) ? M3uParser.ParseGroups(text) : TxtLiveParser.Parse(text);
+        Warnings = [];
+        var text = File.Exists(url) ? await File.ReadAllTextAsync(url, ct) : await _fetch(url, null, ct);
+        if (!text.TrimStart().StartsWith('{')) return Parse(text);
+        var config = ConfigLoader.Parse(text) ?? throw new InvalidDataException("直播配置解析失败。");
+        var groups = new List<LiveGroup>();
+        var failures = new List<string>();
+        foreach (var source in config.Lives.Take(32))
+        {
+            if (string.IsNullOrWhiteSpace(source.Url)) continue;
+            var address = source.Url;
+            if (!Uri.TryCreate(address, UriKind.Absolute, out _))
+                address = Uri.TryCreate(url, UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"
+                    ? new Uri(baseUri, address).AbsoluteUri : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(url))!, address);
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromMilliseconds(source.Timeout > 0 ? Math.Clamp(source.Timeout, 100, 60000) : 12000));
+                var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(source.Ua)) headers["User-Agent"] = source.Ua;
+                var content = File.Exists(address) ? await File.ReadAllTextAsync(address, timeout.Token) : await _fetch(address, headers, timeout.Token);
+                foreach (var group in Parse(content))
+                {
+                    var channels=group.Channels.Select(channel=>
+                    {
+                        var playbackHeaders=new Dictionary<string,string>(headers,StringComparer.OrdinalIgnoreCase);
+                        foreach(var (key,value) in channel.Headers)playbackHeaders[key]=value;
+                        return channel with {Headers=playbackHeaders};
+                    }).ToArray();
+                    groups.Add(group with { Name = string.IsNullOrWhiteSpace(source.Name) ? group.Name : source.Name + " · " + group.Name,Channels=channels });
+                }
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { failures.Add(source.Name + ": 加载超时"); }
+            catch (Exception error) when (error is not OperationCanceledException) { failures.Add(source.Name + ": " + error.Message); }
+        }
+        if (config.Lives.Count > 32) failures.Add("直播源超过32个，只加载前32个");
+        Warnings = failures.ToArray();
+        if (groups.Count == 0 && failures.Count > 0) throw new InvalidDataException("全部直播源失败：" + string.Join("；", failures));
+        var number = 0;
+        return groups.Select(group => group with { Channels = group.Channels.Select(channel => channel with { Number = ++number }).ToArray() }).ToList();
     }
 
-    private async Task<bool> IsM3u(string url) => url.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase)
-        || url.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)
-        || url.Contains("m3u", StringComparison.OrdinalIgnoreCase);
+    private static List<LiveGroup> Parse(string text) => M3uParser.IsM3u(text) ? M3uParser.ParseGroups(text) : TxtLiveParser.Parse(text);
 }
 
 /// <summary>M3U 直播列表解析（#EXTINF + group-title + tvg-logo / tvg-id）。
-/// 注意：其余 # 指令（如 #EXTVLCOPT / #KODIPROP 的 UA-Referer、catchup 回看属性）目前一律跳过，未解析。</summary>
+/// 支持 EXT VLC 的 http-user-agent/http-referrer 与 Kodi stream_headers；其余指令和 catchup 尚未消费。</summary>
 public static class M3uParser
 {
     public static bool IsM3u(string text) => text.Contains("#EXTM3U", StringComparison.OrdinalIgnoreCase);
@@ -155,6 +195,9 @@ public static class M3uParser
     public static List<LiveGroup> ParseGroups(string text)
     {
         var channels = new List<LiveChannel>();
+        string? pendingCatchup = null;
+        int pendingDays = 0;
+        var pendingHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         string? pendingName = null, pendingGroup = "未分组", pendingLogo = null, pendingTvg = null;
         foreach (var rawLine in text.Split('\n'))
         {
@@ -162,6 +205,9 @@ public static class M3uParser
             if (line.Length == 0) continue;
             if (line.StartsWith("#EXTINF", StringComparison.OrdinalIgnoreCase))
             {
+                pendingHeaders.Clear();
+                pendingCatchup = Attr(line, "catchup-source");
+                pendingDays = int.TryParse(Attr(line, "catchup-days"), out var days) ? Math.Clamp(days, 0, 30) : 0;
                 pendingName = null; pendingGroup = "未分组"; pendingLogo = null; pendingTvg = null;
                 var comma = line.IndexOf(',');
                 var attrs = comma > 0 ? line[..comma] : line;
@@ -170,6 +216,21 @@ public static class M3uParser
                 pendingLogo = Attr(attrs, "tvg-logo");
                 pendingTvg = Attr(attrs, "tvg-id");
             }
+            else if (line.StartsWith("#EXTVLCOPT:", StringComparison.OrdinalIgnoreCase))
+            {
+                var option = line[11..];
+                var equals = option.IndexOf('=');
+                if (equals > 0) AddHeader(pendingHeaders, option[..equals], option[(equals + 1)..]);
+            }
+            else if (line.StartsWith("#KODIPROP:inputstream.adaptive.stream_headers=", StringComparison.OrdinalIgnoreCase))
+            {
+                var equals = line.IndexOf('=');
+                foreach (var option in line[(equals + 1)..].Split('&'))
+                {
+                    var split = option.IndexOf('=');
+                    if (split > 0) AddHeader(pendingHeaders, option[..split], Uri.UnescapeDataString(option[(split + 1)..]));
+                }
+            }
             else if (!line.StartsWith('#'))
             {
                 var name = string.IsNullOrWhiteSpace(pendingName) ? GuessName(line) : pendingName;
@@ -177,14 +238,28 @@ public static class M3uParser
                 {
                     Name = name,
                     Uris = [line],
+                    Headers = new Dictionary<string, string>(pendingHeaders, StringComparer.OrdinalIgnoreCase),
                     Logo = pendingLogo,
                     Group = pendingGroup,
                     TvgId = pendingTvg,
+                    CatchupSource = pendingCatchup, CatchupDays = pendingDays,
                 });
-                pendingName = null; pendingLogo = null; pendingTvg = null;
+                pendingName = null; pendingLogo = null; pendingTvg = null; pendingHeaders.Clear();
             }
         }
         return Group(channels);
+    }
+
+    private static void AddHeader(Dictionary<string, string> headers, string key, string value)
+    {
+        if (value.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("直播请求头包含非法控制字符。");
+        var name = key.Trim().ToLowerInvariant() switch
+        {
+            "http-user-agent" or "user-agent" => "User-Agent",
+            "http-referrer" or "http-referer" or "referer" or "referrer" => "Referer",
+            _ => null,
+        };
+        if (name is not null) headers[name] = value.Trim();
     }
 
     private static string? Attr(string attrs, string key)
@@ -210,7 +285,18 @@ public static class M3uParser
         return channels
             .GroupBy(c => c.Group)
             .OrderBy(g => g.Key == "未分组" ? 1 : 0)
-            .Select(g => new LiveGroup(g.Key, g.Select(c => c with { Number = ++number }).ToList(), false))
+            .Select(g =>
+            {
+                var name=g.Key;string? hash=null;
+                // TVBox TXT惯例：分组名_密码。只保存摘要，不在展示名保留密码。
+                var separator=name.LastIndexOf('_');
+                if(separator>0&&separator<name.Length-1)
+                {
+                    hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name[(separator+1)..])));
+                    name=name[..separator];
+                }
+                return new LiveGroup(name,g.Select(c=>c with{Number=++number,Group=name}).ToList(),hash is not null){PasswordHash=hash};
+            })
             .ToList();
     }
 }

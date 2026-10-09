@@ -4,7 +4,7 @@ on:
     inputs:
       version:
         type: string
-        default: '0.2.0'
+        default: '0.2.1'
 jobs:
   build:
     name: AOT ${{ matrix.rid }}
@@ -43,6 +43,8 @@ jobs:
       - name: Restore and test
         shell: bash
         run: |
+          python3 build/test_bundle.py
+          python3 build/test_package.py
           dotnet restore VodBox.slnx
           dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore
           dotnet test tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj -c Debug --no-restore
@@ -55,6 +57,33 @@ jobs:
       - name: Bundle pinned libmpv
         shell: bash
         run: python3 build/bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+      - name: Build and bundle pinned QuickJS bridge
+        shell: bash
+        run: python3 build/quickjs/build.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+      - name: Verify bundled QuickJS and drpy runtime
+        shell: bash
+        run: |
+          case "${{ matrix.rid }}" in
+            win-*) native=vodbox_quickjs.dll ;;
+            osx-*) native=libvodbox_quickjs.dylib ;;
+            *) native=libvodbox_quickjs.so ;;
+          esac
+          export VODBOX_QUICKJS_LIB="$PWD/artifacts/publish/${{ matrix.rid }}/$native"
+          dotnet run --project tests/VodBox.QuickJs.Smoke -c Release
+          dotnet run --project tests/VodBox.Drpy.Smoke -c Release -- --offline
+      - name: Verify NativeAOT script runtime
+        shell: bash
+        run: |
+          case "${{ matrix.rid }}" in
+            win-*) native=vodbox_quickjs.dll; suffix=.exe ;;
+            osx-*) native=libvodbox_quickjs.dylib; suffix= ;;
+            *) native=libvodbox_quickjs.so; suffix= ;;
+          esac
+          export VODBOX_QUICKJS_LIB="$PWD/artifacts/publish/${{ matrix.rid }}/$native"
+          dotnet publish tests/VodBox.QuickJs.Smoke -c Release -r ${{ matrix.rid }} -p:PublishAot=true -o artifacts/smoke/quickjs
+          dotnet publish tests/VodBox.Drpy.Smoke -c Release -r ${{ matrix.rid }} -p:PublishAot=true -o artifacts/smoke/drpy
+          "artifacts/smoke/quickjs/VodBox.QuickJs.Smoke$suffix"
+          "artifacts/smoke/drpy/VodBox.Drpy.Smoke$suffix" --offline
       - name: Archive build
         shell: bash
         run: python3 build/archive.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/build

@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\VodBox.Core\VodBox.Core.csproj" />
     <ProjectReference Include="..\VodBox.PluginHost\VodBox.PluginHost.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" />

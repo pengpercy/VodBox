@@ -25,16 +25,12 @@ def package_macos(rid, source: Path, output: Path, version: str):
                     ignore=shutil.ignore_patterns("*.pdb", "*.dbg"))
     resources = contents / "Resources"
     resources.mkdir(parents=True)
-    # libmpv 与依赖库移到 Resources（加载器路径 @loader_path 保持同目录结构）
-    for name in ("lib",):
-        original = contents / "MacOS" / name
-        if original.exists():
-            shutil.move(str(original), resources / name)
+    # Keep libmpv and lib/ together: native dependencies use @loader_path/lib.
     shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/vodbox.icns", resources / "vodbox.icns")
     with (contents / "Info.plist").open("wb") as file:
         plistlib.dump({
             "CFBundleName": "VodBox", "CFBundleDisplayName": "VodBox",
-            "CFBundleIdentifier": "app.vodbox.desktop", "CFBundleExecutable": "VodBox",
+            "CFBundleIdentifier": "app.vodbox.desktop", "CFBundleExecutable": "VodBox.Desktop",
             "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version,
             "CFBundleVersion": version, "CFBundleIconFile": "vodbox.icns",
             "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "12.0",
@@ -53,7 +49,7 @@ def package_macos(rid, source: Path, output: Path, version: str):
     run("codesign", "--force", "--sign", identity, app)
     run("codesign", "--verify", "--deep", "--strict", app)
     run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, output / (stem + ".zip"))
-    with tempfile.TemporaryDirectory(prefix="vodbox-dmg-") as directory:
+    with tempfile.TemporaryDirectory(prefix="vodbox-dmg-",dir=output) as directory:
         stage = Path(directory)
         shutil.copytree(app, stage / "VodBox.app", symlinks=True)
         (stage / "Applications").symlink_to("/Applications")
@@ -63,13 +59,14 @@ def package_macos(rid, source: Path, output: Path, version: str):
 
 def package_linux(rid, source: Path, output: Path, version: str):
     stem = f"vodbox_{version}_{rid}"
-    with tempfile.TemporaryDirectory(prefix="vodbox-pkg-") as directory:
+    output.mkdir(parents=True,exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="vodbox-pkg-",dir=output) as directory:
         stage = Path(directory)
         app = stage / "opt/vodbox"
         shutil.copytree(source, app, symlinks=True)
         (stage / "usr/bin").mkdir(parents=True)
         launcher = stage / "usr/bin/vodbox"
-        launcher.write_text("#!/bin/sh\nexec /opt/vodbox/VodBox \"$@\"\n")
+        launcher.write_text("#!/bin/sh\nexec /opt/vodbox/VodBox.Desktop \"$@\"\n")
         launcher.chmod(0o755)
         apps = stage / "usr/share/applications"
         apps.mkdir(parents=True)
@@ -83,10 +80,10 @@ def package_linux(rid, source: Path, output: Path, version: str):
                          icons / "vodbox.png")
         output.mkdir(parents=True, exist_ok=True)
         run("fpm", "-t", "deb", "-s", "dir", "-C", stage, "-n", "vodbox", "-v", version,
-            "-d", "libmpv2", "--architecture", rid.removeprefix("linux-"),
+            "-d", "libmpv2", "--architecture", ("amd64" if rid == "linux-x64" else "arm64"),
             "-p", output / f"{stem}.deb", "--description", "VodBox 跨平台影音应用")
         run("fpm", "-t", "rpm", "-s", "dir", "-C", stage, "-n", "vodbox", "-v", version,
-            "-d", "libmpv2", "--architecture", rid.removeprefix("linux-"),
+            "-d", "libmpv2", "--architecture", ("x86_64" if rid == "linux-x64" else "aarch64"),
             "-p", output / f"{stem}.rpm", "--description", "VodBox 跨平台影音应用")
 
 

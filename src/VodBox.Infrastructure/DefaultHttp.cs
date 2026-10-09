@@ -16,12 +16,12 @@ public sealed class DefaultHttp : IDisposable
 
     private readonly HttpClient _client;
 
-    public DefaultHttp()
+    public DefaultHttp(bool allowRedirect=true)
     {
         var handler = new HttpClientHandler
         {
             AutomaticDecompression = DecompressionMethods.All,
-            AllowAutoRedirect = true,
+            AllowAutoRedirect = allowRedirect,
             MaxAutomaticRedirections = 5,
         };
         _client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
@@ -81,6 +81,36 @@ public sealed class DefaultHttp : IDisposable
         using var response = await _client.SendAsync(request, timeout.Token);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsByteArrayAsync(timeout.Token);
+    }
+
+    /// <summary>响应头阶段开始流式读取；在分配大缓冲前限制解压后的字节量。</summary>
+    public async Task<byte[]> GetBoundedAsync(string url, int maxBytes, CancellationToken ct = default, IReadOnlyDictionary<string, string>? headers = null)
+    {
+        if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        using var request = new HttpRequestMessage(HttpMethod.Get, NormalizeIdn(url));
+        var agent = BrowserUserAgent;
+        if (headers is not null)
+            foreach (var (key, value) in headers)
+            {
+                if (key.IndexOfAny(['\r', '\n', '\0']) >= 0 || value.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("请求头包含非法字符。");
+                if (key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)) agent = value;
+                else request.Headers.TryAddWithoutValidation(key, value);
+            }
+        request.Headers.TryAddWithoutValidation("User-Agent", agent);
+        using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        response.EnsureSuccessStatusCode();
+        if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException("响应超过大小上限。");
+        await using var input = await response.Content.ReadAsStreamAsync(timeout.Token);
+        using var output = new MemoryStream();
+        var buffer = new byte[8192]; int count;
+        while ((count = await input.ReadAsync(buffer, timeout.Token)) > 0)
+        {
+            if (output.Length + count > maxBytes) throw new InvalidDataException("响应超过大小上限。");
+            output.Write(buffer, 0, count);
+        }
+        return output.ToArray();
     }
 
     /// <summary>

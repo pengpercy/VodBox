@@ -13,12 +13,12 @@
         <PathIcon Data="{StaticResource Icon.Folder}" Width="24" Height="24" VerticalAlignment="Center" />
         <TextBlock Text="本地文件" FontSize="24" FontWeight="SemiBold" />
       </StackPanel>
-      <Border CornerRadius="9" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1"
+      <Border CornerRadius="9" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
               Padding="12,5" VerticalAlignment="Center" MaxWidth="560">
         <TextBlock Text="{Binding CurrentPath}" FontSize="12" Foreground="#4CC2FF"
                    TextTrimming="CharacterEllipsis" />
       </Border>
-      <TextBlock Text="{Binding Status}" FontSize="12" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
     </StackPanel>
 
     <!-- 文件列表：图标 + 名称 + 目录/文件徽标；目录行整行圆角底 -->

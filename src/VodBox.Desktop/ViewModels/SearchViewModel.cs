@@ -10,10 +10,12 @@ namespace VodBox.Desktop.ViewModels;
 public sealed partial class SearchViewModel : ObservableObject
 {
     private readonly Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> _search;
+    private Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>>? _detailedSearch;
     private readonly Dictionary<MediaItem, string> _sourceKeys = new(ReferenceEqualityComparer.Instance);
     private CancellationTokenSource? _request;
     private long _generation;
     private readonly MainViewModel _main;
+    private readonly IPreferences? _preferences;
 
     public ObservableCollection<SearchSiteResult> SiteResults { get; } = [];
     public ObservableCollection<MediaItem> AllResults { get; } = [];
@@ -32,12 +34,40 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>当前选中的站点结果组（右侧网格随它切换）；null = 全部结果。</summary>
     [ObservableProperty] private SearchSiteResult? _selectedSite;
 
-    public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main) { }
+    public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main, services.Prefs)
+    { _detailedSearch=services.Registry.SearchWithFailuresAsync; }
+    internal void SetDetailedSearch(Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>> search)=>_detailedSearch=search;
 
-    internal SearchViewModel(Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> search, MainViewModel main)
+    internal SearchViewModel(Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> search, MainViewModel main, IPreferences? preferences = null)
     {
         _search = search;
         _main = main;
+        _preferences = preferences;
+        try
+        {
+            var values = System.Text.Json.JsonSerializer.Deserialize(preferences?.GetString("search.history", "[]") ?? "[]", Json.TypeInfo<List<string>>()) ?? [];
+            foreach (var query in values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().Take(8)) SearchHistory.Add(query);
+        }
+        catch (System.Text.Json.JsonException) { }
+    }
+
+    partial void OnKeywordChanged(string value)
+    {
+        Suggestions.Clear();
+        foreach (var query in SearchHistory.Where(query => query.Contains(value, StringComparison.OrdinalIgnoreCase)).Take(8))
+            Suggestions.Add(new SuggestItem { Text = query });
+        ShowSuggestions = value.Length > 0 && Suggestions.Count > 0;
+    }
+
+    private void SaveSearchHistory()
+    {
+        try { _preferences?.Set("search.history", System.Text.Json.JsonSerializer.Serialize(SearchHistory.ToList(), Json.TypeInfo<List<string>>())); }
+        catch (Exception error) { System.Diagnostics.Debug.WriteLine(error.Message); }
+    }
+
+    public void CancelPending()
+    {
+        ++_generation;_request?.Cancel();_request=null;Searching=false;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -66,7 +96,8 @@ public sealed partial class SearchViewModel : ObservableObject
         var ct = scope.Token;
         try
         {
-            var results = await _search(query, ct);
+            var aggregate=_detailedSearch is null?null:await _detailedSearch(query,ct);
+            var results = aggregate?.Results??await _search(query, ct);
             ct.ThrowIfCancellationRequested();
             await _main.RunOnUiAsync(() =>
             {
@@ -87,12 +118,12 @@ public sealed partial class SearchViewModel : ObservableObject
                 }
                 RebuildResultRows();
                 Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {retained.Length} 条结果";
+                if(aggregate?.Failures.Count>0)Summary+=$"；{aggregate.Failures.Count} 个站点失败："+string.Join("；",aggregate.Failures.Take(5).Select(failure=>failure.Site.Name+"："+failure.Error));
                 ShowSuggestions = false;
-                if (!SearchHistory.Contains(query))
-                {
-                    SearchHistory.Insert(0, query);
-                    if (SearchHistory.Count > 8) SearchHistory.RemoveAt(SearchHistory.Count - 1);
-                }
+                SearchHistory.Remove(query);
+                SearchHistory.Insert(0, query);
+                if (SearchHistory.Count > 8) SearchHistory.RemoveAt(SearchHistory.Count - 1);
+                SaveSearchHistory();
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -113,6 +144,18 @@ public sealed partial class SearchViewModel : ObservableObject
             });
             scope.Dispose();
         }
+    }
+
+    [RelayCommand]
+    private void DeleteSearchHistory(string word)
+    {
+        SearchHistory.Remove(word);SaveSearchHistory();OnKeywordChanged(Keyword);
+    }
+
+    [RelayCommand]
+    private void ClearSearchHistory()
+    {
+        SearchHistory.Clear();Suggestions.Clear();ShowSuggestions=false;SaveSearchHistory();
     }
 
     [RelayCommand]

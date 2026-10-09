@@ -37,6 +37,7 @@ public sealed partial class DetailViewModel : ObservableObject
     [RelayCommand] private void ToggleEpisodeOrder() => EpisodesReversed = !EpisodesReversed;
     private CancellationTokenSource? _request;
     private long _generation;
+    private IReadOnlySet<string> _watched = new HashSet<string>();
     // 续播上下文：上次看的是哪条线路的哪一集、看到哪；只有选集对得上才复用位置
     private string _resumeLineId = "";
     private string _resumeEpisodeId = "";
@@ -58,6 +59,7 @@ public sealed partial class DetailViewModel : ObservableObject
         OnPropertyChanged(nameof(EpisodeCountLabel));
         RebuildEpisodeRows();
         SelectedEpisode = value?.Episodes.FirstOrDefault();
+        _ = RefreshWatchedAsync();
     }
 
     /// <summary>当前线路剧集按 10 集/行分块（虚拟化网格）。</summary>
@@ -67,7 +69,25 @@ public sealed partial class DetailViewModel : ObservableObject
         if (SelectedLine is null) return;
         var episodes = (EpisodesReversed ? SelectedLine.Episodes.Reverse() : SelectedLine.Episodes).ToList();
         for (var i = 0; i < episodes.Count; i += 10)
-            EpisodeRows.Add(new EpisodeRow(episodes.Skip(i).Take(10).ToList()));
+            EpisodeRows.Add(new EpisodeRow(episodes.Skip(i).Take(10).ToList(), _watched));
+    }
+
+    public void RefreshWatchedFor(string sourceKey,string mediaId,string lineId)
+    {
+        if(_sourceKey==sourceKey&&Detail?.Item.Id==mediaId&&SelectedLine?.Id==lineId)_=RefreshWatchedAsync();
+    }
+
+    private async Task RefreshWatchedAsync()
+    {
+        var generation=_generation;var line=SelectedLine?.Id;var media=Detail?.Item.Id;
+        _watched=new HashSet<string>();RebuildEpisodeRows();
+        if(line is null||media is null||_sourceKey.Length==0)return;
+        try
+        {
+            var watched=await _store.GetWatchedEpisodesAsync(_sourceKey,media,line);
+            await _main.RunOnUiAsync(()=>{if(generation!=_generation||SelectedLine?.Id!=line||Detail?.Item.Id!=media)return;_watched=watched;RebuildEpisodeRows();});
+        }
+        catch(Exception error){System.Diagnostics.Debug.WriteLine(error.Message);}
     }
 
     /// <summary>从卡片进入详情。</summary>
@@ -188,7 +208,8 @@ public sealed partial class DetailViewModel : ObservableObject
         var line = SelectedLine;
         var sourceKey = _sourceKey;
         var sourceName = SourceName;
-        var resolver = _getSource(sourceKey) as IResolvingContentSource;
+        var source=_getSource(sourceKey);
+        var resolver = source as IResolvingContentSource;
         var selectedId = SelectedEpisode.Id;
         var entries = line.Episodes.Select(episode => new PlaylistEntry(episode.Id, episode.Title, async ct =>
         {
@@ -200,6 +221,8 @@ public sealed partial class DetailViewModel : ObservableObject
                 request = new PlaybackRequest
                 {
                     Uri = episode.Uri, Title = detail.Item.Title, SourceKey = sourceKey,
+                    ParseEndpoint=source?.ParseEndpoint,
+                    Resolution=string.IsNullOrWhiteSpace(source?.ParseEndpoint)?ResolutionKind.Direct:ResolutionKind.Json,
                     SourceName = sourceName, MediaId = detail.Item.Id, LineId = line.Id,
                     EpisodeId = episode.Id, Poster = detail.Item.Poster, Remarks = detail.Item.Remarks,
                 };
@@ -215,27 +238,53 @@ public sealed partial class DetailViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ToggleFavorite()
+    private void OpenRemoteControl()=>_main.Settings.OpenRemoteSettings();
+
+    [RelayCommand]
+    private void SearchOtherSources()
     {
         if (Detail is null) return;
+        _main.Search.Keyword = Detail.Item.Title;
+        _main.Navigate(AppPage.Search);
+        _main.Search.RunSearchCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private async Task ToggleFavorite()
+    {
+        if (Detail is null || Loading) return;
+        var generation = _generation;
+        var previous = IsFavorite;
+        var target = !previous;
         var entry = new FavoriteEntry
         {
-            Kind = FavoriteKind.Vod,
-            SourceKey = _sourceKey,
-            SourceName = _sourceName,
-            MediaId = Detail.Item.Id,
-            Title = Detail.Item.Title,
-            Poster = Detail.Item.Poster,
-            Remarks = Detail.Item.Remarks,
+            Kind = FavoriteKind.Vod, SourceKey = _sourceKey, SourceName = SourceName,
+            MediaId = Detail.Item.Id, Title = Detail.Item.Title, Poster = Detail.Item.Poster, Remarks = Detail.Item.Remarks,
         };
-        IsFavorite = !IsFavorite;
-        await _store.SetFavoriteAsync(entry, IsFavorite);
+        IsFavorite = target;
+        try { await _store.SetFavoriteAsync(entry, target); }
+        catch (Exception error)
+        {
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation != _generation) return;
+                IsFavorite = previous;
+                _main.StatusMessage = $"收藏保存失败：{error.Message}";
+            });
+        }
     }
+
 }
 
 /// <summary>剧集网格行（10 集）。</summary>
 public sealed class EpisodeRow
 {
-    public IReadOnlyList<Episode> Items { get; }
-    public EpisodeRow(IReadOnlyList<Episode> items) => Items = items;
+    public IReadOnlyList<EpisodePresentation> Items { get; }
+    public EpisodeRow(IReadOnlyList<Episode> items,IReadOnlySet<string>? watched=null) => Items=items.Select(episode=>new EpisodePresentation(episode,watched?.Contains(episode.Id)??false)).ToArray();
+}
+
+public sealed record EpisodePresentation(Episode Episode,bool IsWatched)
+{
+    public string Title => Episode.Title;
+    public string Label => IsWatched ? "已看 · "+Episode.Title : Episode.Title;
 }

@@ -5,5 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/VodBox.Playback.Mpv/VodBox.Playback.Mpv.csproj" />
+    <ProjectReference Include="../../src/VodBox.Infrastructure/VodBox.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

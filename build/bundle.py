@@ -31,7 +31,8 @@ def download(rid: str) -> Path:
         with urllib.request.urlopen(asset["url"], timeout=120) as response, partial.open("wb") as output:
             shutil.copyfileobj(response, output)
         partial.replace(path)
-    digest = hashlib.file_digest(path.open("rb"), "sha256").hexdigest()
+    with path.open("rb") as cached:
+        digest = hashlib.file_digest(cached, "sha256").hexdigest()
     if digest != asset["sha256"]:
         raise ValueError(f"SHA256 mismatch: {path.name}")
     return path
@@ -42,7 +43,7 @@ def run(*args):
 
 
 def bundle_macos(archive: Path, output: Path):
-    with tempfile.TemporaryDirectory(prefix="vodbox-mpv-") as temp:
+    with tempfile.TemporaryDirectory(prefix="vodbox-mpv-", dir=ROOT / ".cache") as temp:
         with zipfile.ZipFile(archive) as source:
             source.extractall(temp)
         inner = Path(temp) / "mpv.tar.gz"
@@ -61,10 +62,8 @@ def bundle_macos(archive: Path, output: Path):
                 run("install_name_tool", "-change", dep, f"@loader_path/lib/{name}", target)
         run("codesign", "--force", "--sign", "-", target)
         # lib/ 内部互相依赖 → @loader_path
-        for dylib in (output / "lib").glob("*.dylib") if (output / "lib").exists() else []:
-            pass
         libs = output / "lib"
-        shutil.copytree(libs_dir, libs)
+        shutil.copytree(libs_dir, libs, dirs_exist_ok=True)
         for dylib in libs.glob("*.dylib"):
             for line in subprocess.run(["otool", "-L", dylib], capture_output=True, text=True).stdout.splitlines():
                 if "@executable_path" in line:
@@ -75,7 +74,7 @@ def bundle_macos(archive: Path, output: Path):
 
 
 def bundle_windows(archive: Path, output: Path):
-    with tempfile.TemporaryDirectory(prefix="vodbox-mpv-") as temp:
+    with tempfile.TemporaryDirectory(prefix="vodbox-mpv-", dir=ROOT / ".cache") as temp:
         with zipfile.ZipFile(archive) as source:
             source.extractall(temp)
         copied = 0
@@ -96,7 +95,12 @@ def main():
     parser.add_argument("rid")
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
+    valid={"osx-x64","osx-arm64","win-x64","win-arm64","linux-x64","linux-arm64"}
+    if args.rid not in valid: parser.error("unsupported runtime identifier")
     args.output.mkdir(parents=True, exist_ok=True)
+    if args.rid.startswith("linux-"):
+        print(f"{args.rid}: Linux 使用系统 libmpv，不捆绑")
+        return
     archive = download(args.rid)
     if args.rid.startswith("osx"):
         bundle_macos(archive, args.output)

@@ -47,7 +47,7 @@ public sealed class LibraryStoreMigrationTests : IDisposable
 
         using (var database = OpenDatabase())
         {
-            Assert.Equal(4L, Scalar(database, "PRAGMA user_version"));
+            Assert.Equal(5L, Scalar(database, "PRAGMA user_version"));
             Assert.Equal(3L, Scalar(database, "SELECT COUNT(*) FROM history_legacy"));
             Assert.Equal(2L, Scalar(database, "SELECT COUNT(*) FROM favorites_legacy"));
             Assert.Equal("https://example.invalid/play", Scalar(database, "SELECT uri FROM history_legacy WHERE title='latest'"));
@@ -110,7 +110,7 @@ public sealed class LibraryStoreMigrationTests : IDisposable
             Assert.Equal(42, store.GetInt("volume"));
         }
         using var reopened = OpenDatabase();
-        Assert.Equal(4L, Scalar(reopened, "PRAGMA user_version"));
+        Assert.Equal(5L, Scalar(reopened, "PRAGMA user_version"));
     }
 
     [Theory]

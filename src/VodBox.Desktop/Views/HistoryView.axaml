@@ -26,12 +26,12 @@
           <TextBlock Text="历史 · 今天" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand">
+          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Cursor="Hand">
             <TextBlock Text="全部历史" FontSize="12" VerticalAlignment="Center" />
             <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" VerticalAlignment="Center" />
           </StackPanel>
           <Button Command="{Binding ClearAllCommand}" CornerRadius="7" Padding="12,5"
-                  Background="#12FFFFFF" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand">
+                  Background="{DynamicResource CardHoverBrush}" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.Delete}" Width="18" Height="18" VerticalAlignment="Center" />
               <TextBlock Text="清空" VerticalAlignment="Center" />
@@ -62,7 +62,7 @@
                 </Panel>
               </Border>
               <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0"
+              <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0"
                          TextTrimming="CharacterEllipsis" />
               <!-- 直播=黄条（全程），点播=蓝条按比例 -->
               <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Margin="0,6,0,0">
@@ -80,7 +80,7 @@
       <ListBox Classes="virtualRows" ItemsSource="{Binding Earlier}" Background="Transparent" BorderThickness="0" Padding="0">
         <ListBox.ItemTemplate>
           <DataTemplate>
-            <Border CornerRadius="8" Background="#0FFFFFFF" BorderBrush="#17FFFFFF" BorderThickness="1"
+            <Border CornerRadius="8" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                     Padding="14" Margin="0,0,0,10" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
               <Grid ColumnDefinitions="110,*,Auto,Auto">
                 <Border Grid.Column="0" CornerRadius="6" Height="150" Width="100" Background="#274064"
@@ -93,7 +93,7 @@
                 <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="6" VerticalAlignment="Center">
                   <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                   <TextBlock Text="{Binding SourceName}" FontSize="12" Foreground="#4CC2FF" />
-                  <TextBlock FontSize="11.5" Foreground="#85FFFFFF">
+                  <TextBlock FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}">
                     <Run Text="看到 " /><Run Text="{Binding PositionMs, Converter={x:Static views:MillisecondConverters.ToTime}, Mode=OneWay}" /><Run Text=" / " /><Run Text="{Binding DurationMs, Converter={x:Static views:MillisecondConverters.ToTime}, Mode=OneWay}" />
                   </TextBlock>
                   <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Width="260" HorizontalAlignment="Left" Margin="0,4,0,0">
@@ -110,7 +110,7 @@
                   </StackPanel>
                 </Button>
                 <Button Grid.Column="3" Click="OnDelete" Tag="{Binding}" ToolTip.Tip="删除记录"
-                        Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0" CornerRadius="7"
+                        Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0" CornerRadius="7"
                         Width="30" Height="30" Padding="0" VerticalAlignment="Center" Cursor="Hand">
                   <PathIcon Data="{StaticResource Icon.Close}" Width="18" Height="18" />
                 </Button>
@@ -120,7 +120,7 @@
         </ListBox.ItemTemplate>
       </ListBox>
 
-      <TextBlock Text="暂无观看记录" FontSize="12.5" Foreground="#85FFFFFF" HorizontalAlignment="Center"
+      <TextBlock Text="暂无观看记录" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"
                  Margin="0,20,0,0" IsVisible="{Binding Entries.Count, Converter={x:Static views:CountConverters.IsZero}}" />
     </StackPanel>
   </ScrollViewer>

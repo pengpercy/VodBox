@@ -7,11 +7,13 @@ namespace VodBox.Desktop.Services;
 /// <summary>应用服务组合根（AOT 安全：手写组合，无反射容器）。</summary>
 public sealed class AppServices : IDisposable
 {
+    private int _disposed;
     public string DataDir { get; }
     public LibraryStore Store { get; }
     public SourceRegistry Registry { get; }
     public MpvEngine Player { get; private set; }
     public IPreferences Prefs => Store;
+    public LocalControlServer LocalControl { get; }
 
     /// <summary>默认数据目录走平台规范（XDG / macOS ~/Library / Windows LocalApplicationData）。</summary>
     public AppServices() : this(AppPaths.DataDirectory)
@@ -22,8 +24,9 @@ public sealed class AppServices : IDisposable
     {
         DataDir = overrideDataDir;
         Directory.CreateDirectory(DataDir);
+        LocalControl=new LocalControlServer(Path.Combine(DataDir,"media-inbox"));
         Store = new LibraryStore(Path.Combine(DataDir, "library.db"));
-        Registry = new SourceRegistry();
+        Registry = new SourceRegistry(Store);
         // GUI 模式 + 等渲染面：loadfile 不早于 render-context 创建，消除静默丢画面竞态。
         Player = new MpvEngine(waitForVideoSurface: true);
     }
@@ -66,6 +69,9 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        if(Interlocked.Exchange(ref _disposed,1)!=0)return;
+        LocalControl.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        LocalControl.Proxy.Dispose();
         Registry.Dispose();
         Player.DisposeAsync().AsTask().GetAwaiter().GetResult();
         Store.Dispose();

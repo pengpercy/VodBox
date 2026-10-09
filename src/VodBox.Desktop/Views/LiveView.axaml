@@ -11,23 +11,23 @@
   <Grid ColumnDefinitions="320,*" DataContext="{Binding Live}">
 
     <!-- 频道面板：分组/收藏/历史 三 Tab + 筛选（对齐设计稿 p-live ①） -->
-    <Border Grid.Column="0" BorderBrush="#17FFFFFF" BorderThickness="0,0,1,0">
+    <Border Grid.Column="0" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,0,1,0">
       <Grid RowDefinitions="Auto,Auto,*">
         <!-- 三 Tab：选中=底部蓝线 + 白字 -->
         <Grid Grid.Row="0" ColumnDefinitions="*,*,*" Margin="16,14,16,6">
           <Button Grid.Column="0" Click="OnTabGroups" Background="Transparent" BorderThickness="0,0,0,2"
-                  x:Name="TabGroups" Foreground="White" BorderBrush="#4CC2FF" CornerRadius="0" Padding="0,8" Cursor="Hand">
+                  x:Name="TabGroups" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="#4CC2FF" CornerRadius="0" Padding="0,8" Cursor="Hand">
             <TextBlock Text="分组" FontSize="13" />
           </Button>
           <Button Grid.Column="1" Click="OnTabFavorites" Background="Transparent" BorderThickness="0,0,0,2"
-                  x:Name="TabFavorites" Foreground="#85FFFFFF" BorderBrush="Transparent" CornerRadius="0" Padding="0,8" Cursor="Hand">
+                  x:Name="TabFavorites" Foreground="{DynamicResource TextTertiaryBrush}" BorderBrush="Transparent" CornerRadius="0" Padding="0,8" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
               <TextBlock Text="收藏" FontSize="13" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Button Grid.Column="2" Click="OnTabHistory" Background="Transparent" BorderThickness="0,0,0,2"
-                  x:Name="TabHistory" Foreground="#85FFFFFF" BorderBrush="Transparent" CornerRadius="0" Padding="0,8" Cursor="Hand">
+                  x:Name="TabHistory" Foreground="{DynamicResource TextTertiaryBrush}" BorderBrush="Transparent" CornerRadius="0" Padding="0,8" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.History}" Width="18" Height="18" />
               <TextBlock Text="历史" FontSize="13" VerticalAlignment="Center" />
@@ -35,7 +35,7 @@
           </Button>
         </Grid>
         <Grid Grid.Row="1" Margin="12,4,12,10">
-          <TextBox Text="{Binding FilterText}" Watermark="筛选频道…" Height="32"
+          <TextBox Text="{Binding FilterText}" PlaceholderText="筛选频道…" Height="32"
                    Padding="32,0,10,0" VerticalContentAlignment="Center" CornerRadius="7" />
           <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" Margin="10,0,0,0"
                     HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" />
@@ -46,7 +46,7 @@
           <ListBox.DataTemplates>
             <!-- 组头行：展开箭头 + 锁定状态 + 名称 + 计数。 -->
             <DataTemplate x:DataType="vm:LiveViewModel+LiveGroupHeader">
-              <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,12,6,4" TextElement.Foreground="#C7FFFFFF">
+              <StackPanel PointerPressed="OnGroupHeader" Tag="{Binding}" Cursor="Hand" Orientation="Horizontal" Spacing="6" Margin="6,12,6,4" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                 <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12"
                           IsVisible="{Binding Locked}" VerticalAlignment="Center" />
                 <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12"
@@ -55,7 +55,7 @@
                           IsVisible="{Binding Locked}" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" MaxWidth="180" />
-                <TextBlock Text="{Binding Count}" FontSize="11" Foreground="#4CFFFFFF" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
               </StackPanel>
             </DataTemplate>
             <!-- 频道行 -->
@@ -64,7 +64,7 @@
               <Border x:Name="Row" CornerRadius="7" Padding="2,4" Background="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}">
                 <StackPanel Orientation="Horizontal" Spacing="10" Cursor="Hand"
                             PointerPressed="OnPlayChannel" Tag="{Binding}">
-                  <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="#85FFFFFF"
+                  <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
                              Width="30" VerticalAlignment="Center" />
                   <Border CornerRadius="7" Width="32" Height="32" Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}">
                     <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
@@ -72,7 +72,7 @@
                   </Border>
                   <StackPanel VerticalAlignment="Center" Spacing="2" Width="176">
                     <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding EpgNow}" FontSize="10.5" Foreground="#85FFFFFF"
+                    <TextBlock Text="{Binding EpgNow}" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}"
                                TextTrimming="CharacterEllipsis" />
                   </StackPanel>
                   <Border Background="Transparent" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
@@ -183,13 +183,18 @@
             <Button Click="OnSwitchLine" Background="#12FFFFFF" Foreground="#C7FFFFFF"
                     BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBlock Text="线路 1" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding CurrentLineLabel}" VerticalAlignment="Center" />
                 <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="18" Height="18" />
               </StackPanel>
             </Button>
+            <Button Content="重新锁定" Command="{Binding LockGroupsCommand}" Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" />
+            <Button Content="收藏/取消" Command="{Binding ToggleChannelFavoriteCommand}" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
+            <Button Content="导入节目表" Click="OnImportEpg" Background="#12FFFFFF" Foreground="#C7FFFFFF"
+                    BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
             <Button Content="回看" Click="OnCatchup" Background="#12FFFFFF" Foreground="#C7FFFFFF"
                     BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand" />
-            <TextBlock Text="直播源：MyTV 合集" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center"
+            <TextBlock Text="{Binding LiveSourceLabel}" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center"
                        Margin="6,0,0,0" />
           </StackPanel>
           <StackPanel Grid.Column="4" TextElement.Foreground="#C7FFFFFF" VerticalAlignment="Center">
@@ -198,5 +203,9 @@
         </Grid>
       </Border>
     </Grid>
+    <Border Grid.ColumnSpan="2" IsVisible="{Binding GroupUnlockOpen}" Background="{DynamicResource SurfaceBrush}" Padding="24" CornerRadius="12" Width="360" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <StackPanel Spacing="12"><TextBlock Text="{Binding LockedGroupName}" /><TextBox Text="{Binding GroupPassword}" PasswordChar="●" PlaceholderText="分组密码" />
+      <Button Content="解锁" Command="{Binding UnlockGroupCommand}" /><Button Content="取消" Command="{Binding CancelGroupUnlockCommand}" /></StackPanel>
+    </Border>
   </Grid>
 </UserControl>

@@ -6,16 +6,11 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://VodBox.Desktop/Resources/Icons.xaml" />
+        <ResourceInclude Source="avares://VodBox.Desktop/Resources/Theme.axaml" />
       </ResourceDictionary.MergedDictionaries>
       <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
       <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
       <SolidColorBrush x:Key="AccentStrongBrush" Color="#0078D4" />
-      <SolidColorBrush x:Key="CardBrush" Color="#2D2D2D" Opacity="0.45" />
-      <SolidColorBrush x:Key="CardHoverBrush" Color="#FFFFFF" Opacity="0.085" />
-      <SolidColorBrush x:Key="StrokeBrush" Color="#FFFFFF" Opacity="0.09" />
-      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FFFFFF" Opacity="0.78" />
-      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FFFFFF" Opacity="0.52" />
       <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
       <SolidColorBrush x:Key="WarnBrush" Color="#FFB900" />
       <SolidColorBrush x:Key="OkBrush" Color="#6CCB5F" />
@@ -25,6 +20,7 @@
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <Style Selector="Window"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /></Style>
     <StyleInclude Source="avares://VodBox.Desktop/Views/VirtualRows.axaml" />
     <!-- Material Design 3 风格滑杆：4px 圆头轨道 + 14px 圆 thumb，配 MDI 图标 -->
     <Style Selector="Slider.md">

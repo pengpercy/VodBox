@@ -54,7 +54,7 @@ public sealed class MainWindowPreviewTests
             var brush = Assert.IsType<SolidColorBrush>(divider.Background);
             Assert.InRange(brush.Opacity, 0.05, 0.15);
             Assert.False(divider.IsHitTestVisible);
-            Assert.Single(window.GetVisualDescendants().OfType<Image>().Where(image => image is not RemotePoster));
+            Assert.Single(window.GetVisualDescendants().OfType<Image>(), image => image is not (RemotePoster or LocalWallpaper));
 
             var titleBar = window.FindControl<Grid>("TitleBar")!;
             var search = window.FindControl<TextBox>("GlobalSearch")!;

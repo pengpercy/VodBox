@@ -9,6 +9,8 @@ namespace VodBox.Desktop.Views;
 internal sealed class PosterCache : IDisposable
 {
     internal static readonly PosterCache Shared = new(LoadBitmapAsync);
+    private static readonly VodBox.Infrastructure.PosterDiskCache Disk=new(
+        Path.Combine(VodBox.Infrastructure.AppPaths.DataDirectory,"posters"),FetchPosterBytesAsync);
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
     private readonly object _gate = new();
     private readonly Dictionary<Uri, Entry> _entries = new();
@@ -79,6 +81,11 @@ internal sealed class PosterCache : IDisposable
         {
             await _downloads.WaitAsync(entry.Cancellation.Token).ConfigureAwait(false);
             entered = true;
+            lock(_gate)
+            {
+                if(entry.Retired)throw new OperationCanceledException(entry.Cancellation.Token);
+            }
+            entry.Cancellation.Token.ThrowIfCancellationRequested();
             bitmap = await _loader(entry.Uri, entry.Cancellation.Token).ConfigureAwait(false);
             var bytes = checked((long)bitmap.PixelSize.Width * bitmap.PixelSize.Height * 4);
             List<Bitmap> evicted;
@@ -125,6 +132,7 @@ internal sealed class PosterCache : IDisposable
     {
         List<Bitmap> evicted = new();
         int? idleVersion = null;
+        var cancelNow=false;
         lock (_gate)
         {
             if (--entry.Consumers != 0) return;
@@ -137,9 +145,17 @@ internal sealed class PosterCache : IDisposable
                     evicted = Trim();
                 }
             }
-            else if (entry.Loading && !entry.Retired) idleVersion = ++entry.IdleVersion;
+            else if (entry.Loading && !entry.Retired)
+            {
+                if(_abandonDelay==TimeSpan.Zero)
+                {
+                    Retire(entry);entry.Completion.TrySetCanceled();cancelNow=true;
+                }
+                else idleVersion = ++entry.IdleVersion;
+            }
         }
         DisposeImages(evicted);
+        if(cancelNow)Cancel(entry);
         if (idleVersion is { } version) _ = AbandonAsync(entry, version);
     }
 
@@ -251,21 +267,33 @@ internal sealed class PosterCache : IDisposable
         public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Release(_entry);
     }
 
-    private static async Task<Bitmap> LoadBitmapAsync(Uri uri, CancellationToken cancellationToken)
+    private static async Task<Bitmap> LoadBitmapAsync(Uri uri,CancellationToken cancellationToken)
     {
-        using var response = await Client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        using var data = new MemoryStream();
-        var buffer = new byte[8192];
-        int count;
-        while ((count = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        var bytes=await Disk.GetAsync(uri,cancellationToken).ConfigureAwait(false);
+        try
         {
-            if (data.Length + count > 12 * 1024 * 1024) throw new InvalidDataException("Poster exceeds 12 MiB.");
-            await data.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
+            using var input=new MemoryStream(bytes);cancellationToken.ThrowIfCancellationRequested();
+            return Bitmap.DecodeToWidth(input,460);
         }
-        data.Position = 0;
-        cancellationToken.ThrowIfCancellationRequested();
-        return Bitmap.DecodeToWidth(data, 460);
+        catch(Exception error)when(error is not (OutOfMemoryException or OperationCanceledException))
+        {
+            await Disk.InvalidateAsync(uri,cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static async Task<byte[]> FetchPosterBytesAsync(Uri uri,CancellationToken cancellationToken)
+    {
+        using var response=await Client.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        if(response.Content.Headers.ContentLength>4*1024*1024)throw new InvalidDataException("Poster exceeds 4MiB.");
+        using var stream=await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var data=new MemoryStream();var buffer=new byte[8192];int count;
+        while((count=await stream.ReadAsync(buffer,cancellationToken).ConfigureAwait(false))>0)
+        {
+            if(data.Length+count>4*1024*1024)throw new InvalidDataException("Poster exceeds 4MiB.");
+            await data.WriteAsync(buffer.AsMemory(0,count),cancellationToken).ConfigureAwait(false);
+        }
+        return data.ToArray();
     }
 }

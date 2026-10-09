@@ -32,7 +32,7 @@
             </StackPanel>
           </Button>
           <Button Click="OnTabLive" CornerRadius="8" Padding="14,7" FontSize="12.5" Cursor="Hand"
-                  Background="Transparent" Foreground="#85FFFFFF" BorderThickness="0">
+                  Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.Television}" Width="18" Height="18" VerticalAlignment="Center" />
               <TextBlock Text="直播频道" VerticalAlignment="Center" /><TextBlock Text="{Binding Live.Count}" FontSize="11.5" VerticalAlignment="Center" />
@@ -41,21 +41,21 @@
         </StackPanel>
         <!-- 站点筛选 + 排序 + 管理（设计稿右上控制组） -->
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
+          <Button Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0"
                   CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Text="站点：全部" VerticalAlignment="Center" />
               <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="18" Height="18" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Background="#12FFFFFF" Foreground="#C7FFFFFF" BorderThickness="0"
+          <Button Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0"
                   CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Text="排序：最近收藏" VerticalAlignment="Center" />
               <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="18" Height="18" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Command="{Binding ToggleManageCommand}" Background="#12FFFFFF"
+          <Button Command="{Binding ToggleManageCommand}" Background="{DynamicResource CardHoverBrush}"
                   Foreground="#4CC2FF" BorderThickness="0" CornerRadius="7" Padding="10,6" FontSize="12" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.CheckboxMarked}" Width="18" Height="18" VerticalAlignment="Center" />
@@ -95,7 +95,7 @@
                 </Panel>
               </Border>
               <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-              <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+              <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                 <Run Text="{Binding SourceName}" /><Run Text=" · " /><Run Text="{Binding CreatedAt, Converter={x:Static views:TimeAgoConverters.ToAgo}, Mode=OneWay}" />
               </TextBlock>
                   </StackPanel>
@@ -106,7 +106,7 @@
         </ListBox.ItemTemplate>
       </ListBox>
 
-      <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#85FFFFFF"
+      <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}"
                   HorizontalAlignment="Center" Margin="0,20,0,0"
                   IsVisible="{Binding Vod.Count, Converter={x:Static views:CountConverters.IsZero}}">
         <TextBlock Text="暂无收藏 — 在详情页点击" FontSize="12.5" VerticalAlignment="Center" />

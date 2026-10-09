@@ -1,0 +1,37 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="PageBackgroundBrush" Color="#202020" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#161616" />
+      <SolidColorBrush x:Key="CardBrush" Color="#0FFFFFFF" />
+      <SolidColorBrush x:Key="CardHoverBrush" Color="#12FFFFFF" />
+      <SolidColorBrush x:Key="StrokeBrush" Color="#FFFFFF" Opacity="0.09" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="PageBackgroundBrush" Color="#F3F3F3" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CardBrush" Color="#09000000" />
+      <SolidColorBrush x:Key="CardHoverBrush" Color="#12000000" />
+      <SolidColorBrush x:Key="StrokeBrush" Color="#000000" Opacity="0.12" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#202020" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7202020" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#99202020" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#66202020" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Default">
+      <SolidColorBrush x:Key="PageBackgroundBrush" Color="#202020" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#161616" />
+      <SolidColorBrush x:Key="CardBrush" Color="#0FFFFFFF" />
+      <SolidColorBrush x:Key="CardHoverBrush" Color="#12FFFFFF" />
+      <SolidColorBrush x:Key="StrokeBrush" Color="#FFFFFF" Opacity="0.09" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

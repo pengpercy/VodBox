@@ -83,6 +83,27 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
             .Select(c => new Category(Text(c, "type_id"), Text(c, "type_name"))).ToList();
     }, ct);
 
+    public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)=>CallAsync<IReadOnlyList<FilterGroup>>(async(rt,token)=>
+    {
+        using var document=JsonDocument.Parse(await rt.HomeAsync(token));
+        return ParseFilters(document.RootElement,categoryId);
+    },ct);
+
+    internal static IReadOnlyList<FilterGroup> ParseFilters(JsonElement root,string categoryId)
+    {
+        var result=new List<FilterGroup>();
+        if(!root.TryGetProperty("filters",out var filters)||filters.ValueKind!=JsonValueKind.Object||!filters.TryGetProperty(categoryId,out var groups)||groups.ValueKind!=JsonValueKind.Array)return result;
+        foreach(var group in groups.EnumerateArray().Take(20))
+        {
+            if(group.ValueKind!=JsonValueKind.Object)continue;
+            var key=Text(group,"key");var name=Text(group,"name");
+            if(key.Length==0||!group.TryGetProperty("value",out var values)||values.ValueKind!=JsonValueKind.Array)continue;
+            var options=values.EnumerateArray().Take(100).Where(value=>value.ValueKind==JsonValueKind.Object).Select(value=>new FilterValue(Text(value,"n"),Text(value,"v"))).ToList();
+            result.Add(new FilterGroup(key,name,options,Text(group,"init")));
+        }
+        return result;
+    }
+
     public Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => CallAsync(async (rt, token) =>
         Page(await rt.HomeVodAsync(token).ConfigureAwait(false), 1), ct);
 
@@ -106,9 +127,9 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
             throw new InvalidDataException("drpy 未返回有效 HTTP 媒体地址。");
         var parse = PlaybackFlag(root, "parse");
-        if (PlaybackFlag(root, "jx") != 0 || parse is not (0 or 1))
-            throw new NotSupportedException("该 drpy 选集需要外部解析器（S8 尚未实现）。");
-        if (parse == 1 && !MediaExtension().IsMatch(uri.AbsolutePath))
+        var jx=PlaybackFlag(root,"jx");
+        if(parse is not (0 or 1)||jx is not (0 or 1))throw new NotSupportedException("drpy返回不支持的解析标志。");
+        if (jx==0&&parse == 1 && !MediaExtension().IsMatch(uri.AbsolutePath))
             throw new NotSupportedException("该 drpy 选集需要网页嗅探（尚未实现）。");
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (root.TryGetProperty("header", out var h) || root.TryGetProperty("headers", out h))
@@ -122,7 +143,7 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
         }
         return new PlaybackRequest
         {
-            Uri = url, Resolution = ResolutionKind.Direct, Headers = headers,
+            Uri = url, Resolution = jx==1?ResolutionKind.Json:ResolutionKind.Direct, Headers = headers,
             SourceKey = Key, SourceName = Name, MediaId = mediaId, LineId = entry.LineId, EpisodeId = episodeId,
             Title = parsed.Detail.Item.Title + " · " + entry.Title,
             Poster = parsed.Detail.Item.Poster, Remarks = parsed.Detail.Item.Remarks

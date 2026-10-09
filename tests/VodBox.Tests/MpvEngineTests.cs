@@ -10,6 +10,39 @@ namespace VodBox.Tests;
 public sealed class MpvEngineTests
 {
     [Fact]
+    public void GuiUsesNativeAudioAutoselectionInsteadOfInvalidAutoDriver()
+    {
+        var gui=MpvEngine.DefaultOptions(false);
+        Assert.Equal("libmpv",gui["vo"]);Assert.False(gui.ContainsKey("ao"));
+        var headless=MpvEngine.DefaultOptions(true);
+        Assert.Equal("null",headless["ao"]);Assert.Equal("null",headless["vo"]);
+    }
+
+    [Fact]
+    public async Task SubtitleStyleSetsNativePropertiesAndRejectsInvalidValues()
+    {
+        var client = new Client();
+        await using var engine = new MpvEngine(factory: () => client);
+        await engine.OpenAsync(new PlaybackRequest { Uri = "https://media.example/video" }, 1, TestContext.Current.CancellationToken);
+        await engine.SetSubtitleStyleAsync(-.5, 52, TestContext.Current.CancellationToken);
+        Assert.Equal("-0.5", client.Properties["sub-delay"]);
+        Assert.Equal("52", client.Properties["sub-font-size"]);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => engine.SetSubtitleStyleAsync(double.NaN, 40));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => engine.SetSubtitleStyleAsync(0, 500));
+    }
+
+    [Fact]
+    public async Task EngineReportsVideoDisplayAspectAndClearsItWhenNewMediaOpens()
+    {
+        var client=new Client{DisplayAspect=9d/16};await using var engine=new MpvEngine(factory:()=>client);
+        await engine.OpenAsync(new PlaybackRequest{Uri="https://media.example/portrait"},1,TestContext.Current.CancellationToken);
+        await Until(()=>engine.Snapshot.VideoAspectRatio is not null);Assert.Equal(9d/16,engine.Snapshot.VideoAspectRatio);
+        client.DisplayAspect=null;await engine.OpenAsync(new PlaybackRequest{Uri="https://media.example/audio"},2,TestContext.Current.CancellationToken);
+        Assert.Null(engine.Snapshot.VideoAspectRatio);
+        client.DisplayAspect=double.NaN;await Task.Delay(150,TestContext.Current.CancellationToken);Assert.Null(engine.Snapshot.VideoAspectRatio);
+    }
+
+    [Fact]
     public async Task AspectRatioIsAppliedOnOpenRestoredAndValidated()
     {
         var client = new Client();
@@ -113,6 +146,29 @@ public sealed class MpvEngineTests
         await Until(() => engine.Snapshot.State == PlaybackState.Playing);
     }
 
+    [Fact]
+    public async Task LocalSubtitleUsesSelectedTrackAndRejectsStaleSession()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, $"字幕-{Guid.NewGuid():N}.srt");
+        await File.WriteAllTextAsync(path, "1\n00:00:00,000 --> 00:00:01,000\n测试字幕\n");
+        try
+        {
+            var client = new Client();
+            await using var engine = new MpvEngine(factory: () => client);
+            await engine.OpenAsync(new PlaybackRequest { Uri = "https://media.example/video" }, 11);
+            await Until(() => engine.Snapshot.State == PlaybackState.Playing);
+            await engine.LoadSubtitleAsync(path, 10);
+            Assert.Empty(client.Subtitles);
+            await engine.LoadSubtitleAsync(path, 11);
+            Assert.Equal(new[] { path, "select" }, Assert.Single(client.Subtitles));
+            await Assert.ThrowsAsync<FileNotFoundException>(() => engine.LoadSubtitleAsync(path + ".missing", 11));
+            await Assert.ThrowsAsync<FileNotFoundException>(() => engine.LoadSubtitleAsync("relative.srt", 11));
+            await engine.StopAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => engine.LoadSubtitleAsync(path, 11));
+        }
+        finally { File.Delete(path); }
+    }
+
     private static async Task Until(Func<bool> condition)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -126,10 +182,13 @@ public sealed class MpvEngineTests
         public List<string> Observed { get; } = [];
         public List<string> SeekFlags { get; } = [];
         public int Disposals, Loads;
+        public double? DisplayAspect {get;set;}
+        public List<string[]> Subtitles { get; } = [];
         public void Command(params string[] args)
         {
             switch (args[0])
             {
+                case "sub-add": Subtitles.Add(args.Skip(1).ToArray()); break;
                 case "set":
                     Properties[args[1]] = args[2];
                     if (args[1] == "pause") Events.Enqueue(new MpvEvent(22, 0, 3, PropertyName: "pause", PropertyFlag: args[2] == "yes"));
@@ -160,6 +219,7 @@ public sealed class MpvEngineTests
         private double _position;
         public double? GetDouble(string name) => name switch
         {
+            "video-out-params/aspect" => DisplayAspect,
             "track-list/count" => 2,
             "track-list/0/id" => 1, "track-list/1/id" => 2,
             _ => null

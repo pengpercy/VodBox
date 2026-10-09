@@ -7,7 +7,7 @@ namespace VodBox.Infrastructure;
 /// <summary>SQLite 库存储：历史、收藏、配置订阅、键值偏好（7 表结构中桌面首版需要的 4 张）。</summary>
 public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, IDisposable
 {
-    private const int SchemaVersion = 4;
+    private const int SchemaVersion = 5;
     private readonly SqliteConnection _db;
 
     public LibraryStore(string path)
@@ -66,6 +66,8 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
                 id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, name TEXT NOT NULL,
                 kind INTEGER NOT NULL, created_at INTEGER NOT NULL, active INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS prefs(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS watched(source_key TEXT NOT NULL,media_id TEXT NOT NULL,line_id TEXT NOT NULL,episode_id TEXT NOT NULL,
+                watched_at INTEGER NOT NULL,PRIMARY KEY(source_key,media_id,line_id,episode_id));
             """)) create.ExecuteNonQuery();
 
         ValidateSchema(transaction);
@@ -110,6 +112,8 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         RequirePrimaryKey(transaction, "favorite", "kind", "source_key", "media_id");
         RequirePrimaryKey(transaction, "config", "id");
         RequirePrimaryKey(transaction, "prefs", "key");
+        RequireColumns(Columns(transaction,"watched"),"watched","source_key","media_id","line_id","episode_id","watched_at");
+        RequirePrimaryKey(transaction,"watched","source_key","media_id","line_id","episode_id");
     }
 
     private void RequirePrimaryKey(SqliteTransaction transaction, string table, params string[] required)
@@ -240,6 +244,29 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         }, ct);
     }
 
+    public Task MarkEpisodeWatchedAsync(string sourceKey,string mediaId,string lineId,string episodeId,CancellationToken ct=default) => Task.Run(() =>
+    {
+        if (string.IsNullOrWhiteSpace(episodeId)) return;
+        using var command=Query("INSERT INTO watched(source_key,media_id,line_id,episode_id,watched_at) VALUES($s,$m,$l,$e,$t) ON CONFLICT(source_key,media_id,line_id,episode_id) DO UPDATE SET watched_at=excluded.watched_at",
+            ("$s",sourceKey),("$m",mediaId),("$l",lineId),("$e",episodeId),("$t",DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+        command.ExecuteNonQuery();
+    },ct);
+
+    public Task<IReadOnlyList<WatchedEpisode>> ExportWatchedAsync(CancellationToken ct=default) => Task.Run<IReadOnlyList<WatchedEpisode>>(()=>
+    {
+        using var command=Query("SELECT source_key,media_id,line_id,episode_id,watched_at FROM watched");
+        using var reader=command.ExecuteReader();var result=new List<WatchedEpisode>();
+        while(reader.Read())result.Add(new WatchedEpisode(reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(4))));
+        return result;
+    },ct);
+
+    public Task<IReadOnlySet<string>> GetWatchedEpisodesAsync(string sourceKey,string mediaId,string lineId,CancellationToken ct=default) => Task.Run<IReadOnlySet<string>>(() =>
+    {
+        using var command=Query("SELECT episode_id FROM watched WHERE source_key=$s AND media_id=$m AND line_id=$l",("$s",sourceKey),("$m",mediaId),("$l",lineId));
+        using var reader=command.ExecuteReader();var result=new HashSet<string>();
+        while(reader.Read()) result.Add(reader.GetString(0));return result;
+    },ct);
+
     public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default) => Task.Run<IReadOnlyList<HistoryEntry>>(() =>
     {
         using var command = Query($"SELECT * FROM history ORDER BY updated_at DESC LIMIT {limit}");
@@ -274,13 +301,19 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         UpdatedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(reader.GetOrdinal("updated_at"))),
     };
 
-    public Task DeleteHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.Run(() =>
+    public Task DeleteHistoryAsync(string sourceKey,string mediaId,CancellationToken ct=default)=>Task.Run(()=>
     {
-        using var command = Query("DELETE FROM history WHERE source_key=$k AND media_id=$m", ("$k", sourceKey), ("$m", mediaId));
-        command.ExecuteNonQuery();
-    }, ct);
+        using var connection=new SqliteConnection(_db.ConnectionString);connection.Open();using var transaction=connection.BeginTransaction();
+        foreach(var table in new[]{"history","watched"})
+        {
+            ct.ThrowIfCancellationRequested();using var command=connection.CreateCommand();command.Transaction=transaction;
+            command.CommandText=$"DELETE FROM {table} WHERE source_key=$k AND media_id=$m";
+            command.Parameters.AddWithValue("$k",sourceKey);command.Parameters.AddWithValue("$m",mediaId);command.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    },ct);
 
-    public Task ClearHistoryAsync(CancellationToken ct = default) => Task.Run(() => Exec("DELETE FROM history"), ct);
+    public Task ClearHistoryAsync(CancellationToken ct = default) => Task.Run(() => Exec("DELETE FROM history; DELETE FROM watched"), ct);
 
     // ---------- 收藏 ----------
 
@@ -371,9 +404,77 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
 
     public Task SetActiveAsync(ConfigKind kind, long id, CancellationToken ct = default) => Task.Run(() =>
     {
-        Exec("UPDATE config SET active=0 WHERE kind=$kind".Replace("$kind", ((int)kind).ToString()));
-        using var command = Query("UPDATE config SET active=1 WHERE id=$id", ("$id", id));
+        using var check = Query("SELECT COUNT(*) FROM config WHERE id=$id AND kind=$kind", ("$id", id), ("$kind", (int)kind));
+        if (Convert.ToInt64(check.ExecuteScalar()) != 1) throw new InvalidOperationException("订阅不存在或类型不匹配。");
+        using var command = Query("UPDATE config SET active=CASE WHEN id=$id THEN 1 ELSE 0 END WHERE kind=$kind", ("$id", id), ("$kind", (int)kind));
         command.ExecuteNonQuery();
+    }, ct);
+
+    /// <summary>独立连接单事务合并；不把后台播放写入混进恢复事务。</summary>
+    public Task ImportBackupAtomicAsync(LibraryBackup backup, CancellationToken ct = default) => Task.Run(() =>
+    {
+        ct.ThrowIfCancellationRequested();
+        using var connection = new SqliteConnection(_db.ConnectionString);
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        void Execute(string sql, params (string Key, object? Value)[] values)
+        {
+            ct.ThrowIfCancellationRequested();
+            using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandText = sql;
+            foreach (var (key, value) in values) command.Parameters.AddWithValue(key, value ?? DBNull.Value);
+            command.ExecuteNonQuery();
+        }
+        foreach (var entry in backup.History)
+            Execute("""
+                INSERT INTO history(source_key,source_name,media_id,title,poster,remarks,line_id,episode_id,position_ms,duration_ms,rate,opening_skip,ending_skip,updated_at)
+                VALUES($k,$sn,$m,$t,$p,$r,$l,$e,$pos,$dur,$rate,$op,$ed,$time)
+                ON CONFLICT(source_key,media_id) DO UPDATE SET source_name=excluded.source_name,title=excluded.title,poster=excluded.poster,
+                remarks=excluded.remarks,line_id=excluded.line_id,episode_id=excluded.episode_id,position_ms=excluded.position_ms,
+                duration_ms=excluded.duration_ms,rate=excluded.rate,opening_skip=excluded.opening_skip,ending_skip=excluded.ending_skip,updated_at=excluded.updated_at
+                WHERE excluded.updated_at>=history.updated_at
+                """, ("$k",entry.SourceKey),("$sn",entry.SourceName),("$m",entry.MediaId),("$t",entry.Title),("$p",entry.Poster),("$r",entry.Remarks),
+                ("$l",entry.LineId),("$e",entry.EpisodeId),("$pos",entry.PositionMs),("$dur",entry.DurationMs),("$rate",entry.Rate),
+                ("$op",entry.OpeningSkipSec),("$ed",entry.EndingSkipSec),("$time",entry.UpdatedAt.ToUnixTimeMilliseconds()));
+        foreach(var entry in backup.Watched)
+            Execute("INSERT INTO watched(source_key,media_id,line_id,episode_id,watched_at) VALUES($s,$m,$l,$e,$t) ON CONFLICT(source_key,media_id,line_id,episode_id) DO UPDATE SET watched_at=MAX(watched.watched_at,excluded.watched_at)",
+                ("$s",entry.SourceKey),("$m",entry.MediaId),("$l",entry.LineId),("$e",entry.EpisodeId),("$t",entry.WatchedAt.ToUnixTimeMilliseconds()));
+        foreach (var entry in backup.Favorites)
+            Execute("""
+                INSERT INTO favorite(kind,source_key,media_id,source_name,title,poster,remarks,created_at) VALUES($kind,$k,$m,$sn,$t,$p,$r,$time)
+                ON CONFLICT(kind,source_key,media_id) DO NOTHING
+                """, ("$kind",(int)entry.Kind),("$k",entry.SourceKey),("$m",entry.MediaId),("$sn",entry.SourceName),("$t",entry.Title),
+                ("$p",entry.Poster),("$r",entry.Remarks),("$time",entry.CreatedAt.ToUnixTimeMilliseconds()));
+        foreach (var entry in backup.Subscriptions.DistinctBy(entry => (entry.Kind,entry.Url)))
+            Execute("""
+                INSERT INTO config(url,name,kind,created_at,active)
+                SELECT $url,$name,$kind,$time,0 WHERE NOT EXISTS(SELECT 1 FROM config WHERE url=$url AND kind=$kind)
+                """, ("$url",entry.Url),("$name",entry.Name),("$kind",(int)entry.Kind),("$time",entry.CreatedAt.ToUnixTimeMilliseconds()));
+        foreach (var (key,value) in backup.Preferences)
+            Execute("INSERT INTO prefs(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",("$key",key),("$value",value));
+        foreach(var kind in new[]{ConfigKind.Vod,ConfigKind.Live})
+        {
+            var preference=kind==ConfigKind.Vod?"config_vod":"config_live";
+            var requested=backup.Preferences.GetValueOrDefault(preference);
+            if(string.IsNullOrWhiteSpace(requested))requested=backup.Subscriptions.FirstOrDefault(entry=>entry.Kind==kind&&entry.Active)?.Url;
+            if(string.IsNullOrWhiteSpace(requested))continue;
+            using var check=connection.CreateCommand();check.Transaction=transaction;
+            check.CommandText="SELECT id FROM config WHERE kind=$kind AND url=$url ORDER BY id LIMIT 1";
+            check.Parameters.AddWithValue("$kind",(int)kind);check.Parameters.AddWithValue("$url",requested);
+            if(check.ExecuteScalar() is not long selected)continue;
+            Execute("UPDATE config SET active=CASE WHEN id=$id THEN 1 ELSE 0 END WHERE kind=$kind",("$id",selected),("$kind",(int)kind));
+            Execute("INSERT INTO prefs(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",("$key",preference),("$value",requested));
+        }
+        ct.ThrowIfCancellationRequested();
+        transaction.Commit();
+    }, ct);
+
+    public Task<Dictionary<string, string>> ExportPreferencesAsync(CancellationToken ct = default) => Task.Run(() =>
+    {
+        using var command = Query("SELECT key,value FROM prefs");
+        using var reader = command.ExecuteReader();
+        var values = new Dictionary<string, string>();
+        while (reader.Read()) values[reader.GetString(0)] = reader.GetString(1);
+        return values;
     }, ct);
 
     // ---------- 键值偏好 ----------
@@ -385,19 +486,30 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
     }
 
     public string GetString(string key, string fallback = "") => ReadPref(key) ?? fallback;
-    public int GetInt(string key, int fallback = 0) => int.TryParse(ReadPref(key), out var v) ? v : fallback;
+    public int GetInt(string key, int fallback = 0) => int.TryParse(ReadPref(key),NumberStyles.Integer,CultureInfo.InvariantCulture,out var v) ? v : fallback;
     public bool GetBool(string key, bool fallback = false) => ReadPref(key) switch
     {
         "1" or "true" or "True" => true,
         "0" or "false" or "False" => false,
         _ => fallback,
     };
-    public double GetDouble(string key, double fallback = 0) => double.TryParse(ReadPref(key), out var v) ? v : fallback;
+    public double GetDouble(string key,double fallback=0)
+    {
+        var text=ReadPref(key);
+        if(double.TryParse(text,NumberStyles.Float,CultureInfo.InvariantCulture,out var value)&&double.IsFinite(value))return value;
+        // 兼容早期随系统语言写入的小数，禁止千分位解释以免1,5误读成15。
+        if(double.TryParse(text,NumberStyles.Float,CultureInfo.CurrentCulture,out value)&&double.IsFinite(value))return value;
+        return fallback;
+    }
 
     public void Set(string key, string value) => WritePref(key, value);
-    public void Set(string key, int value) => WritePref(key, value.ToString());
+    public void Set(string key, int value) => WritePref(key, value.ToString(CultureInfo.InvariantCulture));
     public void Set(string key, bool value) => WritePref(key, value ? "1" : "0");
-    public void Set(string key, double value) => WritePref(key, value.ToString());
+    public void Set(string key,double value)
+    {
+        if(!double.IsFinite(value))throw new ArgumentOutOfRangeException(nameof(value));
+        WritePref(key,value.ToString("R",CultureInfo.InvariantCulture));
+    }
 
     private void WritePref(string key, string value)
     {

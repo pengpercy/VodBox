@@ -348,7 +348,7 @@ public sealed class App99Source : IResolvingContentSource, IDisposable
             payload["timestamp"] = Value(timestamp);
             payload["nonce"] = Value(nonce);
             payload["token"] = Value("");
-            byte[] json = JsonSerializer.SerializeToUtf8Bytes(payload, Json.Options);
+            byte[] json = JsonSerializer.SerializeToUtf8Bytes(payload, Json.TypeInfo<Dictionary<string, JsonElement>>());
             byte[] iv = RandomNumberGenerator.GetBytes(16);
             using var aes = Aes.Create();
             aes.Key = _key;
@@ -504,9 +504,9 @@ public sealed class App99Source : IResolvingContentSource, IDisposable
 
     private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
-    private static JsonElement Value(string value) => JsonSerializer.SerializeToElement(value, Json.Options);
+    private static JsonElement Value(string value) => JsonSerializer.SerializeToElement(value, Json.TypeInfo<string>());
 
-    private static JsonElement Value(int value) => JsonSerializer.SerializeToElement(value, Json.Options);
+    private static JsonElement Value(int value) => JsonSerializer.SerializeToElement(value, Json.TypeInfo<int>());
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 

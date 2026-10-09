@@ -8,8 +8,8 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://VodBox.Desktop/Resources/Icons.xaml" />
+        <ResourceInclude Source="avares://VodBox.Desktop/Resources/Theme.axaml" />
       </ResourceDictionary.MergedDictionaries>
-      <SolidColorBrush x:Key="StrokeBrush" Color="#FFFFFF" Opacity="0.09" />
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>

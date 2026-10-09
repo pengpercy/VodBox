@@ -17,7 +17,7 @@
     <StackPanel Grid.Row="0" Spacing="10" Margin="28,0,28,0">
       <StackPanel Spacing="10" HorizontalAlignment="Center" Margin="0" MaxWidth="440">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBox Text="{Binding Keyword}" Watermark="搜索影片、剧集、综艺…" Width="340" Height="32"
+          <TextBox Text="{Binding Keyword}" PlaceholderText="搜索影片、剧集、综艺…" Width="340" Height="32"
                    CornerRadius="16" FontSize="13" Padding="12,0"
                    VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
           <Button Command="{Binding RunSearchCommand}"
@@ -31,7 +31,7 @@
         </StackPanel>
 
         <!-- 联想列表（热词带火焰图标） -->
-        <Border CornerRadius="10" Background="#E6161616" BorderBrush="#17FFFFFF" BorderThickness="1"
+        <Border CornerRadius="10" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                 IsVisible="{Binding ShowSuggestions}" ClipToBounds="True">
           <ItemsControl ItemsSource="{Binding Suggestions}">
             <ItemsControl.ItemTemplate>
@@ -54,10 +54,10 @@
 
       <!-- 结果说明 + 搜索历史 -->
       <Grid ColumnDefinitions="*,Auto" MinHeight="24">
-        <TextBlock Grid.Column="0" Text="{Binding Summary}" FontSize="13" Foreground="#85FFFFFF"
+        <TextBlock Grid.Column="0" Text="{Binding Summary}" FontSize="13" Foreground="{DynamicResource TextTertiaryBrush}"
                    VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <TextBlock Text="搜索历史：" FontSize="11.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
+          <TextBlock Text="搜索历史：" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
           <ItemsControl ItemsSource="{Binding SearchHistory}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -66,13 +66,13 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border CornerRadius="10" Background="#12FFFFFF" Padding="10,4" Cursor="Hand"
+                <Border CornerRadius="10" Background="{DynamicResource CardHoverBrush}" Padding="10,4" Cursor="Hand"
                         PointerPressed="OnPickHistory" Tag="{Binding}">
-                  <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#C7FFFFFF">
+                  <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                     <TextBlock Text="{Binding Mode=OneWay}" FontSize="11.5" VerticalAlignment="Center" />
-                    <StackPanel TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center">
+                    <Button Click="OnDeleteHistory" Tag="{Binding}" Padding="2" Background="Transparent" ToolTip.Tip="删除搜索词">
                       <PathIcon Data="{StaticResource Icon.Close}" Width="12" Height="12" />
-                    </StackPanel>
+                    </Button>
                   </StackPanel>
                 </Border>
               </DataTemplate>
@@ -84,7 +84,7 @@
 
     <!-- 下：站点列表 + 虚拟化结果网格 -->
     <Grid Grid.Row="1" ColumnDefinitions="190,20,*" Margin="28,8,0,0">
-      <Border Grid.Column="0" CornerRadius="10" Background="#0FFFFFFF" BorderBrush="#17FFFFFF"
+      <Border Grid.Column="0" CornerRadius="10" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}"
               BorderThickness="1" Padding="6">
         <ListBox ItemsSource="{Binding SiteResults}" Background="Transparent" BorderThickness="0"
                  SelectionChanged="OnSiteChanged">
@@ -129,7 +129,7 @@
                       </Panel>
                     </Border>
                     <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-                    <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                       <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
                     </TextBlock>
                   </StackPanel>

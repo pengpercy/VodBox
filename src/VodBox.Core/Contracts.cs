@@ -5,7 +5,9 @@ public interface IContentSource
 {
     string Key { get; }
     string Name { get; }
+    string? ParseEndpoint=>null;
     Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)=>Task.FromResult<IReadOnlyList<FilterGroup>>([]);
     Task<MediaPage> GetHomeAsync(CancellationToken ct = default);
     Task<MediaPage> GetItemsAsync(string categoryId, int page, IReadOnlyDictionary<string, string>? filters, CancellationToken ct = default);
     Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default);
@@ -35,6 +37,11 @@ public interface IPlaybackEngine : IAsyncDisposable
     /// <summary>null 恢复媒体原始比例，其余为宽/高比值。</summary>
     Task SetAspectRatioAsync(double? ratio, CancellationToken ct = default) =>
         Task.FromException(new NotSupportedException("当前引擎不支持画面比例切换。"));
+    /// <summary>加载本地外挂字幕；会话编号防止文件选择期间切集串入新媒体。</summary>
+    Task LoadSubtitleAsync(string path, long sessionId, CancellationToken ct = default) =>
+        Task.FromException(new NotSupportedException("当前引擎不支持外挂字幕。"));
+    Task SetSubtitleStyleAsync(double delaySeconds, int fontSize, CancellationToken ct = default) =>
+        Task.FromException(new NotSupportedException("当前引擎不支持字幕样式。"));
     IReadOnlyList<MediaTrack> GetTracks(TrackKind kind);
     Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default);
 }
@@ -43,6 +50,9 @@ public interface IPlaybackEngine : IAsyncDisposable
 public interface ILibraryStore
 {
     Task SaveHistoryAsync(HistoryEntry entry, CancellationToken ct = default);
+    Task MarkEpisodeWatchedAsync(string sourceKey, string mediaId, string lineId, string episodeId, CancellationToken ct = default) => Task.CompletedTask;
+    Task<IReadOnlySet<string>> GetWatchedEpisodesAsync(string sourceKey, string mediaId, string lineId, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
     Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default);
     Task DeleteHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default);
     Task ClearHistoryAsync(CancellationToken ct = default);

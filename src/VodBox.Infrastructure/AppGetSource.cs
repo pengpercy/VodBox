@@ -386,7 +386,7 @@ public sealed class AppGetSource : IResolvingContentSource, IDisposable
             if (_jsonRequests)
             {
                 body["version"] = _version;
-                request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, Json.Options));
+                request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, Json.TypeInfo<Dictionary<string, string>>()));
                 request.Content.Headers.ContentType = new("application/json");
             }
             else

@@ -45,12 +45,7 @@ public sealed class MpvEngine : IPlaybackEngine
     {
         _headless = headless;
         _waitForVideoSurface = waitForVideoSurface;
-        _factory = factory ?? (() => new MpvClient(new Dictionary<string, string>
-        {
-            ["vo"] = headless ? "null" : "libmpv",
-            ["ao"] = headless ? "null" : "auto",
-            ["hwdec"] = headless ? "no" : "auto-safe",
-        }));
+        _factory=factory??(()=>new MpvClient(DefaultOptions(headless)));
         if (headless)
         {
             try
@@ -63,6 +58,13 @@ public sealed class MpvEngine : IPlaybackEngine
                 _client = null;
             }
         }
+    }
+
+    internal static IReadOnlyDictionary<string,string> DefaultOptions(bool headless)
+    {
+        var options=new Dictionary<string,string>{["vo"]=headless?"null":"libmpv",["hwdec"]=headless?"no":"auto-safe"};
+        if(headless)options["ao"]="null"; // GUI不指定ao，交由mpv选择可用的系统驱动。
+        return options;
     }
 
     /// <summary>渲染面已创建并安装好 render context（消除 loadfile 早于渲染上下文导致无声丢画面的竞态）。</summary>
@@ -81,6 +83,7 @@ public sealed class MpvEngine : IPlaybackEngine
             client.Observe("seekable", 4, MpvPropertyFormat.Flag);
             client.Observe("paused-for-cache", 5, MpvPropertyFormat.Flag);
             client.Observe("track-list", 6, MpvPropertyFormat.None);
+            if(Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1"&&client is MpvClient diagnostic)diagnostic.RequestLogs("info");
             _client = client; Initialized?.Invoke(this, EventArgs.Empty);
             _pump = Task.Run(PumpAsync);
         }
@@ -155,8 +158,8 @@ public sealed class MpvEngine : IPlaybackEngine
     public Task SeekToAsync(TimeSpan position, CancellationToken token = default) => ExecuteAsync(() =>
     {
         if (_loaded && Snapshot.CanSeek)
-            _client!.Command("seek", Number(Math.Clamp(position.TotalSeconds, 0,
-                Snapshot.Duration > TimeSpan.Zero ? Snapshot.Duration.TotalSeconds : double.MaxValue)), "absolute+exact");
+            _client!.Command("seek",Number(Math.Clamp(position.TotalSeconds,0,
+                Snapshot.Duration>TimeSpan.Zero?Snapshot.Duration.TotalSeconds:double.MaxValue)),"absolute+exact");
     }, token);
 
     public Task SeekByAsync(TimeSpan delta, CancellationToken token = default) => ExecuteAsync(() =>
@@ -178,6 +181,29 @@ public sealed class MpvEngine : IPlaybackEngine
         {
             _aspect = ratio ?? -1;
             _client?.Command("set", "video-aspect-override", Number(_aspect));
+        }, token);
+    }
+
+    public Task LoadSubtitleAsync(string path, long sessionId, CancellationToken token = default)
+    {
+        if (!Path.IsPathFullyQualified(path) || !File.Exists(path))
+            throw new FileNotFoundException("字幕文件不存在或不是本地绝对路径。", path);
+        return ExecuteAsync(() =>
+        {
+            if (sessionId != _session) return;
+            if (!_loaded || _client is null) throw new InvalidOperationException("媒体尚未加载完成。 ");
+            _client.Command("sub-add", path, "select");
+        }, token);
+    }
+
+    public Task SetSubtitleStyleAsync(double delaySeconds, int fontSize, CancellationToken token = default)
+    {
+        if (!double.IsFinite(delaySeconds) || Math.Abs(delaySeconds) > 120) throw new ArgumentOutOfRangeException(nameof(delaySeconds));
+        if (fontSize is < 12 or > 96) throw new ArgumentOutOfRangeException(nameof(fontSize));
+        return ExecuteAsync(() =>
+        {
+            _client?.Command("set", "sub-delay", Number(delaySeconds));
+            _client?.Command("set", "sub-font-size", fontSize.ToString(CultureInfo.InvariantCulture));
         }, token);
     }
 
@@ -212,7 +238,14 @@ public sealed class MpvEngine : IPlaybackEngine
                     for (int i = 0; i < 256; i++)
                     {
                         var item = _client!.PollEvent(); if (item.Id == 0) break;
+                        if(item.LogText is not null&&Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1")Console.Error.WriteLine("[mpv] "+item.LogText.TrimEnd());
                         snapshot = Process(item, snapshot);
+                    }
+                    if(_loaded)
+                    {
+                        var ratio=_client!.GetDouble("video-out-params/aspect");
+                        if(ratio is not >0||!double.IsFinite(ratio.Value))ratio=_client.GetDouble("video-params/aspect");
+                        if(ratio is >0&&double.IsFinite(ratio.Value))snapshot=snapshot with{VideoAspectRatio=ratio};
                     }
                     if (snapshot != before) SetSnapshot(snapshot);
                 }

@@ -7,6 +7,14 @@ namespace VodBox.Tests;
 public class ConfigLoaderTests
 {
     [Fact]
+    public void SitePlayUrlSurvivesImportIntoMacCmsRuntime()
+    {
+        var sources=ConfigLoader.ToSources(new TvBoxConfig{Sites=[new TvBoxSite{Key="site",Name="站点",Api="https://example.com/api",Type=1,PlayUrl="https://parse.example/?url="}]});
+        var site=Assert.Single(sources);Assert.Equal("https://parse.example/?url=",site.PlayUrl);
+        using var http=new DefaultHttp();var source=new MacCmsSource(site,http);Assert.Equal(site.PlayUrl,source.ParseEndpoint);
+    }
+
+    [Fact]
     public void ParsesStandardTvBoxConfig()
     {
         const string json = """

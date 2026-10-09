@@ -15,7 +15,8 @@
 
   <!-- Mica 底色：桌面壁纸采样 + 深色叠加 -->
   <Panel>
-    <Rectangle Fill="#202020" Opacity="0.86" />
+    <views:LocalWallpaper HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Path="{Binding WallpaperPath}" Stretch="UniformToFill" IsHitTestVisible="False" />
+    <Rectangle x:Name="PageBackdrop" Fill="{DynamicResource PageBackgroundBrush}" Opacity="0.86" />
     <Grid RowDefinitions="44,*" ColumnDefinitions="216,*"
           chrome:WindowDecorationProperties.ElementRole="User">
 

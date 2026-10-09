@@ -40,6 +40,7 @@ public partial class NavItemView : UserControl
                 e.Handled = true;
             }
         };
+        ActualThemeVariantChanged+=(_,_)=>UpdateVisual();
         UpdateVisual();
     }
 
@@ -47,11 +48,12 @@ public partial class NavItemView : UserControl
     {
         if (this.FindControl<PathIcon>("IconPath") is not { } icon) return;
         icon.Data = Icon;
-        Foreground = new SolidColorBrush(IsSelected ? Colors.White : Color.FromUInt32(0xC7FFFFFF));
+        var light=ActualThemeVariant==Avalonia.Styling.ThemeVariant.Light;
+        Foreground = new SolidColorBrush(light?Color.FromUInt32(IsSelected?0xFF202020u:0xC7202020u):(IsSelected ? Colors.White : Color.FromUInt32(0xC7FFFFFF)));
         if (this.FindControl<TextBlock>("LabelText") is { } label)
             label.Text = Label;
         if (this.FindControl<Border>("Shell") is { } shell)
-            shell.Background = new SolidColorBrush(IsSelected ? Color.FromUInt32(0x12FFFFFF) : Colors.Transparent);
+            shell.Background = new SolidColorBrush(IsSelected ? Color.FromUInt32(light?0x12000000u:0x12FFFFFFu) : Colors.Transparent);
         if (this.FindControl<Border>("Indicator") is { } indicator) indicator.IsVisible = IsSelected;
     }
 }

@@ -38,7 +38,7 @@
             <TextBlock Text="今日推荐 · TOP 1" FontSize="11.5" Foreground="#4CC2FF" LetterSpacing="2" />
             <TextBlock Text="{Binding HeroTitle}" FontSize="30" FontWeight="SemiBold" />
             <TextBlock Text="{Binding HeroRemarks}" FontSize="13" Foreground="#4CC2FF" />
-            <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="#C7FFFFFF" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" MaxLines="2" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" MaxLines="2" TextTrimming="CharacterEllipsis" />
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
               <Button Background="#0078D4" Foreground="White" BorderThickness="0"
                       CornerRadius="7" Padding="18,9" Click="OnHeroPlay" Cursor="Hand">
@@ -47,10 +47,10 @@
                   <TextBlock Text="立即播放" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
-              <Button Content="详情" Background="#12FFFFFF" Foreground="White" BorderThickness="1"
-                      BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
-              <Button Background="#12FFFFFF" Foreground="White" BorderThickness="1"
-                      BorderBrush="#17FFFFFF" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand">
+              <Button Content="详情" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1"
+                      BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
+              <Button Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1"
+                      BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
                   <TextBlock Text="收藏" VerticalAlignment="Center" />
@@ -73,7 +73,7 @@
         <StackPanel Orientation="Horizontal" Spacing="8">
           <PathIcon Data="{StaticResource Icon.History}" Width="18" Height="18" VerticalAlignment="Center" />
           <TextBlock Text="最近观看" FontSize="16" FontWeight="SemiBold" />
-          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center"
+          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center"
                       Cursor="Hand" PointerPressed="OnShowAllHistory">
             <TextBlock Text="查看全部" FontSize="12" VerticalAlignment="Center" />
             <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12" VerticalAlignment="Center" />
@@ -115,8 +115,8 @@
         <StackPanel Orientation="Horizontal" Spacing="8">
           <PathIcon Data="{StaticResource Icon.Sparkles}" Width="18" Height="18" VerticalAlignment="Center" />
           <TextBlock FontSize="16" FontWeight="SemiBold" Text="站点推荐" />
-          <TextBlock Text="{Binding SourceName}" FontSize="12.5" Foreground="#85FFFFFF" VerticalAlignment="Center" />
-          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="#85FFFFFF" VerticalAlignment="Center" Cursor="Hand"
+          <TextBlock Text="{Binding SourceName}" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Cursor="Hand"
                       PointerPressed="OnSwitchSource">
             <TextBlock Text="换源" FontSize="12" VerticalAlignment="Center" />
             <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" VerticalAlignment="Center" />
@@ -142,7 +142,7 @@
                   </Panel>
                 </Border>
                 <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-                <TextBlock FontSize="11" Foreground="#85FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                   <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
                 </TextBlock>
               </StackPanel>
