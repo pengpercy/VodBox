@@ -1399,10 +1399,10 @@ public sealed class ViewModelRaceTests
         try
         {
             window.RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Light;Dispatcher.UIThread.RunJobs();window.UpdateLayout();
-            var background=Assert.IsType<Avalonia.Media.SolidColorBrush>(window.FindControl<Avalonia.Controls.Shapes.Rectangle>("PageBackdrop")!.Fill);
+            var background=Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(window.FindControl<Avalonia.Controls.Shapes.Rectangle>("PageBackdrop")!.Fill);
             Assert.Equal(Avalonia.Media.Color.Parse("#F3F3F3"),background.Color);
             window.RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Dark;Dispatcher.UIThread.RunJobs();window.UpdateLayout();
-            background=Assert.IsType<Avalonia.Media.SolidColorBrush>(window.FindControl<Avalonia.Controls.Shapes.Rectangle>("PageBackdrop")!.Fill);
+            background=Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(window.FindControl<Avalonia.Controls.Shapes.Rectangle>("PageBackdrop")!.Fill);
             Assert.Equal(Avalonia.Media.Color.Parse("#202020"),background.Color);
         }
         finally{window.Close();}
@@ -1415,9 +1415,9 @@ public sealed class ViewModelRaceTests
         var window=new Window{Content=nav,RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Light};window.Show();
         try
         {
-            Dispatcher.UIThread.RunJobs();Assert.Equal(Avalonia.Media.Color.Parse("#202020"),Assert.IsType<Avalonia.Media.SolidColorBrush>(nav.Foreground).Color);
+            Dispatcher.UIThread.RunJobs();Assert.Equal(Avalonia.Media.Color.Parse("#202020"),Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(nav.Foreground).Color);
             window.RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Dark;Dispatcher.UIThread.RunJobs();
-            Assert.Equal(Avalonia.Media.Colors.White,Assert.IsType<Avalonia.Media.SolidColorBrush>(nav.Foreground).Color);
+            Assert.Equal(Avalonia.Media.Colors.White,Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(nav.Foreground).Color);
         }
         finally{window.Close();}
     }
@@ -1782,10 +1782,15 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
-    public async Task PlayerPanelIsExactlyEightyPercentAndRatePopupDoesNotCycle()
+    public async Task PlayerPanelIsSixtyPercentTallerAndRatePopupDoesNotCycle()
     {
         using var context = new Context();
-        await Done(context.Main.Player.PlayResolvedAsync(_ => Task.FromResult(Request("ep1"))));
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+        };
+        await Done(context.Main.Player.PlayResolvedAsync(entries[0].Resolve, entries, 0));
         var window = new PlayerWindow { DataContext = context.Main, Width = 1000, Height = 600 };
         window.Show();
         try
@@ -1793,17 +1798,41 @@ public sealed class ViewModelRaceTests
             window.UpdateLayout();
             var overlay=window.Overlay;
             var panel=overlay.FindControl<Border>("BottomControls")!;
-            Assert.Equal(overlay.Bounds.Width * .8, panel.Bounds.Width, 5);
-            Assert.InRange(panel.Bounds.Height, 50, 74);
+            Assert.Equal(overlay.Bounds.Width * .6, panel.Bounds.Width, 5);
+            Assert.Equal(new Avalonia.Thickness(16, 12, 16, 13), panel.Padding);
+            // Measured against the previous 69px compact bar (30px buttons, 4px spacing, 7/8 padding):
+            // the requested 60% width plus roughly a quarter more height.
+            Assert.InRange(panel.Bounds.Height / 69d, 1.2, 1.3);
+            // Neutral grays only: the player panel must not use the app accent blue.
+            var progress=overlay.FindControl<Slider>("ProgressSlider")!;
+            var track=progress.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Track>().Single();
+            var played=Assert.IsAssignableFrom<Avalonia.Controls.RepeatButton>(track.DecreaseButton);
+            var remaining=Assert.IsAssignableFrom<Avalonia.Controls.RepeatButton>(track.IncreaseButton);
+            Assert.Equal(Avalonia.Media.Color.Parse("#FFC6C9CE"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(played.Background).Color);
+            Assert.Equal(Avalonia.Media.Color.Parse("#FF5C6066"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(remaining.Background).Color);
+            var volume=overlay.GetVisualDescendants().OfType<Slider>().Single(item=>item.Maximum==100);
+            Assert.Equal(Avalonia.Media.Color.Parse("#FFC6C9CE"),
+                Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(volume.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Track>().Single().DecreaseButton!.Background).Color);
             var button=overlay.FindControl<Button>("RateButton")!;
             button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(1, context.Main.Player.Rate);
             var menu=Assert.IsType<ContextMenu>(button.ContextMenu);
             Assert.True(menu.IsOpen);
+            Assert.Equal(12d, menu.FontSize);
+            Assert.Equal(12d, Assert.IsType<MenuItem>(menu.Items[0]).FontSize);
             var choice=menu.Items.OfType<MenuItem>().Single(item=>item.Header?.ToString()=="1.5×");
             choice.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(1.5,context.Main.Player.Rate);
             menu.Close();
+            // Episode arrows keep their normal look at the lists edges; the command itself no-ops.
+            var previous=overlay.GetVisualDescendants().OfType<Button>()
+                .Single(item=>item.Content is PathIcon { Data: var data } && ReferenceEquals(data, overlay.FindResource("Icon.SkipPrevious")));
+            // First episode has no previous one, yet the arrow keeps its normal look.
+            Assert.False(context.Main.Player.HasPreviousEpisode);
+            Assert.True(previous.IsEffectivelyEnabled);
+            previous.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(0, context.Main.Player.PlaylistIndex);
             var pin=overlay.FindControl<Button>("TopmostButton")!;
             pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Assert.True(window.Topmost);Assert.True(context.Main.Player.AlwaysOnTop);

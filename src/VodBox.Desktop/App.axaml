@@ -20,6 +20,9 @@
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <!-- 悬浮子面板（ContextMenu）统一小一号字号，减少遮挡 -->
+    <Style Selector="ContextMenu"><Setter Property="FontSize" Value="12" /></Style>
+    <Style Selector="ContextMenu MenuItem"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="Window"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /></Style>
     <StyleInclude Source="avares://VodBox.Desktop/Views/VirtualRows.axaml" />
     <!-- Material Design 3 风格滑杆：4px 圆头轨道 + 14px 圆 thumb，配 MDI 图标 -->
