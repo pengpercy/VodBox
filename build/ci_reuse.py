@@ -126,6 +126,8 @@ def main() -> int:
             parser.error("finalize needs --meta")
         path = Path(args.meta)
         data = json.loads(path.read_text()) if path.exists() else {"reused": False}
+        if not data.get("reused"):
+            data["sourceSha"] = git("rev-parse", "HEAD").strip()
         data["artifactRunId"] = str(data.get("sourceRunId") or args.current_run)
         Path(args.meta).write_text(json.dumps(data, indent=2))
         return 0

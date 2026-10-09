@@ -1,8 +1,17 @@
 import unittest
-from package_reuse import validate
+from package_reuse import validate, verified_checkout_sha
 
 
 class ReuseTests(unittest.TestCase):
+    def test_checkout_receipt_reads_actual_commit(self):
+        sha = 'a' * 40
+        self.assertEqual(sha, verified_checkout_sha('time [command]/usr/bin/git log -1 --format=%H\ntime ' + sha))
+        self.assertEqual(sha, verified_checkout_sha('time [command]\"C:/Git/bin/git.exe\" log -1 --format=%H\ntime ' + sha))
+        with self.assertRaises(ValueError):
+            verified_checkout_sha('time ' + sha)
+        with self.assertRaises(ValueError):
+            verified_checkout_sha('time [command]/usr/bin/git log -1 --format=%H\ntime invalid')
+
     def setUp(self):
         self.meta = {'sourceSha': 'source', 'version': '0.2.3'}
         self.jobs = [{'name': 'build / AOT osx-arm64', 'conclusion': 'success'},

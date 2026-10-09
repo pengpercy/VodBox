@@ -48,7 +48,7 @@ jobs:
           reuse_arg=()
           if [ -n "${{ inputs.source_run }}" ]; then reuse_arg=(--reuse-packages); fi
           python3 build/package_reuse.py --rid ${{ matrix.rid }} --version "$VERSION" --source-sha "$SOURCE_SHA" \
-            --meta artifacts/meta/${{ matrix.rid }}.json --jobs artifacts/jobs.json "${reuse_arg[@]}" >> "$GITHUB_OUTPUT"
+            --repo "$GITHUB_REPOSITORY" --meta artifacts/meta/${{ matrix.rid }}.json --jobs artifacts/jobs.json "${reuse_arg[@]}" >> "$GITHUB_OUTPUT"
       - name: Reuse successful package
         if: steps.source.outputs.reuse_package == 'true'
         shell: bash
