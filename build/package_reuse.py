@@ -10,7 +10,7 @@ def verified_checkout_sha(text):
     """Read the receipt emitted by actions/checkout, never infer a dispatch source from run HEAD."""
     lines = text.splitlines()
     for index, line in enumerate(lines[:-1]):
-        if '[command]' in line and re.search(r'git(?:\.exe|[\"])? log -1 --format=%H', line):
+        if '[command]' in line and re.search(r'git(?:\.exe)?"? log -1 --format=%H', line):
             value = lines[index + 1].split(' ', 1)[-1].strip()
             if re.fullmatch(r'[0-9a-f]{40}', value):
                 return value
