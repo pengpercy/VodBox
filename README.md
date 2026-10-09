@@ -26,7 +26,7 @@
 
 ## 开发
 
-要求 .NET SDK 10.0.400（`global.json` 固定）。播放需 libmpv：macOS 开发机可下载 mpv 官方 app 并把主二进制重链接（或 `export VODBOX_MPV_LIB=/path/to/libmpv.dylib`）；Windows 放 `mpv-2.dll`；Linux `apt install libmpv2`。
+要求 .NET SDK 10.0.400（`global.json` 固定）。播放需 libmpv：macOS 开发机可下载 mpv 官方 app 并把主二进制重链接（或 `export VODBOX_MPV_LIB=/path/to/libmpv.dylib`）；Windows 放 `libmpv-2.dll`（mpv 0.36+ 的命名，旧版 `mpv-2.dll` 也兼容）；Linux 安装系统 libmpv。
 
 ```sh
 dotnet restore VodBox.slnx
@@ -39,7 +39,7 @@ dotnet run --project src/VodBox.Desktop
 
 ## 打包与发布
 
-推送 `vX.Y.Z` tag（与 `VERSION` 一致）触发 Release：每 RID 在对应本机 runner 上 NativeAOT 构建 → 捆绑钉定 sha256 的 libmpv → 产物为 Windows ZIP、macOS `.app`/ZIP/DMG（ad-hoc 签名）、Linux deb/rpm（fpm）。CI 全量构建 + 测试在每次 push 运行。
+推送 `vX.Y.Z` tag（与 `VERSION` 一致）触发 Release：每 RID 在对应本机 runner 上 NativeAOT 构建 → macOS 捆绑钉定 sha256 的 libmpv（Windows/Linux 使用运行时提供的 libmpv） → 产物为 Windows ZIP、macOS `.app`/ZIP/DMG（ad-hoc 签名）、Linux deb/rpm（fpm）。CI 全量构建 + 测试在每次 push 运行。
 
 ```sh
 # 本机 AOT 发布（macOS x64 示例）

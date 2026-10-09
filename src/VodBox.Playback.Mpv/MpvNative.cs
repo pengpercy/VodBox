@@ -40,6 +40,8 @@ internal static partial class MpvNative
         }
         else if (OperatingSystem.IsWindows())
         {
+            // mpv 0.36+ renamed the shared library from mpv-2.dll to libmpv-2.dll; support both.
+            yield return Path.Combine(AppContext.BaseDirectory, "libmpv-2.dll");
             yield return Path.Combine(AppContext.BaseDirectory, "mpv-2.dll");
         }
         else if (OperatingSystem.IsLinux())

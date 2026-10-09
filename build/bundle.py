@@ -73,21 +73,22 @@ def bundle_macos(archive: Path, output: Path):
             run("codesign", "--force", "--sign", "-", dylib)
 
 
-def bundle_windows(archive: Path, output: Path):
-    with tempfile.TemporaryDirectory(prefix="vodbox-mpv-", dir=ROOT / ".cache") as temp:
-        with zipfile.ZipFile(archive) as source:
-            source.extractall(temp)
-        copied = 0
-        for candidate in Path(temp).rglob("*.dll"):
+def bundle_windows(archive: Path | None, output: Path):
+    """Official mpv Windows archives ship mpv.exe (statically linked) and no libmpv DLL.
+
+    The only libmpv DLL builds are rolling third-party dev packages whose pinned URLs expire,
+    so Windows gets the same contract as Linux: libmpv-2.dll must be supplied at runtime
+    (`VODBOX_MPV_LIB`, next to the executable, or on PATH). Failing the release here would
+    only hide that requirement.
+    """
+    if archive is not None:
+        for candidate in Path(archive).parent.rglob("*.dll"):
             if "mpv" not in candidate.name.lower():
                 continue
             shutil.copy2(candidate, output / candidate.name)
-            copied += 1
-        if copied == 0:
-            raise RuntimeError("mpv dll not found in archive")
-        for candidate in Path(temp).rglob("mpv.exe"):
-            shutil.copy2(candidate, output / "mpv.exe")
-            break
+            print(f"bundled {candidate.name} for win")
+            return
+    print("win: no libmpv DLL in the official archive; the app resolves libmpv-2.dll at runtime")
 
 
 def main():
@@ -100,6 +101,9 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     if args.rid.startswith("linux-"):
         print(f"{args.rid}: Linux 使用系统 libmpv，不捆绑")
+        return
+    if args.rid.startswith("win-"):
+        bundle_windows(None, args.output)
         return
     archive = download(args.rid)
     if args.rid.startswith("osx"):
