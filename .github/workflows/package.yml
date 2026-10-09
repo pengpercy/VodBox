@@ -21,14 +21,17 @@ jobs:
           - { os: ubuntu-22.04-arm, rid: linux-arm64 }
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v7
-        with:
-          name: vodbox.${{ matrix.rid }}
-          path: artifacts/build
-      - name: Extract build
+      # The binaries may come from this run or from an earlier green run of the same source tree.
+      - name: Fetch build artifact
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p artifacts/publish/${{ matrix.rid }}
+          mkdir -p artifacts/meta artifacts/build artifacts/publish/${{ matrix.rid }}
+          gh run download ${{ github.run_id }} -n vodbox-meta.${{ matrix.rid }} -D artifacts/meta
+          run_id=$(python3 build/ci_reuse.py artifact-run --meta artifacts/meta/${{ matrix.rid }}.json --current-run ${{ github.run_id }})
+          echo "binary artifact run: $run_id"
+          gh run download "$run_id" -n vodbox.${{ matrix.rid }} -D artifacts/build
           tar -xzf artifacts/build/VodBox.${{ matrix.rid }}.tar.gz -C artifacts/publish/${{ matrix.rid }}
       - name: Linux packaging tools
         if: startsWith(matrix.rid, 'linux')

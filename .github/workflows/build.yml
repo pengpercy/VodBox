@@ -5,6 +5,14 @@ on:
       version:
         type: string
         default: '0.2.1'
+      source_sha:
+        description: Commit to build; empty means the triggering ref.
+        type: string
+        default: ''
+      reuse_existing:
+        description: Reuse a successful build of an identical source tree instead of rebuilding.
+        type: boolean
+        default: true
 jobs:
   build:
     name: AOT ${{ matrix.rid }}
@@ -21,28 +29,43 @@ jobs:
           - { os: ubuntu-22.04, rid: linux-x64 }
           - { os: ubuntu-22.04-arm, rid: linux-arm64 }
     env:
+      GH_TOKEN: ${{ github.token }}
       NUGET_PACKAGES: ${{ github.workspace }}/.packages
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_NOLOGO: '1'
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      # Cheap by design: hashes the build inputs and looks for an already-green artifact of the same tree.
+      # Any doubt (API error, missing/expired artifact, different version) falls back to a full build.
+      - name: Look for a reusable build
+        id: reuse
+        if: inputs.reuse_existing
+        shell: bash
+        run: |
+          python3 build/ci_reuse.py probe --rid ${{ matrix.rid }} --version "${{ inputs.version }}" \
+            --repo ${{ github.repository }} --meta artifacts/meta/${{ matrix.rid }}.json >> "$GITHUB_OUTPUT"
       - uses: actions/setup-dotnet@v5
+        if: steps.reuse.outputs.skip != 'true'
         with:
           global-json-file: global.json
       - uses: actions/cache@v4
+        if: steps.reuse.outputs.skip != 'true'
         with:
           path: |
             .packages
             .cache/downloads
           key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json') }}
       - name: Linux native dependencies
-        if: startsWith(matrix.rid, 'linux')
+        if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
         run: |
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev libicu-dev
           # libmpv is resolved at runtime and its package name varies (libmpv1 on 22.04, libmpv2 on 24.04).
           sudo apt-get install -y libmpv-dev || sudo apt-get install -y libmpv1 || true
       - name: Restore and test
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: |
           python3 build/test_bundle.py
@@ -51,18 +74,22 @@ jobs:
           dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore
           dotnet test tests/VodBox.PreviewTests/VodBox.PreviewTests.csproj -c Debug --no-restore
       - name: Publish Native AOT
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: |
           dotnet publish src/VodBox.Desktop/VodBox.Desktop.csproj -c Release -r ${{ matrix.rid }} \
             --self-contained -o artifacts/publish/${{ matrix.rid }} \
             -p:Version=${{ inputs.version }} -p:TreatWarningsAsErrors=true
       - name: Bundle pinned libmpv
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
       - name: Build and bundle pinned QuickJS bridge
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/quickjs/build.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
       - name: Verify bundled QuickJS and drpy runtime
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: |
           case "${{ matrix.rid }}" in
@@ -74,6 +101,7 @@ jobs:
           dotnet run --project tests/VodBox.QuickJs.Smoke -c Release
           dotnet run --project tests/VodBox.Drpy.Smoke -c Release -- --offline
       - name: Verify NativeAOT script runtime
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: |
           case "${{ matrix.rid }}" in
@@ -87,16 +115,32 @@ jobs:
           "artifacts/smoke/quickjs/VodBox.QuickJs.Smoke$suffix"
           "artifacts/smoke/drpy/VodBox.Drpy.Smoke$suffix" --offline
       - name: Archive build
+        if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/archive.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/build
       - uses: actions/upload-artifact@v6
+        if: steps.reuse.outputs.skip != 'true'
         with:
           name: vodbox.${{ matrix.rid }}
           path: artifacts/build/VodBox.${{ matrix.rid }}.tar.gz
           retention-days: 7
       - uses: actions/upload-artifact@v6
+        if: steps.reuse.outputs.skip != 'true'
         with:
           name: symbols.${{ matrix.rid }}
           path: artifacts/build/symbols.${{ matrix.rid }}/
           if-no-files-found: ignore
+          retention-days: 7
+      # Always published: tells the package stage where the real binaries live.
+      - name: Finalize build metadata
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/meta
+          python3 build/ci_reuse.py finalize --meta artifacts/meta/${{ matrix.rid }}.json --current-run ${{ github.run_id }}
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: vodbox-meta.${{ matrix.rid }}
+          path: artifacts/meta/${{ matrix.rid }}.json
           retention-days: 7

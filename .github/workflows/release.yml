@@ -2,26 +2,47 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Reuse an already-green build: no rebuild is a no-op, it just packages and releases.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release; must equal VERSION at the source commit.
+        required: true
+      source_sha:
+        description: Commit to package and tag.
+        required: true
 permissions:
   contents: write
+  actions: read
 jobs:
   version:
     runs-on: ubuntu-22.04
     outputs:
       value: ${{ steps.version.outputs.value }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v6
       - id: version
         shell: bash
         run: |
-          version=$(cat VERSION)
-          test "$GITHUB_REF_NAME" = "v$version"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+            sha="${{ inputs.source_sha }}"
+            git fetch --depth=1 origin "$sha"
+            test "$(git show "$sha:VERSION" | tr -d '[:space:]')" = "$version"
+          else
+            version=$(cat VERSION)
+            test "$GITHUB_REF_NAME" = "v$version"
+            sha=$(git rev-parse HEAD)
+          fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
   build:
     needs: version
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.value }}
+      source_sha: ${{ needs.version.outputs.sha }}
   package:
     needs: [version, build]
     uses: ./.github/workflows/package.yml
@@ -39,4 +60,12 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" artifacts/release/* --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
+        run: |
+          tag="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then tag="v${{ needs.version.outputs.value }}"; fi
+          sha="${{ needs.version.outputs.sha }}"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            gh release create "$tag" artifacts/release/* --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
+          else
+            gh release create "$tag" artifacts/release/* --target "$sha" --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
+          fi
