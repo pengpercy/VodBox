@@ -1978,6 +1978,24 @@ public sealed class ViewModelRaceTests
         Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
     }
 
+    [Fact]
+    public void LiveCardGridTracksFilteringAndExcludesGroupHeaders()
+    {
+        using var context = new Context();
+        var channels = new[]
+        {
+            new LiveChannel { Name = "CCTV-1", Number = 1, Uris = ["https://example.com/1"] },
+            new LiveChannel { Name = "CCTV-2", Number = 2, Uris = ["https://example.com/2"] },
+        };
+        context.Main.Live.Groups.Add(new LiveGroup("测试", channels, false, 2));
+        context.Main.Live.FilterText = "CCTV";
+        Assert.Equal(channels, context.Main.Live.ChannelCards);
+        context.Main.Live.FilterText = "CCTV-2";
+        Assert.Same(channels[1], Assert.Single(context.Main.Live.ChannelCards));
+        context.Main.Live.FilterText = "不存在";
+        Assert.Empty(context.Main.Live.ChannelCards);
+    }
+
     [AvaloniaTheory]
     [InlineData(null)]
     [InlineData("新闻联播 19:00")]
@@ -2006,7 +2024,7 @@ public sealed class ViewModelRaceTests
                 Dispatcher.UIThread.RunJobs();
             }
             var view = window.GetVisualDescendants().OfType<LiveView>().Single();
-            var poster = view.GetVisualDescendants().OfType<RemotePoster>().Single();
+            var poster = view.GetVisualDescendants().OfType<RemotePoster>().Single(p => p.Name == "ChannelLogo");
             var name = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "CCTV-1综合");
             var placeholder = view.GetVisualDescendants().OfType<Border>()
                 .Single(b => b.Name == "BadgePlaceholder");
@@ -2109,7 +2127,7 @@ public sealed class ViewModelRaceTests
             var frame = await Force(context, window);
             Assert.NotNull(frame);
             var view = window.GetVisualDescendants().OfType<LiveView>().Single();
-            var posters = view.GetVisualDescendants().OfType<RemotePoster>().ToArray();
+            var posters = view.GetVisualDescendants().OfType<RemotePoster>().Where(p => !string.IsNullOrWhiteSpace(p.Url)).ToArray();
             Assert.NotEmpty(posters);
             Assert.All(posters, poster =>
             {

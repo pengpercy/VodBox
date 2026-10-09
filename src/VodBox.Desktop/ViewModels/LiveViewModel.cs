@@ -190,6 +190,9 @@ public sealed partial class LiveViewModel : ObservableObject
     /// <summary>频道面板行集合：组头（LiveGroupHeader）+ 频道行（LiveChannel）混排，UI 按类型选模板。</summary>
     public ObservableCollection<object> VisibleChannels { get; } = [];
 
+    /// <summary>与左侧分组/收藏/历史及搜索同步，卡片不包含组头或锁定频道。</summary>
+    public ObservableCollection<LiveChannel> ChannelCards { get; } = [];
+
     /// <summary>EPG 时间轴（当前频道的节目卡片，过去可回看、现在高亮）。S4 前为演示数据。</summary>
     public ObservableCollection<LiveEpgCard> EpgTimeline { get; } = [];
 
@@ -210,6 +213,11 @@ public sealed partial class LiveViewModel : ObservableObject
         _services = services;
         _main = main;
         _loadGroups = loadGroups;
+        VisibleChannels.CollectionChanged += (_, _) =>
+        {
+            ChannelCards.Clear();
+            foreach (var channel in VisibleChannels.OfType<LiveChannel>()) ChannelCards.Add(channel);
+        };
     }
 
     partial void OnSelectedGroupChanged(LiveGroup? value) => ApplyFilter();

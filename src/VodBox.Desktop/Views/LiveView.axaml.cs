@@ -28,6 +28,18 @@ public partial class LiveView : UserControl
 
     private LiveViewModel VM => ((MainViewModel)DataContext!).Live;
 
+    private void OnCardPanelSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (sender is not WrapPanel panel || e.NewSize.Width <= 0) return;
+        var columns = Math.Max(1, (int)(e.NewSize.Width / 220));
+        panel.ItemWidth = e.NewSize.Width / columns;
+    }
+
+    private void OnPlayCard(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control { Tag: LiveChannel channel }) VM.PlayChannelCommand.Execute(channel);
+    }
+
     private void OnGroupHeader(object? sender,PointerPressedEventArgs e)
     {
         if(sender is Control{Tag:LiveViewModel.LiveGroupHeader header}&&header.Locked)VM.RequestGroupUnlock(header.Name);
