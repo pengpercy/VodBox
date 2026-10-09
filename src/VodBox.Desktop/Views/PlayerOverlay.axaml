@@ -63,7 +63,7 @@
         <Button x:Name="TopmostButton" Grid.Column="1" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
                 Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="6"
                 Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
-          <PathIcon Data="{DynamicResource Icon.Pin}" Width="16" Height="16" />
+          <PathIcon Data="{DynamicResource Icon.Pin}" Width="14" Height="14" />
         </Button>
       </Grid>
 
@@ -93,47 +93,47 @@
                 <Button Command="{Binding ToggleMuteCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="静音 / 恢复音量">
                   <Panel>
-                    <PathIcon Data="{DynamicResource Icon.VolumeHigh}" IsVisible="{Binding IsMuted, Converter={x:Static v:BoolConverters.Not}}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <PathIcon Data="{DynamicResource Icon.VolumeOff}" IsVisible="{Binding IsMuted}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.VolumeHigh}" IsVisible="{Binding IsMuted, Converter={x:Static v:BoolConverters.Not}}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.VolumeOff}" IsVisible="{Binding IsMuted}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Panel>
                 </Button>
                 <Slider Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="64" IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" />
               </StackPanel>
 
               <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
                           HorizontalAlignment="Right">
                 <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="画面比例">
-                  <PathIcon Data="{DynamicResource Icon.AspectRatio}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.AspectRatio}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnTogglePip" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="置顶小窗 / 恢复窗口">
-                  <PathIcon Data="{DynamicResource Icon.PiP}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.PiP}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="插件">
-                  <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnTogglePlaylist" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">
-                  <PathIcon Data="{DynamicResource Icon.Playlist}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Playlist}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button x:Name="RateButton" Click="OnSelectRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Padding="6,0" Height="34" Cursor="Hand" ToolTip.Tip="倍速">
                   <StackPanel Orientation="Horizontal" Spacing="3">
-                    <PathIcon Data="{DynamicResource Icon.Speed}" Width="16" Height="16" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.Speed}" Width="14" Height="14" VerticalAlignment="Center" />
                     <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="#FFD2D5DA"
                                VerticalAlignment="Center" FontWeight="SemiBold" />
                   </StackPanel>
                 </Button>
                 <Button Click="OnToggleFullscreen" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="全屏">
-                  <PathIcon Data="{DynamicResource Icon.Fullscreen}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Fullscreen}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnToggleSettings" Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="设置">
-                  <PathIcon Data="{DynamicResource Icon.Settings}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Settings}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
               </StackPanel>
             </Grid>
