@@ -2005,6 +2005,8 @@ public sealed class ViewModelRaceTests
     public void LiveTabsHaveMatchingRoundedSurfacesAndIcons()
     {
         using var context = new Context();
+        context.Main.Live.Groups.Add(new LiveGroup("测试", [new LiveChannel { Name = "频道", Uris = ["https://example.com/live"] }], false, 1));
+        context.Main.Live.FilterText = "频道";
         var view = new LiveView { DataContext = context.Main };
         var window = new Window { Content = view, Width = 1280, Height = 800 };
         window.Show();
@@ -2013,10 +2015,24 @@ public sealed class ViewModelRaceTests
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
             var tabs = new[] { "TabGroups", "TabFavorites", "TabHistory" }
                 .Select(name => view.FindControl<Button>(name)!).ToArray();
+            var tabGrid = Assert.IsType<Grid>(tabs[0].Parent);
+            Assert.Equal(tabGrid.Bounds.Width, tabs.Sum(tab => tab.Bounds.Width), 1);
+            var rowSurfaces = view.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "ChannelRowSurface").ToArray();
+            Assert.NotEmpty(rowSurfaces);
+            Assert.All(rowSurfaces, surface =>
+            {
+                Assert.Equal(new Avalonia.CornerRadius(7), surface.CornerRadius);
+                Assert.True(surface.ClipToBounds);
+            });
             Assert.All(tabs, tab =>
             {
+                Assert.Equal(new Avalonia.Thickness(0), tab.Margin);
+                Assert.InRange(Math.Abs(tabGrid.Bounds.Width / 3 - tab.Bounds.Width), 0, 1);
+                var content = tab.GetVisualDescendants().OfType<StackPanel>().Single();
+                var centre = content.TranslatePoint(new Avalonia.Point(content.Bounds.Width / 2, content.Bounds.Height / 2), tab)!.Value;
+                Assert.InRange(Math.Abs(centre.X - tab.Bounds.Width / 2), 0, 1);
                 Assert.Equal(38, tab.Bounds.Height);
-                Assert.Equal(tabs[0].Bounds.Width, tab.Bounds.Width, 1);
+                Assert.InRange(Math.Abs(tabs[0].Bounds.Width - tab.Bounds.Width), 0, 1);
                 Assert.Equal(new Avalonia.CornerRadius(8), tab.CornerRadius);
                 Assert.Equal(tabs[0].Padding, tab.Padding);
                 Assert.Equal(tabs[0].Margin, tab.Margin);

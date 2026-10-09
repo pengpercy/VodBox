@@ -11,8 +11,9 @@
   <UserControl.Styles>
     <Style Selector="Button.liveTab">
       <Setter Property="Height" Value="38" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Padding" Value="8,0" />
-      <Setter Property="Margin" Value="3,0" />
+      <Setter Property="Margin" Value="0" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
@@ -45,7 +46,7 @@
     <Border Grid.Column="0" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,0,1,0">
       <Grid RowDefinitions="Auto,Auto,*">
         <!-- 等宽等高、相同圆角与图标规格，悬停背景覆盖整个按钮。 -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,*,*" Margin="9,14,9,6">
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*" Margin="0,14,0,6">
           <Button Grid.Column="0" Click="OnTabGroups" x:Name="TabGroups" Classes="liveTab selected" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.Folder}" Width="18" Height="18" VerticalAlignment="Center" />
@@ -74,6 +75,31 @@
         <!-- 频道列表：组头（可折叠 + 计数）+ 频道行（台标+EPG 单行） -->
         <ListBox Grid.Row="2" ItemsSource="{Binding VisibleChannels}" Margin="6,0,6,12"
                  Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.Styles>
+            <!-- 统一实际绘制 hover 的容器，而不是只给模板中的频道内容加圆角。 -->
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="Margin" Value="0,2" />
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+              <Setter Property="Template">
+                <ControlTemplate>
+                  <Border x:Name="ChannelRowSurface" CornerRadius="7" Background="Transparent" ClipToBounds="True">
+                    <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="Stretch" />
+                  </Border>
+                </ControlTemplate>
+              </Setter>
+            </Style>
+            <Style Selector="ListBoxItem:selected /template/ Border#ChannelRowSurface">
+              <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover /template/ Border#ChannelRowSurface">
+              <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:pressed /template/ Border#ChannelRowSurface">
+              <Setter Property="Background" Value="{DynamicResource StrokeBrush}" />
+            </Style>
+          </ListBox.Styles>
           <ListBox.DataTemplates>
             <!-- 组头行：展开箭头 + 锁定状态 + 名称 + 计数。 -->
             <DataTemplate x:DataType="vm:LiveViewModel+LiveGroupHeader">
