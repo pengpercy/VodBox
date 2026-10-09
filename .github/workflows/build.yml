@@ -4,7 +4,7 @@ on:
     inputs:
       version:
         type: string
-        default: '0.2.1'
+        default: '0.2.2'
       source_sha:
         description: Commit to build; empty means the triggering ref.
         type: string
@@ -94,6 +94,7 @@ jobs:
         run: |
           python3 build/test_bundle.py
           python3 build/test_package.py
+          python3 build/test_archive.py
           python3 build/test_ci_reuse.py
           dotnet restore VodBox.slnx
           # Warnings are errors here so the CI log stays clean and no warning can creep back in.

@@ -4,7 +4,7 @@
 
 设计与交互稿见 [design/DESIGN.md](design/DESIGN.md)：Mica/Fluent 深色主题、左侧导航 Shell、影院式详情页、全局播放浮层。
 
-## 已实现（0.2.1）
+## 已实现（0.2.2）
 
 - **TVBox 配置体系**：远程订阅加载、JS 变量包裹、`//` 行注释剥离、JPEG 尾部 base64 隐写（饭太硬 `in.bmp` 形态）、宽容字段解析（`type_id` 数字/字符串、`ext`/`style` 对象、`rules` 数组）——与 FongMi Gson 容错行为对齐。
 - **点播**：MacCMS（苹果CMS V10 JSON 采集）站点分类/分页/筛选/详情/搜索全链路；`vod_play_from$$$vod_play_url` 线路/选集拆分。
@@ -15,7 +15,7 @@
 - **UI**：8 页面（首页/点播/详情/直播/搜索/收藏/历史/本地文件）+ 设置中心 + 播放浮层；本地文件页可直接播放；全视图 `Design.DataContext` 设计预览数据（Rider 打开 axaml 即可预览，不触网不触库）。
 - **AOT 约束**：全 JSON 源码生成（`JsonSerializerIsReflectionEnabledByDefault=false`）、`PublishAot` 六 RID 发布、无反射容器（手写组合根）。
 
-## 已知限制（0.2.1）
+## 已知限制（0.2.2）
 
 - **非 UA/Referer 请求头暂拒绝**：mpv 只能全局设置 UA/Referer，其余请求头（Cookie 等）需媒体代理转发——引擎目前明确报错而非静默丢弃（媒体代理计划 S7）。
 - **字幕外挂接口未移植**：旧栈的 `AddSubtitleAsync`/`SubtitleSource` 在新契约无位置，S1 未移植（在线/本地字幕计划 S8）。
@@ -48,7 +48,7 @@ bash build/publish-aot.sh osx-x64 artifacts/publish/osx-x64
 # 需要 CMake 和本机 C 编译器；仅托管编译检查可设 VODBOX_SKIP_QUICKJS_BUILD=1。
 # 普通 solution/Debug restore 不产生 net10.0/osx-x64 的 AOT 资产；不能直接复用。
 python3 build/bundle.py osx-x64 artifacts/publish/osx-x64
-python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --version 0.2.1
+python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --version 0.2.2
 ```
 
 ## 结构

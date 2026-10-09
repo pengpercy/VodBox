@@ -42,6 +42,57 @@ def run(*args):
     subprocess.run([str(x) for x in args], check=True)
 
 
+def copy_libraries(libs_dir: Path, libs: Path) -> list[Path]:
+    """Copy the pinned dylibs into `libs`, preserving aliases without duplicating payloads.
+
+    Each entry is keyed by resolved inode, so if an upstream build ever ships version symlinks
+    (`libfoo.dylib -> libfoo.1.dylib`) the alias is recreated as a symlink instead of a second
+    full copy. The pinned mpv.app currently ships 97 distinct real files and no symlinks, so this
+    is behaviour-identical today and only guards the duplicate-bytes regression.
+    """
+    libs.mkdir(parents=True, exist_ok=True)
+    copied: dict[tuple[int, int], str] = {}
+    written: list[Path] = []
+    for dylib in sorted(libs_dir.glob("*.dylib")):
+        stat = dylib.resolve().stat()
+        canonical = copied.get((stat.st_dev, stat.st_ino))
+        if canonical is None:
+            shutil.copy2(dylib, libs / dylib.name, follow_symlinks=True)
+            copied[(stat.st_dev, stat.st_ino)] = dylib.name
+            written.append(libs / dylib.name)
+        elif canonical != dylib.name:
+            alias = libs / dylib.name
+            alias.unlink(missing_ok=True)
+            alias.symlink_to(canonical)
+    return written
+
+
+def missing_dependencies(lib: Path, libs: Path, seen: set[str] | None = None) -> list[str]:
+    """Names of `@loader_path` dependencies reachable from `lib` that are absent from `libs`."""
+    seen = set() if seen is None else seen
+    missing: list[str] = []
+    # `check=True`: without it a failing otool yields empty stdout, which reads as a clean,
+    # fully-resolved closure and silently hides a missing-dependency regression.
+    listing = subprocess.run(["otool", "-L", str(lib)], capture_output=True, text=True, check=True).stdout
+    for line in listing.splitlines()[1:]:
+        text = line.strip()
+        if not text:
+            continue
+        dep = text.split(" ")[0]
+        if "@loader_path/" not in dep:
+            continue
+        name = dep.rsplit("/", 1)[1]
+        if name in seen:
+            continue
+        seen.add(name)
+        target = libs / name
+        if target.exists():
+            missing += missing_dependencies(target, libs, seen)
+        else:
+            missing.append(name)
+    return missing
+
+
 def bundle_macos(archive: Path, output: Path):
     with tempfile.TemporaryDirectory(prefix="vodbox-mpv-", dir=ROOT / ".cache") as temp:
         with zipfile.ZipFile(archive) as source:
@@ -66,16 +117,18 @@ def bundle_macos(archive: Path, output: Path):
         # The upstream mpv.app ships stray dotfiles in lib/ (`.gitkeep`, AppleDouble `._*`).
         # Copying only real dylibs keeps the bundle signable: codesign descends into a sibling
         # `lib/` directory and rejects anything there that is not signed code.
-        libs.mkdir(parents=True, exist_ok=True)
-        for dylib in sorted(libs_dir.glob("*.dylib")):
-            shutil.copy2(dylib, libs / dylib.name, follow_symlinks=True)
-        for dylib in libs.glob("*.dylib"):
+        for dylib in copy_libraries(libs_dir, libs):
             for line in subprocess.run(["otool", "-L", dylib], capture_output=True, text=True).stdout.splitlines():
                 if "@executable_path" in line:
                     dep = line.strip().split(" ")[0]
                     name = dep.rsplit("/", 1)[1]
                     run("install_name_tool", "-change", dep, f"@loader_path/{name}", dylib)
             run("codesign", "--force", "--sign", "-", dylib)
+        # libmpv is useless if any transitive @loader_path dependency is missing. The asset is
+        # pinned by SHA256, so a non-empty result means the copy/closure logic itself regressed.
+        broken = missing_dependencies(target, libs)
+        if broken:
+            raise ValueError(f"bundled libmpv is missing dependencies: {', '.join(sorted(set(broken)))}")
 
 
 def bundle_windows(archive: Path | None, output: Path):

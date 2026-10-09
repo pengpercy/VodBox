@@ -21,8 +21,11 @@ def package_macos(rid, source: Path, output: Path, version: str):
     if app.exists():
         shutil.rmtree(app)
     contents = app / "Contents"
+    # Debug payloads never ship in the app: `.dSYM` alone is >100 MB of DWARF the runtime never
+    # loads. archive.py already diverts them into the `symbols.<rid>` artifact; ignoring them
+    # here too keeps a direct `package.py` run on a publish tree from re-shipping them.
     shutil.copytree(source, contents / "MacOS", symlinks=True,
-                    ignore=shutil.ignore_patterns("*.pdb", "*.dbg"))
+                    ignore=shutil.ignore_patterns("*.pdb", "*.dbg", "*.dSYM"))
     resources = contents / "Resources"
     resources.mkdir(parents=True)
     assets = contents / "MacOS" / "Assets"

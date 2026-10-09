@@ -18,6 +18,9 @@ class PackageTests(unittest.TestCase):
             root = pathlib.Path(temp)
             source = root / 'source'; source.mkdir()
             (source / 'VodBox.Desktop').write_text('fixture')
+            (source / 'VodBox.Desktop.pdb').write_text('symbols fixture')
+            (source / 'VodBox.Desktop.dSYM/Contents/Resources/DWARF').mkdir(parents=True)
+            (source / 'VodBox.Desktop.dSYM/Contents/Resources/DWARF/VodBox.Desktop').write_text('dwarf fixture')
             (source / 'libmpv.dylib').write_text('fixture')
             (source / 'lib').mkdir(); (source / 'lib/dependency.dylib').write_text('fixture')
             (source / 'lib/.gitkeep').touch()
@@ -36,6 +39,9 @@ class PackageTests(unittest.TestCase):
             self.assertFalse((app / 'MacOS/Assets').exists())
             self.assertFalse((app / 'MacOS/lib/.gitkeep').exists())
             self.assertFalse((app / 'MacOS/lib/._.gitkeep').exists())
+            # Debug payloads must never reach the shipped app bundle.
+            self.assertFalse((app / 'MacOS/VodBox.Desktop.dSYM').exists())
+            self.assertFalse((app / 'MacOS/VodBox.Desktop.pdb').exists())
 
     def test_linux_launcher_and_package_architecture(self):
         for rid, deb, rpm in [('linux-x64', 'amd64', 'x86_64'), ('linux-arm64', 'arm64', 'aarch64')]:
