@@ -1,6 +1,6 @@
 # 完整媒体内核发行
 
-开发中的下一版：Windows x64/arm64、Linux x64/arm64 与 macOS 一样，发行包必须包含 libmpv 和媒体依赖。缺失库、架构错误或实际解码失败会阻断构建；不再以“用户安装系统 libmpv”作为成功路径。已发布的 0.2.2 尚不包含这些 Windows/Linux 变更。
+0.2.3 发行构建：Windows x64/arm64、Linux x64/arm64 与 macOS 一样，发行包必须包含 libmpv 和媒体依赖。缺失库、架构错误或实际解码失败会阻断构建；不再以“用户安装系统 libmpv”作为成功路径。0.2.2 及之前的 Windows/Linux 发行包尚不包含这些变更。
 
 ## Windows
 

@@ -4,7 +4,7 @@ on:
     inputs:
       version:
         type: string
-        default: '0.2.2'
+        default: '0.2.3'
       source_sha:
         description: Commit to build; empty means the triggering ref.
         type: string
@@ -85,7 +85,7 @@ jobs:
         if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang zlib1g-dev libicu-dev libmpv2 libdisplay-info1 liblua5.2-0 patchelf zstd
+          sudo apt-get install -y clang zlib1g-dev libicu-dev libmpv2 libpipewire-0.3-0 libmujs3 libdisplay-info1 liblua5.2-0 patchelf zstd
       - name: Restore and test
         # Managed tests do not depend on CPU architecture; the arm64 legs stay on native verification only.
         if: steps.reuse.outputs.skip != 'true' && !endsWith(matrix.rid, '-arm64')
