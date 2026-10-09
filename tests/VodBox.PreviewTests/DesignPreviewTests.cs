@@ -60,10 +60,10 @@ public sealed class DesignPreviewTests
         Assert.All(view.GetVisualDescendants().OfType<PathIcon>(), icon =>
         {
             Assert.NotNull(icon.Data);
-            // Fluent 控件模板自身的图标（如滚动条箭头）使用主题尺寸。
+            // Fluent 控件模板自身的图标（如滚动条箭头）使用主题尺寸；播放器控制条另用16px小图标。
             if (icon.TemplatedParent is not null) return;
             Assert.Equal(icon.Width, icon.Height);
-            Assert.Contains(icon.Width, new[] { 12d, 18d, 24d, 48d });
+            Assert.Contains(icon.Width, new[] { 12d, 16d, 18d, 24d, 48d });
             Assert.False(icon.IsSet(PathIcon.ForegroundProperty));
         });
         if (view is SearchView)

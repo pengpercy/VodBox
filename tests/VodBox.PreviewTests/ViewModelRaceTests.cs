@@ -1800,6 +1800,19 @@ public sealed class ViewModelRaceTests
             var panel=overlay.FindControl<Border>("BottomControls")!;
             Assert.Equal(overlay.Bounds.Width * .6, panel.Bounds.Width, 5);
             Assert.Equal(new Avalonia.Thickness(16, 12, 16, 13), panel.Padding);
+            // Only the previous/play/next triple keeps the larger glyph; every other control-bar
+            // icon is a notch smaller. (The centre toast also draws Icon.Play, hence the 18px filter.)
+            var panelIcons=overlay.GetVisualDescendants().OfType<PathIcon>()
+                .Where(icon => icon.TemplatedParent is null && icon.Width is 16d or 18d).ToArray();
+            var transport=panelIcons.Where(icon => icon.Width == 18d).ToArray();
+            Assert.Equal(4, transport.Length);
+            Assert.All(transport, icon => Assert.Contains(
+                new[] { "Icon.SkipPrevious", "Icon.Pause", "Icon.Play", "Icon.SkipNext" },
+                key => ReferenceEquals(icon.Data, overlay.FindResource(key))));
+            var smaller=panelIcons.Except(transport).ToArray();
+            Assert.Equal(10, smaller.Length);
+            Assert.DoesNotContain(smaller, icon => new[] { "Icon.SkipPrevious", "Icon.SkipNext" }
+                .Any(key => ReferenceEquals(icon.Data, overlay.FindResource(key))));
             // Measured against the previous 69px compact bar (30px buttons, 4px spacing, 7/8 padding):
             // the requested 60% width plus roughly a quarter more height.
             Assert.InRange(panel.Bounds.Height / 69d, 1.2, 1.3);
