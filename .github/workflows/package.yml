@@ -5,6 +5,13 @@ on:
       version:
         type: string
         required: true
+      source_sha:
+        type: string
+        required: true
+      source_run:
+        description: Use verified outputs and successful packages from this run; empty means this run.
+        type: string
+        default: ''
 jobs:
   package:
     runs-on: ${{ matrix.os }}
@@ -21,27 +28,79 @@ jobs:
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }
     steps:
       - uses: actions/checkout@v7
-      # The binaries may come from this run or from an earlier green run of the same source tree.
-      - name: Fetch build artifact
+      - name: Test packaging reuse guards
+        shell: bash
+        run: python3 build/test_package_reuse.py
+      # Tooling belongs to the workflow revision; metadata keeps the actual compiled source SHA.
+      - name: Validate native build metadata
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORIGIN_RUN: ${{ inputs.source_run || github.run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$ORIGIN_RUN" in ''|*[!0-9]*) exit 1;; esac
+          mkdir -p artifacts/meta
+          gh run view "$ORIGIN_RUN" --repo "$GITHUB_REPOSITORY" --json jobs,headSha,event,headBranch > artifacts/jobs.json
+          gh run download "$ORIGIN_RUN" --repo "$GITHUB_REPOSITORY" -n vodbox-meta.${{ matrix.rid }} -D artifacts/meta
+          reuse_arg=()
+          if [ -n "${{ inputs.source_run }}" ]; then reuse_arg=(--reuse-packages); fi
+          python3 build/package_reuse.py --rid ${{ matrix.rid }} --version "$VERSION" --source-sha "$SOURCE_SHA" \
+            --meta artifacts/meta/${{ matrix.rid }}.json --jobs artifacts/jobs.json "${reuse_arg[@]}" >> "$GITHUB_OUTPUT"
+      - name: Reuse successful package
+        if: steps.source.outputs.reuse_package == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n package.${{ matrix.rid }} -D artifacts/packages
+      - name: Fetch verified build artifact
+        if: steps.source.outputs.reuse_package != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p artifacts/meta artifacts/build artifacts/publish/${{ matrix.rid }}
-          gh run download ${{ github.run_id }} -n vodbox-meta.${{ matrix.rid }} -D artifacts/meta
-          run_id=$(python3 build/ci_reuse.py artifact-run --meta artifacts/meta/${{ matrix.rid }}.json --current-run ${{ github.run_id }})
+          mkdir -p artifacts/build artifacts/publish/${{ matrix.rid }}
+          origin_run="${{ inputs.source_run || github.run_id }}"
+          run_id=$(python3 build/ci_reuse.py artifact-run --meta artifacts/meta/${{ matrix.rid }}.json --current-run "$origin_run")
           echo "binary artifact run: $run_id"
-          gh run download "$run_id" -n vodbox.${{ matrix.rid }} -D artifacts/build
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" -n vodbox.${{ matrix.rid }} -D artifacts/build
           tar -xzf artifacts/build/VodBox.${{ matrix.rid }}.tar.gz -C artifacts/publish/${{ matrix.rid }}
       - name: Linux packaging tools
-        if: startsWith(matrix.rid, 'linux')
+        if: steps.source.outputs.reuse_package != 'true' && startsWith(matrix.rid, 'linux')
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby-dev build-essential rpm
           sudo gem install fpm --version 1.16.0 --no-document
       - name: Package
+        if: steps.source.outputs.reuse_package != 'true'
         shell: bash
         run: python3 build/package.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} artifacts/packages --version ${{ inputs.version }}
+      - name: Record packaging provenance
+        shell: bash
+        env:
+          REUSED: ${{ steps.source.outputs.reuse_package }}
+          TOOL_SHA: ${{ github.workflow_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('artifacts/meta/${{ matrix.rid }}.json')
+          meta = json.loads(p.read_text())
+          original = json.loads(Path('artifacts/jobs.json').read_text())
+          meta['sourceSha'] = os.environ['SOURCE_SHA']
+          meta['packagingWorkflowSha'] = original['headSha'] if os.environ['REUSED'] == 'true' else os.environ['TOOL_SHA']
+          meta['packageReused'] = os.environ['REUSED'] == 'true'
+          p.write_text(json.dumps(meta, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        if: inputs.source_run != ''
+        with:
+          name: vodbox-meta.${{ matrix.rid }}
+          path: artifacts/meta/${{ matrix.rid }}.json
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: package.${{ matrix.rid }}

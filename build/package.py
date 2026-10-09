@@ -34,6 +34,11 @@ def package_macos(rid, source: Path, output: Path, version: str):
     assets = contents / "MacOS" / "Assets"
     if assets.is_dir():
         shutil.move(str(assets), resources / "Assets")
+    # License/provenance text is a bundle resource, never nested code in Contents/MacOS.
+    for name in ("licenses", "media-dependencies.json"):
+        text_resource = contents / "MacOS" / name
+        if text_resource.exists():
+            shutil.move(str(text_resource), resources / name)
     # Archive round-trips (tar/zip on macOS) can leave `.DS_Store`, AppleDouble `._*` or upstream
     # `.gitkeep` files behind. They are never runtime content and they break codesign, which walks
     # sibling code directories such as lib/ and requires every entry there to be signed code.

@@ -11,6 +11,10 @@ on:
       source_sha:
         description: Commit to package and tag.
         required: true
+      build_run:
+        description: Existing run with successful native builds; retry packaging only and retain successful packages.
+        required: false
+        default: ''
       package_run:
         description: Existing run with six successful packages; skips building and packaging.
         required: false
@@ -42,18 +46,20 @@ jobs:
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
   build:
-    if: inputs.package_run == ''
+    if: inputs.package_run == '' && inputs.build_run == ''
     needs: version
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.value }}
       source_sha: ${{ needs.version.outputs.sha }}
   package:
-    if: inputs.package_run == ''
+    if: always() && inputs.package_run == '' && needs.version.result == 'success' && (needs.build.result == 'success' || inputs.build_run != '')
     needs: [version, build]
     uses: ./.github/workflows/package.yml
     with:
       version: ${{ needs.version.outputs.value }}
+      source_sha: ${{ needs.version.outputs.sha }}
+      source_run: ${{ inputs.build_run }}
   release:
     if: always() && needs.version.result == 'success' && (needs.package.result == 'success' || inputs.package_run != '')
     needs: [version, package]
