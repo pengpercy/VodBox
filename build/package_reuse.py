@@ -26,10 +26,10 @@ def restore_missing_source(meta, run, rid, repo):
     if job is None:
         raise ValueError('No verified native build job: ' + rid)
     result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job['databaseId']}/logs"],
-                            capture_output=True, text=True)
+                            capture_output=True, text=True, encoding="utf-8")
     if result.returncode and 'allow-escape-sequences' in result.stderr:
         result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job['databaseId']}/logs",
-                                 '--allow-escape-sequences'], capture_output=True, text=True)
+                                 '--allow-escape-sequences'], capture_output=True, text=True, encoding="utf-8")
     if result.returncode:
         raise ValueError('Checkout log download failed: ' + result.stderr.strip())
     return {**meta, 'sourceSha': verified_checkout_sha(result.stdout)}
