@@ -25,7 +25,7 @@ public static class PlayerLayout
     /// 倍速键本身按内容自适应（这样图标不会离邻键太远），此值仅作为最小宽度算式的最坏情况上界，
     /// 保证切到任意倍速都不会与三键重叠。回归会遍历全部档位校验该上界。
     /// </summary>
-    public const double RateButtonMaxWidth = 52;
+    public const double RateButtonMaxWidth = 60;
 
     // ── 左侧音量 ────────────────────────────────────────────────────────────
     public const double VolumeSliderWidth = 64;
