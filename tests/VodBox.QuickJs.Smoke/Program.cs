@@ -128,4 +128,13 @@ await Check("relative URL joining preserves scheme, query and dot segments", asy
     Equal("https://example.org/a?x=1", await urls.EvaluateAsync("__hostapi.__host('joinUrl', JSON.stringify({base:'https://example.org/a?old=1',rel:'?x=1'}))"));
     Equal("https://example.org/b", await urls.EvaluateAsync("__hostapi.__host('joinUrl', JSON.stringify({base:'https://example.org/a/c',rel:'../b'}))"));
 });
+await Check("optimizer fixes preserve Date arithmetic and array splice", async () =>
+{
+    using var optimized = new QuickJsEngine();
+    Equal("0:951782400000:-999:60000", await optimized.EvaluateAsync(
+        "[Date.UTC(1970,0,1),Date.UTC(2000,1,29),Date.UTC(1970,0,1,0,0,-1,1),Date.UTC(1970,0,1,0,1)].join(':')"));
+    Equal("2,3:1,8,9,4:1,8,9,4", await optimized.EvaluateAsync(
+        "var a=[1,2,3,4]; var removed=a.splice(1,2,8,9); [removed.join(','),a.join(','),a.slice().join(',')].join(':')"));
+    Equal("true", await optimized.EvaluateAsync("typeof new Error('optimizer').stack === 'string'"));
+});
 Console.WriteLine($"QUICKJS SMOKE {passed}/{passed}");

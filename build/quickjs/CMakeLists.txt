@@ -8,6 +8,12 @@ FetchContent_Declare(quickjs
   URL_HASH SHA256=0af6f985be7030a7a9d12b92c25c2bc9f7dd716829c5074a81d7c4a4452040c8
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(quickjs)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/patch_msvc.py"
+  "${quickjs_SOURCE_DIR}" RESULT_VARIABLE vodbox_patch_result)
+if(NOT vodbox_patch_result EQUAL 0)
+  message(FATAL_ERROR "Pinned QuickJS optimizer patch failed")
+endif()
 
 # Third-party code: build it quietly so CI warnings only ever come from our own sources.
 # The pinned quickjs-ng revision triggers C41xx/C47xx diagnostics that we cannot fix upstream.

@@ -9,6 +9,11 @@ on:
       - 'design/**'
   pull_request:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Comma-separated RIDs to verify, or all.
+        type: string
+        default: all
 permissions:
   contents: read
   actions: read
@@ -40,3 +45,4 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.value }}
+      platforms: ${{ inputs.platforms || 'all' }}

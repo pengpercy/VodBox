@@ -13,21 +13,40 @@ on:
         description: Reuse a successful build of an identical source tree instead of rebuilding.
         type: boolean
         default: true
+      platforms:
+        description: Comma-separated RIDs to verify, or all.
+        type: string
+        default: all
 jobs:
+  select:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        shell: bash
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          runners = {"win-x64":"windows-2022", "win-arm64":"windows-11-arm",
+                     "osx-x64":"macos-15-intel", "osx-arm64":"macos-15",
+                     "linux-x64":"ubuntu-22.04", "linux-arm64":"ubuntu-22.04-arm"}
+          value = os.environ["PLATFORMS"].strip()
+          requested = list(runners) if value == "all" else list(dict.fromkeys(x.strip() for x in value.split(",")))
+          if not requested or any(x not in runners for x in requested):
+              raise SystemExit("Unknown or empty platform selection")
+          print("matrix=" + json.dumps({"include":[{"os":runners[x], "rid":x} for x in requested]}))
+          PY
   build:
+    needs: select
     name: AOT ${{ matrix.rid }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { os: windows-2022, rid: win-x64 }
-          - { os: windows-11-arm, rid: win-arm64 }
-          - { os: macos-15-intel, rid: osx-x64 }
-          - { os: macos-15, rid: osx-arm64 }
-          - { os: ubuntu-22.04, rid: linux-x64 }
-          - { os: ubuntu-22.04-arm, rid: linux-arm64 }
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     env:
       GH_TOKEN: ${{ github.token }}
       NUGET_PACKAGES: ${{ github.workspace }}/.packages
@@ -95,7 +114,7 @@ jobs:
         if: steps.reuse.outputs.skip != 'true'
         with:
           path: artifacts/quickjs/${{ matrix.rid }}
-          key: quickjs-${{ matrix.rid }}-${{ hashFiles('build/quickjs/CMakeLists.txt', 'build/quickjs/bridge.c') }}
+          key: quickjs-${{ matrix.rid }}-${{ hashFiles('build/quickjs/CMakeLists.txt', 'build/quickjs/bridge.c', 'build/quickjs/patch_msvc.py') }}
       - name: Build and bundle pinned QuickJS bridge
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
