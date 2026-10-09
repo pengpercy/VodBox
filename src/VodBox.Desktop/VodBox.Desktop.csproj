@@ -70,4 +70,30 @@
     <TrimmerRootDescriptor Include="Roots.xml" />
     <TrimmerRootAssembly Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
+
+  <!--
+    开发期原生库：bin 目录默认不含 libmpv 与脚本运行库（发布包由 build/bundle.py 打进产物），
+    因此在 IDE / dotnet run 下播放会以 DllNotFoundException 失败。
+    build/dev-natives.sh 会把它们准备到 .cache/dev-natives/<rid>/，这里自动复制到输出目录，
+    使开发运行与发布包行为一致。找不到该目录时静默跳过（CI 与干净检出不受影响）。
+  -->
+  <Target Name="CopyDevNativeLibraries" AfterTargets="Build">
+    <PropertyGroup>
+      <!-- 普通开发构建不带 -r（RuntimeIdentifier 为空），用 SDK 的主机 RID 推断当前平台。 -->
+      <DevNativeRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</DevNativeRid>
+      <DevNativeRid Condition="'$(DevNativeRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</DevNativeRid>
+      <DevNativeDir>$(MSBuildThisFileDirectory)../../.cache/dev-natives/$(DevNativeRid)</DevNativeDir>
+    </PropertyGroup>
+    <ItemGroup Condition="Exists('$(DevNativeDir)')">
+      <DevNativeFiles Include="$(DevNativeDir)/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DevNativeFiles)"
+          DestinationFiles="@(DevNativeFiles->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(DevNativeFiles)' != ''" />
+    <Message Importance="normal" Condition="'@(DevNativeFiles)' != ''"
+             Text="已复制开发期原生库：@(DevNativeFiles->'%(Filename)%(Extension)', ', ')" />
+    <Message Importance="high" Condition="!Exists('$(DevNativeDir)')"
+             Text="提示：未找到开发期原生库（$(DevNativeDir)）。播放视频前请执行：bash build/dev-natives.sh $(DevNativeRid)" />
+  </Target>
 </Project>

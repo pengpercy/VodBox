@@ -69,12 +69,27 @@ public sealed class MpvEngine : IPlaybackEngine
 
     /// <summary>渲染面已创建并安装好 render context（消除 loadfile 早于渲染上下文导致无声丢画面的竞态）。</summary>
     public void NotifyVideoSurfaceReady() => _videoSurfaceReady.TrySetResult();
-    public void NotifyVideoSurfaceFailure(Exception error) => _videoSurfaceReady.TrySetException(error);
+    public void NotifyVideoSurfaceFailure(Exception error)
+    {
+        VodBoxLog.Error("mpv", "视频渲染面报告失败", error);
+        _videoSurfaceReady.TrySetException(error);
+    }
 
     private void Initialize()
     {
         if (_client is not null) return;
-        var client = _factory();
+        IMpvClient client;
+        try
+        {
+            client = _factory();
+        }
+        catch (DllNotFoundException error)
+        {
+            // 开发构建的 bin 目录默认没有 libmpv；把解决办法直接写进错误，避免只看到 dlopen 噪声。
+            throw new InvalidOperationException(
+                "未找到 libmpv 动态库。开发运行时请执行 bash build/dev-natives.sh 准备原生库" +
+                "（或设置 VODBOX_MPV_LIB 指向 libmpv，或改用打包版本）。", error);
+        }
         try
         {
             client.Observe("time-pos", 1, MpvPropertyFormat.Double);
@@ -83,11 +98,21 @@ public sealed class MpvEngine : IPlaybackEngine
             client.Observe("seekable", 4, MpvPropertyFormat.Flag);
             client.Observe("paused-for-cache", 5, MpvPropertyFormat.Flag);
             client.Observe("track-list", 6, MpvPropertyFormat.None);
-            if(Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1"&&client is MpvClient diagnostic)diagnostic.RequestLogs("info");
+            // 订阅 mpv 日志：默认 warn（错误/警告是排障关键，必须落盘），
+            // 开启诊断或 verbose 时升级到 info 以获得完整上下文。
+            if(client is MpvClient logClient)
+            {
+                var verbose = VodBoxLog.Verbose || Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1";
+                logClient.RequestLogs(verbose ? "info" : "warn");
+            }
             _client = client; Initialized?.Invoke(this, EventArgs.Empty);
             _pump = Task.Run(PumpAsync);
         }
-        catch { _client = null; client.Dispose(); throw; }
+        catch (Exception error)
+        {
+            VodBoxLog.Error("mpv", "初始化 libmpv 客户端失败（常见原因：缺少 libmpv 动态库）", error);
+            _client = null; client.Dispose(); throw;
+        }
     }
 
     private async Task ExecuteAsync(Action action, CancellationToken token)
@@ -118,7 +143,20 @@ public sealed class MpvEngine : IPlaybackEngine
         {
             await ExecuteAsync(Initialize, token).ConfigureAwait(false);
             // loadfile 早于 render-context 创建时 libmpv 会静默丢视频。
-            await _videoSurfaceReady.Task.WaitAsync(TimeSpan.FromSeconds(8), token).ConfigureAwait(false);
+            try
+            {
+                await _videoSurfaceReady.Task.WaitAsync(TimeSpan.FromSeconds(8), token).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                VodBoxLog.Error("mpv", "等待 OpenGL 渲染面超时（8 秒）：窗口可能未显示或渲染初始化失败");
+                throw;
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                VodBoxLog.Error("mpv", "OpenGL 渲染面创建失败", error);
+                throw;
+            }
         }
         await ExecuteAsync(() =>
         {
@@ -250,9 +288,13 @@ public sealed class MpvEngine : IPlaybackEngine
                         var item = _client!.PollEvent(); if (item.Id == 0) break;
                         if(item.LogText is not null)
                         {
-                            // 原有控制台诊断保留；同时写入文件日志（verbose 时才落盘，避免日常噪音）。
+                            // 原有控制台诊断保留。
                             if(Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1")Console.Error.WriteLine("[mpv] "+item.LogText.TrimEnd());
-                            VodBoxLog.Trace("mpv", item.LogText.TrimEnd());
+                            var text=item.LogText.TrimEnd();
+                            // mpv 自己的错误/警告是定位解码、网络、协议问题的关键，必须落盘；
+                            // 其余（info/debug）只在 verbose 下记录，避免日常噪音。
+                            if(!VodBoxLog.Verbose && Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")!="1")VodBoxLog.Warn("mpv", text);
+                            else VodBoxLog.Trace("mpv", text);
                         }
                         snapshot = Process(item, snapshot);
                     }

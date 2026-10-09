@@ -184,7 +184,7 @@
           </StackPanel>
           <StackPanel x:Name="AboutSection" Spacing="12" IsVisible="{Binding IsAboutSection}">
             <TextBlock Text="关于" FontSize="20" />
-          <TextBlock Text="VodBox 0.2.3 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" />
+          <TextBlock Text="VodBox 0.2.4 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" />
           </StackPanel>
 
           <!-- 诊断：日志开关 + 目录/文件 + 尾部预览。排障时“复现一次 → 刷新 → 复制内容”即可。 -->

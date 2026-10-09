@@ -4,7 +4,7 @@
 
 设计与交互稿见 [design/DESIGN.md](design/DESIGN.md)：Mica/Fluent 深色主题、左侧导航 Shell、影院式详情页、全局播放浮层。
 
-## 已实现（0.2.3）
+## 已实现（0.2.4）
 
 - **TVBox 配置体系**：远程订阅加载、JS 变量包裹、`//` 行注释剥离、JPEG 尾部 base64 隐写（饭太硬 `in.bmp` 形态）、宽容字段解析（`type_id` 数字/字符串、`ext`/`style` 对象、`rules` 数组）——与 FongMi Gson 容错行为对齐。
 - **点播**：MacCMS（苹果CMS V10 JSON 采集）站点分类/分页/筛选/详情/搜索全链路；`vod_play_from$$$vod_play_url` 线路/选集拆分。
@@ -15,7 +15,7 @@
 - **UI**：8 页面（首页/点播/详情/直播/搜索/收藏/历史/本地文件）+ 设置中心 + 播放浮层；本地文件页可直接播放；全视图 `Design.DataContext` 设计预览数据（Rider 打开 axaml 即可预览，不触网不触库）。
 - **AOT 约束**：全 JSON 源码生成（`JsonSerializerIsReflectionEnabledByDefault=false`）、`PublishAot` 六 RID 发布、无反射容器（手写组合根）。
 
-## 已知限制（0.2.3）
+## 已知限制（0.2.4）
 
 - **非 UA/Referer 请求头暂拒绝**：mpv 只能全局设置 UA/Referer，其余请求头（Cookie 等）需媒体代理转发——引擎目前明确报错而非静默丢弃（媒体代理计划 S7）。
 - **字幕外挂接口未移植**：旧栈的 `AddSubtitleAsync`/`SubtitleSource` 在新契约无位置，S1 未移植（在线/本地字幕计划 S8）。
@@ -26,7 +26,21 @@
 
 ## 开发
 
-要求 .NET SDK 10.0.400（`global.json` 固定）。播放需 libmpv：macOS 开发机可下载 mpv 官方 app 并把主二进制重链接（或 `export VODBOX_MPV_LIB=/path/to/libmpv.dylib`）；Windows 放 `libmpv-2.dll`（mpv 0.36+ 的命名，旧版 `mpv-2.dll` 也兼容）；Linux 安装系统 libmpv。
+要求 .NET SDK 10.0.400（`global.json` 固定）。
+
+**播放前先在开发机上准备原生库**：发布包由 `build/bundle.py` 把 libmpv 与媒体依赖打进产物，但 `bin/<Config>/net10.0` 默认没有它们，直接运行会在播放时报 `DllNotFoundException: vodbox-mpv`。
+
+```sh
+bash build/dev-natives.sh          # 自动识别 RID，也接受 osx-x64 / linux-arm64 / win-x64 等
+```
+
+脚本把 libmpv、脚本运行库（QuickJS 桥）与其依赖闭包放入 `.cache/dev-natives/<rid>/`，并同步到已有 `bin` 目录；Desktop 项目在构建时也会自动复制，因此 IDE 里改完直接跑即可。首次准备可指定来源：
+
+```sh
+bash build/dev-natives.sh osx-x64 --from artifacts/publish/osx-x64
+```
+
+也可以继续用环境变量覆盖：`VODBOX_MPV_LIB` / `VODBOX_QUICKJS_LIB` 指向具体库文件。
 
 ```sh
 dotnet restore VodBox.slnx
@@ -34,6 +48,8 @@ dotnet build VodBox.slnx -c Debug
 dotnet test tests/VodBox.Tests/VodBox.Tests.csproj
 dotnet run --project src/VodBox.Desktop
 ```
+
+**排查播放问题**：设置 → 诊断 可开关日志、打开日志目录并查看最后若干行；日志位于 `<数据目录>/logs/vodbox-YYYYMMDD.log`（macOS 为 `~/Library/Application Support/VodBox/logs`）。日志记录选台、线路、mpv 打开/载入/结束原因与失败异常，地址中的 `key`/`authid`/`token` 会自动脱敏。需要 mpv 原始日志时设 `VODBOX_LOG_VERBOSE=1`。
 
 首次启动 → 设置 → 填入 TVBox 配置地址（如 `https://example.com/tvbox.json`）加载；直播页填 m3u 地址。
 
@@ -48,7 +64,7 @@ bash build/publish-aot.sh osx-x64 artifacts/publish/osx-x64
 # 需要 CMake 和本机 C 编译器；仅托管编译检查可设 VODBOX_SKIP_QUICKJS_BUILD=1。
 # 普通 solution/Debug restore 不产生 net10.0/osx-x64 的 AOT 资产；不能直接复用。
 python3 build/bundle.py osx-x64 artifacts/publish/osx-x64
-python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --version 0.2.3
+python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --version 0.2.4
 ```
 
 ## 结构
