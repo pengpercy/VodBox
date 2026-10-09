@@ -13,22 +13,30 @@ bundle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bundle)
 
 class BundleTests(unittest.TestCase):
-    def test_linux_never_requests_download_asset(self):
-        with tempfile.TemporaryDirectory(dir=pathlib.Path(__file__).resolve().parent.parent / '.alma') as directory:
-            for rid in ('linux-x64', 'linux-arm64'):
-                with patch('sys.argv', ['bundle.py', rid, directory]), patch.object(bundle, 'download', side_effect=AssertionError('Linux must not download')), contextlib.redirect_stdout(io.StringIO()):
+    def test_windows_and_linux_must_download_and_bundle(self):
+        for rid in ('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64'):
+            with self.subTest(rid=rid), tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
+                archive = pathlib.Path(directory) / 'asset'
+                method = 'bundle_windows' if rid.startswith('win') else 'bundle_linux'
+                with patch('sys.argv', ['bundle.py', rid, directory]), patch.object(bundle, 'download', return_value=archive) as download, patch.object(bundle, method) as package, patch.object(bundle, 'copy_media_notices'):
                     bundle.main()
+                    download.assert_called_once_with(rid)
+                    package.assert_called_once_with(archive, pathlib.Path(directory), rid)
 
-    def test_windows_reports_runtime_requirement_without_downloading_or_failing(self):
-        import pathlib as _p
-        with _p.Path(__file__).resolve().parent.parent.joinpath('.alma').mkdir(parents=True, exist_ok=True) or tempfile.TemporaryDirectory(dir=_p.Path(__file__).resolve().parent.parent / '.alma') as directory:
-            for rid in ('win-x64', 'win-arm64'):
-                output = _p.Path(directory)
-                with patch('sys.argv', ['bundle.py', rid, str(output)]), patch.object(bundle, 'download', side_effect=AssertionError('Windows must not download a DLL asset')):
-                    stdout = io.StringIO()
-                    with contextlib.redirect_stdout(stdout):
-                        bundle.main()
-                    self.assertIn('libmpv-2.dll', stdout.getvalue())
+    def test_windows_exe_only_asset_must_fail(self):
+        import zipfile
+        with tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
+            archive = pathlib.Path(directory) / 'asset.zip'
+            with zipfile.ZipFile(archive, 'w') as source:
+                source.writestr('mpv.exe', b'not a dll')
+            with self.assertRaisesRegex(ValueError, 'no libmpv'):
+                bundle.bundle_windows(archive, pathlib.Path(directory), 'win-x64')
+
+    def test_windows_loader_is_not_optional(self):
+        with tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
+            (pathlib.Path(directory) / 'libmpv-2.dll').write_bytes(b'fixture')
+            with self.assertRaisesRegex(bundle.NativeVerifyError, 'vulkan-1.dll'):
+                bundle.verify_windows_closure(pathlib.Path(directory), 'win-x64')
 
     def test_unknown_rid_rejected_before_download(self):
         with patch('sys.argv', ['bundle.py', 'unknown', '.']), patch.object(bundle, 'download', side_effect=AssertionError('bad RID')), contextlib.redirect_stderr(io.StringIO()):

@@ -48,12 +48,18 @@ class PackageTests(unittest.TestCase):
             with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
                 root = pathlib.Path(temp); source = root / 'source'; source.mkdir()
                 (source / 'VodBox.Desktop').write_text('fixture')
+                (source / 'lib').mkdir()
+                (source / 'lib/libmpv.so.2').write_bytes(b'fixture')
                 commands = []
                 def capture(*args, **kwargs):
                     commands.append(args)
                     stage = pathlib.Path(args[args.index('-C') + 1])
-                    self.assertIn('/opt/vodbox/VodBox.Desktop', (stage / 'usr/bin/vodbox').read_text())
-                with patch.object(package, 'run', side_effect=capture):
+                    launcher = (stage / 'usr/bin/vodbox').read_text()
+                    self.assertIn('/opt/vodbox/VodBox.Desktop', launcher)
+                    self.assertIn('/opt/vodbox/lib:', launcher)
+                    self.assertTrue((stage / 'opt/vodbox/lib/libmpv.so.2').exists())
+                    self.assertNotIn('libmpv2', args)
+                with patch.object(package, 'run', side_effect=capture), patch.object(package, 'verify_linux_closure'):
                     package.package_linux(rid, source, root / 'output', '0.2.1')
                 self.assertEqual(deb, commands[0][commands[0].index('--architecture') + 1])
                 self.assertEqual(rpm, commands[1][commands[1].index('--architecture') + 1])

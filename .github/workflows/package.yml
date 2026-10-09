@@ -17,8 +17,8 @@ jobs:
           - { os: windows-11-arm, rid: win-arm64 }
           - { os: macos-15-intel, rid: osx-x64 }
           - { os: macos-15, rid: osx-arm64 }
-          - { os: ubuntu-22.04, rid: linux-x64 }
-          - { os: ubuntu-22.04-arm, rid: linux-arm64 }
+          - { os: ubuntu-24.04, rid: linux-x64 }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
     steps:
       - uses: actions/checkout@v7
       # The binaries may come from this run or from an earlier green run of the same source tree.

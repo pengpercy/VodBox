@@ -39,7 +39,7 @@ dotnet run --project src/VodBox.Desktop
 
 ## 打包与发布
 
-推送 `vX.Y.Z` tag（与 `VERSION` 一致）触发 Release：每 RID 在对应本机 runner 上 NativeAOT 构建 → macOS 捆绑钉定 sha256 的 libmpv（Windows/Linux 使用运行时提供的 libmpv） → 产物为 Windows ZIP、macOS `.app`/ZIP/DMG（ad-hoc 签名）、Linux deb/rpm（fpm）。CI 全量构建 + 测试在每次 push 运行。
+推送 `vX.Y.Z` tag（与 `VERSION` 一致）触发 Release：每 RID 在对应本机 runner 上 NativeAOT 构建 → 所有平台捆绑钉定 SHA256 的 libmpv 与媒体依赖（Windows 额外包含 Vulkan 加载器，Linux 递归收集完整依赖闭包） → 产物为 Windows ZIP、macOS `.app`/ZIP/DMG（ad-hoc 签名）、Linux deb/rpm（fpm）。CI 全量构建 + 测试在每次 push 运行。
 
 ```sh
 # 本机 AOT 发布（macOS x64 示例）
@@ -77,3 +77,6 @@ bash build/test-desktop-smoke.sh artifacts/publish/osx-x64/VodBox.Desktop
 主题切换和主播放器渲染帧/暂停/seek/全屏往返/小窗恢复，正常退出后清理自己的测试文件。
 不会加载现有订阅或改写用户库存储。Windows/Linux/arm64 必须在对应图形环境运行，
 macOS x64 的通过结果不能当作其他平台通过。
+
+
+完整媒体内核捆绑的开发变更与最低系统要求见 [媒体发行说明](docs/MEDIA-BUNDLING.md)。当前已发布的 0.2.2 仍是旧布局，Windows/Linux 完整媒体包将在下一版提供。

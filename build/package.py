@@ -8,6 +8,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+from bundle import verify_windows_closure
+from nativeverify import verify_linux_closure
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -70,6 +73,7 @@ def package_macos(rid, source: Path, output: Path, version: str):
 
 
 def package_linux(rid, source: Path, output: Path, version: str):
+    verify_linux_closure(source / "lib", rid)
     stem = f"vodbox_{version}_{rid}"
     output.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="vodbox-pkg-",dir=output) as directory:
@@ -78,7 +82,7 @@ def package_linux(rid, source: Path, output: Path, version: str):
         shutil.copytree(source, app, symlinks=True)
         (stage / "usr/bin").mkdir(parents=True)
         launcher = stage / "usr/bin/vodbox"
-        launcher.write_text("#!/bin/sh\nexec /opt/vodbox/VodBox.Desktop \"$@\"\n")
+        launcher.write_text("#!/bin/sh\nexport LD_LIBRARY_PATH=\"/opt/vodbox/lib:/opt/vodbox${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"\nexec /opt/vodbox/VodBox.Desktop \"$@\"\n")
         launcher.chmod(0o755)
         apps = stage / "usr/share/applications"
         apps.mkdir(parents=True)
@@ -92,10 +96,10 @@ def package_linux(rid, source: Path, output: Path, version: str):
                          icons / "vodbox.png")
         output.mkdir(parents=True, exist_ok=True)
         run("fpm", "-t", "deb", "-s", "dir", "-C", stage, "-n", "vodbox", "-v", version,
-            "-d", "libmpv2", "--architecture", ("amd64" if rid == "linux-x64" else "arm64"),
+            "--architecture", ("amd64" if rid == "linux-x64" else "arm64"),
             "-p", output / f"{stem}.deb", "--description", "VodBox 跨平台影音应用")
         run("fpm", "-t", "rpm", "-s", "dir", "-C", stage, "-n", "vodbox", "-v", version,
-            "-d", "libmpv2", "--architecture", ("x86_64" if rid == "linux-x64" else "aarch64"),
+            "--architecture", ("x86_64" if rid == "linux-x64" else "aarch64"),
             "-p", output / f"{stem}.rpm", "--description", "VodBox 跨平台影音应用")
 
 
@@ -108,6 +112,7 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     if args.rid.startswith("win"):
+        verify_windows_closure(args.source, args.rid)
         stem = f"VodBox_{args.version}.{args.rid}"
         shutil.make_archive(str(args.output / stem), "zip", args.source)
     elif args.rid.startswith("osx"):

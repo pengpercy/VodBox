@@ -20,7 +20,15 @@ internal static partial class MpvNative
             if (name != Library) return IntPtr.Zero;
             foreach (var candidate in CandidateLibraries())
             {
-                if (NativeLibrary.TryLoad(candidate, out var handle)) return handle;
+                // Resolve private DLL dependencies (notably Vulkan) beside libmpv, including
+                // when a developer supplies an absolute VODBOX_MPV_LIB outside the executable dir.
+                if (OperatingSystem.IsWindows() && Path.IsPathFullyQualified(candidate))
+                {
+                    if (NativeLibrary.TryLoad(candidate, typeof(MpvNative).Assembly,
+                            DllImportSearchPath.SafeDirectories | DllImportSearchPath.UseDllDirectoryForDependencies,
+                            out var localHandle)) return localHandle;
+                }
+                else if (NativeLibrary.TryLoad(candidate, out var handle)) return handle;
             }
             return IntPtr.Zero;
         });
@@ -46,6 +54,8 @@ internal static partial class MpvNative
         }
         else if (OperatingSystem.IsLinux())
         {
+            yield return Path.Combine(AppContext.BaseDirectory, "lib", "libmpv.so.2");
+            yield return Path.Combine(AppContext.BaseDirectory, "lib", "libmpv.so");
             yield return Path.Combine(AppContext.BaseDirectory, "libmpv.so");
             // Distro packages expose versioned sonames; Ubuntu 22.04 ships libmpv.so.1, 24.04 ships libmpv.so.2.
             yield return "libmpv.so.2";

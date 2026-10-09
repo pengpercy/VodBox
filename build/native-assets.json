@@ -8,7 +8,46 @@
     "osx-arm64": {
       "url": "https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-macos-15-arm.zip",
       "sha256": "489cf6a54f57c54f86ad8d7cedaf5bb26848770d58dc059021214e2f689ee799"
+    },
+    "win-x64": {
+      "url": "https://github.com/edde746/mpv-build/releases/download/binaries-windows/libmpv-windows-442b5d101e4c-x86_64.zip",
+      "sha256": "b35ea76f624846c90cef4d14c4199dd7ba7c4b27c1ef00f3137a945ffbc45243",
+      "source": "https://github.com/edde746/mpv-build/tree/690a755f66c21240515bb2ef84f86a9187652856",
+      "license": "GPL-3.0-or-later"
+    },
+    "win-arm64": {
+      "url": "https://github.com/edde746/mpv-build/releases/download/binaries-windows/libmpv-windows-442b5d101e4c-aarch64.zip",
+      "sha256": "4caa21fe9c22ed3a33e43835e74e183e991826901ed376bde693b059ff60ff70",
+      "source": "https://github.com/edde746/mpv-build/tree/690a755f66c21240515bb2ef84f86a9187652856",
+      "license": "GPL-3.0-or-later"
+    },
+    "linux-x64": {
+      "url": "https://github.com/edde746/mpv-build/releases/download/binaries-linux/libmpv-linux-47a8d9f36f50-x86_64.tar.zst",
+      "sha256": "33092da46409048edf87f9a7cd792d31293c10120333d73c98b753de7c06d098",
+      "source": "https://github.com/edde746/mpv-build/tree/690a755f66c21240515bb2ef84f86a9187652856",
+      "license": "GPL-3.0-or-later",
+      "mpvVersion": "0.40.0",
+      "minimumGlibc": "2.38"
+    },
+    "linux-arm64": {
+      "url": "https://github.com/edde746/mpv-build/releases/download/binaries-linux/libmpv-linux-47a8d9f36f50-aarch64.tar.zst",
+      "sha256": "003c0bc4f63509639a4cd0beaadef1def9ccbe959e3abed7e3e1581f6c2d95db",
+      "source": "https://github.com/edde746/mpv-build/tree/690a755f66c21240515bb2ef84f86a9187652856",
+      "license": "GPL-3.0-or-later",
+      "mpvVersion": "0.40.0",
+      "minimumGlibc": "2.38"
     }
   },
-  "note": "Windows and Linux resolve libmpv at runtime; only macOS bundles a pinned libmpv."
+  "note": "All six runtimes bundle libmpv and its media libraries. Windows/Linux use immutable, content-addressed GPL builds; SHA256 and build-source revision are pinned.",
+  "windowsVulkan": {
+    "loader": {
+      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Loader/tar.gz/refs/tags/v1.4.341",
+      "sha256": "9a8c6f1aace4a03641429a09bc823073f2375abf2d62ac5a4d38c46e732b2d85"
+    },
+    "headers": {
+      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/refs/tags/v1.4.341",
+      "sha256": "8876aad926b2e72bdefddc34885472d5332e2d20aa3ed57313466f0bc982cf3f"
+    },
+    "version": "1.4.341"
+  }
 }
