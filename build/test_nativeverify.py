@@ -75,6 +75,7 @@ class NativeTests(unittest.TestCase):
             p = Path(t)
             pe(p / 'libmpv-2.dll', dependency='vulkan-1.dll')
             pe(p / 'vulkan-1.dll')
+            pe(p / 'av_libglesv2.dll', dependency='dxgi.dll')
             verify_windows_closure(p, 'win-x64')
 
     def test_linux_dependency_alias_must_physically_exist(self):
