@@ -49,6 +49,7 @@ public sealed class DrpyRuntime : IDrpyRuntime
         var candidates = new[]
         {
             Path.Combine(baseDir, "Assets", "js"),
+            Path.Combine(baseDir, "..", "Resources", "Assets", "js"), // macOS app bundle resources
             Path.Combine(baseDir, "..", "..", "..", "Assets", "js"), // dev 布局（bin/Debug/net10.0 → 项目根）
             Path.Combine(baseDir, "..", "..", "..", "..", "src", "VodBox.PluginHost", "Assets", "js"),
         };

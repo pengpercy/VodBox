@@ -23,6 +23,7 @@ ARTIFACT_NAME = "vodbox.{rid}"
 SOURCE_PATHS = (
     "src", "tests", "build", "Directory.Build.props", "Directory.Packages.props",
     "global.json", "VodBox.slnx", "NuGet.Config", "VERSION",
+    ".github/workflows/build.yml", ".github/workflows/ci.yml",
 )
 
 
@@ -67,9 +68,17 @@ def probe(rid: str, version: str, repo: str) -> dict:
         sha = artifact["workflow_run"]["head_sha"]
         try:
             run = api(f"repos/{repo}/actions/runs/{run_id}")
+            jobs = api(f"repos/{repo}/actions/runs/{run_id}/jobs?filter=latest&per_page=100")
         except Exception:  # noqa: BLE001
             continue
-        if run.get("conclusion") != "success":
+        if run.get("path") != ".github/workflows/ci.yml":
+            continue  # Release dispatches can build a source SHA different from the run HEAD.
+        if run.get("event") == "pull_request" or run.get("head_repository", {}).get("full_name", repo) != repo:
+            continue
+        # Another RID failing must not invalidate this RID's already-verified artifact.
+        if not any(job.get("conclusion") == "success" and
+                   job.get("name", "").split(" / ")[-1] == f"AOT {rid}"
+                   for job in jobs.get("jobs", [])):
             continue
         if not ensure_commit(sha):
             continue
@@ -115,7 +124,8 @@ def main() -> int:
     if args.command == "finalize":
         if not args.meta:
             parser.error("finalize needs --meta")
-        data = json.loads(Path(args.meta).read_text())
+        path = Path(args.meta)
+        data = json.loads(path.read_text()) if path.exists() else {"reused": False}
         data["artifactRunId"] = str(data.get("sourceRunId") or args.current_run)
         Path(args.meta).write_text(json.dumps(data, indent=2))
         return 0

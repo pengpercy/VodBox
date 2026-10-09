@@ -63,7 +63,12 @@ def bundle_macos(archive: Path, output: Path):
         run("codesign", "--force", "--sign", "-", target)
         # lib/ 内部互相依赖 → @loader_path
         libs = output / "lib"
-        shutil.copytree(libs_dir, libs, dirs_exist_ok=True)
+        # The upstream mpv.app ships stray dotfiles in lib/ (`.gitkeep`, AppleDouble `._*`).
+        # Copying only real dylibs keeps the bundle signable: codesign descends into a sibling
+        # `lib/` directory and rejects anything there that is not signed code.
+        libs.mkdir(parents=True, exist_ok=True)
+        for dylib in sorted(libs_dir.glob("*.dylib")):
+            shutil.copy2(dylib, libs / dylib.name, follow_symlinks=True)
         for dylib in libs.glob("*.dylib"):
             for line in subprocess.run(["otool", "-L", dylib], capture_output=True, text=True).stdout.splitlines():
                 if "@executable_path" in line:

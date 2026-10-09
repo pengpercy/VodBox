@@ -75,6 +75,7 @@ jobs:
         run: |
           python3 build/test_bundle.py
           python3 build/test_package.py
+          python3 build/test_ci_reuse.py
           dotnet restore VodBox.slnx
           # Warnings are errors here so the CI log stays clean and no warning can creep back in.
           dotnet test tests/VodBox.Tests/VodBox.Tests.csproj -c Release --no-restore -p:TreatWarningsAsErrors=true

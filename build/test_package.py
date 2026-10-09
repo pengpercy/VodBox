@@ -20,6 +20,10 @@ class PackageTests(unittest.TestCase):
             (source / 'VodBox.Desktop').write_text('fixture')
             (source / 'libmpv.dylib').write_text('fixture')
             (source / 'lib').mkdir(); (source / 'lib/dependency.dylib').write_text('fixture')
+            (source / 'lib/.gitkeep').touch()
+            (source / 'lib/._.gitkeep').touch()
+            (source / 'Assets/js/lib').mkdir(parents=True)
+            (source / 'Assets/js/lib/cheerio.min.js').write_text('resource fixture')
             output = root / 'output'; output.mkdir()
             with patch.object(package, 'run'):
                 package.package_macos('osx-x64', source, output, '0.2.1')
@@ -28,6 +32,10 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual('VodBox.Desktop', plistlib.load(file)['CFBundleExecutable'])
             self.assertTrue((app / 'MacOS/lib/dependency.dylib').exists())
             self.assertTrue((app / 'MacOS/libmpv.dylib').exists())
+            self.assertTrue((app / 'Resources/Assets/js/lib/cheerio.min.js').exists())
+            self.assertFalse((app / 'MacOS/Assets').exists())
+            self.assertFalse((app / 'MacOS/lib/.gitkeep').exists())
+            self.assertFalse((app / 'MacOS/lib/._.gitkeep').exists())
 
     def test_linux_launcher_and_package_architecture(self):
         for rid, deb, rpm in [('linux-x64', 'amd64', 'x86_64'), ('linux-arm64', 'arm64', 'aarch64')]:

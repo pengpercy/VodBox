@@ -25,6 +25,15 @@ def package_macos(rid, source: Path, output: Path, version: str):
                     ignore=shutil.ignore_patterns("*.pdb", "*.dbg"))
     resources = contents / "Resources"
     resources.mkdir(parents=True)
+    assets = contents / "MacOS" / "Assets"
+    if assets.is_dir():
+        shutil.move(str(assets), resources / "Assets")
+    # Archive round-trips (tar/zip on macOS) can leave `.DS_Store`, AppleDouble `._*` or upstream
+    # `.gitkeep` files behind. They are never runtime content and they break codesign, which walks
+    # sibling code directories such as lib/ and requires every entry there to be signed code.
+    for detritus in sorted(contents.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if detritus.name.startswith("."):
+            shutil.rmtree(detritus, ignore_errors=True) if detritus.is_dir() else detritus.unlink(missing_ok=True)
     # Keep libmpv and lib/ together: native dependencies use @loader_path/lib.
     shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/vodbox.icns", resources / "vodbox.icns")
     with (contents / "Info.plist").open("wb") as file:
