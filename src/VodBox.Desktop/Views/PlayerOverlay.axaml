@@ -117,8 +117,8 @@
           <ExperimentalAcrylicBorder x:Name="ControlPanelMaterial" CornerRadius="13" IsHitTestVisible="False"
                                      Margin="-16,-12,-16,-13">
             <ExperimentalAcrylicBorder.Material>
-              <ExperimentalAcrylicMaterial BackgroundSource="Digger" TintColor="#181A1E" TintOpacity="0.55"
-                                           MaterialOpacity="0.72" FallbackColor="#D9181A1E" />
+              <ExperimentalAcrylicMaterial BackgroundSource="Digger" TintColor="#181A1E" TintOpacity="0.18"
+                                           MaterialOpacity="0.25" FallbackColor="#80181A1E" />
             </ExperimentalAcrylicBorder.Material>
           </ExperimentalAcrylicBorder>
         <StackPanel Spacing="{x:Static v:PlayerLayout.RowSpacing}">
