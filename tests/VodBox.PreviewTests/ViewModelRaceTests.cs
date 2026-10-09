@@ -2036,6 +2036,15 @@ public sealed class ViewModelRaceTests
             Assert.Equal(tabGrid.Bounds.Width, tabs.Sum(tab => tab.Bounds.Width), 1);
             var rowSurfaces = view.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "ChannelRowSurface").ToArray();
             Assert.NotEmpty(rowSurfaces);
+            var header = view.GetVisualDescendants().OfType<Grid>().Single(g => g.Name == "GroupHeaderRow");
+            var headerSurface = header.FindAncestorOfType<Border>()!;
+            Assert.Equal("ChannelRowSurface", headerSurface.Name);
+            Assert.Equal(36, headerSurface.Bounds.Height);
+            foreach (var label in header.GetVisualDescendants().OfType<TextBlock>())
+            {
+                var centre = label.TranslatePoint(new Avalonia.Point(0, label.Bounds.Height / 2), headerSurface)!.Value.Y;
+                Assert.InRange(Math.Abs(centre - headerSurface.Bounds.Height / 2), 0, 1);
+            }
             Assert.All(rowSurfaces, surface =>
             {
                 Assert.Equal(new Avalonia.CornerRadius(7), surface.CornerRadius);

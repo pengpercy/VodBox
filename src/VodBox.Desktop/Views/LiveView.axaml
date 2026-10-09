@@ -103,7 +103,8 @@
           <ListBox.DataTemplates>
             <!-- 组头行：展开箭头 + 锁定状态 + 名称 + 计数。 -->
             <DataTemplate x:DataType="vm:LiveViewModel+LiveGroupHeader">
-              <StackPanel PointerPressed="OnGroupHeader" Tag="{Binding}" Cursor="Hand" Orientation="Horizontal" Spacing="6" Margin="6,12,6,4" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
+              <Grid x:Name="GroupHeaderRow" PointerPressed="OnGroupHeader" Tag="{Binding}" Cursor="Hand" Height="36" Background="Transparent">
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                 <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12"
                           IsVisible="{Binding Expanded, Converter={x:Static views:BoolConverters.Not}}" VerticalAlignment="Center" />
                 <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12"
@@ -113,7 +114,8 @@
                 <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" MaxWidth="180" />
                 <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
-              </StackPanel>
+                </StackPanel>
+              </Grid>
             </DataTemplate>
             <!-- 频道行 -->
             <DataTemplate x:DataType="core:LiveChannel">
