@@ -1978,6 +1978,45 @@ public sealed class ViewModelRaceTests
         Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
     }
 
+    [AvaloniaFact]
+    public void LargeLiveGridRealizesOnlyViewportRowsAndRecyclesOnScroll()
+    {
+        using var context = new Context();
+        var channels = Enumerable.Range(1, 2000).Select(i => new LiveChannel
+        { Name = $"频道{i}", Number = i, Uris = [$"https://example.com/{i}"] }).ToArray();
+        context.Main.Live.Groups.Add(new LiveGroup("性能测试", channels, false, channels.Length));
+        context.Main.Live.FilterText = "频道";
+        context.Main.Navigate(AppPage.Live);
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            void Layout()
+            {
+                for (var i = 0; i < 4; i++)
+                { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            }
+            Layout();
+            var view = window.GetVisualDescendants().OfType<LiveView>().Single();
+            var grid = view.FindControl<ListBox>("ChannelCardGrid")!;
+            Assert.Equal(2000, context.Main.Live.ChannelCards.Count);
+            Assert.True(context.Main.Live.CardColumns > 1);
+            Assert.Contains(grid.GetVisualDescendants(), visual => visual is VirtualizingStackPanel);
+            int Cards() => grid.GetVisualDescendants().OfType<Button>().Count(b => b.Name == "ChannelCard");
+            Assert.InRange(Cards(), 1, 100);
+            var scroll = grid.GetVisualDescendants().OfType<ScrollViewer>().Single();
+            scroll.Offset = new Avalonia.Vector(0, 19400);
+            Layout();
+            Assert.InRange(Cards(), 1, 100);
+            Assert.Contains(grid.GetVisualDescendants().OfType<Button>(), b => b.Name == "ChannelCard" && b.Tag is LiveChannel c && c.Number > 100);
+            context.Main.Live.FilterText = "频道2000";
+            Layout();
+            Assert.Single(context.Main.Live.ChannelCards);
+            Assert.Single(context.Main.Live.ChannelCardRows);
+        }
+        finally { window.Close(); }
+    }
+
     [Fact]
     public void LiveCardGridTracksFilteringAndExcludesGroupHeaders()
     {

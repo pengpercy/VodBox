@@ -116,14 +116,35 @@
                    Foreground="{DynamicResource TextTertiaryBrush}" />
       </Grid>
       <Panel Grid.Row="1">
-        <ScrollViewer x:Name="ChannelCardScroll" HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl x:Name="ChannelCardGrid" ItemsSource="{Binding ChannelCards}" HorizontalAlignment="Stretch">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal" ItemWidth="230" ItemHeight="194" SizeChanged="OnCardPanelSizeChanged" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
+        <!-- ListBox owns the finite viewport; only visible rows and a small cache are realized. -->
+        <ListBox x:Name="ChannelCardGrid" ItemsSource="{Binding ChannelCardRows}"
+                 SizeChanged="OnCardViewportSizeChanged" Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 Padding="0">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="Margin" Value="0" />
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+              <Setter Property="Focusable" Value="False" />
+              <Setter Property="Template">
+                <ControlTemplate><ContentPresenter Content="{TemplateBinding Content}"
+                    ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" /></ControlTemplate>
+              </Setter>
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:LiveViewModel+ChannelCardRow">
+              <ItemsControl ItemsSource="{Binding Channels}" Height="194">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Rows="1" Columns="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.CardColumns}" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="core:LiveChannel">
                 <Button x:Name="ChannelCard" Tag="{Binding}" Click="OnPlayCard" Margin="0,0,14,14"
                         Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="7"
@@ -166,9 +187,11 @@
                   </Grid>
                 </Button>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
         <TextBlock Text="暂无频道，请先导入直播源或调整筛选条件" HorizontalAlignment="Center" VerticalAlignment="Center"
                    TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
                    IsVisible="{Binding !ChannelCards.Count}" />

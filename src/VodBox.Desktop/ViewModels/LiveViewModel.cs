@@ -193,6 +193,29 @@ public sealed partial class LiveViewModel : ObservableObject
     /// <summary>与左侧分组/收藏/历史及搜索同步，卡片不包含组头或锁定频道。</summary>
     public ObservableCollection<LiveChannel> ChannelCards { get; } = [];
 
+    public sealed record ChannelCardRow(IReadOnlyList<LiveChannel> Channels);
+    public ObservableCollection<ChannelCardRow> ChannelCardRows { get; } = [];
+    private int _cardColumns = 1;
+    public int CardColumns => _cardColumns;
+
+    public void SetCardViewportWidth(double width)
+    {
+        if (!double.IsFinite(width) || width <= 0) return;
+        var columns = Math.Max(1, (int)(width / 220));
+        if (columns == _cardColumns) return;
+        _cardColumns = columns;
+        OnPropertyChanged(nameof(CardColumns));
+        RebuildCardRows();
+    }
+
+    private void RebuildCardRows()
+    {
+        ChannelCardRows.Clear();
+        for (var index = 0; index < ChannelCards.Count; index += _cardColumns)
+            ChannelCardRows.Add(new ChannelCardRow(Enumerable.Range(index, Math.Min(_cardColumns, ChannelCards.Count - index)).Select(i => ChannelCards[i]).ToArray()));
+    }
+
+
     /// <summary>EPG 时间轴（当前频道的节目卡片，过去可回看、现在高亮）。S4 前为演示数据。</summary>
     public ObservableCollection<LiveEpgCard> EpgTimeline { get; } = [];
 
@@ -213,17 +236,24 @@ public sealed partial class LiveViewModel : ObservableObject
         _services = services;
         _main = main;
         _loadGroups = loadGroups;
-        VisibleChannels.CollectionChanged += (_, _) =>
-        {
-            ChannelCards.Clear();
-            foreach (var channel in VisibleChannels.OfType<LiveChannel>()) ChannelCards.Add(channel);
-        };
+
     }
 
     partial void OnSelectedGroupChanged(LiveGroup? value) => ApplyFilter();
     partial void OnFilterTextChanged(string value) => ApplyFilter();
 
     private void ApplyFilter()
+    {
+        try { ApplyChannelFilter(); }
+        finally
+        {
+            ChannelCards.Clear();
+            foreach (var channel in VisibleChannels.OfType<LiveChannel>()) ChannelCards.Add(channel);
+            RebuildCardRows();
+        }
+    }
+
+    private void ApplyChannelFilter()
     {
         VisibleChannels.Clear();
         if (ChannelTab != 0)
@@ -300,6 +330,8 @@ public sealed partial class LiveViewModel : ObservableObject
             Loading = false;
             Groups.Clear();
             VisibleChannels.Clear();
+            ChannelCards.Clear();
+            ChannelCardRows.Clear();
             CurrentChannel = null;
             EpgTimeline.Clear();
             OnPropertyChanged(nameof(LiveSourceLabel));

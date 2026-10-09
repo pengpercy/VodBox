@@ -28,11 +28,10 @@ public partial class LiveView : UserControl
 
     private LiveViewModel VM => ((MainViewModel)DataContext!).Live;
 
-    private void OnCardPanelSizeChanged(object? sender, SizeChangedEventArgs e)
+    private void OnCardViewportSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        if (sender is not WrapPanel panel || e.NewSize.Width <= 0) return;
-        var columns = Math.Max(1, (int)(e.NewSize.Width / 220));
-        panel.ItemWidth = e.NewSize.Width / columns;
+        if (DataContext is MainViewModel main)
+            main.Live.SetCardViewportWidth(Math.Max(1, e.NewSize.Width - 18));
     }
 
     private void OnPlayCard(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
