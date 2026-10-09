@@ -76,6 +76,7 @@ class NativeTests(unittest.TestCase):
             pe(p / 'libmpv-2.dll', dependency='vulkan-1.dll')
             pe(p / 'vulkan-1.dll')
             pe(p / 'av_libglesv2.dll', dependency='dxgi.dll')
+            pe(p / 'libSkiaSharp.dll', dependency='fontsub.dll')
             verify_windows_closure(p, 'win-x64')
 
     def test_linux_dependency_alias_must_physically_exist(self):

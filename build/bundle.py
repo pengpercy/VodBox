@@ -138,7 +138,7 @@ def bundle_macos(archive: Path, output: Path):
             raise ValueError(f"bundled libmpv is missing dependencies: {', '.join(sorted(set(broken)))}")
 
 
-WINDOWS_SYSTEM_DLLS = frozenset("dxgi dxcore d3d9 d3d11 d3d12 d3dcompiler_47 msvcrt ucrtbase wintrust normaliz ncrypt kernelbase advapi32 avicap32 avrt bcrypt cfgmgr32 combase crypt32 d2d1 dbghelp dwrite dwmapi gdi32 imm32 iphlpapi kernel32 mpr msimg32 ntdll ole32 oleaut32 opengl32 powrprof propsys psapi rpcrt4 secur32 setupapi shell32 shcore shlwapi user32 userenv usp10 uxtheme version winhttp wininet winmm winspool ws2_32 wtsapi32".split())
+WINDOWS_SYSTEM_DLLS = frozenset("fontsub dxgi dxcore d3d9 d3d11 d3d12 d3dcompiler_47 msvcrt ucrtbase wintrust normaliz ncrypt kernelbase advapi32 avicap32 avrt bcrypt cfgmgr32 combase crypt32 d2d1 dbghelp dwrite dwmapi gdi32 imm32 iphlpapi kernel32 mpr msimg32 ntdll ole32 oleaut32 opengl32 powrprof propsys psapi rpcrt4 secur32 setupapi shell32 shcore shlwapi user32 userenv usp10 uxtheme version winhttp wininet winmm winspool ws2_32 wtsapi32".split())
 
 
 def verify_windows_closure(directory: Path, rid: str):
