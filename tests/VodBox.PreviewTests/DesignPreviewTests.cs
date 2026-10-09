@@ -63,7 +63,13 @@ public sealed class DesignPreviewTests
             // Fluent 控件模板自身的图标（如滚动条箭头）使用主题尺寸；播放器控制条另用14px小图标。
             if (icon.TemplatedParent is not null) return;
             Assert.Equal(icon.Width, icon.Height);
-            Assert.Contains(icon.Width, new[] { 12d, 14d, 18d, 24d, 48d });
+            // 播放器控制条的尺寸由 PlayerLayout 单点定义；其余用主题标准尺寸。
+            Assert.Contains(icon.Width, new[]
+            {
+                12d, 24d, 48d,
+                VodBox.Desktop.Views.PlayerLayout.IconGlyphSize,
+                VodBox.Desktop.Views.PlayerLayout.TransportGlyphSize,
+            });
             Assert.False(icon.IsSet(PathIcon.ForegroundProperty));
         });
         if (view is SearchView)

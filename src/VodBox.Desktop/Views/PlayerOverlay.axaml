@@ -42,6 +42,19 @@
     </ControlTheme>
   </UserControl.Resources>
   <UserControl.Styles>
+    <!-- 图标按钮不要 hover/按下高亮：底色始终与常态一致 -->
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.pin:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#66000000" />
+    </Style>
+    <Style Selector="Button.pin:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#66000000" />
+    </Style>
     <Style Selector="Button.pin.pinned"><Setter Property="Foreground" Value="#FFF0F1F3" /></Style>
   </UserControl.Styles>
   <Panel DataContext="{Binding Player}">
@@ -62,8 +75,8 @@
         </StackPanel>
         <Button x:Name="TopmostButton" Grid.Column="1" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
                 Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="6"
-                Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
-          <PathIcon Data="{DynamicResource Icon.Pin}" Width="14" Height="14" />
+                Width="{x:Static v:PlayerLayout.TitleBarButtonSize}" Height="{x:Static v:PlayerLayout.TitleBarButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
+          <PathIcon Data="{DynamicResource Icon.Pin}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" />
         </Button>
       </Grid>
 
@@ -80,80 +93,85 @@
       <!-- 底部：单个半透明圆角面板（参考图紧凑控制条） -->
       <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#A6000000" CornerRadius="14"
               BorderBrush="#1AFFFFFF" BorderThickness="1"
-              Margin="0,0,0,13" Padding="16,12,16,13" HorizontalAlignment="Center"
-              Width="{Binding $parent[UserControl].Bounds.Width, Converter={x:Static v:PlayerLayoutConverters.ControlWidth}}">
-        <StackPanel Spacing="7">
+              Margin="{x:Static v:PlayerLayout.PanelMargin}" Padding="{x:Static v:PlayerLayout.PanelPadding}" HorizontalAlignment="Center">
+        <Border.Width>
+          <MultiBinding Converter="{x:Static v:PlayerLayoutConverters.ControlWidth}">
+            <Binding Path="$parent[UserControl].Bounds.Width" />
+            <Binding Path="CompactMode" />
+          </MultiBinding>
+        </Border.Width>
+        <StackPanel Spacing="{x:Static v:PlayerLayout.RowSpacing}">
 
           <!-- 上行：左音量贴边 + 右图标组贴边（底层）；播放三键整面板绝对居中（上层） -->
           <Panel>
             <Grid ColumnDefinitions="*,*">
               <!-- 左：喇叭+音量滑杆 -->
-              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.VolumeSpacing}" VerticalAlignment="Center"
                           HorizontalAlignment="Left">
                 <Button Command="{Binding ToggleMuteCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="28" Height="28" Padding="0" Cursor="Hand" ToolTip.Tip="静音 / 恢复音量">
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="静音 / 恢复音量">
                   <Panel>
-                    <PathIcon Data="{DynamicResource Icon.VolumeHigh}" IsVisible="{Binding IsMuted, Converter={x:Static v:BoolConverters.Not}}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <PathIcon Data="{DynamicResource Icon.VolumeOff}" IsVisible="{Binding IsMuted}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.VolumeHigh}" IsVisible="{Binding IsMuted, Converter={x:Static v:BoolConverters.Not}}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.VolumeOff}" IsVisible="{Binding IsMuted}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Panel>
                 </Button>
-                <Slider Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="64" IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" />
+                <Slider Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="{x:Static v:PlayerLayout.VolumeSliderWidth}" IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" />
               </StackPanel>
 
               <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.IconButtonSpacing}" VerticalAlignment="Center"
                           HorizontalAlignment="Right">
                 <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="画面比例">
-                  <PathIcon Data="{DynamicResource Icon.AspectRatio}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="画面比例">
+                  <PathIcon Data="{DynamicResource Icon.AspectRatio}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnTogglePip" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="置顶小窗 / 恢复窗口">
-                  <PathIcon Data="{DynamicResource Icon.PiP}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="置顶小窗 / 恢复窗口">
+                  <PathIcon Data="{DynamicResource Icon.PiP}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="插件">
-                  <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="插件">
+                  <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnTogglePlaylist" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">
-                  <PathIcon Data="{DynamicResource Icon.Playlist}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">
+                  <PathIcon Data="{DynamicResource Icon.Playlist}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button x:Name="RateButton" Click="OnSelectRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Padding="6,0" Height="34" Cursor="Hand" ToolTip.Tip="倍速">
+                        Padding="4,0" Height="{x:Static v:PlayerLayout.IconButtonSize}" Cursor="Hand" ToolTip.Tip="倍速">
                   <StackPanel Orientation="Horizontal" Spacing="3">
-                    <PathIcon Data="{DynamicResource Icon.Speed}" Width="14" Height="14" VerticalAlignment="Center" />
+                    <PathIcon Data="{DynamicResource Icon.Speed}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" VerticalAlignment="Center" />
                     <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="#FFD2D5DA"
                                VerticalAlignment="Center" FontWeight="SemiBold" />
                   </StackPanel>
                 </Button>
                 <Button Click="OnToggleFullscreen" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="全屏">
-                  <PathIcon Data="{DynamicResource Icon.Fullscreen}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="全屏">
+                  <PathIcon Data="{DynamicResource Icon.Fullscreen}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnToggleSettings" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="设置">
-                  <PathIcon Data="{DynamicResource Icon.Settings}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="设置">
+                  <PathIcon Data="{DynamicResource Icon.Settings}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
               </StackPanel>
             </Grid>
 
             <!-- 上层：上一集/播放/下一集三键（等大 30px，图标统一 18px）。 -->
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.TransportSpacing}" HorizontalAlignment="Center" VerticalAlignment="Center">
               <Button Command="{Binding PreviousEpisodeCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="上一集">
-                <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      Width="{x:Static v:PlayerLayout.TransportButtonSize}" Height="{x:Static v:PlayerLayout.TransportButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="上一集">
+                <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="7"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
+                      Width="{x:Static v:PlayerLayout.TransportButtonSize}" Height="{x:Static v:PlayerLayout.TransportButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
                 <Panel>
-                  <PathIcon Data="{DynamicResource Icon.Pause}" IsVisible="{Binding IsPlaying}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  <PathIcon Data="{DynamicResource Icon.Play}" IsVisible="{Binding IsPlaying, Converter={x:Static v:BoolConverters.Not}}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Pause}" IsVisible="{Binding IsPlaying}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <PathIcon Data="{DynamicResource Icon.Play}" IsVisible="{Binding IsPlaying, Converter={x:Static v:BoolConverters.Not}}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Panel>
               </Button>
               <Button Command="{Binding NextEpisodeCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
-                      Width="34" Height="34" Padding="0" Cursor="Hand" ToolTip.Tip="下一集">
-                <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      Width="{x:Static v:PlayerLayout.TransportButtonSize}" Height="{x:Static v:PlayerLayout.TransportButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="下一集">
+                <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
             </StackPanel>
           </Panel>

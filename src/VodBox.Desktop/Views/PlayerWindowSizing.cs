@@ -20,6 +20,11 @@ internal static class PlayerWindowSizing
         var minScale=Math.Min(maxScale,Math.Max((compact?180:280)/ratio,compact?120:180));
         var targetScale=Math.Min(compact?360:720,(compact?640:1280)/ratio);
         var scale=Math.Clamp(targetScale,minScale,maxScale);
-        return new(new Size(scale*ratio,scale),new Size(minScale*ratio,minScale),new Size(maxScale*ratio,maxScale));
+        var size=new Size(scale*ratio,scale);
+        var minimum=new Size(minScale*ratio,minScale);
+        // 控制条需要真实宽度：窗口最小宽度按控件需求抬高，但不突破屏幕与当前尺寸。
+        var required=Math.Min(maxWidth,PlayerLayout.MinimumWindowWidth(compact));
+        minimum=new Size(Math.Min(size.Width,Math.Max(minimum.Width,required)),minimum.Height);
+        return new(size,minimum,new Size(maxScale*ratio,maxScale));
     }
 }

@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.Data.Converters;
+using Avalonia.Data;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Avalonia.Markup.Xaml;
@@ -515,12 +516,19 @@ public partial class PlayerOverlay : UserControl
 
 public static class PlayerLayoutConverters
 {
-    public static readonly IValueConverter ControlWidth = new WidthConverter();
-    private sealed class WidthConverter : IValueConverter
+    /// <summary>面板宽度 = max(视频宽 60%, 该模式下的内容需求)，且不超出视频宽度。</summary>
+    public static readonly IMultiValueConverter ControlWidth = new ControlWidthConverter();
+
+    private sealed class ControlWidthConverter : IMultiValueConverter
     {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => value is double width && double.IsFinite(width) ? Math.Max(0, width * .6) : 0d;
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (values.Count < 2 || values[0] is not double width || !double.IsFinite(width) || width <= 0) return 0d;
+            var compact = values[1] as bool? ?? false;
+            return Math.Min(width, Math.Max(width * .6, PlayerLayout.MinimumPanelWidth(compact)));
+        }
+
+        public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();
     }
 }

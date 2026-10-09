@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VodBox.Core;
@@ -1782,6 +1783,86 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public async Task PlayerPanelMinimumWidthMatchesMeasuredControlsAndNeverOverlaps()
+    {
+        using var context = new Context();
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+        };
+        await Done(context.Main.Player.PlayResolvedAsync(entries[0].Resolve, entries, 0));
+        context.Main.Player.Rate = 1.25; // 最长倍速角标，决定倍速键的自然宽度
+        var minimumWindow = PlayerLayout.MinimumWindowWidth(false);
+        var window = new PlayerWindow { DataContext = context.Main, Width = minimumWindow, Height = 700 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            var overlay = window.Overlay;
+            Assert.Equal(minimumWindow, window.MinWidth);
+            Assert.Equal(minimumWindow, window.Width, 1);
+            var (leftGroup, rightGroup, transport) = ControlGroups(overlay);
+
+            // 常量必须覆盖控件实测需求，否则最小宽度就会失真。
+            var measured = 2 * (Math.Max(leftGroup.DesiredSize.Width, rightGroup.DesiredSize.Width)
+                                + transport.DesiredSize.Width / 2 + PlayerLayout.GroupGap)
+                           + PlayerLayout.HorizontalPadding;
+            // 常量必须是覆盖实测需求的紧致上界：为负说明最小宽度不够、窄窗口会重叠。
+            var slack=PlayerLayout.MinimumPanelWidth(false)-measured;
+            Assert.InRange(slack, 0, 8);
+            Assert.Equal(PlayerLayout.RightGroupWidth, rightGroup.DesiredSize.Width, 6);
+
+            // 最小窗口宽度下面板放得下内容，三键与两侧组互不相交。
+            var panel = overlay.FindControl<Border>("BottomControls")!;
+            Assert.Equal(PlayerLayout.MinimumPanelWidth(false), panel.Bounds.Width, 6);
+            Assert.True(transport.Bounds.X >= leftGroup.Bounds.Right, "三键与左侧组重叠");
+            var mute=leftGroup.Children.OfType<Button>().First();
+            Assert.Equal(PlayerLayout.IconButtonSize, mute.Width);
+            Assert.Equal(mute.Width, mute.Height);
+            // 音量滑杆宽度参与最小宽度算式，XAML 必须与常量一致。
+            Assert.Equal(PlayerLayout.VolumeSliderWidth, leftGroup.Children.OfType<Slider>().Single().Width);
+            Assert.True(transport.Bounds.Right <= rightGroup.Bounds.X, "三键与右侧组重叠");
+            Assert.True(rightGroup.Bounds.Right <= panel.Bounds.Width - 16 + 0.5, "右侧组溢出面板");
+
+            // 低于最小宽度时窗口不得再缩；窗口本身也不会小于面板需求。
+            Assert.True(window.MinWidth >= PlayerLayout.MinimumPanelWidth(false));
+        }
+        finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
+    }
+
+    [AvaloniaFact]
+    public void PlayerWindowSizingHonoursControlRequirementsAndTinyScreens()
+    {
+        var normal = PlayerWindowSizing.Fit(16d / 9, 1920, 1080);
+        Assert.True(normal.Minimum.Width >= PlayerLayout.MinimumWindowWidth(false));
+        Assert.True(normal.Size.Width >= normal.Minimum.Width);
+        Assert.True(normal.Minimum.Width <= normal.Maximum.Width);
+
+        var compact = PlayerWindowSizing.Fit(16d / 9, 1920, 1080, compact: true);
+        Assert.True(compact.Minimum.Width >= PlayerLayout.MinimumWindowWidth(true));
+        Assert.True(compact.Minimum.Width < normal.Minimum.Width);
+
+        // 屏幕比控件需求还小时按屏幕收敛，绝不报出比屏幕更宽的最小值。
+        var tiny = PlayerWindowSizing.Fit(16d / 9, 320, 200);
+        Assert.True(tiny.Minimum.Width <= 320);
+        Assert.InRange(tiny.Size.Width, tiny.Minimum.Width, tiny.Maximum.Width);
+        Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
+    }
+
+    private static (StackPanel Left, StackPanel Right, StackPanel Transport) ControlGroups(PlayerOverlay overlay)
+    {
+        var bottom = overlay.FindControl<Border>("BottomControls")!;
+        var rows = Assert.IsType<StackPanel>(bottom.Child);
+        var topRow = Assert.IsType<Panel>(rows.Children[0]);
+        var grid = Assert.IsType<Grid>(topRow.Children[0]);
+        return (Assert.IsType<StackPanel>(grid.Children[0]), Assert.IsType<StackPanel>(grid.Children[1]),
+                Assert.IsType<StackPanel>(topRow.Children[1]));
+    }
+
+    [AvaloniaFact]
     public async Task PlayerPanelIsSixtyPercentTallerAndRatePopupDoesNotCycle()
     {
         using var context = new Context();
@@ -1799,23 +1880,87 @@ public sealed class ViewModelRaceTests
             var overlay=window.Overlay;
             var panel=overlay.FindControl<Border>("BottomControls")!;
             Assert.Equal(overlay.Bounds.Width * .6, panel.Bounds.Width, 5);
-            Assert.Equal(new Avalonia.Thickness(16, 12, 16, 13), panel.Padding);
-            // Only the previous/play/next triple keeps the larger glyph; every other control-bar
-            // icon is a notch smaller. (The centre toast also draws Icon.Play, hence the 18px filter.)
-            var panelIcons=overlay.GetVisualDescendants().OfType<PathIcon>()
-                .Where(icon => icon.TemplatedParent is null && icon.Width is 14d or 18d).ToArray();
-            var transport=panelIcons.Where(icon => icon.Width == 18d).ToArray();
-            Assert.Equal(4, transport.Length);
-            Assert.All(transport, icon => Assert.Contains(
-                new[] { "Icon.SkipPrevious", "Icon.Pause", "Icon.Play", "Icon.SkipNext" },
-                key => ReferenceEquals(icon.Data, overlay.FindResource(key))));
-            var smaller=panelIcons.Except(transport).ToArray();
-            Assert.Equal(10, smaller.Length);
-            Assert.All(smaller, icon => Assert.Equal(14d, icon.Width));
+            Assert.Equal(PlayerLayout.PanelPadding, panel.Padding);
+            // 图标尺寸按**结构分组**校验：三键内的图标用 TransportGlyphSize，其余控制条图标用
+            // IconGlyphSize。不能靠比较数值区分——两个常量允许被调成相等。
+            var (leftGroup, rightGroupIcons, transportGroup) = ControlGroups(overlay);
+            var transportIcons=transportGroup.GetVisualDescendants().OfType<PathIcon>()
+                .Where(icon => icon.TemplatedParent is null).ToArray();
+            Assert.Equal(4, transportIcons.Length);
+            Assert.All(transportIcons, icon =>
+            {
+                Assert.Equal(PlayerLayout.TransportGlyphSize, icon.Width);
+                Assert.Equal(icon.Width, icon.Height);
+            });
+            Assert.Contains(transportIcons, icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.SkipPrevious")));
+            Assert.Contains(transportIcons, icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.SkipNext")));
+
+            var barIcons=leftGroup.GetVisualDescendants().OfType<PathIcon>()
+                .Concat(rightGroupIcons.GetVisualDescendants().OfType<PathIcon>())
+                .Where(icon => icon.TemplatedParent is null).ToArray();
+            Assert.NotEmpty(barIcons);
+            Assert.All(barIcons, icon =>
+            {
+                Assert.Equal(PlayerLayout.IconGlyphSize, icon.Width);
+                Assert.Equal(icon.Width, icon.Height);
+            });
+            // 图标绝不能比自己的按钮还大，否则会被裁切或压到相邻按钮。
+            Assert.All(barIcons, icon => Assert.True(PlayerLayout.IconGlyphSize <= PlayerLayout.IconButtonSize));
+
             // The right-hand icon group is tighter than the default button spacing.
             var rightGroup=Assert.IsType<StackPanel>(overlay.FindControl<Button>("RateButton")!.Parent);
             Assert.Equal(0d, rightGroup.Spacing);
-            Assert.DoesNotContain(smaller, icon => new[] { "Icon.SkipPrevious", "Icon.SkipNext" }
+            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !double.IsNaN(item.Width)), item =>
+            {
+                Assert.Equal(PlayerLayout.IconButtonSize, item.Width);
+                Assert.Equal(item.Width, item.Height);
+            }
+            );
+            // 倍速键宽度自适应（装“1.5x”角标），高度同样跟随图标行，不得再是 28。
+            Assert.Equal(PlayerLayout.IconButtonSize, overlay.FindControl<Button>("RateButton")!.Height);
+
+            // 16px buttons holding 14px glyphs with zero spacing leave a 2px gap: tight, and the
+            // layout engine can never overlap siblings. Verify the numbers, then the measured X.
+            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !double.IsNaN(item.Width)), item =>
+            {
+                // 宽高必须相等：曾经只改宽度不改高度，出现过 16×28 的瘦长按钮。
+                Assert.Equal(PlayerLayout.IconButtonSize, item.Width);
+                Assert.Equal(item.Width, item.Height);
+                var glyph=Assert.Single(item.GetVisualDescendants().OfType<PathIcon>());
+                Assert.Equal(PlayerLayout.IconGlyphSize, glyph.Width);
+                Assert.Equal(glyph.Width, glyph.Height);
+                Assert.True(item.Width > glyph.Width, "14px glyph must fit inside the icon button");
+            });
+            // 按钮是同一父级的兄弟节点，Bounds 可直接比较；每个图标必须装得进自己的按钮。
+            var buttons=rightGroup.Children.OfType<Button>().ToArray();
+            for (var i = 0; i < buttons.Length; i++)
+            {
+                var glyph=Assert.Single(buttons[i].GetVisualDescendants().OfType<PathIcon>());
+                Assert.True(glyph.Bounds.Right <= buttons[i].Bounds.Width + 0.5, "图标溢出按钮");
+                Assert.True(glyph.Bounds.X >= -0.5, "图标超出按钮左边界");
+                if (i == 0) continue;
+                Assert.False(buttons[i].Bounds.Intersects(buttons[i - 1].Bounds),
+                    $"按钮 {i - 1} 与 {i} 重叠");
+            }
+
+            // No icon button keeps a hover or pressed highlight.
+            var checkedButtons = 0;
+            foreach (var item in overlay.GetVisualDescendants().OfType<Button>().Where(candidate => candidate.TemplatedParent is null).ToArray())
+            {
+                if (item.GetVisualDescendants().OfType<ContentPresenter>().FirstOrDefault() is not { } presenter) continue;
+                var normal=(presenter.Background as Avalonia.Media.ISolidColorBrush)?.Color;
+                foreach (var state in new[] { ":pointerover", ":pressed" })
+                {
+                    ((IPseudoClasses)item.Classes).Set(state, true);
+                    overlay.UpdateLayout();
+                    Assert.Equal(normal, (presenter.Background as Avalonia.Media.ISolidColorBrush)?.Color);
+                    ((IPseudoClasses)item.Classes).Set(state, false);
+                }
+                checkedButtons++;
+            }
+            Assert.True(checkedButtons >= 10, $"only {checkedButtons} icon buttons checked");
+            // 三键的图标不得混进左右图标组。
+            Assert.DoesNotContain(barIcons, icon => new[] { "Icon.SkipPrevious", "Icon.SkipNext" }
                 .Any(key => ReferenceEquals(icon.Data, overlay.FindResource(key))));
             // Measured against the previous 69px compact bar (30px buttons, 4px spacing, 7/8 padding):
             // the requested 60% width plus roughly a quarter more height.
