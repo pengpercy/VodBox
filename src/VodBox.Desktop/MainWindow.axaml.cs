@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         e.Handled = true;
         if (DataContext is not MainViewModel main) return;
         var (intent, path) = DroppedFiles.Classify(DroppedPaths(e));
+        VodBox.Core.VodBoxLog.Event("drop", "files", ("intent", intent.ToString()), ("path", path));
         switch (intent)
         {
             case DroppedIntent.PlayLive:
@@ -126,6 +127,13 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>把播放窗口提到最前：先还原最小化，再激活（不改变用户的置顶选择）。</summary>
+    private static void RaisePlaybackWindow(Window window)
+    {
+        if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+        if (!window.IsActive) window.Activate();
+    }
+
     private void StopObservingPlayer()
     {
         if (_observedPlayer is not null) _observedPlayer.PropertyChanged -= OnPlayerVisibilityChanged;
@@ -136,19 +144,28 @@ public partial class MainWindow : Window
 
     private void OnPlayerVisibilityChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PlayerViewModel.Visible)) SyncPlayerWindow();
+        // Visible 决定窗口的存在；Title 变化说明换了台/换了集，此时要把窗口提到最前。
+        if (e.PropertyName is nameof(PlayerViewModel.Visible) or nameof(PlayerViewModel.Title)) SyncPlayerWindow();
     }
 
     private void SyncPlayerWindow()
     {
         if (DataContext is not MainViewModel main) return;
         if (!main.Player.Visible) { PlaybackWindow?.CloseAfterPlayback(); return; }
-        if (PlaybackWindow is not null) return;
+        if (PlaybackWindow is { } existing)
+        {
+            // 窗口已开（换台/换集）：把它提到最前，否则被主窗口挡住时用户会以为没播。
+            VodBox.Core.VodBoxLog.Trace("player", $"播放窗口已存在，提到最前：{main.Player.Title}");
+            RaisePlaybackWindow(existing);
+            return;
+        }
+        VodBox.Core.VodBoxLog.Info("player", $"创建独立播放窗口：{main.Player.Title}");
         var player = new Views.PlayerWindow { DataContext = main, Topmost = main.Player.AlwaysOnTop };
         PlaybackWindow = player;
         player.Closed += (_, _) => { if (ReferenceEquals(PlaybackWindow, player)) PlaybackWindow = null; };
         // Non-modal and unowned: the main/detail window remains independently interactive.
         player.Show();
+        RaisePlaybackWindow(player);
     }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)

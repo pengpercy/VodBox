@@ -19,7 +19,12 @@ public sealed partial class LiveViewModel : ObservableObject
         if(_lastFailedIntent==intent||request.SourceKey!="live"||!request.IsLive||CurrentChannel is not {} channel||IsLocked(channel))return;
         if(channel.Uris.Count==0||request.MediaId!=channel.Uris[0]||request.Uri!=channel.Uris[_lineIndex])return;
         _lastFailedIntent=intent;
-        if(++_failedLines>=channel.Uris.Count){_main.StatusMessage="该频道全部线路播放失败，请手动重试或切换频道";return;}
+        if(++_failedLines>=channel.Uris.Count)
+        {
+            VodBox.Core.VodBoxLog.Error("live", $"频道全部线路失败：{channel.Name}（{channel.Uris.Count} 条线路）");
+            _main.StatusMessage="该频道全部线路播放失败，请手动重试或切换频道";return;
+        }
+        VodBox.Core.VodBoxLog.Warn("live", $"线路失败自动换线：{channel.Name} → 线路 {_lineIndex+2}/{channel.Uris.Count}");
         _lineIndex=(_lineIndex+1)%channel.Uris.Count;OnPropertyChanged(nameof(CurrentLineLabel));
         _main.StatusMessage=$"直播线路失败，尝试线路 {_lineIndex+1}";
         PlayCurrentLine(channel);
@@ -298,7 +303,11 @@ public sealed partial class LiveViewModel : ObservableObject
         Loading = true;
         try
         {
+            VodBox.Core.VodBoxLog.Info("live", $"开始加载直播源：{url}");
             var groups = await _loadGroups(url, scope.Token);
+            VodBox.Core.VodBoxLog.Event("live", "loaded",
+                ("url", url), ("groups", groups.Count.ToString()),
+                ("channels", groups.Sum(group => group.Channels.Count).ToString()));
             if (groups.Sum(group => group.Channels.Count) == 0) throw new InvalidDataException("直播源没有可播放频道。");
             scope.Token.ThrowIfCancellationRequested();
             await _main.RunOnUiAsync(() =>
@@ -343,12 +352,24 @@ public sealed partial class LiveViewModel : ObservableObject
     [RelayCommand]
     public void PlayChannel(LiveChannel channel)
     {
-        if(IsLocked(channel)){_main.StatusMessage="请先解锁频道分组";return;}
+        if(IsLocked(channel))
+        {
+            VodBox.Core.VodBoxLog.Warn("live", $"频道被密码分组锁定，拒绝播放：{channel.Name}");
+            _main.StatusMessage="请先解锁频道分组";return;
+        }
+        VodBox.Core.VodBoxLog.Event("live", "play-channel",
+            ("name", channel.Name), ("group", channel.Group), ("number", channel.Number.ToString()),
+            ("lines", channel.Uris.Count.ToString()), ("headers", channel.Headers.Count.ToString()),
+            ("uri", channel.Uris.FirstOrDefault()));
         SetCurrent(channel);
         _lineIndex = 0;_failedLines=0;_lastFailedIntent=-1;
         OnPropertyChanged(nameof(CurrentLineLabel));
         var uri = channel.Uris.FirstOrDefault();
-        if (uri is null) return;
+        if (uri is null)
+        {
+            VodBox.Core.VodBoxLog.Error("live", $"频道没有播放地址：{channel.Name}");
+            return;
+        }
         _main.Player.Play(new PlaybackRequest
         {
             Uri = uri,

@@ -10,6 +10,16 @@ public sealed class RemotePoster : Image
 {
     public static readonly StyledProperty<string?> UrlProperty =
         AvaloniaProperty.Register<RemotePoster, string?>(nameof(Url));
+
+    /// <summary>是否已经拿到图像。台标占位（文字/底色）据此在加载成功后让位，加载失败则保留占位。</summary>
+    public static readonly DirectProperty<RemotePoster, bool> HasImageProperty =
+        AvaloniaProperty.RegisterDirect<RemotePoster, bool>(nameof(HasImage), o => o.HasImage);
+    private bool _hasImage;
+    public bool HasImage
+    {
+        get => _hasImage;
+        private set => SetAndRaise(HasImageProperty, ref _hasImage, value);
+    }
     private readonly PosterCache _cache;
     private CancellationTokenSource? _load;
     private PosterCache.Lease? _lease;
@@ -52,6 +62,7 @@ public sealed class RemotePoster : Image
         previous?.Cancel();
         // Clear the UI reference before releasing its lease; only the cache owns Bitmap disposal.
         Source = null;
+        HasImage = false;
         _lease?.Dispose();
         _lease = null;
     }
@@ -76,6 +87,7 @@ public sealed class RemotePoster : Image
                 if (!_attached || scope.IsCancellationRequested || !ReferenceEquals(_load, scope)) return;
                 _lease = lease;
                 Source = lease.Bitmap;
+                HasImage = true;
                 lease = null;
             });
         }

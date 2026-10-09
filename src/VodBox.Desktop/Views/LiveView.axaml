@@ -66,22 +66,32 @@
                             PointerPressed="OnPlayChannel" Tag="{Binding}">
                   <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
                              Width="30" VerticalAlignment="Center" />
-                  <!-- 台标：底层是文字占位，logo 加载成功后覆盖；清单里没有的频道或图片 404 时自动露出占位。 -->
-                  <Panel Width="32" Height="32">
-                    <Border CornerRadius="7" Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}">
-                      <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
-                                 VerticalAlignment="Center" FontWeight="SemiBold" />
-                    </Border>
-                    <Border CornerRadius="7" Background="#14FFFFFF"
-                            IsVisible="{Binding Logo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                      <views:RemotePoster Url="{Binding Logo}" Stretch="Uniform" Margin="2" />
-                    </Border>
-                  </Panel>
-                  <StackPanel VerticalAlignment="Center" Spacing="2" Width="176">
-                    <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding EpgNow}" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}"
+                  <!--
+                    台标与频道名占同一网格行，两者垂直居中对齐（此前“名称+EPG”整块居中会让名称高出
+                    台标中心 6~8px）。台标本身不画背景色：品牌图多为透明 PNG，原来的彩色占位方块会
+                    透出来变成“背景色”；占位只在没有台标或加载失败时显示。
+                  -->
+                  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                        Width="{x:Static views:LiveLayout.RowWidth}" VerticalAlignment="Center">
+                    <Panel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
+                           Width="{x:Static views:LiveLayout.BadgeWidth}" Height="{x:Static views:LiveLayout.BadgeHeight}">
+                      <Border x:Name="BadgePlaceholder" CornerRadius="7"
+                              Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}"
+                              IsVisible="{Binding #ChannelLogo.HasImage, Converter={x:Static views:BoolConverters.Not}}">
+                        <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" FontWeight="SemiBold" />
+                      </Border>
+                      <views:RemotePoster x:Name="ChannelLogo" Url="{Binding Logo}" Stretch="Uniform" />
+                    </Panel>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" FontSize="13"
+                               Margin="{x:Static views:LiveLayout.NameMargin}" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
+                    <!-- 无 EPG 时折叠整行，避免每行白占一个行高。 -->
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding EpgNow}" FontSize="10.5"
+                               Foreground="{DynamicResource TextTertiaryBrush}" Margin="{x:Static views:LiveLayout.EpgMargin}"
+                               IsVisible="{Binding EpgNow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               TextTrimming="CharacterEllipsis" />
+                  </Grid>
                   <Border Background="Transparent" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
                           Padding="6,1" VerticalAlignment="Center" IsVisible="{Binding IsCurrent}">
                     <TextBlock Text="LIVE" FontSize="9.5" Foreground="#4CC2FF" FontWeight="SemiBold" />

@@ -71,7 +71,12 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>直接播放一个本地媒体文件（拖放与文件列表共用）。</summary>
     public void PlayLocalFile(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            VodBox.Core.VodBoxLog.Warn("local", $"本地文件不存在，忽略：{path}");
+            return;
+        }
+        VodBox.Core.VodBoxLog.Event("local", "play-file", ("path", path));
         Player.Play(new PlaybackRequest
         {
             Uri = new Uri(path).AbsoluteUri,
@@ -87,6 +92,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(path)) return;
         try
         {
+            VodBox.Core.VodBoxLog.Info("live", $"打开本地直播播放列表：{path}");
             var loaded = await Live.ApplyConfigurationAsync(path);
             if (!loaded) return;
             Navigate(AppPage.Live);
@@ -94,6 +100,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception error)
         {
+            VodBox.Core.VodBoxLog.Error("live", $"打开本地直播播放列表失败：{path}", error);
             StatusMessage = $"打开直播播放列表失败：{error.Message}";
         }
     }

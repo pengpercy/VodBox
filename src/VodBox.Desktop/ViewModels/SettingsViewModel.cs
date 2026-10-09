@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Input;
@@ -77,10 +78,85 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool IsDataSection=>Section==5;
     public bool IsRemoteSection=>Section==6;
     public bool IsAboutSection=>Section==7;
+    public bool IsDiagnosticsSection=>Section==8;
     public PlayerViewModel PlayerSettings=>_main.Player;
+    // ---- 诊断（日志）----
+    private bool _logEnabled = true;
+    /// <summary>日志开关。关闭后不再写入，用于日常降低噪音；排障时打开。</summary>
+    public bool LogEnabled
+    {
+        get => _logEnabled;
+        set
+        {
+            if (SetProperty(ref _logEnabled, value))
+            {
+                VodBox.Core.VodBoxLog.SetEnabled(value);
+                _services.Prefs.Set("diagnostics.log", value ? 1 : 0);
+                RefreshLog();
+            }
+        }
+    }
+
+    public string LogDirectory => VodBox.Core.VodBoxLog.LogDirectory ?? "（尚未初始化）";
+    public string LogFile => VodBox.Core.VodBoxLog.CurrentFile is { } file ? Path.GetFileName(file) : "（本次运行还没有日志文件）";
+    public string LogPath => VodBox.Core.VodBoxLog.CurrentFile ?? "";
+    [ObservableProperty] private string _logTail = "";
+    [ObservableProperty] private string _diagnosticsMessage = "";
+
+    /// <summary>重新读取日志尾部；点“刷新”或切到本区时调用。</summary>
+    public void RefreshLog()
+    {
+        var lines = VodBox.Core.VodBoxLog.ReadTail(80);
+        LogTail = lines.Count == 0 ? "（暂无日志。执行一次播放后刷新即可看到记录。）" : string.Join(Environment.NewLine, lines);
+        OnPropertyChanged(nameof(LogDirectory));
+        OnPropertyChanged(nameof(LogFile));
+        OnPropertyChanged(nameof(LogPath));
+    }
+
+    [RelayCommand]
+    public void RefreshLogs() { RefreshLog(); DiagnosticsMessage = $"已刷新（{VodBox.Core.VodBoxLog.ReadTail(80).Count} 行）"; }
+
+    [RelayCommand]
+    public void OpenLogFolder()
+    {
+        try
+        {
+            var directory = VodBox.Core.VodBoxLog.LogDirectory;
+            if (string.IsNullOrEmpty(directory)) { DiagnosticsMessage = "日志目录尚未初始化"; return; }
+            Directory.CreateDirectory(directory);
+            Process.Start(new ProcessStartInfo { FileName = directory, UseShellExecute = true });
+            DiagnosticsMessage = "已打开日志目录";
+        }
+        catch (Exception error) { DiagnosticsMessage = $"打开失败：{error.Message}"; }
+    }
+
+    [RelayCommand]
+    public void ClearLogs()
+    {
+        try
+        {
+            VodBox.Core.VodBoxLog.Clear();
+            RefreshLog();
+            DiagnosticsMessage = "日志已清空";
+        }
+        catch (Exception error) { DiagnosticsMessage = $"清空失败：{error.Message}"; }
+    }
+
+    [RelayCommand]
+    public void CopyLogPath()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(LogPath)) { DiagnosticsMessage = "还没有日志文件"; return; }
+            // 剪贴板需窗口，这里退化为把路径显示出来，避免破坏无窗口调用。
+            DiagnosticsMessage = LogPath;
+        }
+        catch (Exception error) { DiagnosticsMessage = error.Message; }
+    }
+
     partial void OnSectionChanged(int value)
     {
-        foreach(var property in new[]{nameof(IsSourcesSection),nameof(IsPlaybackSection),nameof(IsDanmakuSection),nameof(IsSubtitleSection),nameof(IsInterfaceSection),nameof(IsDataSection),nameof(IsRemoteSection),nameof(IsAboutSection),nameof(PlayerSettings)}) OnPropertyChanged(property);
+        foreach(var property in new[]{nameof(IsSourcesSection),nameof(IsPlaybackSection),nameof(IsDanmakuSection),nameof(IsSubtitleSection),nameof(IsInterfaceSection),nameof(IsDataSection),nameof(IsRemoteSection),nameof(IsAboutSection),nameof(IsDiagnosticsSection),nameof(PlayerSettings)}) OnPropertyChanged(property);
     }
 
     // ---- 更改点播配置弹窗（设计稿 ②） ----

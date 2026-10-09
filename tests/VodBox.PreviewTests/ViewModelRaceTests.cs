@@ -1,3 +1,4 @@
+using Avalonia;
 using Microsoft.Extensions.Logging;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
@@ -17,6 +18,16 @@ public sealed class ViewModelRaceTests
 {
     private static TaskCompletionSource<T> Gate<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static Task Done(Task task) => task.WaitAsync(TimeSpan.FromSeconds(10));
+
+    private static async Task Until(Func<bool> condition, int milliseconds = 5000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(milliseconds);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException("condition not met");
+            await Task.Delay(20);
+        }
+    }
     private static MediaItem Item(string id) => new() { Id = id, Title = id };
     private static MediaDetail Detail(string id) => new()
     {
@@ -1763,6 +1774,52 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public async Task SwitchingLiveChannelReusesSinglePlayerWindowAndRaisesIt()
+    {
+        using var context = new Context();
+        var shell = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        shell.Show();
+        try
+        {
+            var first = new LiveChannel
+            {
+                Name = "CCTV-1综合", Group = "组", Number = 1, Badge = "1",
+                Uris = ["http://host/a.m3u8?key=k&playlive=1"],
+            };
+            var second = new LiveChannel
+            {
+                Name = "湖南卫视", Group = "组", Number = 2, Badge = "湖南",
+                Uris = ["http://host/b.m3u8?key=k&playlive=1"],
+            };
+            context.Main.Live.Groups.Add(new LiveGroup("组", [first, second], false));
+            context.Main.Live.SelectedGroup = context.Main.Live.Groups[0];
+
+            // 选频道走界面同一条路径（PlayChannel 内部即 Player.Play）。
+            context.Main.Live.PlayChannel(first);
+            await Until(() => context.Engine.Opened.Count == 1);
+            Dispatcher.UIThread.RunJobs();
+            var player = Assert.IsType<PlayerWindow>(shell.PlaybackWindow);
+            Assert.True(player.IsVisible);
+            Assert.Equal("CCTV-1综合", context.Main.Player.Title);
+
+            // 换台：必须复用同一个窗口（否则每次点频道都弹新窗），并更新标题与选中态。
+            context.Main.Navigate(AppPage.Live);
+            context.Main.Live.PlayChannel(second);
+            await Until(() => context.Engine.Opened.Count == 2);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(player, shell.PlaybackWindow);
+            Assert.Equal("湖南卫视", context.Main.Player.Title);
+            Assert.Same(second, context.Main.Live.CurrentChannel);
+            Assert.False(first.IsCurrent);
+
+            await Done(context.Main.Player.Close());
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(shell.PlaybackWindow);
+        }
+        finally { shell.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task PlayerNativeCloseStopsPlaybackAndRetainsMainWindow()
     {
         using var context = new Context();
@@ -1919,6 +1976,109 @@ public sealed class ViewModelRaceTests
         Assert.True(tiny.Minimum.Width <= 320);
         Assert.InRange(tiny.Size.Width, tiny.Minimum.Width, tiny.Maximum.Width);
         Assert.True(PlayerLayout.MinimumPanelWidth(true) < PlayerLayout.MinimumPanelWidth(false));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(null)]
+    [InlineData("新闻联播 19:00")]
+    public async Task ChannelBadgeAlignsWithNameAndCarriesNoBackground(string? epg)
+    {
+        using var context = new Context();
+        var channel = new LiveChannel
+        {
+            Name = "CCTV-1综合", Group = "组", Number = 1, Badge = "1", BadgeColor = "#C0392B",
+            Logo = "https://gcore.jsdelivr.net/gh/taksssss/tv/icon/CCTV1.png",
+            Uris = ["http://host/a.m3u8"],
+        };
+        if (epg is not null) channel.EpgNow = epg;
+        context.Main.Live.Groups.Add(new LiveGroup("组", [channel], false));
+        context.Main.Live.SelectedGroup = context.Main.Live.Groups[0];
+        context.Main.Navigate(AppPage.Live);
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1180, Height = 760 };
+        window.Show();
+        try
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
+                Dispatcher.UIThread.RunJobs();
+            }
+            var view = window.GetVisualDescendants().OfType<LiveView>().Single();
+            var poster = view.GetVisualDescendants().OfType<RemotePoster>().Single();
+            var name = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "CCTV-1综合");
+            var placeholder = view.GetVisualDescendants().OfType<Border>()
+                .Single(b => b.Name == "BadgePlaceholder");
+            var row = name.FindAncestorOfType<Border>()!;
+            await poster.LoadingTask.WaitAsync(TimeSpan.FromSeconds(20));
+            for (var i = 0; i < 4; i++)
+            {
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
+                Dispatcher.UIThread.RunJobs();
+            }
+
+            // 台标必须真的加载出来（否则下面的断言只是在看占位）。
+            Assert.True(poster.HasImage, "台标未加载：需联网获取 taksssss 台标图");
+            Assert.NotNull(poster.Source);
+
+            // 1) 不要背景色：图加载成功后，彩色占位必须隐藏，图本身也不带底色。
+            Assert.False(placeholder.IsVisible, "台标加载后仍显示彩色底色占位");
+            // 整行内不得再有任何可见的彩色底块（台标区域是透明的）。
+            var badgeColour = Avalonia.Media.Color.Parse("#C0392B");
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b =>
+                b.IsVisible && b.Bounds.Width > 0 &&
+                b.Background is Avalonia.Media.ISolidColorBrush brush && brush.Color == badgeColour);
+
+            // 2) 台标与频道名同一行水平对齐（此前名称高出 6~8px）。
+            double CenterY(Avalonia.Controls.Control control) =>
+                control.TranslatePoint(new Avalonia.Point(0, control.Bounds.Height / 2), row)!.Value.Y;
+            var badgeCentre = CenterY(poster);
+            var nameCentre = CenterY(name);
+            Assert.InRange(Math.Abs(badgeCentre - nameCentre), 0, 1.0);
+
+            // 3) 台标按比例完整显示，不裁切也不溢出框。
+            Assert.Equal(Avalonia.Media.Stretch.Uniform, poster.Stretch);
+            var parent = (Avalonia.Controls.Panel)poster.Parent!;
+            Assert.True(poster.Bounds.Width <= parent.Bounds.Width + .5, "台标水平溢出");
+            Assert.True(poster.Bounds.Height <= parent.Bounds.Height + .5, "台标垂直溢出");
+            var bitmap = (Avalonia.Media.Imaging.Bitmap)poster.Source!;
+            Assert.Equal(bitmap.Size.Width / bitmap.Size.Height, poster.Bounds.Width / poster.Bounds.Height, 1);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ChannelWithoutLogoKeepsTextBadgePlaceholder()
+    {
+        using var context = new Context();
+        var channel = new LiveChannel
+        {
+            Name = "涿州新闻", Group = "组", Number = 1, Badge = "涿州", BadgeColor = "#1F6FB2",
+            Uris = ["http://host/a.m3u8"],   // 无 Logo
+        };
+        context.Main.Live.Groups.Add(new LiveGroup("组", [channel], false));
+        context.Main.Live.SelectedGroup = context.Main.Live.Groups[0];
+        context.Main.Navigate(AppPage.Live);
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1180, Height = 760 };
+        window.Show();
+        try
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
+                Dispatcher.UIThread.RunJobs();
+            }
+            var view = window.GetVisualDescendants().OfType<LiveView>().Single();
+            // 没有台标时保留文字占位（而不是空一块）。
+            Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BadgePlaceholder").IsVisible);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "涿州");
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

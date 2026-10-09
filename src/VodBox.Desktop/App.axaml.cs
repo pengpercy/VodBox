@@ -21,6 +21,15 @@ public class App : Application
         if(ApplicationLifetime is IClassicDesktopStyleApplicationLifetime validationLifetime&&validationLifetime.Args?.Contains("--ui-smoke")==true&&string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VODBOX_DATA_DIR")))
             throw new InvalidOperationException("UI smoke requires an isolated VODBOX_DATA_DIR.");
         Services = new AppServices();
+        VodBox.Core.VodBoxLog.Initialize(Services.DataDir);
+        VodBox.Core.VodBoxLog.Info("app", $"VodBox {typeof(App).Assembly.GetName().Version} 启动 | data={Services.DataDir}");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            VodBox.Core.VodBoxLog.Error("app", "未处理的异常", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            VodBox.Core.VodBoxLog.Error("app", "未观察的任务异常", e.Exception);
+            e.SetObserved();
+        };
         RequestedThemeVariant = Services.Prefs.GetInt("ui.theme", 0) switch
         {
             1 => Avalonia.Styling.ThemeVariant.Light, 2 => Avalonia.Styling.ThemeVariant.Dark, _ => Avalonia.Styling.ThemeVariant.Default,
@@ -41,9 +50,55 @@ public class App : Application
                         {
                             main.Navigate(page);window.UpdateLayout();await Task.Delay(100);
                         }
-                        for(var section=0;section<8;section++){main.Settings.Section=section;window.UpdateLayout();await Task.Delay(50);}
+                        for(var section=0;section<9;section++){main.Settings.Section=section;window.UpdateLayout();await Task.Delay(50);}
+                        main.Settings.RefreshLog();
+                        if(string.IsNullOrWhiteSpace(main.Settings.LogTail))throw new InvalidOperationException("诊断区没有读到日志内容。");
                         window.RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Light;window.UpdateLayout();await Task.Delay(100);
                         window.RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Dark;
+                        // 直播播放验证：--live=<m3u 路径> 用与界面完全相同的路径选频道播放并报告结果，
+                        // 便于在没有界面的情况下确认“能解析但播不出来”是应用问题还是源本身的问题。
+                        var liveArg=desktop.Args.FirstOrDefault(argument=>argument.StartsWith("--live=",StringComparison.Ordinal));
+                        if(liveArg is not null)
+                        {
+                            var playlistPath=liveArg[7..];
+                            var loaded=await main.Live.ApplyConfigurationAsync(playlistPath);
+                            var channels=main.Live.Groups.SelectMany(group=>group.Channels).ToArray();
+                            var channel=channels.FirstOrDefault()??throw new InvalidOperationException("直播播放列表没有频道。");
+                            Console.WriteLine($"LIVE LOADED: ok={loaded} groups={main.Live.Groups.Count} channels={channels.Length}");
+                            main.Live.PlayChannel(channel);
+                            var deadline=DateTime.UtcNow.AddSeconds(30);
+                            while(main.Player.State is VodBox.Core.PlaybackState.Resolving or VodBox.Core.PlaybackState.Loading&&DateTime.UtcNow<deadline)
+                                await Task.Delay(100);
+                            await Task.Delay(4000);
+                            var overlay3=window.PlaybackWindow?.Overlay;
+                            Console.WriteLine($"LIVE PLAY: channel={channel.Name} state={main.Player.State} error={main.Player.Error??"<none>"} "+
+                                $"position={main.Player.Position.TotalSeconds:F2}s frames={overlay3?.RenderedFrames??0} "+
+                                $"videoRatio={main.Player.VideoAspectRatio?.ToString("F3")??"<none>"} visible={main.Player.Visible}");
+                            await main.ShutdownAsync();window.Close();return;
+                        }
+                        // 网络流验证：--url=<http(s) 地址> 走与直播频道完全相同的播放链路
+                        // （真实窗口 + OpenGL 渲染面），用于排查“能解析但播不出来”的问题。
+                        var network=desktop.Args.FirstOrDefault(argument=>argument.StartsWith("--url=",StringComparison.Ordinal));
+                        if(network is not null)
+                        {
+                            var address=network[6..];
+                            main.Player.Play(new VodBox.Core.PlaybackRequest
+                            {
+                                Uri=address,Title="网络流验证",SourceKey="smoke",SourceName="验收",
+                                MediaId=address,IsLive=true,
+                            });
+                            var deadline=DateTime.UtcNow.AddSeconds(30);
+                            while(main.Player.State is VodBox.Core.PlaybackState.Resolving or VodBox.Core.PlaybackState.Loading&&DateTime.UtcNow<deadline)
+                                await Task.Delay(100);
+                            await Task.Delay(3000);
+                            var window2=window;
+                            var overlay2=window2.PlaybackWindow?.Overlay;
+                            Console.WriteLine($"NETWORK STREAM: state={main.Player.State} error={main.Player.Error??"<none>"} "+
+                                $"position={main.Player.Position.TotalSeconds:F2}s duration={main.Player.Duration.TotalSeconds:F2}s "+
+                                $"frames={overlay2?.RenderedFrames??0} videoRatio={main.Player.VideoAspectRatio?.ToString("F3")??"<none>"} "+
+                                $"visible={main.Player.Visible}");
+                            await main.ShutdownAsync();window.Close();return;
+                        }
                         var media=desktop.Args.FirstOrDefault(argument=>argument.StartsWith("--media=",StringComparison.Ordinal));
                         if(media is not null)
                         {
@@ -104,13 +159,14 @@ public class App : Application
                             Console.WriteLine($"Native main player: OK | frames={renderedFrames}, independent single-window/main bounds/pause/seek/fullscreen/compact restore/resume/automatic-next/history");
                         }
                         await main.ShutdownAsync();
-                        Console.WriteLine("Native desktop UI: OK | 8 pages, 8 settings sections, light/dark, graceful shutdown");
+                        Console.WriteLine("Native desktop UI: OK | 8 pages, 9 settings sections, light/dark, graceful shutdown");
                         window.Close();
                     }
                     catch(Exception error){Console.Error.WriteLine(error);desktop.Shutdown(1);}
                 };
             }
         }
+        VodBox.Core.VodBoxLog.Info("app", "界面初始化完成");
         base.OnFrameworkInitializationCompleted();
     }
 }

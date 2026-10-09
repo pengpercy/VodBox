@@ -103,6 +103,9 @@ public sealed class MpvEngine : IPlaybackEngine
         if (!Uri.TryCreate(request.Uri, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https" or "file" or "rtsp" or "rtmp" or "udp" or "rtp"))
             throw new InvalidDataException("mpv 需要明确的媒体 URI。");
+        VodBoxLog.Event("mpv", "open", ("session", sessionId.ToString()), ("uri", request.Uri),
+            ("live", request.IsLive.ToString()), ("headers", request.Headers.Count.ToString()),
+            ("startMs", request.StartPositionMs.ToString()));
         foreach (var header in request.Headers)
         {
             if (header.Value.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("媒体请求头含控制字符。");
@@ -138,8 +141,14 @@ public sealed class MpvEngine : IPlaybackEngine
             client.Command("set", "speed", Number(_rate));
             client.Command("set", "video-aspect-override", Number(_aspect));
             try { client.Command("loadfile", uri.AbsoluteUri, "replace"); }
-            catch (Exception error) { SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message }); throw; }
+            catch (Exception error)
+            {
+                VodBoxLog.Error("mpv", $"loadfile 失败 uri={request.Uri}", error);
+                SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message });
+                throw;
+            }
         }, token);
+        VodBoxLog.Info("mpv", $"已提交 loadfile session={sessionId}");
     }
 
     public Task PlayAsync(CancellationToken token = default) =>
@@ -150,6 +159,7 @@ public sealed class MpvEngine : IPlaybackEngine
 
     public Task StopAsync(CancellationToken token = default) => ExecuteAsync(() =>
     {
+        VodBoxLog.Info("mpv", $"stop（结束会话 {_session}）");
         _client?.Command("stop"); _loaded = false; _startPosition = 0;
         Volatile.Write(ref _tracks, []);
         SetSnapshot(new PlaybackSnapshot(PlaybackState.Idle, TimeSpan.Zero, TimeSpan.Zero, false));
@@ -238,7 +248,12 @@ public sealed class MpvEngine : IPlaybackEngine
                     for (int i = 0; i < 256; i++)
                     {
                         var item = _client!.PollEvent(); if (item.Id == 0) break;
-                        if(item.LogText is not null&&Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1")Console.Error.WriteLine("[mpv] "+item.LogText.TrimEnd());
+                        if(item.LogText is not null)
+                        {
+                            // 原有控制台诊断保留；同时写入文件日志（verbose 时才落盘，避免日常噪音）。
+                            if(Environment.GetEnvironmentVariable("VODBOX_MPV_DIAGNOSTICS")=="1")Console.Error.WriteLine("[mpv] "+item.LogText.TrimEnd());
+                            VodBoxLog.Trace("mpv", item.LogText.TrimEnd());
+                        }
                         snapshot = Process(item, snapshot);
                     }
                     if(_loaded)
@@ -250,7 +265,11 @@ public sealed class MpvEngine : IPlaybackEngine
                     if (snapshot != before) SetSnapshot(snapshot);
                 }
                 catch (ObjectDisposedException) when (_shutdown.IsCancellationRequested) { }
-                catch (Exception error) { SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message }); }
+                catch (Exception error)
+                {
+                    VodBoxLog.Error("mpv", "事件泵异常", error);
+                    SetSnapshot(Snapshot with { State = PlaybackState.Failed, Error = error.Message });
+                }
                 finally { _commands.Release(); }
             }
         }
@@ -262,6 +281,9 @@ public sealed class MpvEngine : IPlaybackEngine
         if (item.Id == 8) // MPV_EVENT_FILE_LOADED
         {
             _loaded = true; RefreshTracks();
+            VodBoxLog.Event("mpv", "file-loaded",
+                ("session", _session.ToString()),
+                ("tracks", Volatile.Read(ref _tracks).Count.ToString()));
             if (_startPosition > 0) { _client!.Command("seek", Number(_startPosition / 1000d), "absolute+exact"); _startPosition = 0; }
             return snapshot with { State = CurrentState(), Error = null };
         }
@@ -269,11 +291,16 @@ public sealed class MpvEngine : IPlaybackEngine
         {
             if (item.EndReason == 2 && !_loaded && snapshot.State == PlaybackState.Loading) return snapshot; // OpenAsync 的前置 stop
             _loaded = false;
-            return snapshot with
+            var next = snapshot with
             {
                 State = item.EndReason == 0 ? PlaybackState.Ended : item.EndReason == 4 ? PlaybackState.Failed : PlaybackState.Idle,
                 Error = item.EndReason == 4 ? $"mpv 无法播放此媒体（错误 {item.EndError}）。" : null
             };
+            // 播放器只在这里能拿到 mpv 的原始结束原因，出问题时这是最关键的一行。
+            VodBoxLog.Event("mpv", "end-file", ("session", _session.ToString()), ("reason", item.EndReason.ToString()),
+                ("error", item.EndError.ToString()), ("wasLoaded", snapshot.State.ToString()), ("next", next.State.ToString()));
+            if (next.Error is not null) VodBoxLog.Error("mpv", $"播放失败 session={_session}：{next.Error}");
+            return next;
         }
         if (item.Id != 22) return snapshot; // 只关心 MPV_EVENT_PROPERTY_CHANGE
         switch (item.PropertyName)

@@ -126,7 +126,21 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _controlsVisible = true;
     public bool IsSeeking => _seekIntent is not null;
     public bool IsPlaying => State is PlaybackState.Playing or PlaybackState.Buffering;
-    partial void OnStateChanged(PlaybackState value) => OnPropertyChanged(nameof(IsPlaying));
+    partial void OnStateChanged(PlaybackState value)
+    {
+        OnPropertyChanged(nameof(IsPlaying));
+        // 播放状态就是排查“点了没反应”的第一现场：带上标题、进度与错误。
+        if (value is PlaybackState.Playing or PlaybackState.Failed)
+        {
+            VodBox.Core.VodBoxLog.Event("player", "state",
+                ("state", value.ToString()), ("title", Title), ("position", $"{Position.TotalSeconds:F1}s"),
+                ("duration", $"{Duration.TotalSeconds:F1}s"), ("error", Error));
+        }
+        else
+        {
+            VodBox.Core.VodBoxLog.Trace("player", $"state={value} title={Title}");
+        }
+    }
     [ObservableProperty] private PlaybackState _state = PlaybackState.Idle;
     [ObservableProperty] private string _title = "媒体";
     [ObservableProperty] private TimeSpan _position;
@@ -467,6 +481,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         await _main.RunOnUiAsync(() =>
         {
             if (intent != _intent) return;
+            VodBox.Core.VodBoxLog.Info("player", $"播放已关闭：{Title}");
             Visible = false;
             State = PlaybackState.Idle;
         });

@@ -44,6 +44,10 @@
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=7}">
             <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="{StaticResource Icon.Information}" Width="18" Height="18" /><TextBlock Text="关于" /></StackPanel>
           </Button>
+          <Button Click="OnSelectSection" Tag="8" HorizontalContentAlignment="Left" Padding="13,9"
+                  Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=8}">
+            <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="{StaticResource Icon.History}" Width="18" Height="18" /><TextBlock Text="诊断" /></StackPanel>
+          </Button>
         </StackPanel>
       </Border>
 
@@ -181,6 +185,27 @@
           <StackPanel x:Name="AboutSection" Spacing="12" IsVisible="{Binding IsAboutSection}">
             <TextBlock Text="关于" FontSize="20" />
           <TextBlock Text="VodBox 0.2.3 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" />
+          </StackPanel>
+
+          <!-- 诊断：日志开关 + 目录/文件 + 尾部预览。排障时“复现一次 → 刷新 → 复制内容”即可。 -->
+          <StackPanel x:Name="DiagnosticsSection" Spacing="12" IsVisible="{Binding IsDiagnosticsSection}">
+            <TextBlock Text="诊断日志" FontSize="20" />
+            <TextBlock Text="播放出问题时：打开日志 → 复现一次 → 回到这里点“刷新” → 复制内容发我。日志只记录事件与地址，查询串里的密钥已脱敏。" TextWrapping="Wrap" FontSize="11.5" />
+            <CheckBox Content="启用日志记录" IsChecked="{Binding LogEnabled}" />
+            <TextBlock Text="{Binding LogDirectory, StringFormat='目录：{0}'}" FontSize="11.5" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding LogFile, StringFormat='当前文件：{0}'}" FontSize="11.5" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="刷新" Command="{Binding RefreshLogsCommand}" />
+              <Button Content="打开日志目录" Command="{Binding OpenLogFolderCommand}" />
+              <Button Content="清空日志" Command="{Binding ClearLogsCommand}" />
+              <Button Content="显示路径" Command="{Binding CopyLogPathCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding DiagnosticsMessage}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap" />
+            <Border Background="#0AFFFFFF" CornerRadius="8" Padding="10">
+              <TextBox Text="{Binding LogTail}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                       FontFamily="{DynamicResource FontMono}" FontSize="11"
+                       MinHeight="240" MaxHeight="360" Background="Transparent" BorderThickness="0" />
+            </Border>
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
