@@ -8,6 +8,7 @@ from pathlib import Path
 
 def verified_checkout_sha(text):
     """Read the receipt emitted by actions/checkout, never infer a dispatch source from run HEAD."""
+    text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
     lines = text.splitlines()
     for index, line in enumerate(lines[:-1]):
         if '[command]' in line and re.search(r'git(?:\.exe)?"? log -1 --format=%H', line):
@@ -26,6 +27,9 @@ def restore_missing_source(meta, run, rid, repo):
         raise ValueError('No verified native build job: ' + rid)
     result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job['databaseId']}/logs"],
                             capture_output=True, text=True)
+    if result.returncode and 'allow-escape-sequences' in result.stderr:
+        result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job['databaseId']}/logs",
+                                 '--allow-escape-sequences'], capture_output=True, text=True)
     if result.returncode:
         raise ValueError('Checkout log download failed: ' + result.stderr.strip())
     return {**meta, 'sourceSha': verified_checkout_sha(result.stdout)}
