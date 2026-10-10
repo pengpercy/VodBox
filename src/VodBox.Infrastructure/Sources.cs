@@ -8,7 +8,7 @@ namespace VodBox.Infrastructure;
 /// <summary>苹果 CMS V10 JSON 采集站点源（site.type=0，api 形如 https://xx/api.php/provide/vod）。</summary>
 public sealed class MacCmsSource : IContentSource
 {
-    private readonly DefaultHttp _http;
+    private readonly Func<string, CancellationToken, Task<string>> _fetch;
     private readonly SourceInfo _site;
 
     public string Key => _site.Key;
@@ -16,10 +16,19 @@ public sealed class MacCmsSource : IContentSource
     public string? ParseEndpoint=>_site.PlayUrl;
 
     public MacCmsSource(SourceInfo site, DefaultHttp http)
+        : this(site, async (url, ct) => DefaultHttp.Decode(await http.GetBoundedAsync(url, 8 * 1024 * 1024, ct))) { }
+
+    internal MacCmsSource(SourceInfo site, Func<string, CancellationToken, Task<string>> fetch)
     {
         _site = site;
-        _http = http;
+        _fetch = fetch;
     }
+
+    private static bool IsXml(string response) => response.TrimStart('\uFEFF', ' ', '\t', '\r', '\n').StartsWith('<');
+    private static MacCmsListResponse ParseList(string response) => IsXml(response)
+        ? MacCmsXml.Parse(response)
+        : JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsListResponse>())
+            ?? throw new InvalidDataException("列表响应解析失败");
 
     private string Api(string action, IReadOnlyDictionary<string, string> args)
     {
@@ -33,16 +42,17 @@ public sealed class MacCmsSource : IContentSource
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default)
     {
         var url = Api("list", new Dictionary<string, string>());
-        var response = await _http.GetStringAsync(url, ct: ct);
-        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsCategoryResponse>())
-                     ?? throw new InvalidDataException("分类响应解析失败");
-        return parsed.Classes
+        var response = await _fetch(url, ct);
+        var classes = IsXml(response) ? MacCmsXml.Parse(response).Classes
+            : (JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsCategoryResponse>())
+                ?? throw new InvalidDataException("分类响应解析失败")).Classes;
+        return classes
             .Where(c => !string.IsNullOrWhiteSpace(c.TypeId))
             .Select(c => new Category(c.TypeId, c.TypeName))
             .ToList();
     }
 
-    public async Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => await GetItemsAsync("1", 1, null, ct);
+    public async Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => await GetItemsAsync("0", 1, null, ct);
 
     public async Task<MediaPage> GetItemsAsync(string categoryId, int page, IReadOnlyDictionary<string, string>? filters, CancellationToken ct = default)
     {
@@ -55,18 +65,16 @@ public sealed class MacCmsSource : IContentSource
             if (filters.TryGetValue("lang", out var lang) && !string.IsNullOrEmpty(lang)) args["lang"] = lang;
             if (filters.TryGetValue("class", out var cls) && !string.IsNullOrEmpty(cls)) args["class"] = cls;
         }
-        var response = await _http.GetStringAsync(Api("videolist", args), ct: ct);
-        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsListResponse>())
-                     ?? throw new InvalidDataException("列表响应解析失败");
+        var response = await _fetch(Api("videolist", args), ct);
+        var parsed = ParseList(response);
         var page_ = parsed.Page <= 0 ? page : parsed.Page;
         return new MediaPage(parsed.List.Select(ToItem).ToList(), page_, parsed.PageCount);
     }
 
     public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
     {
-        var response = await _http.GetStringAsync(Api("videolist", new Dictionary<string, string> { ["ids"] = mediaId }), ct: ct);
-        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsDetailResponse>())
-                     ?? throw new InvalidDataException("详情响应解析失败");
+        var response = await _fetch(Api("videolist", new Dictionary<string, string> { ["ids"] = mediaId }), ct);
+        var parsed = ParseList(response);
         var vod = parsed.List.FirstOrDefault() ?? throw new InvalidDataException($"未找到条目 {mediaId}");
         return ToDetail(vod);
     }
@@ -74,10 +82,9 @@ public sealed class MacCmsSource : IContentSource
     public async Task<MediaPage> SearchAsync(string query, int page, CancellationToken ct = default)
     {
         var args = new Dictionary<string, string> { ["wd"] = query, ["pg"] = page.ToString(CultureInfo.InvariantCulture) };
-        var response = await _http.GetStringAsync(Api("videolist", args), ct: ct);
-        var parsed = JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsSearchResponse>())
-                     ?? throw new InvalidDataException("搜索响应解析失败");
-        return new MediaPage(parsed.List.Select(ToItem).ToList(), page, page <= 1 ? 1 : page);
+        var response = await _fetch(Api("videolist", args), ct);
+        var parsed = ParseList(response);
+        return new MediaPage(parsed.List.Select(ToItem).ToList(), parsed.Page <= 0 ? page : parsed.Page, Math.Max(1, parsed.PageCount));
     }
 
     internal static MediaItem ToItem(MacCmsVod vod) => new()
@@ -95,8 +102,8 @@ public sealed class MacCmsSource : IContentSource
     internal static MediaDetail ToDetail(MacCmsVod vod)
     {
         var lines = new List<PlaybackLine>();
-        var froms = (vod.VodPlayFrom ?? "").Split("$$$", StringSplitOptions.RemoveEmptyEntries);
-        var urls = (vod.VodPlayUrl ?? "").Split("$$$", StringSplitOptions.RemoveEmptyEntries);
+        var froms = (vod.VodPlayFrom ?? "").Split("$$$", StringSplitOptions.None);
+        var urls = (vod.VodPlayUrl ?? "").Split("$$$", StringSplitOptions.None);
         for (var i = 0; i < froms.Length && i < urls.Length; i++)
         {
             var episodes = new List<Episode>();
