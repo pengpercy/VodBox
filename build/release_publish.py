@@ -62,7 +62,12 @@ def main() -> int:
     if release is None:
         # A failed upload leaves a recoverable draft, not a half-populated public release.
         gh("release", "create", tag, "--repo", repo, "--verify-tag", "--draft", "--title", f"VodBox {version}", "--generate-notes")
-        release = json.loads(gh("api", f"repos/{repo}/releases/tags/{tag}"))
+        # The tags endpoint can return 404 for a newly-created draft. Enumerate
+        # authenticated releases instead; drafts are keyed by id until publication.
+        pages = json.loads(gh("api", "--paginate", "--slurp", f"repos/{repo}/releases?per_page=100"))
+        release = next((item for page in pages for item in page if item["tag_name"] == tag), None)
+        if release is None:
+            raise ValueError("Created release draft could not be found")
     existing = json.loads(gh("api", "--paginate", "--slurp", release["assets_url"]))
     pending = validate_assets(files, [asset for page in existing for asset in page])
     if pending and not release["draft"]:

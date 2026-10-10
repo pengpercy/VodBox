@@ -33,6 +33,8 @@ class ReleasePublishTests(unittest.TestCase):
                 def gh(*args):
                     calls.append(args)
                     if "--slurp" in args:
+                        if any(call[:2] == ("release", "create") for call in calls) and "releases?" in args[-1]:
+                            return json.dumps([[{"tag_name": "v1.0.0", "draft": True, "assets_url": "assets"}]])
                         return "[[]]"
                     if "matching-refs" in " ".join(args):
                         return "[]"
