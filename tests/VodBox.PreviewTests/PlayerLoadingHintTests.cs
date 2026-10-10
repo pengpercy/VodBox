@@ -33,8 +33,7 @@ public sealed class PlayerLoadingHintTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var directory in _directories)
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        foreach (var directory in _directories) TempDataDirectory.TryDelete(directory);
     }
 
     private static void Pump(Window window)

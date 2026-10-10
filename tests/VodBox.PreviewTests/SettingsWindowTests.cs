@@ -147,7 +147,8 @@ public sealed class SettingsWindowTests
         finally
         {
             window.Close();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            services.Dispose(); // 先释放数据库连接：Windows 不允许删除仍被占用的文件
+            TempDataDirectory.TryDelete(directory);
         }
     }
 
@@ -173,7 +174,8 @@ public sealed class SettingsWindowTests
         finally
         {
             window.Close();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            services.Dispose(); // 先释放数据库连接：Windows 不允许删除仍被占用的文件
+            TempDataDirectory.TryDelete(directory);
         }
     }
 
@@ -208,7 +210,8 @@ public sealed class SettingsWindowTests
         finally
         {
             window.Close();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            services.Dispose(); // 先释放数据库连接：Windows 不允许删除仍被占用的文件
+            TempDataDirectory.TryDelete(directory);
         }
     }
 
@@ -268,7 +271,8 @@ public sealed class SettingsWindowTests
         finally
         {
             shell.Close();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            services.Dispose(); // 先释放数据库连接：Windows 不允许删除仍被占用的文件
+            TempDataDirectory.TryDelete(directory);
         }
     }
 
@@ -294,7 +298,11 @@ public sealed class SettingsWindowTests
                 // 骨架阶段未接入内容时，版本号回退到程序集版本，不应为空。
                 Assert.False(string.IsNullOrWhiteSpace(vm.AppVersion));
             }
-            finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
+            finally
+            {
+                services.Dispose();
+                TempDataDirectory.TryDelete(directory);
+            }
         }
         finally { window.Close(); }
     }

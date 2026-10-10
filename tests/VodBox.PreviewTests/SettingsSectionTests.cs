@@ -31,8 +31,9 @@ public sealed class SettingsSectionTests : IDisposable
 
     public void Dispose()
     {
+        // 先释放数据库连接，再删目录：Windows 不允许删除仍被占用的文件。
         _services.Dispose();
-        if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+        TempDataDirectory.TryDelete(_directory);
     }
 
     /// <summary>注入一个可见站点；空站点列表会让站点行绑定测不出东西。</summary>
