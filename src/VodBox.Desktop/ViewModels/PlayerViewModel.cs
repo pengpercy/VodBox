@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VodBox.Core;
@@ -126,9 +127,90 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _controlsVisible = true;
     public bool IsSeeking => _seekIntent is not null;
     public bool IsPlaying => State is PlaybackState.Playing or PlaybackState.Buffering;
+    /// <summary>起始加载期（窗口已出现、首帧未上屏）。黑窗期由它驱动提示块。</summary>
+    public bool IsLoading => State is PlaybackState.Resolving or PlaybackState.Loading;
+    /// <summary>播放中途缓冲；起始加载期不可达（<c>MpvEngine</c> 在 file-loaded 前丢弃 paused-for-cache）。</summary>
+    public bool IsBuffering => State == PlaybackState.Buffering;
+    public bool IsFailed => State == PlaybackState.Failed;
+    /// <summary>当前会话是否直播；决定加载主文案用「连接频道」还是「加载视频」。</summary>
+    public bool IsLive => _current?.IsLive ?? false;
+    /// <summary>加载块主文案（规格 §8）；<see cref="PlaybackState.Resolving"/> 与 <see cref="PlaybackState.Loading"/> 共用同一容器，只换这段文字。</summary>
+    public string LoadingText => State switch
+    {
+        PlaybackState.Resolving => "正在获取播放地址…",
+        PlaybackState.Loading => IsLive ? "正在连接频道…" : "正在加载视频…",
+        _ => "正在加载…",
+    };
+
+    /// <summary>缓冲胶囊显示延迟：更短的抖动不提示（规格 §4）。</summary>
+    internal static readonly TimeSpan BufferingHintDelay = TimeSpan.FromMilliseconds(400);
+    /// <summary>缓冲胶囊最短显示时长：一旦显示至少停留这么久，避免闪现（规格 §4）。</summary>
+    internal static readonly TimeSpan BufferingHintMinimum = TimeSpan.FromMilliseconds(600);
+    private DispatcherTimer? _bufferingTimer;
+    private bool _bufferingHint;
+    private long _bufferingShownAt;
+
+    /// <summary>懒建计时器：只在状态真的变化（必然在 UI 线程）时才碰 Dispatcher，构造 VM 不依赖 Avalonia 初始化。</summary>
+    private DispatcherTimer BufferingTimer
+    {
+        get
+        {
+            if (_bufferingTimer is not null) return _bufferingTimer;
+            _bufferingTimer = new DispatcherTimer();
+            _bufferingTimer.Tick += (_, _) => OnBufferingTick();
+            return _bufferingTimer;
+        }
+    }
+
+    /// <summary>缓冲胶囊的最终可见性：延迟显示、最短停留，由 <see cref="State"/> 变化驱动。</summary>
+    public bool BufferingHintVisible
+    {
+        get => _bufferingHint;
+        private set => SetProperty(ref _bufferingHint, value);
+    }
+
+    /// <summary>缓冲提示的延迟/最短显示计时（规格 §4）：短暂抖动不显示，显示后不闪现。</summary>
+    private void UpdateBufferingHint(PlaybackState state)
+    {
+        if (state == PlaybackState.Buffering)
+        {
+            // 已在显示或已在等待延迟：不重置计时，保持现状。
+            if (_bufferingHint || (_bufferingTimer?.IsEnabled ?? false)) return;
+            BufferingTimer.Interval = BufferingHintDelay;
+            BufferingTimer.Start();
+            return;
+        }
+        _bufferingTimer?.Stop();
+        if (!_bufferingHint) return; // 从未显示：直接结束，不存在闪烁。
+        if (state != PlaybackState.Playing) { BufferingHintVisible = false; return; }
+        var shownFor = Environment.TickCount64 - _bufferingShownAt;
+        if (shownFor >= BufferingHintMinimum.TotalMilliseconds) { BufferingHintVisible = false; return; }
+        BufferingTimer.Interval = TimeSpan.FromMilliseconds(BufferingHintMinimum.TotalMilliseconds - shownFor);
+        BufferingTimer.Start();
+    }
+
+    private void OnBufferingTick()
+    {
+        _bufferingTimer?.Stop();
+        if (State == PlaybackState.Buffering)
+        {
+            _bufferingShownAt = Environment.TickCount64;
+            BufferingHintVisible = true;
+        }
+        else
+        {
+            BufferingHintVisible = false;
+        }
+    }
+
     partial void OnStateChanged(PlaybackState value)
     {
         OnPropertyChanged(nameof(IsPlaying));
+        OnPropertyChanged(nameof(IsLoading));
+        OnPropertyChanged(nameof(IsBuffering));
+        OnPropertyChanged(nameof(IsFailed));
+        OnPropertyChanged(nameof(LoadingText));
+        UpdateBufferingHint(value);
         // 播放状态就是排查“点了没反应”的第一现场：带上标题、进度与错误。
         if (value is PlaybackState.Playing or PlaybackState.Failed)
         {
@@ -301,6 +383,8 @@ public sealed partial class PlayerViewModel : ObservableObject
                 // 在任何 await/清空进度之前截取旧会话；后续写库不再读取可变 VM。
                 var saved = QueueHistory(CaptureHistory());
                 _current = null;
+                OnPropertyChanged(nameof(IsLive));
+                OnPropertyChanged(nameof(LoadingText));
                 VideoAspectRatio=null;
                 Visible = true;
                 Error = null;
@@ -339,6 +423,8 @@ public sealed partial class PlayerViewModel : ObservableObject
                         rate = Rate;
                         if (intent != _intent) throw new OperationCanceledException(ct);
                         _current = request;
+                        OnPropertyChanged(nameof(IsLive));
+                        OnPropertyChanged(nameof(LoadingText));
                         Title = request.Title;
                         Subtitle = index >= 0 && index < Playlist.Count
                             ? $"{Playlist[index].Title} · {request.SourceName}" : request.SourceName;
@@ -476,6 +562,8 @@ public sealed partial class PlayerViewModel : ObservableObject
             CancelSeek();
             saved = QueueHistory(CaptureHistory());
             _current = null;
+            OnPropertyChanged(nameof(IsLive));
+            OnPropertyChanged(nameof(LoadingText));
             Playlist.Clear();
             PlaylistIndex = -1;
             stop = _coordinator.CloseAsync(); // 立即取消解析，不等待历史写入。

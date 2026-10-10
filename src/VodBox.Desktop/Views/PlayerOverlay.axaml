@@ -67,6 +67,57 @@
     <Panel x:Name="VideoHost" />
     <v:DanmakuLayer x:Name="DanmakuCanvas" IsHitTestVisible="False" ClipToBounds="True" />
 
+    <!-- 状态提示层（规格 docs/PLAYBACK-LOADING-SPEC.md）：独立于 IsVisible="{Binding Visible}" 的控制层，
+         只由播放状态驱动，落在中间弹性行，不遮挡底部控制条。整体不命中测试，双击全屏/拖拽窗口照常可用。 -->
+    <Grid x:Name="StatusLayer" x:DataType="vm:PlayerViewModel" RowDefinitions="Auto,*,Auto" IsHitTestVisible="False">
+
+      <!-- 首次加载（Resolving/Loading）：黑窗期唯一视觉主体，窗口一出现即在位、无入场动画。
+           Resolving 与 Loading 共用这一个容器，只换主文案，进度条不重来。 -->
+      <StackPanel x:Name="LoadingLayer" Grid.Row="1" Spacing="12" Opacity="1" IsVisible="False"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel.Transitions>
+          <Transitions>
+            <!-- 隐藏留 250ms 淡出：Playing 早于首帧上屏，兼作首帧宽限期。 -->
+            <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="CubicEaseOut" />
+          </Transitions>
+        </StackPanel.Transitions>
+        <ProgressBar IsIndeterminate="True" Width="160" Height="4" CornerRadius="2"
+                     Foreground="{DynamicResource AccentBrush}" Background="#33FFFFFF" HorizontalAlignment="Center" />
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding LoadingText}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"
+                     TextAlignment="Center" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding Title}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}"
+                     TextAlignment="Center" HorizontalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </StackPanel>
+
+      <!-- 播放中途缓冲：复用中央 toast 的几何，克制、延迟 400ms 才出现（计时在 VM）。 -->
+      <Border x:Name="BufferingHint" Grid.Row="1" Opacity="0" IsVisible="False"
+              Background="#CC000000" CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="14,8"
+              HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Border.Transitions>
+          <Transitions>
+            <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" />
+          </Transitions>
+        </Border.Transitions>
+        <StackPanel Orientation="Horizontal" Spacing="8" TextElement.Foreground="White">
+          <ProgressBar IsIndeterminate="True" Width="40" Height="3" CornerRadius="2" VerticalAlignment="Center" />
+          <TextBlock Text="正在缓冲…" FontSize="12" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- 失败态：与加载块互斥，复用同一条居中带。 -->
+      <StackPanel Grid.Row="1" Spacing="10" IsVisible="{Binding IsFailed}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+        <PathIcon Data="{DynamicResource Icon.Information}" Width="24" Height="24"
+                  Foreground="{DynamicResource DangerBrush}" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Error, TargetNullValue='无法播放。'}" FontSize="12.5" MaxWidth="360"
+                   Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+        <TextBlock Text="请稍后重试，或切换频道/线路。" FontSize="11.5"
+                   Foreground="{DynamicResource TextTertiaryBrush}" TextAlignment="Center" />
+      </StackPanel>
+    </Grid>
+
     <!-- 控制层：参考主流播放器（Earth 图）一比一布局 -->
     <Grid RowDefinitions="Auto,*,Auto" ClipToBounds="True" IsVisible="{Binding Visible}">
 

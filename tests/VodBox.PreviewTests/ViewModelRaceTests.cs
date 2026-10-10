@@ -1633,11 +1633,18 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
-    public void RemoteEntryClosesConfigDialogAndNavigatesToActualRemoteForm()
+    public void RemoteEntryClosesConfigDialogAndRequestsTheSettingsWindow()
     {
-        using var context=new Context();context.Main.Settings.ConfigDialogOpen=true;
+        using var context=new Context();
+        var requested=0;context.Main.SettingsRequested+=()=>requested++;
+        var before=context.Main.Page;
+        context.Main.Settings.ConfigDialogOpen=true;
         context.Main.Detail.OpenRemoteControlCommand.Execute(null);
-        Assert.Equal(AppPage.Settings,context.Main.Page);Assert.Equal(6,context.Main.Settings.Section);Assert.False(context.Main.Settings.ConfigDialogOpen);
+        // 设置是独立窗口：请求开窗并切到「推送与遥控」分区，但主窗口不切页。
+        Assert.Equal(1,requested);
+        Assert.Equal(before,context.Main.Page);
+        Assert.Equal(6,context.Main.Settings.Section);
+        Assert.False(context.Main.Settings.ConfigDialogOpen);
     }
 
     [AvaloniaFact]

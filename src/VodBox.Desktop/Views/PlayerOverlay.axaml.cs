@@ -57,6 +57,9 @@ public partial class PlayerOverlay : UserControl
     private bool _drawerOpen;
     private readonly DispatcherTimer _drawerHideTimer =
         new() { Interval = TimeSpan.FromMilliseconds(PlayerLayout.PlaylistDrawerSlideMs + 40) };
+    // 提示层的淡出收尾：Opacity 过渡播完后才落 IsVisible，避免硬切（规格 §3/§4）。
+    private readonly DispatcherTimer _loadingHideTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly DispatcherTimer _bufferingHideTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private ContextMenu? _activeMenu;
     private PlayerViewModel? _observedPlayer;
     private static readonly Cursor HiddenCursor = new(StandardCursorType.None);
@@ -92,6 +95,16 @@ public partial class PlayerOverlay : UserControl
             _drawerHideTimer.Stop();
             this.FindControl<Border>("PlaylistDrawer")?.IsVisible = false;
         };
+        _loadingHideTimer.Tick += (_, _) =>
+        {
+            _loadingHideTimer.Stop();
+            if (VM?.IsLoading != true && this.FindControl<Control>("LoadingLayer") is { } layer) layer.IsVisible = false;
+        };
+        _bufferingHideTimer.Tick += (_, _) =>
+        {
+            _bufferingHideTimer.Stop();
+            if (VM?.BufferingHintVisible != true && this.FindControl<Control>("BufferingHint") is { } hint) hint.IsVisible = false;
+        };
         AttachedToVisualTree += OnAttached;
         DetachedFromVisualTree += OnDetached;
     }
@@ -120,6 +133,46 @@ public partial class PlayerOverlay : UserControl
         }
         if (e.PropertyName is nameof(PlayerViewModel.Position) or nameof(PlayerViewModel.Danmaku) or nameof(PlayerViewModel.DanmakuEnabled) or nameof(PlayerViewModel.DanmakuOpacity) or nameof(PlayerViewModel.DanmakuLimit) or nameof(PlayerViewModel.Visible))
             this.FindControl<DanmakuLayer>("DanmakuCanvas")?.InvalidateVisual();
+        if (e.PropertyName is nameof(PlayerViewModel.IsLoading) or nameof(PlayerViewModel.IsFailed)) UpdateLoadingLayer();
+        if (e.PropertyName == nameof(PlayerViewModel.BufferingHintVisible)) UpdateBufferingLayer();
+    }
+
+    /// <summary>加载块显隐：出现即时（开窗即在位），隐藏留 250ms 淡出后再落 IsVisible。</summary>
+    private void UpdateLoadingLayer()
+    {
+        if (this.FindControl<Control>("LoadingLayer") is not { } layer || VM is not { } vm) return;
+        if (vm.IsLoading)
+        {
+            _loadingHideTimer.Stop();
+            layer.Opacity = 1;
+            layer.IsVisible = true;
+            return;
+        }
+        // 失败要立刻看到原因，与失败块不做淡出交叠。
+        if (vm.IsFailed) { _loadingHideTimer.Stop(); layer.IsVisible = false; return; }
+        if (!layer.IsVisible) return;
+        layer.Opacity = 0;
+        _loadingHideTimer.Start();
+    }
+
+    /// <summary>缓冲胶囊：淡入 150ms；淡出 150ms 后再落 IsVisible。</summary>
+    private void UpdateBufferingLayer()
+    {
+        if (this.FindControl<Control>("BufferingHint") is not { } hint || VM is not { } vm) return;
+        if (vm.BufferingHintVisible)
+        {
+            _bufferingHideTimer.Stop();
+            if (hint.IsVisible) { hint.Opacity = 1; return; }
+            // 先置 0 再显示、下一渲染帧再置 1，过渡才会真正播放（同 OpenPlaylistDrawer）。
+            hint.Opacity = 0;
+            hint.IsVisible = true;
+            Dispatcher.UIThread.Post(() => { if (VM?.BufferingHintVisible == true && hint.IsVisible) hint.Opacity = 1; },
+                DispatcherPriority.Render);
+            return;
+        }
+        if (!hint.IsVisible) return;
+        hint.Opacity = 0;
+        _bufferingHideTimer.Start();
     }
 
     private void OnAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
@@ -132,6 +185,8 @@ public partial class PlayerOverlay : UserControl
         }
         TryInstallSurface();
         FitWindowToVideo();
+        UpdateLoadingLayer();
+        UpdateBufferingLayer();
         if (Avalonia.Application.Current is App) _controlsTimer.Start();
     }
 
@@ -208,6 +263,8 @@ public partial class PlayerOverlay : UserControl
         _activeMenu?.Close();_activeMenu=null;_menuOpen=false;ClosePlaylistDrawer(animate:false);
         RestoreWindow();RestorePlayerWindow();
         _controlsTimer.Stop();
+        _loadingHideTimer.Stop();
+        _bufferingHideTimer.Stop();
         VM?.CancelSeek();
         RevealControls();
         // 控件卸载时丢渲染面；重新入树时重建（OpenGlControlBase 会重新走 Init 流程）。
