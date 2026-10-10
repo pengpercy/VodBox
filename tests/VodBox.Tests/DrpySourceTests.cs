@@ -213,6 +213,41 @@ public sealed class DrpySourceTests
         await Assert.ThrowsAsync<InvalidDataException>(() => invalid.GetHomeAsync(ct: TestContext.Current.CancellationToken));
     }
 
+    [Theory]
+    [InlineData("{\"list\":[null]}")]
+    [InlineData("{\"list\":[1]}")]
+    [InlineData("{\"list\":[{\"vod_id\":{},\"vod_name\":\"坏数据\"}]}")]
+    [InlineData("{\"list\":[{\"vod_id\":\"1\",\"vod_name\":[]}]}")]
+    public async Task MalformedItemsReportProtocolErrorsAndRetireRuntime(string json)
+    {
+        var runtime = new FakeRuntime { HomeVodJson = json };
+        using var source = new DrpySource(Site, () => runtime);
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.GetHomeAsync(TestContext.Current.CancellationToken));
+        Assert.True(runtime.Disposed);
+    }
+
+    [Fact]
+    public async Task MissingIdentityDoesNotCreateUnopenableCards()
+    {
+        using var source = new DrpySource(Site, () => new FakeRuntime
+        {
+            HomeVodJson = """{"list":[{"vod_name":"缺少ID"},{"vod_id":2,"vod_name":"有效"}]}"""
+        });
+        Assert.Equal("2", Assert.Single((await source.GetHomeAsync(TestContext.Current.CancellationToken)).Items).Id);
+    }
+
+    [Fact]
+    public async Task NullHeaderFallsBackToPluralHeaders()
+    {
+        using var source = new DrpySource(Site, () => new FakeRuntime
+        {
+            PlayJson = """{"parse":0,"url":"https://cdn.example/video.mp4","header":null,"headers":{"Referer":"https://example.invalid/"}}"""
+        });
+        var detail = await source.GetDetailAsync("7", TestContext.Current.CancellationToken);
+        var request = await source.ResolvePlaybackAsync("7", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken);
+        Assert.Equal("https://example.invalid/", request.Headers["Referer"]);
+    }
+
     private sealed class FakeRuntime : IDrpyRuntime
     {
         public string HomeJson = """{"class":[{"type_id":2,"type_name":"儿歌"}]}""";

@@ -132,7 +132,7 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
         if (jx==0&&parse == 1 && !MediaExtension().IsMatch(uri.AbsolutePath))
             throw new NotSupportedException("该 drpy 选集需要网页嗅探（尚未实现）。");
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (root.TryGetProperty("header", out var h) || root.TryGetProperty("headers", out h))
+        if ((root.TryGetProperty("header", out var h) && h.ValueKind != JsonValueKind.Null) || root.TryGetProperty("headers", out h))
         {
             if (h.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(h.GetString()))
             {
@@ -168,7 +168,7 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
-        var items = List(root, "list").Select(Item).ToList();
+        var items = List(root, "list").Select(Item).Where(item => item.Id.Length > 0).ToList();
         var page = Math.Max(1, Number(root, "page", requestedPage));
         return new MediaPage(items, page, Math.Max(page, Number(root, "pagecount", page)));
     }
@@ -232,6 +232,7 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
 
     private static int PlaybackFlag(JsonElement root, string key)
     {
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("drpy 播放响应不是 JSON 对象。");
         if (!root.TryGetProperty(key, out var value)) return 0;
         if (value.ValueKind is JsonValueKind.String or JsonValueKind.Number &&
             int.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) return n;
@@ -245,7 +246,14 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
         Poster = Text(vod, "vod_pic"), Remarks = Text(vod, "vod_remarks"), Year = Text(vod, "vod_year"),
         Area = Text(vod, "vod_area"), TypeName = Text(vod, "type_name")
     };
-    private static string Text(JsonElement root, string key) => root.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString().Trim() : "";
+    private static string Text(JsonElement root, string key)
+    {
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("drpy 条目不是 JSON 对象。");
+        if (!root.TryGetProperty(key, out var value) || value.ValueKind == JsonValueKind.Null) return "";
+        if (value.ValueKind is not (JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidDataException($"drpy {key} 不是标量字段。");
+        return value.ToString().Trim();
+    }
     private static int Number(JsonElement root, string key, int fallback) => int.TryParse(Text(root, key), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : fallback;
 
     [GeneratedRegex(@"\.(?:m3u8|mp4|flv|mpd|mkv|webm|m4v|mov|ts|mp3|m4a|aac)$", RegexOptions.IgnoreCase)]
