@@ -14,7 +14,7 @@
         <PathIcon Data="{StaticResource Icon.Folder}" Width="24" Height="24" VerticalAlignment="Center" />
         <TextBlock Text="本地文件" FontSize="24" FontWeight="SemiBold" />
       </StackPanel>
-      <Border CornerRadius="9" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
+      <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
               Padding="12,5" VerticalAlignment="Center" MaxWidth="560">
         <TextBlock Text="{Binding CurrentPath}" FontSize="12" Foreground="#4CC2FF"
                    TextTrimming="CharacterEllipsis" />
@@ -26,7 +26,7 @@
     <ListBox Grid.Row="1" ItemsSource="{Binding Entries}" Background="Transparent" BorderThickness="0">
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <Border CornerRadius="7" Padding="10,6" Margin="0,1" Cursor="Hand"
+          <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="10,6" Margin="0,1" Cursor="Hand"
                   Background="#0AFFFFFF" PointerPressed="OnOpen" Tag="{Binding}">
             <Border.ContextMenu>
               <!-- 右键：播放列表可“作为直播源打开”，媒体文件可直接播放；目录给“打开”。 -->

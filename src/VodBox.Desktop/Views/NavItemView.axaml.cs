@@ -53,7 +53,6 @@ public partial class NavItemView : UserControl
         if (this.FindControl<TextBlock>("LabelText") is { } label)
             label.Text = Label;
         if (this.FindControl<Border>("Shell") is { } shell)
-            shell.Background = new SolidColorBrush(IsSelected ? Color.FromUInt32(light?0x12000000u:0x12FFFFFFu) : Colors.Transparent);
-        if (this.FindControl<Border>("Indicator") is { } indicator) indicator.IsVisible = IsSelected;
+            shell.Background = new SolidColorBrush(IsSelected ? Color.FromUInt32(light?0x14000000u:0x1FFFFFFFu) : Colors.Transparent);
     }
 }

@@ -54,7 +54,10 @@ public sealed class MainWindowPreviewTests
             var brush = Assert.IsType<SolidColorBrush>(divider.Background);
             Assert.InRange(brush.Opacity, 0.05, 0.15);
             Assert.False(divider.IsHitTestVisible);
-            Assert.Single(window.GetVisualDescendants().OfType<Image>(), image => image is not (RemotePoster or LocalWallpaper));
+            // 侧边栏不再有品牌 logo；剩下的 Image 只能是海报或壁纸。
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Image>(), image => image is not (RemotePoster or LocalWallpaper));
+            // 品牌名称也已移除，侧边栏顶部不再出现 "VodBox" 字样。
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "VodBox");
 
             var titleBar = window.FindControl<Grid>("TitleBar")!;
             var search = window.FindControl<TextBox>("GlobalSearch")!;
@@ -71,6 +74,16 @@ public sealed class MainWindowPreviewTests
                 Assert.Equal(item.Foreground, icon.Foreground);
                 Assert.Equal(WindowDecorationsElementRole.User, WindowDecorationProperties.GetElementRole(item));
             });
+            // 高亮胶囊左右留间隙（对齐 App Store），且不再使用左侧蓝色指示条。
+            var selected = items.Single(item => item.IsSelected);
+            var selectedShell = selected.FindControl<Border>("Shell")!;
+            var sidebarWidth = window.FindControl<Border>("SidebarDragArea")!.Bounds.Width;
+            var leftGap = selectedShell.TranslatePoint(default, window)!.Value.X;
+            Assert.True(leftGap >= 6, $"高亮左侧应留间隙，实际 {leftGap}");
+            Assert.True(sidebarWidth - (leftGap + selectedShell.Bounds.Width) >= 6, "高亮右侧应留间隙");
+            Assert.Null(selected.FindControl<Border>("Indicator"));
+            Assert.All(items.Select(item => item.FindControl<Border>("Indicator")), indicator => Assert.Null(indicator));
+
             var sidebar = window.FindControl<Border>("SidebarDragArea")!;
             Assert.Equal(WindowDecorationsElementRole.TitleBar, WindowDecorationProperties.GetElementRole(sidebar));
             var sidebarGrid = Assert.IsType<Grid>(sidebar.Child);

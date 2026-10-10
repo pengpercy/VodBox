@@ -11,7 +11,7 @@
     <StackPanel Spacing="26" DataContext="{Binding Home}">
 
       <!-- 英雄区（蓝紫渐变 + 左侧文字遮罩 + 按钮组 + 轮播指示器，对齐设计稿 p-home） -->
-      <Border CornerRadius="12" Height="300" ClipToBounds="True" PointerPressed="OnHeroPressed" Cursor="Hand">
+      <Border x:Name="HeroCard" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="300" ClipToBounds="True" PointerPressed="OnHeroPressed" PointerEntered="OnHeroPointerEntered" PointerExited="OnHeroPointerExited" Cursor="Hand">
         <Panel>
           <!-- 蓝紫渐变底 -->
           <Border>
@@ -35,22 +35,22 @@
             </Border.Background>
           </Border>
           <StackPanel VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="8" IsVisible="{Binding !Loading}">
-            <TextBlock Text="今日推荐 · TOP 1" FontSize="11.5" Foreground="#4CC2FF" LetterSpacing="2" />
+            <TextBlock Text="{Binding HeroPositionLabel}" FontSize="11.5" Foreground="#4CC2FF" LetterSpacing="2" />
             <TextBlock Text="{Binding HeroTitle}" FontSize="30" FontWeight="SemiBold" />
             <TextBlock Text="{Binding HeroRemarks}" FontSize="13" Foreground="#4CC2FF" />
             <TextBlock Text="{Binding HeroDescription}" FontSize="12.5" Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.9" TextWrapping="Wrap" MaxWidth="560" MaxLines="2" TextTrimming="CharacterEllipsis" />
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
               <Button Background="#0078D4" Foreground="White" BorderThickness="0"
-                      CornerRadius="7" Padding="18,9" Click="OnHeroPlay" Cursor="Hand">
+                      CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="18,9" Click="OnHeroPlay" Cursor="Hand">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" />
                   <TextBlock Text="立即播放" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button Content="详情" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1"
-                      BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
+                      BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="18,9" Click="OnHeroClick" Cursor="Hand" />
               <Button Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1"
-                      BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="7" Padding="18,9" Click="OnHeroClick" Cursor="Hand">
+                      BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="18,9" Click="OnHeroClick" Cursor="Hand">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
                   <TextBlock Text="收藏" VerticalAlignment="Center" />
@@ -71,13 +71,36 @@
               <Border Classes="skeleton hero" Height="38" Width="92" />
             </StackPanel>
           </StackPanel>
-          <!-- 轮播指示器（右下角，当前位为胶囊） -->
-          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24">
-            <Border CornerRadius="4" Width="22" Height="7" Background="#4CC2FF" />
-            <Border CornerRadius="3.5" Width="7" Height="7" Background="#59FFFFFF" />
-            <Border CornerRadius="3.5" Width="7" Height="7" Background="#59FFFFFF" />
-            <Border CornerRadius="3.5" Width="7" Height="7" Background="#59FFFFFF" />
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,16,16,0" IsVisible="{Binding CanRotateHero}">
+            <Button x:Name="PreviousHero" Command="{Binding PreviousHeroCommand}" Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="#60000000" Foreground="White" ToolTip.Tip="上一张推荐">
+              <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+            <Button x:Name="NextHero" Command="{Binding NextHeroCommand}" Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="#60000000" Foreground="White" ToolTip.Tip="下一张推荐">
+              <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
           </StackPanel>
+          <ItemsControl x:Name="HeroIndicators" ItemsSource="{Binding HeroSlides}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" IsVisible="{Binding CanRotateHero}">
+            <ItemsControl.Styles>
+              <Style Selector="Button.heroIndicator">
+                <Setter Property="Width" Value="8" /><Setter Property="Height" Value="8" />
+                <Setter Property="MinWidth" Value="0" /><Setter Property="MinHeight" Value="0" />
+                <Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="3,0" />
+                <Setter Property="CornerRadius" Value="4" /><Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Background" Value="#59FFFFFF" />
+              </Style>
+              <Style Selector="Button.heroIndicator.active">
+                <Setter Property="Width" Value="22" /><Setter Property="Background" Value="#4CC2FF" />
+              </Style>
+            </ItemsControl.Styles>
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:HomeViewModel+HeroSlide">
+                <Button Classes="heroIndicator" Classes.active="{Binding IsSelected}" Tag="{Binding Index}" Click="OnSelectHero" ToolTip.Tip="{Binding Item.Title}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </Panel>
       </Border>
 
@@ -93,19 +116,25 @@
           </StackPanel>
         </StackPanel>
         <Panel>
-        <ItemsControl ItemsSource="{Binding Recent}" IsVisible="{Binding !ShowRecentSkeleton}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="16" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
+        <!-- 最近观看永远只有一行：横向 ScrollViewer 承载，支持左右滑动，最多前 20 条。 -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                      IsVisible="{Binding !ShowRecentSkeleton}">
+          <ItemsControl ItemsSource="{Binding Recent}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="16" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <StackPanel Width="150" Cursor="Hand" PointerPressed="OnResumeHistory" Tag="{Binding}">
-                <Border CornerRadius="8" Height="225" Background="#274064" ClipToBounds="True">
+                <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="225" Background="#274064" ClipToBounds="True">
                   <Panel>
-                    <PathIcon Data="{StaticResource Icon.Filmstrip}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <views:RemotePoster Url="{Binding Poster}" />
+                    <Panel IsVisible="{Binding #HomeRecentPoster.HasImage, Converter={x:Static views:BoolConverters.Not}}">
+                      <PathIcon Data="{StaticResource Icon.Filmstrip}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsNotLive}}" />
+                      <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsLive}}" />
+                    </Panel>
+                    <views:RemotePoster x:Name="HomeRecentPoster" Url="{Binding Poster}" ChannelName="{Binding Converter={x:Static views:HistoryConverters.ChannelName}}" Stretch="{Binding Converter={x:Static views:HistoryConverters.CoverStretch}}" />
                     <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,0">
                       <Border Background="#66000000" Padding="8,18,8,7">
                         <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
@@ -120,8 +149,9 @@
                 </Border>
               </StackPanel>
             </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
         <!-- 最近观看骨架：本地库读取中占位（读得快，通常一闪而过，不留空白） -->
         <ItemsControl ItemsSource="{x:Static views:SkeletonData.Recent}" IsVisible="{Binding ShowRecentSkeleton}">
           <ItemsControl.ItemsPanel>
@@ -170,7 +200,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <StackPanel Margin="0,0,16,0" Cursor="Hand" PointerPressed="OnOpenRecommend" Tag="{Binding}">
-                <Border CornerRadius="8" Height="210" Background="#3A2A55" ClipToBounds="True">
+                <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="210" Background="#3A2A55" ClipToBounds="True">
                   <Panel>
                     <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     <views:RemotePoster Url="{Binding Poster}" />

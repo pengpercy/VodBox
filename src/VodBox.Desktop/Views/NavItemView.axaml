@@ -4,16 +4,11 @@
              x:Class="VodBox.Desktop.Views.NavItemView"
              x:Name="Root"
              chrome:WindowDecorationProperties.ElementRole="User">
-  <Panel>
-    <Border x:Name="Shell" CornerRadius="7" Padding="12,9" Background="Transparent" Cursor="Hand">
-      <Panel>
-        <Border x:Name="Indicator" Width="3" CornerRadius="2" Background="#4CC2FF"
-                HorizontalAlignment="Left" Margin="-12,1,0,1" IsVisible="False" />
-        <StackPanel Orientation="Horizontal" Spacing="12" Margin="6,0,0,0">
-          <PathIcon x:Name="IconPath" Width="18" Height="18" />
-          <TextBlock x:Name="LabelText" FontSize="13.5" />
-        </StackPanel>
-      </Panel>
-    </Border>
-  </Panel>
+  <!-- 高亮胶囊左右留出间隙（对齐 App Store 侧边栏），外层边距才是"撑满"的原因。 -->
+  <Border x:Name="Shell" CornerRadius="{DynamicResource AppControlCornerRadius}" Margin="8,1" Padding="10,9" Background="Transparent" Cursor="Hand">
+    <StackPanel Orientation="Horizontal" Spacing="12">
+      <PathIcon x:Name="IconPath" Width="18" Height="18" />
+      <TextBlock x:Name="LabelText" FontSize="13.5" />
+    </StackPanel>
+  </Border>
 </UserControl>

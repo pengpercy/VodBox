@@ -104,17 +104,14 @@ public sealed partial class FavoritesViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Open(FavoriteEntry entry)
+    private void Open(FavoriteEntry entry) => _main.ResumeEntry(new HistoryEntry
     {
-        _main.Detail.Resume(new HistoryEntry
-        {
-            SourceKey = entry.SourceKey,
-            SourceName = entry.SourceName,
-            MediaId = entry.MediaId,
-            Title = entry.Title,
-            Poster = entry.Poster,
-        });
-    }
+        SourceKey = entry.SourceKey,
+        SourceName = entry.SourceName,
+        MediaId = entry.MediaId,
+        Title = entry.Title,
+        Poster = entry.Poster,
+    });
 
     [RelayCommand]
     private void ToggleManage() => Managing = !Managing;
@@ -138,9 +135,9 @@ public sealed partial class HistoryViewModel : ObservableObject
 
     /// <summary>无痕模式开启时页面顶部横幅（设计稿 ②）。S6 设置接开关。</summary>
     [ObservableProperty] private bool _incognitoBanner = false;
-    /// <summary>今天的历史（首页同款卡片，直播含「看了 N 分钟」）。</summary>
-    public ObservableCollection<HistoryEntry> Today { get; } = [];
-    /// <summary>更早历史（今天之前的记录）。</summary>
+    /// <summary>最近的历史，与首页共用最近 20 条的范围。</summary>
+    public ObservableCollection<HistoryEntry> Recent { get; } = [];
+    /// <summary>更早历史（最近 20 条之外的记录）。</summary>
     public ObservableCollection<HistoryEntry> Earlier { get; } = [];
 
     [ObservableProperty] private bool _loading;
@@ -153,12 +150,14 @@ public sealed partial class HistoryViewModel : ObservableObject
     public bool ShowSkeleton => Loading && Entries.Count == 0;
     /// <summary>加载结束且确实没有记录 → 空态文案。</summary>
     public bool ShowEmpty => !Loading && Entries.Count == 0 && string.IsNullOrEmpty(Hint);
+    public bool ShowRecentArea => ShowSkeleton || Recent.Count > 0;
 
     public HistoryViewModel(AppServices services, MainViewModel main)
     {
         _services = services;
         _main = main;
         Entries.CollectionChanged += (_, _) => NotifyHistoryState();
+        Recent.CollectionChanged += (_, _) => NotifyHistoryState();
     }
 
     partial void OnLoadingChanged(bool value) => NotifyHistoryState();
@@ -168,6 +167,7 @@ public sealed partial class HistoryViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowSkeleton));
         OnPropertyChanged(nameof(ShowEmpty));
+        OnPropertyChanged(nameof(ShowRecentArea));
     }
 
     /// <summary>离开历史页：丢弃在途结果，避免回到旧页面时回填。</summary>
@@ -193,7 +193,7 @@ public sealed partial class HistoryViewModel : ObservableObject
                 // 结果到齐后再替换：刷新期间保留旧列表，不出现「有记录却显示空态」的中间帧。
                 Entries.Clear();
                 foreach (var entry in entries) Entries.Add(entry);
-                SplitByDay();
+                SplitHistory();
             });
         }
         catch (Exception error)
@@ -211,27 +211,24 @@ public sealed partial class HistoryViewModel : ObservableObject
         }
     }
 
-    /// <summary>按「今天 / 更早」拆两组（设计稿：历史 · 今天 分组）。</summary>
-    public void SplitByDay()
+    /// <summary>与首页一致：前 20 条为最近观看，剩余记录为更早，不以午夜为分界。</summary>
+    public void SplitHistory()
     {
-        Today.Clear();
+        Recent.Clear();
         Earlier.Clear();
-        foreach (var entry in Entries)
-        {
-            if (entry.UpdatedAt.Date == DateTimeOffset.Now.Date) Today.Add(entry);
-            else Earlier.Add(entry);
-        }
+        foreach (var entry in Entries.Take(HomeViewModel.RecentLimit)) Recent.Add(entry);
+        foreach (var entry in Entries.Skip(HomeViewModel.RecentLimit)) Earlier.Add(entry);
     }
 
     [RelayCommand]
-    private void Resume(HistoryEntry entry) => _main.Detail.Resume(entry);
+    private void Resume(HistoryEntry entry) => _main.ResumeEntry(entry);
 
     [RelayCommand]
     private async Task Delete(HistoryEntry entry)
     {
         await _services.Store.DeleteHistoryAsync(entry.SourceKey, entry.MediaId);
         Entries.Remove(entry);
-        SplitByDay();
+        SplitHistory();
     }
 
     [RelayCommand]
@@ -239,7 +236,7 @@ public sealed partial class HistoryViewModel : ObservableObject
     {
         await _services.Store.ClearHistoryAsync();
         Entries.Clear();
-        SplitByDay();
+        SplitHistory();
     }
 }
 

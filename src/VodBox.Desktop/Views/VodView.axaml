@@ -13,7 +13,7 @@
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,14">
       <TextBlock Text="点播" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
       <!-- 当前站点（下拉换源）+ 可用站点计数，对齐设计稿 p-vod -->
-      <Button CornerRadius="15" Background="#264CC2FF" Foreground="#4CC2FF"
+      <Button CornerRadius="{DynamicResource AppControlCornerRadius}" Background="#264CC2FF" Foreground="#4CC2FF"
               BorderBrush="#4CC2FF" BorderThickness="1" Padding="14,5" Click="OnSwitchSource" Cursor="Hand">
         <StackPanel Orientation="Horizontal" Spacing="6">
           <PathIcon Data="{StaticResource Icon.Broadcast}" Width="18" Height="18" VerticalAlignment="Center" />
@@ -24,13 +24,13 @@
       <TextBlock Text="{Binding SourceCountLabel}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Opacity="0.75" />
       <Panel HorizontalAlignment="Right" />
       <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
-        <Border CornerRadius="6" Background="#264CC2FF" Padding="10,4">
+        <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="#264CC2FF" Padding="10,4">
           <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#4CC2FF">
             <PathIcon Data="{StaticResource Icon.ViewGrid}" Width="18" Height="18" VerticalAlignment="Center" />
             <TextBlock Text="网格" FontSize="11.5" VerticalAlignment="Center" />
           </StackPanel>
         </Border>
-        <Border CornerRadius="6" Background="{DynamicResource CardHoverBrush}" Padding="10,4">
+        <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardHoverBrush}" Padding="10,4">
           <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}">
             <PathIcon Data="{StaticResource Icon.ViewList}" Width="18" Height="18" VerticalAlignment="Center" />
             <TextBlock Text="列表" FontSize="11.5" VerticalAlignment="Center" />
@@ -71,7 +71,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Button Content="{Binding Name}" CornerRadius="16" Padding="14,6" FontSize="12.5"
+              <Button Content="{Binding Name}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,6" FontSize="12.5"
                       Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1"
                       BorderBrush="{DynamicResource StrokeBrush}" Cursor="Hand"
                       Click="OnCategoryClick" Tag="{Binding}" />
@@ -97,7 +97,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <StackPanel Width="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterWidth}" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
-              <Border CornerRadius="8" Height="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterHeight}" Background="#274064" ClipToBounds="True">
+              <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterHeight}" Background="#274064" ClipToBounds="True">
                 <Panel>
                   <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   <views:RemotePoster Url="{Binding Poster}" />
@@ -140,7 +140,7 @@
     </ScrollViewer>
 
     <!-- 翻页：保留当前页，只在左下角提示进度（与直播页一致的加载条样式） -->
-    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="12,8" Margin="0,0,12,12"
+    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="12,8" Margin="0,0,12,12"
             HorizontalAlignment="Left" VerticalAlignment="Bottom" IsVisible="{Binding Paging}">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <ProgressBar IsIndeterminate="True" Width="34" Height="4" VerticalAlignment="Center" />
@@ -157,16 +157,16 @@
 
     <!-- 分页 -->
     <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,16,0,0">
-      <Button Command="{Binding PrevPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="上一页" Width="30" Height="30" CornerRadius="6"
+      <Button Command="{Binding PrevPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="上一页" Width="30" Height="30" CornerRadius="{DynamicResource AppControlCornerRadius}"
               Background="{DynamicResource CardHoverBrush}" BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Padding="0">
         <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="18" Height="18" />
       </Button>
-      <Border CornerRadius="6" Background="#264CC2FF" Width="30" Height="30">
+      <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="#264CC2FF" Width="30" Height="30">
         <TextBlock Text="{Binding Page}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#4CC2FF" FontSize="12.5" />
       </Border>
       <TextBlock Text=" / " Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
       <TextBlock Text="{Binding PageCount}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-      <Button Command="{Binding NextPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="下一页" Width="30" Height="30" CornerRadius="6"
+      <Button Command="{Binding NextPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="下一页" Width="30" Height="30" CornerRadius="{DynamicResource AppControlCornerRadius}"
               Background="{DynamicResource CardHoverBrush}" BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Padding="0">
         <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" />
       </Button>

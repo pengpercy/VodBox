@@ -58,7 +58,7 @@
           <TextBlock Text="源与订阅" FontSize="20" FontWeight="SemiBold" />
 
           <!-- 点播配置卡片（点「更改」开弹窗，设计稿 ②） -->
-          <Border CornerRadius="12" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1">
+          <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1">
             <StackPanel Margin="20,4,20,4">
               <Grid ColumnDefinitions="*,Auto" MinHeight="64">
                 <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
@@ -67,7 +67,7 @@
                              TextTrimming="CharacterEllipsis" MaxWidth="420" />
                 </StackPanel>
                 <Button Grid.Column="1" Content="更改配置…" Command="{Binding OpenConfigDialogCommand}"
-                        CornerRadius="6" Padding="14,7" Background="#0078D4" Foreground="White"
+                        CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,7" Background="#0078D4" Foreground="White"
                         BorderThickness="0" Cursor="Hand" VerticalAlignment="Center" />
               </Grid>
               <Separator Background="#17FFFFFF" Height="1" />
@@ -77,9 +77,9 @@
                   <TextBlock Text="IPTV 直播源地址" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                  <TextBox Text="{Binding LiveConfigUrl}" Width="280" Height="32" CornerRadius="6"
+                  <TextBox Text="{Binding LiveConfigUrl}" Width="280" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}"
                            PlaceholderText="https://…/live.m3u" />
-                  <Button Content="加载" Command="{Binding ApplyLiveConfigCommand}" CornerRadius="6" Padding="14,7"
+                  <Button Content="加载" Command="{Binding ApplyLiveConfigCommand}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,7"
                           Background="#0078D4" Foreground="White" BorderThickness="0" Cursor="Hand" />
                 </StackPanel>
               </Grid>
@@ -87,7 +87,7 @@
           </Border>
 
           <TextBlock Text="站点列表" FontSize="20" FontWeight="SemiBold" />
-          <Border CornerRadius="12" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" MinHeight="120">
+          <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" MinHeight="120">
             <ItemsControl ItemsSource="{Binding Sites}" Margin="20,12">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
@@ -209,7 +209,7 @@
               <Button Content="显示路径" Command="{Binding CopyLogPathCommand}" />
             </StackPanel>
             <TextBlock Text="{Binding DiagnosticsMessage}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap" />
-            <Border Background="#0AFFFFFF" CornerRadius="8" Padding="10">
+            <Border Background="#0AFFFFFF" CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="10">
               <TextBox Text="{Binding LogTail}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                        FontFamily="{DynamicResource FontMono}" FontSize="11"
                        MinHeight="240" MaxHeight="360" Background="Transparent" BorderThickness="0" />
@@ -222,7 +222,7 @@
     <!-- 更改点播配置弹窗（亚克力黑 + 圆角 12 + 历史配置 + 扫码推送，设计稿 ②③） -->
     <Panel IsVisible="{Binding Settings.ConfigDialogOpen}">
       <Rectangle Fill="#88000000" />
-      <Border Width="560" CornerRadius="12" Background="{DynamicResource SurfaceBrush}" BorderBrush="#26FFFFFF" BorderThickness="1"
+      <Border Width="560" CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource SurfaceBrush}" BorderBrush="#26FFFFFF" BorderThickness="1"
               VerticalAlignment="Center" HorizontalAlignment="Center" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto">
           <!-- 弹窗头 -->
@@ -232,7 +232,7 @@
               <TextBlock Text="更改点播配置" FontSize="15.5" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
             <Button Grid.Column="1" Command="{Binding Settings.CancelConfigDialogCommand}" ToolTip.Tip="关闭"
-                    Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0" CornerRadius="6"
+                    Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                     Width="28" Height="28" Padding="0" FontSize="13" Cursor="Hand">
               <PathIcon Data="{StaticResource Icon.Close}" Width="18" Height="18" />
             </Button>
@@ -241,10 +241,10 @@
           <StackPanel Grid.Row="1" Margin="20,4,20,12" Spacing="12">
             <TextBlock Text="输入 TVBox 配置地址，或从剪贴板读取" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" />
             <Grid ColumnDefinitions="*,Auto">
-              <TextBox Grid.Column="0" Text="{Binding Settings.DialogUrl}" Height="34" CornerRadius="7"
+              <TextBox Grid.Column="0" Text="{Binding Settings.DialogUrl}" Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}"
                        PlaceholderText="https://…/tvbox.json" />
               <Button Grid.Column="1" Command="{Binding Settings.PasteFromClipboardCommand}"
-                      CornerRadius="7" Padding="12,6" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
+                      CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,6" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
                       BorderThickness="0" Margin="8,0,0,0" FontSize="12" Cursor="Hand">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <PathIcon Data="{StaticResource Icon.Clipboard}" Width="18" Height="18" VerticalAlignment="Center" />
@@ -254,7 +254,7 @@
             </Grid>
 
             <TextBlock Text="历史配置" FontSize="12" Margin="0,4,0,0" />
-            <Border CornerRadius="8" BorderBrush="#1FFFFFFF" BorderThickness="1" MaxHeight="170">
+            <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" BorderBrush="#1FFFFFFF" BorderThickness="1" MaxHeight="170">
               <ScrollViewer>
                 <ItemsControl ItemsSource="{Binding Settings.ConfigHistory}">
                   <ItemsControl.ItemTemplate>
@@ -270,10 +270,10 @@
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                           <Button Content="切换" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.SwitchConfigCommand}"
                                   CommandParameter="{Binding}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
-                                  BorderThickness="0" CornerRadius="6" Padding="10,4" FontSize="11.5" Cursor="Hand" />
+                                  BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,4" FontSize="11.5" Cursor="Hand" />
                           <Button Content="删除" Foreground="#FF6B6B" Background="Transparent" BorderThickness="0"
                                   CommandParameter="{Binding}" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.DeleteConfigCommand}"
-                                  CornerRadius="6" Padding="10,4" FontSize="11.5" Cursor="Hand" />
+                                  CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,4" FontSize="11.5" Cursor="Hand" />
                         </StackPanel>
                       </Grid>
                     </DataTemplate>
@@ -286,7 +286,7 @@
           <Border Grid.Row="2" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="20,12">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <Button Grid.Column="0" Command="{Binding Settings.OpenRemoteSettingsCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
-                      BorderThickness="0" CornerRadius="7" Padding="12,7" FontSize="12" Cursor="Hand">
+                      BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,7" FontSize="12" Cursor="Hand">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" VerticalAlignment="Center" />
                   <TextBlock Text="手机扫码推送" VerticalAlignment="Center" />
@@ -294,9 +294,9 @@
               </Button>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                 <Button Content="取消" Command="{Binding Settings.CancelConfigDialogCommand}" Background="{DynamicResource CardHoverBrush}"
-                        Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" CornerRadius="7" Padding="16,7" FontSize="12.5" Cursor="Hand" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="16,7" FontSize="12.5" Cursor="Hand" />
                 <Button Content="确定加载" Command="{Binding Settings.ConfirmConfigDialogCommand}"
-                        Background="#0078D4" Foreground="White" BorderThickness="0" CornerRadius="7"
+                        Background="#0078D4" Foreground="White" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Padding="16,7" FontSize="12.5" FontWeight="SemiBold" Cursor="Hand" />
               </StackPanel>
             </Grid>

@@ -31,6 +31,19 @@ public static class PageConverters
     }
 }
 
+/// <summary>直播历史使用台标缓存与频道名回退，点播历史保留海报显示。</summary>
+public static class HistoryConverters
+{
+    public static readonly IValueConverter ChannelName = new FuncValueConverter<VodBox.Core.HistoryEntry?, string?>(
+        entry => entry?.SourceKey == "live" ? entry.Title : null);
+    public static readonly IValueConverter IsLive = new FuncValueConverter<VodBox.Core.HistoryEntry?, bool>(
+        entry => entry?.SourceKey == "live");
+    public static readonly IValueConverter IsNotLive = new FuncValueConverter<VodBox.Core.HistoryEntry?, bool>(
+        entry => entry?.SourceKey != "live");
+    public static readonly IValueConverter CoverStretch = new FuncValueConverter<VodBox.Core.HistoryEntry?, Avalonia.Media.Stretch>(
+        entry => entry?.SourceKey == "live" ? Avalonia.Media.Stretch.Uniform : Avalonia.Media.Stretch.UniformToFill);
+}
+
 public static class StringConverters
 {
     public static readonly IValueConverter IsNotNullOrEmpty = new NotNullOrEmptyConverter();

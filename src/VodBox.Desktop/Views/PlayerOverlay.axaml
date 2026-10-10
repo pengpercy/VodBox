@@ -78,7 +78,7 @@
           <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#80FFFFFF" TextTrimming="CharacterEllipsis" />
         </StackPanel>
         <Button x:Name="TopmostButton" Grid.Column="1" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
-                Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="6"
+                Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                 Width="{x:Static v:PlayerLayout.TitleBarButtonSize}" Height="{x:Static v:PlayerLayout.TitleBarButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
           <!-- 与播放/暂停同款做法：置顶态与未置顶态用两个不同图标，状态一眼可辨。 -->
           <Panel>
@@ -94,7 +94,7 @@
       </Grid>
 
       <!-- 中央 toast（倍速/跳片头提示） -->
-      <Border Grid.Row="1" Background="#CC000000" CornerRadius="9" Padding="14,8"
+      <Border Grid.Row="1" Background="#CC000000" CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="14,8"
               VerticalAlignment="Center" HorizontalAlignment="Center"
               IsVisible="{Binding ShowToast}">
         <StackPanel Orientation="Horizontal" Spacing="8" TextElement.Foreground="White">
@@ -103,9 +103,10 @@
         </StackPanel>
       </Border>
 
-      <!-- 底部：单个半透明圆角面板（参考图紧凑控制条） -->
-      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#A6000000" CornerRadius="14"
-              BorderBrush="#1AFFFFFF" BorderThickness="1"
+      <!-- 底部：单个半透明圆角面板（对齐 IINA 参考图）。
+           IINA 用白色半透明材质：压在亮画面上呈灰白、暗画面上偏深，不是固定黑底。 -->
+      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#F0202429" CornerRadius="{DynamicResource AppPanelCornerRadius}"
+              BorderBrush="#26FFFFFF" BorderThickness="1" TextElement.Foreground="#F2FFFFFF"
               Margin="{x:Static v:PlayerLayout.PanelMargin}" Padding="{x:Static v:PlayerLayout.PanelPadding}" HorizontalAlignment="Center">
         <Border.Width>
           <MultiBinding Converter="{x:Static v:PlayerLayoutConverters.ControlWidth}">
@@ -121,7 +122,7 @@
               <!-- 左：喇叭+音量滑杆 -->
               <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.VolumeSpacing}" VerticalAlignment="Center"
                           HorizontalAlignment="Left">
-                <Button Command="{Binding ToggleMuteCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button Command="{Binding ToggleMuteCommand}" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="静音 / 恢复音量">
                   <Panel>
                     <PathIcon Data="{DynamicResource Icon.VolumeHigh}" IsVisible="{Binding IsMuted, Converter={x:Static v:BoolConverters.Not}}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -134,35 +135,35 @@
               <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.IconButtonSpacing}" VerticalAlignment="Center"
                           HorizontalAlignment="Right">
-                <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="画面比例">
                   <PathIcon Data="{DynamicResource Icon.AspectRatio}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OnTogglePip" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button Click="OnTogglePip" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="置顶小窗 / 恢复窗口">
                   <PathIcon Data="{DynamicResource Icon.PiP}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button IsVisible="{Binding CompactMode, Converter={x:Static v:BoolConverters.Not}}" Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="插件">
                   <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OnTogglePlaylist" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button Click="OnTogglePlaylist" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">
                   <PathIcon Data="{DynamicResource Icon.Playlist}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button x:Name="RateButton" Click="OnSelectRate" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button x:Name="RateButton" Click="OnSelectRate" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Padding="4,0" Height="{x:Static v:PlayerLayout.IconButtonSize}" Cursor="Hand" ToolTip.Tip="倍速">
                   <StackPanel Orientation="Horizontal" Spacing="3">
                     <PathIcon Data="{DynamicResource Icon.Speed}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" VerticalAlignment="Center" />
-                    <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="#FFD2D5DA"
+                    <TextBlock x:Name="RateBadge" Text="{Binding Rate, StringFormat={}{0:0.##}x}" FontSize="10.5" Foreground="#E6FFFFFF"
                                VerticalAlignment="Center" FontWeight="SemiBold" />
                   </StackPanel>
                 </Button>
-                <Button Click="OnToggleFullscreen" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button Click="OnToggleFullscreen" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="全屏">
                   <PathIcon Data="{DynamicResource Icon.Fullscreen}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OnToggleSettings" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                <Button Click="OnToggleSettings" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="设置">
                   <PathIcon Data="{DynamicResource Icon.Settings}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
@@ -171,18 +172,18 @@
 
             <!-- 上层：上一集/播放/下一集三键（等大 30px，图标统一 18px）。 -->
             <StackPanel Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.TransportSpacing}" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Button Command="{Binding PreviousEpisodeCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+              <Button Command="{Binding PreviousEpisodeCommand}" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                       Width="{x:Static v:PlayerLayout.TransportButtonSize}" Height="{x:Static v:PlayerLayout.TransportButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="上一集">
                 <PathIcon Data="{DynamicResource Icon.SkipPrevious}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
-              <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="7"
+              <Button Click="OnTogglePlay" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                       Width="{x:Static v:PlayerLayout.TransportButtonSize}" Height="{x:Static v:PlayerLayout.TransportButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="播放/暂停">
                 <Panel>
                   <PathIcon Data="{DynamicResource Icon.Pause}" IsVisible="{Binding IsPlaying}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   <PathIcon Data="{DynamicResource Icon.Play}" IsVisible="{Binding IsPlaying, Converter={x:Static v:BoolConverters.Not}}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Panel>
               </Button>
-              <Button Command="{Binding NextEpisodeCommand}" Background="Transparent" BorderThickness="0" CornerRadius="6"
+              <Button Command="{Binding NextEpisodeCommand}" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                       Width="{x:Static v:PlayerLayout.TransportButtonSize}" Height="{x:Static v:PlayerLayout.TransportButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="下一集">
                 <PathIcon Data="{DynamicResource Icon.SkipNext}" Width="{x:Static v:PlayerLayout.TransportGlyphSize}" Height="{x:Static v:PlayerLayout.TransportGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
@@ -192,11 +193,11 @@
           <!-- 下行：时间 + 进度条 + 总时长 -->
           <Grid ColumnDefinitions="Auto,*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding Position, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
-                       FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="2,0,8,0" />
+                       FontSize="11.5" Foreground="#E6FFFFFF" VerticalAlignment="Center" Margin="2,0,8,0" />
             <Slider x:Name="ProgressSlider" Grid.Column="1" Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="{Binding Duration.TotalSeconds, Mode=OneWay}"
                     Value="{Binding SeekPositionSeconds, Mode=TwoWay}" />
             <TextBlock Grid.Column="2" Text="{Binding Duration, Converter={x:Static v:TimeConverters.ToTime}, Mode=OneWay}"
-                       FontSize="11.5" Foreground="#A0FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />
+                       FontSize="11.5" Foreground="#E6FFFFFF" VerticalAlignment="Center" Margin="8,0,2,0" />
           </Grid>
         </StackPanel>
       </Border>

@@ -63,7 +63,7 @@
 
       <Grid ColumnDefinitions="200,36,*,28,280">
         <!-- 海报 -->
-        <Border Grid.Column="0" CornerRadius="12" Height="300" Background="#274064" ClipToBounds="True">
+        <Border Grid.Column="0" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="300" Background="#274064" ClipToBounds="True">
           <Panel>
             <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
             <views:RemotePoster Url="{Binding Detail.Item.Poster}" />
@@ -100,28 +100,28 @@
           <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
             <!-- 主按钮智能显示续播集数（读取历史进度，S2 接运行时逻辑；设计稿为「续播 第12集」） -->
             <Button Command="{Binding PlayCommand}" Background="#0078D4"
-                    Foreground="White" BorderThickness="0" CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+                    Foreground="White" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" />
                 <TextBlock Text="{Binding PlayLabel}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
             <Button Command="{Binding ToggleFavoriteCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
-                    BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+                    BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
                 <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
             <Button Command="{Binding SearchOtherSourcesCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
-                    CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+                    CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" />
                 <TextBlock Text="跨站搜索" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
             <Button Command="{Binding OpenRemoteControlCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
-                    CornerRadius="7" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+                    CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" />
                 <TextBlock Text="遥控设置" VerticalAlignment="Center" />
@@ -135,7 +135,7 @@
              当前产品决策：播放统一走全局浮层，此窗只作提示。 -->
         <StackPanel Grid.Column="4" Spacing="10">
           <!-- 内嵌试看播放器（影院模式占位：S5 接第二个 MpvVideoSurface；当前产品决策为全局浮层） -->
-          <Border CornerRadius="12" Height="158" ClipToBounds="True" Cursor="Hand">
+          <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="158" ClipToBounds="True" Cursor="Hand">
             <Border.Background>
               <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                 <GradientStop Color="#1E3A5F" Offset="0" />
@@ -179,7 +179,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Button Content="{Binding Name}" Click="OnPickLine" Tag="{Binding}"
-                      CornerRadius="16" Padding="14,6" FontSize="12.5" Cursor="Hand"
+                      CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,6" FontSize="12.5" Cursor="Hand"
                       Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
@@ -193,7 +193,7 @@
           <TextBlock Text="{Binding EpisodeCountLabel}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
           <Panel />
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button Command="{Binding ToggleEpisodeOrderCommand}" CornerRadius="6" Background="{DynamicResource CardHoverBrush}" Padding="10,4" Cursor="Hand">
+            <Button Command="{Binding ToggleEpisodeOrderCommand}" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="{DynamicResource CardHoverBrush}" Padding="10,4" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                 <PathIcon Data="{StaticResource Icon.SwapVertical}" Width="18" Height="18" VerticalAlignment="Center" />
                 <TextBlock Text="倒序" FontSize="11.5" VerticalAlignment="Center" />
@@ -217,7 +217,7 @@
                   <DataTemplate>
                     <Grid Margin="0,0,8,10" Width="132">
                       <Button Click="OnPickEpisode" Tag="{Binding Episode}" ToolTip.Tip="{Binding Title}"
-                              CornerRadius="7" Padding="10,9" FontSize="12.5" Cursor="Hand"
+                              CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,9" FontSize="12.5" Cursor="Hand"
                               Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}">
                         <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
                       </Button>

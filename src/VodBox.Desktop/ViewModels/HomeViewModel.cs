@@ -18,7 +18,55 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly MainViewModel _main;
 
     public ObservableCollection<MediaItem> Recommendations { get; } = [];
+    public ObservableCollection<HeroSlide> HeroSlides { get; } = [];
+    [ObservableProperty] private int _heroIndex;
+    public bool CanRotateHero => HeroSlides.Count > 1;
+    public string HeroPositionLabel => HeroSlides.Count == 0 ? "今日推荐" : $"今日推荐 · {HeroIndex + 1}/{HeroSlides.Count}";
+
+    public sealed partial class HeroSlide(MediaItem item, int index) : ObservableObject
+    {
+        public MediaItem Item { get; } = item;
+        public int Index { get; } = index;
+        [ObservableProperty] private bool _isSelected;
+    }
+
+    private void RebuildHeroSlides()
+    {
+        var candidates = Recommendations.Where(item => !string.IsNullOrWhiteSpace(item.Poster))
+            .DistinctBy(item => item.Poster).Take(5).ToArray();
+        if (candidates.Length < 2) candidates = Recommendations.DistinctBy(item => item.Id).Take(5).ToArray();
+        HeroSlides.Clear();
+        for (var i = 0; i < candidates.Length; i++) HeroSlides.Add(new HeroSlide(candidates[i], i));
+        OnPropertyChanged(nameof(CanRotateHero));
+        if (HeroSlides.Count == 0) { HeroIndex = 0; SetHero(null); }
+        else SelectHero(Math.Min(HeroIndex, HeroSlides.Count - 1));
+        OnPropertyChanged(nameof(HeroPositionLabel));
+    }
+
+    public void SelectHero(int index)
+    {
+        if (index < 0 || index >= HeroSlides.Count) return;
+        HeroIndex = index;
+        foreach (var slide in HeroSlides) slide.IsSelected = slide.Index == index;
+        SetHero(HeroSlides[index].Item);
+        OnPropertyChanged(nameof(HeroPositionLabel));
+    }
+
+    [RelayCommand]
+    private void NextHero()
+    {
+        if (CanRotateHero) SelectHero((HeroIndex + 1) % HeroSlides.Count);
+    }
+
+    [RelayCommand]
+    private void PreviousHero()
+    {
+        if (CanRotateHero) SelectHero((HeroIndex + HeroSlides.Count - 1) % HeroSlides.Count);
+    }
     public ObservableCollection<HistoryEntry> Recent { get; } = [];
+
+    /// <summary>首页最近观看上限：固定一行、可横向滑动，最多前 20 条。</summary>
+    internal const int RecentLimit = 20;
 
     [ObservableProperty] private bool _loading;
     [ObservableProperty] private bool _recentLoading;
@@ -39,6 +87,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _store = store;
         _main = main;
         Recent.CollectionChanged += (_, _) => NotifyRecentState();
+        Recommendations.CollectionChanged += (_, _) => RebuildHeroSlides();
     }
 
     /// <summary>最近观看：加载中且尚无内容 → 骨架行（本地库读取极快，只在首屏占位）。</summary>
@@ -118,7 +167,7 @@ public sealed partial class HomeViewModel : ObservableObject
                 _sourceKey = source.Key;
                 SourceName = source.Name;
                 foreach (var item in page.Items.Take(24)) Recommendations.Add(item);
-                SetHero(page.Items.FirstOrDefault());
+                SelectHero(0);
                 RecommendationsHint = Recommendations.Count == 0 ? source is IInformationalContentSource notice ? notice.Notice : "该站点暂时没有返回推荐内容" : "";
             });
         }
@@ -142,13 +191,15 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         try
         {
-            var recent = await _store.GetHistoryAsync(12, ct);
+            // 首页最近观看固定一行、可横向滑动，最多展示前 20 条。
+            // 上限在 VM 兜底：存储层可能忽略 limit（或返回超出请求条数），不能只靠查询参数。
+            var recent = await _store.GetHistoryAsync(RecentLimit, ct);
             ct.ThrowIfCancellationRequested();
             await _main.RunOnUiAsync(() =>
             {
                 if (generation != _generation || ct.IsCancellationRequested) return;
                 Recent.Clear();
-                foreach (var entry in recent) Recent.Add(entry);
+                foreach (var entry in recent.Take(RecentLimit)) Recent.Add(entry);
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -185,6 +236,6 @@ public sealed partial class HomeViewModel : ObservableObject
     private void OpenItem(MediaItem item) => _main.Detail.Open(_sourceKey, item);
 
     [RelayCommand]
-    private void Resume(HistoryEntry entry) => _main.Detail.Resume(entry);
+    private void Resume(HistoryEntry entry) => _main.ResumeEntry(entry);
 
 }

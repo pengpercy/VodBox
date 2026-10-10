@@ -2090,6 +2090,7 @@ public sealed class ViewModelRaceTests
         var second = new LiveChannel { Name = "二组频道", Uris = ["https://example.com/2"] };
         live.Groups.Add(new LiveGroup("一组", [first], false, 1));
         live.Groups.Add(new LiveGroup("二组", [second], false, 1));
+        live.SelectedGroup = null; // 仅验证旧的折叠分组模式；默认模式已改为全部频道。
         live.ToggleGroup("一组");
         Assert.False(live.VisibleChannels.OfType<LiveViewModel.LiveGroupHeader>().First().Expanded);
         Assert.Same(second, Assert.Single(live.ChannelCards));
@@ -2105,55 +2106,215 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
-    public void LiveTabsHaveMatchingRoundedSurfacesAndIcons()
+    public void LiveGroupDropdownFiltersCardsAndSearchStaysInSelectedGroup()
     {
         using var context = new Context();
-        context.Main.Live.Groups.Add(new LiveGroup("测试", [new LiveChannel { Name = "频道", Uris = ["https://example.com/live"] }], false, 1));
-        context.Main.Live.FilterText = "频道";
+        var first = new LiveChannel { Name = "新闻", Uris = ["https://example.com/1"] };
+        var second = new LiveChannel { Name = "新闻二台", Uris = ["https://example.com/2"] };
+        var third = new LiveChannel { Name = "体育", Uris = ["https://example.com/3"] };
+        var live = context.Main.Live;
+        live.Groups.Add(new LiveGroup("央视", [first], false));
+        live.Groups.Add(new LiveGroup("卫视", [second, third], false));
+        live.SelectedGroup = live.Groups[0];
         var view = new LiveView { DataContext = context.Main };
         var window = new Window { Content = view, Width = 1280, Height = 800 };
         window.Show();
         try
         {
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
-            var tabs = new[] { "TabGroups", "TabFavorites", "TabHistory" }
-                .Select(name => view.FindControl<Button>(name)!).ToArray();
-            var tabGrid = Assert.IsType<Grid>(tabs[0].Parent);
-            Assert.Equal(tabGrid.Bounds.Width, tabs.Sum(tab => tab.Bounds.Width), 1);
-            var rowSurfaces = view.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "ChannelRowSurface").ToArray();
-            Assert.NotEmpty(rowSurfaces);
-            var header = view.GetVisualDescendants().OfType<Grid>().Single(g => g.Name == "GroupHeaderRow");
-            var headerSurface = header.FindAncestorOfType<Border>()!;
-            Assert.Equal("ChannelRowSurface", headerSurface.Name);
-            Assert.Equal(36, headerSurface.Bounds.Height);
-            foreach (var label in header.GetVisualDescendants().OfType<TextBlock>())
+            Assert.Null(view.FindControl<Button>("TabGroups"));
+            var groups = view.FindControl<ComboBox>("GroupSelector")!;
+            var search = view.FindControl<TextBox>("ChannelSearch")!;
+            Assert.Same(first, Assert.Single(live.ChannelCards));
+            groups.SelectedItem = live.Groups[1];
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(2, live.ChannelCards.Count);
+            search.Text = "新闻";
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(second, Assert.Single(live.ChannelCards));
+            var groupPoint = groups.TranslatePoint(default, view)!.Value;
+            var searchPoint = search.TranslatePoint(default, view)!.Value;
+            Assert.Equal(groupPoint.Y + groups.Bounds.Height / 2, searchPoint.Y + search.Bounds.Height / 2, 1);
+            Assert.True(searchPoint.X >= groupPoint.X + groups.Bounds.Width);
+            Assert.Equal(210, search.Bounds.Width);
+            Assert.Equal(34, groups.Bounds.Height);
+            Assert.NotNull(groups.SelectionBoxItemTemplate);
+            Assert.NotNull(groups.ItemTemplate);
+            groups.IsDropDownOpen = true;
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var selectedItem = Assert.IsType<ComboBoxItem>(groups.ContainerFromIndex(2));
+            var labels = selectedItem.GetVisualDescendants().OfType<TextBlock>().ToArray();
+            var groupName = labels.Single(text => text.Text == "卫视");
+            var groupCount = labels.Single(text => text.Text == "2 个频道");
+            Assert.True(groupCount.TranslatePoint(default, selectedItem)!.Value.Y > groupName.TranslatePoint(default, selectedItem)!.Value.Y);
+            var check = selectedItem.GetVisualDescendants().OfType<PathIcon>().Single(icon => icon.Width == 16);
+            Assert.True(check.IsVisible);
+            var presenter = selectedItem.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>()
+                .Single(control => control.Name == "PART_ContentPresenter");
+            var selectedBrush = Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(presenter.Background);
+            Assert.InRange(selectedBrush.Color.A, (byte)0, (byte)32);
+            groups.IsDropDownOpen = false;
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void LiveAllChannelsIsDefaultAndCountsEveryGroupWithoutExposingLockedChannels()
+    {
+        using var context = new Context();
+        var first = new LiveChannel { Name = "新闻一", Uris = ["https://example.com/1"] };
+        var second = new LiveChannel { Name = "新闻二", Uris = ["https://example.com/2"] };
+        var locked = new LiveChannel { Name = "加密", Uris = ["https://example.com/3"] };
+        var live = context.Main.Live;
+        Assert.Equal("全部频道", live.SelectedGroup!.Name);
+        Assert.Equal(0, live.SelectedGroup.Count);
+        live.Groups.Add(new LiveGroup("央视", [first], false));
+        live.Groups.Add(new LiveGroup("卫视", [second], false));
+        live.Groups.Add(new LiveGroup("加密组", [locked], true));
+        Assert.Equal("全部频道", live.SelectedGroup.Name);
+        Assert.Equal(3, live.SelectedGroup.Count);
+        Assert.Equal(4, live.GroupOptions.Count);
+        Assert.Equal(new[] { first, second }, live.ChannelCards);
+        live.FilterText = "新闻二";
+        Assert.Same(second, Assert.Single(live.ChannelCards));
+        live.SelectedGroup = live.Groups[0];
+        Assert.Empty(live.ChannelCards);
+        live.SelectedGroup = live.GroupOptions[0];
+        Assert.Same(second, Assert.Single(live.ChannelCards));
+        live.Groups.Clear();
+        Assert.Equal("全部频道", live.SelectedGroup!.Name);
+        Assert.Equal(0, live.SelectedGroup.Count);
+        Assert.Empty(live.ChannelCards);
+    }
+
+    [AvaloniaFact]
+    public void LiveToolbarHasBoundedDynamicGroupWidthAndEdgeAlignedList()
+    {
+        using var context = new Context();
+        var channels = Enumerable.Range(0, 100).Select(i => new LiveChannel { Name = $"测试-{i}", Uris = [$"https://example.com/{i}"] }).ToArray();
+        var live = context.Main.Live;
+        foreach (var name in new[] { "央视", "河北廊坊组播 河北联通", new string('长', 80) })
+            live.Groups.Add(new LiveGroup(name, channels, false));
+        live.SelectedGroup = live.Groups[0];
+        var view = new LiveView { DataContext = context.Main };
+        var window = new Window { Content = view, Width = 1000, Height = 700 };
+        window.Show();
+        try
+        {
+            void Layout() { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
+            Layout();
+            var selector = view.FindControl<ComboBox>("GroupSelector")!;
+            var shortWidth = selector.Bounds.Width;
+            selector.SelectedItem = live.Groups[1]; Layout();
+            var middleWidth = selector.Bounds.Width;
+            selector.SelectedItem = live.Groups[2]; Layout();
+            var longWidth = selector.Bounds.Width;
+            Assert.InRange(shortWidth, 150, 280);
+            Assert.True(middleWidth > shortWidth);
+            Assert.InRange(middleWidth, 150, 280);
+            Assert.InRange(longWidth, middleWidth + 1, 280);
+            var label = selector.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == live.SelectedGroup!.Name);
+            Assert.Equal(Avalonia.Media.TextTrimming.CharacterEllipsis, label.TextTrimming);
+            Assert.True(label.Bounds.Width < selector.Bounds.Width);
+            var list = view.FindControl<ListBox>("ChannelCardGrid")!;
+            var right = list.TranslatePoint(new Avalonia.Point(list.Bounds.Width, 0), view)!.Value.X;
+            Assert.Equal(view.Bounds.Width, right, 1);
+            var bar = list.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>()
+                .Single(control => control.Orientation == Avalonia.Layout.Orientation.Vertical);
+            Assert.Equal(view.Bounds.Width, bar.TranslatePoint(new Avalonia.Point(bar.Bounds.Width, 0), view)!.Value.X, 1);
+            var heading = view.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "频道列表");
+            var count = view.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "共 100 个频道");
+            Assert.True(count.TranslatePoint(default, view)!.Value.Y > heading.TranslatePoint(default, view)!.Value.Y);
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), button => button.Content is string text && text is "上一台" or "下一台" or "导入节目表" or "回看");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void LiveHidesGlobalSearchAndMovesContentUpWithoutAffectingHome()
+    {
+        using var context = new Context();
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            var search = window.FindControl<TextBox>("GlobalSearch")!;
+            var home = window.GetVisualDescendants().OfType<HomeView>().Single();
+            var originalY = home.TranslatePoint(default, window)!.Value.Y;
+            Assert.True(search.IsVisible);
+            context.Main.Navigate(AppPage.Live);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Assert.False(search.IsVisible);
+            var live = window.GetVisualDescendants().OfType<LiveView>().Single();
+            if (OperatingSystem.IsMacOS())
+                Assert.True(live.TranslatePoint(default, window)!.Value.Y < originalY);
+            else
+                Assert.Equal(originalY, live.TranslatePoint(default, window)!.Value.Y);
+            var groups = live.FindControl<ComboBox>("GroupSelector")!;
+            Assert.Equal(34, groups.Bounds.Height);
+            context.Main.Navigate(AppPage.Home);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Assert.True(search.IsVisible);
+            Assert.Equal(originalY, home.TranslatePoint(default, window)!.Value.Y);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void NonMacLiveToolbarStaysBelowWindowButtonsAtMinimumAndDefaultWidths()
+    {
+        using var context = new Context();
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        window.Show();
+        try
+        {
+            context.Main.Navigate(AppPage.Live);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            var live = window.GetVisualDescendants().OfType<LiveView>().Single();
+            var page = Assert.IsType<Panel>(live.Parent);
+            var safeMargin = MainViewModel.GetPageContentMargin(AppPage.Live, isMacOS: false);
+            Assert.Equal(new Avalonia.Thickness(0), safeMargin);
+            page.Margin = safeMargin; // 在 macOS 测试环境中也测量 Windows/Linux 的实际页面布局。
+            foreach (var width in new[] { 960d, 1280d })
             {
-                var centre = label.TranslatePoint(new Avalonia.Point(0, label.Bounds.Height / 2), headerSurface)!.Value.Y;
-                Assert.InRange(Math.Abs(centre - headerSurface.Bounds.Height / 2), 0, 1);
+                window.Width = width;
+                window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+                var titleBar = window.FindControl<Grid>("TitleBar")!;
+                var titleBarBottom = titleBar.TranslatePoint(new Avalonia.Point(0, titleBar.Bounds.Height), window)!.Value.Y;
+                var toolbar = live.FindControl<Grid>("LiveToolbar")!;
+                Assert.True(toolbar.TranslatePoint(default, window)!.Value.Y >= titleBarBottom);
+                var search = live.FindControl<TextBox>("ChannelSearch")!;
+                Assert.True(search.TranslatePoint(default, window)!.Value.Y >= titleBarBottom);
+                Assert.Equal(34, search.Bounds.Height);
             }
-            Assert.All(rowSurfaces, surface =>
-            {
-                Assert.Equal(new Avalonia.CornerRadius(7), surface.CornerRadius);
-                Assert.True(surface.ClipToBounds);
-            });
-            Assert.All(tabs, tab =>
-            {
-                Assert.Equal(new Avalonia.Thickness(0), tab.Margin);
-                Assert.InRange(Math.Abs(tabGrid.Bounds.Width / 3 - tab.Bounds.Width), 0, 1);
-                var content = tab.GetVisualDescendants().OfType<StackPanel>().Single();
-                var centre = content.TranslatePoint(new Avalonia.Point(content.Bounds.Width / 2, content.Bounds.Height / 2), tab)!.Value;
-                Assert.InRange(Math.Abs(centre.X - tab.Bounds.Width / 2), 0, 1);
-                Assert.Equal(38, tab.Bounds.Height);
-                Assert.InRange(Math.Abs(tabs[0].Bounds.Width - tab.Bounds.Width), 0, 1);
-                Assert.Equal(new Avalonia.CornerRadius(8), tab.CornerRadius);
-                Assert.Equal(tabs[0].Padding, tab.Padding);
-                Assert.Equal(tabs[0].Margin, tab.Margin);
-                var icon = Assert.Single(tab.GetVisualDescendants().OfType<PathIcon>());
-                Assert.Equal(18, icon.Width); Assert.Equal(18, icon.Height);
-                var surface = tab.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "TabSurface");
-                Assert.Equal(tab.Bounds.Size, surface.Bounds.Size);
-                Assert.Equal(new Avalonia.CornerRadius(8), surface.CornerRadius);
-            });
+            Assert.Equal(new Avalonia.Thickness(0, -24, 0, 0), MainViewModel.GetPageContentMargin(AppPage.Live, isMacOS: true));
+            Assert.Equal(new Avalonia.Thickness(0), MainViewModel.GetPageContentMargin(AppPage.Home, isMacOS: true));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task LiveListScrollMarksMotionThenClearsItAfterIdle()
+    {
+        using var context = new Context();
+        var live = context.Main.Live;
+        var channels = Enumerable.Range(0, 100).Select(i => new LiveChannel { Name = $"测试频道{i}-XYZ", Uris = [$"https://example.com/{i}"] }).ToArray();
+        live.Groups.Add(new LiveGroup("测试", channels, false));
+        live.SelectedGroup = live.Groups[0];
+        var view = new LiveView { DataContext = context.Main };
+        var window = new Window { Content = view, Width = 1000, Height = 700 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var list = view.FindControl<ListBox>("ChannelCardGrid")!;
+            var scroller = list.GetVisualDescendants().OfType<ScrollViewer>().Single();
+            scroller.Offset = new Avalonia.Vector(0, 300);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Assert.True(live.IsChannelScrolling);
+            await Until(() => !live.IsChannelScrolling);
+            Assert.False(live.IsChannelScrolling);
         }
         finally { window.Close(); }
     }
@@ -2218,82 +2379,35 @@ public sealed class ViewModelRaceTests
     [AvaloniaTheory]
     [InlineData(null)]
     [InlineData("新闻联播 19:00")]
-    public async Task ChannelBadgeAlignsWithNameAndCarriesNoBackground(string? epg)
+    public void ChannelCardShowsNameAndEpgInSelectedGroup(string? epg)
     {
         using var context = new Context();
-        var channel = new LiveChannel
-        {
-            Name = "CCTV-1综合", Group = "组", Number = 1, Badge = "1", BadgeColor = "#C0392B",
-            Logo = "https://gcore.jsdelivr.net/gh/taksssss/tv/icon/CCTV1.png",
-            Uris = ["http://host/a.m3u8"],
-        };
-        if (epg is not null) channel.EpgNow = epg;
-        context.Main.Live.Groups.Add(new LiveGroup("组", [channel], false));
+        var channel = new LiveChannel { Name = "未收录测试频道-XYZ", EpgNow = epg ?? "", Uris = ["https://example.com/live"] };
+        context.Main.Live.Groups.Add(new LiveGroup("央视", [channel], false));
         context.Main.Live.SelectedGroup = context.Main.Live.Groups[0];
-        context.Main.Navigate(AppPage.Live);
-        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1180, Height = 760 };
+        var view = new LiveView { DataContext = context.Main };
+        var window = new Window { Content = view, Width = 1180, Height = 760 };
         window.Show();
         try
         {
-            for (var i = 0; i < 10; i++)
-            {
-                window.UpdateLayout();
-                Dispatcher.UIThread.RunJobs();
-                Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
-                Dispatcher.UIThread.RunJobs();
-            }
-            var view = window.GetVisualDescendants().OfType<LiveView>().Single();
-            var poster = view.GetVisualDescendants().OfType<RemotePoster>().Single(p => p.Name == "ChannelLogo");
-            var name = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "CCTV-1综合");
-            var placeholder = view.GetVisualDescendants().OfType<Border>()
-                .Single(b => b.Name == "BadgePlaceholder");
-            var row = name.FindAncestorOfType<Border>()!;
-            await poster.LoadingTask.WaitAsync(TimeSpan.FromSeconds(20));
-            for (var i = 0; i < 4; i++)
-            {
-                window.UpdateLayout();
-                Dispatcher.UIThread.RunJobs();
-                Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
-                Dispatcher.UIThread.RunJobs();
-            }
-
-            // 台标必须真的加载出来（否则下面的断言只是在看占位）。
-            Assert.True(poster.HasImage, "台标未加载：需联网获取 taksssss 台标图");
-            Assert.NotNull(poster.Source);
-
-            // 1) 不要背景色：图加载成功后，彩色占位必须隐藏，图本身也不带底色。
-            Assert.False(placeholder.IsVisible, "台标加载后仍显示彩色底色占位");
-            // 整行内不得再有任何可见的彩色底块（台标区域是透明的）。
-            var badgeColour = Avalonia.Media.Color.Parse("#C0392B");
-            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b =>
-                b.IsVisible && b.Bounds.Width > 0 &&
-                b.Background is Avalonia.Media.ISolidColorBrush brush && brush.Color == badgeColour);
-
-            // 2) 台标与频道名同一行水平对齐（此前名称高出 6~8px）。
-            double CenterY(Avalonia.Controls.Control control) =>
-                control.TranslatePoint(new Avalonia.Point(0, control.Bounds.Height / 2), row)!.Value.Y;
-            var badgeCentre = CenterY(poster);
-            var nameCentre = CenterY(name);
-            Assert.InRange(Math.Abs(badgeCentre - nameCentre), 0, 1.0);
-
-            // 3) 台标按比例完整显示，不裁切也不溢出框。
-            Assert.Equal(Avalonia.Media.Stretch.Uniform, poster.Stretch);
-            var parent = (Avalonia.Controls.Panel)poster.Parent!;
-            Assert.True(poster.Bounds.Width <= parent.Bounds.Width + .5, "台标水平溢出");
-            Assert.True(poster.Bounds.Height <= parent.Bounds.Height + .5, "台标垂直溢出");
-            var bitmap = (Avalonia.Media.Imaging.Bitmap)poster.Source!;
-            Assert.Equal(bitmap.Size.Width / bitmap.Size.Height, poster.Bounds.Width / poster.Bounds.Height, 1);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var logo = view.GetVisualDescendants().OfType<RemotePoster>().Single(p => p.Name == "CardLogo");
+            Assert.False(logo.HasImage);
+            Assert.Null(logo.Source);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == channel.Name);
+            Assert.Equal(Avalonia.Media.Stretch.Uniform, logo.Stretch);
+            Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "CardPlaceholder").IsVisible);
         }
         finally { window.Close(); }
     }
 
     [AvaloniaFact]
-    public async Task ChannelWithoutLogoKeepsTextBadgePlaceholder()
+    public void UnknownChannelWithoutLogoKeepsCardPlaceholder()
     {
         using var context = new Context();
         var channel = new LiveChannel
         {
-            Name = "涿州新闻", Group = "组", Number = 1, Badge = "涿州", BadgeColor = "#1F6FB2",
+            Name = "未收录台标的测试频道-XYZ", Group = "组", Number = 1, Badge = "测试", BadgeColor = "#1F6FB2",
             Uris = ["http://host/a.m3u8"],   // 无 Logo
         };
         context.Main.Live.Groups.Add(new LiveGroup("组", [channel], false));
@@ -2312,8 +2426,8 @@ public sealed class ViewModelRaceTests
             }
             var view = window.GetVisualDescendants().OfType<LiveView>().Single();
             // 没有台标时保留文字占位（而不是空一块）。
-            Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BadgePlaceholder").IsVisible);
-            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "涿州");
+            Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "CardPlaceholder").IsVisible);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "TV");
         }
         finally { window.Close(); }
     }
@@ -2339,7 +2453,7 @@ public sealed class ViewModelRaceTests
         try
         {
             // 数据层是可靠断言：列表数据与台标解析不依赖渲染时机。
-            Assert.Equal(53, context.Main.Live.VisibleChannels.Count); // 1 组头 + 52 频道
+            Assert.Equal(52, context.Main.Live.VisibleChannels.Count); // 下拉框选中分组，只展示频道
             Assert.Equal("河北保定酒店 河北联通", context.Main.Live.Groups[0].Name);
 
             // 先强制渲染再取控件：ListBox 虚拟化，行要在布局完成后才存在。
@@ -2585,6 +2699,291 @@ public sealed class ViewModelRaceTests
             overlay.UpdateLayout();
         }
         finally { await Done(context.Main.Player.Close());window.CloseAfterPlayback(); }
+    }
+
+    [AvaloniaFact]
+    public async Task History_SkeletonSitsBelowTheGroupHeadingInsteadOfPushingItDown()
+    {
+        using var context = new Context();
+        context.Main.History.Loading = true;
+        var view = new HistoryView { DataContext = context.Main };
+        var window = new Window { Width = 1280, Height = 800, Content = view };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var heading = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "历史 · 最近观看");
+            var skeleton = view.GetVisualDescendants().OfType<Border>()
+                .Where(border => border.Classes.Contains("skeleton") && border.IsEffectivelyVisible).ToArray();
+            Assert.NotEmpty(skeleton);
+
+            // 骨架必须排在分组标题之下：否则加载时标题会被顶走，列表看起来"错位"。
+            var headingY = heading.TranslatePoint(default, view)!.Value.Y;
+            var highestSkeletonY = skeleton.Min(border => border.TranslatePoint(default, view)!.Value.Y);
+            Assert.True(highestSkeletonY > headingY,
+                $"骨架({highestSkeletonY}) 必须低于分组标题({headingY})");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task HomeCarouselRotatesDistinctPostersAndOpensTheSelectedRecommendation()
+    {
+        using var context = new Context();
+        var items = new[]
+        {
+            new MediaItem { Id = "one", Title = "第一张", Poster = "https://example.com/one.jpg" },
+            new MediaItem { Id = "two", Title = "第二张", Poster = "https://example.com/two.jpg" },
+            new MediaItem { Id = "duplicate", Title = "重复海报", Poster = "https://example.com/one.jpg" },
+        };
+        context.Source.Home = _ => Task.FromResult(new MediaPage(items, 1, 1));
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        await Done(home.LoadAsync());
+        Assert.Equal(2, home.HeroSlides.Count);
+        Assert.True(home.CanRotateHero);
+        Assert.Equal("第一张", home.HeroTitle);
+        home.NextHeroCommand.Execute(null);
+        Assert.Equal("第二张", home.HeroTitle);
+        Assert.Equal(items[1].Poster, home.HeroPoster);
+        Assert.Equal(1, home.HeroIndex);
+        Assert.Equal("今日推荐 · 2/2", home.HeroPositionLabel);
+        Assert.Single(home.HeroSlides, slide => slide.IsSelected);
+        home.NextHeroCommand.Execute(null);
+        Assert.Equal(0, home.HeroIndex);
+        home.PreviousHeroCommand.Execute(null);
+        Assert.Equal(1, home.HeroIndex);
+        var requested = "";
+        context.Source.Load = (id, _) => { requested = id; return Task.FromResult(Detail(id)); };
+        home.OpenHeroCommand.Execute(null);
+        await Until(() => requested == "two");
+        home.Recommendations.Clear();
+        Assert.False(home.CanRotateHero);
+        Assert.Empty(home.HeroSlides);
+        Assert.Null(home.HeroPoster);
+    }
+
+    [AvaloniaFact]
+    public void HomeCarouselIndicatorsSelectSlidesAndTimerStopsWhenHiddenOrDetached()
+    {
+        using var context = new Context();
+        var home = context.Main.Home;
+        home.Recommendations.Add(new MediaItem { Id = "one", Title = "第一张", Poster = "https://example.com/one.jpg" });
+        home.Recommendations.Add(new MediaItem { Id = "two", Title = "第二张", Poster = "https://example.com/two.jpg" });
+        var view = new HomeView { DataContext = context.Main };
+        var window = new Window { Content = view, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.True(view.IsHeroRotationRunning);
+            foreach (var name in new[] { "PreviousHero", "NextHero" })
+            {
+                var button = view.FindControl<Button>(name)!;
+                var icon = Assert.IsType<PathIcon>(button.Content);
+                var center = icon.TranslatePoint(new Avalonia.Point(icon.Bounds.Width / 2, icon.Bounds.Height / 2), button)!.Value;
+                Assert.Equal(button.Bounds.Width / 2, center.X, 6);
+                Assert.Equal(button.Bounds.Height / 2, center.Y, 6);
+            }
+            var indicators = view.FindControl<ItemsControl>("HeroIndicators")!.GetVisualDescendants().OfType<Button>().ToArray();
+            Assert.Equal(2, indicators.Length);
+            Assert.Equal(22, indicators[0].Bounds.Width);
+            Assert.Equal(8, indicators[1].Bounds.Width);
+            indicators[1].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.Equal(1, home.HeroIndex);
+            Assert.Equal(22, indicators[1].Bounds.Width);
+            view.RotateHero();
+            Assert.Equal(0, home.HeroIndex);
+            view.IsVisible = false;
+            Assert.False(view.IsHeroRotationRunning);
+            view.RotateHero();
+            Assert.Equal(0, home.HeroIndex);
+            view.IsVisible = true;
+            Assert.True(view.IsHeroRotationRunning);
+        }
+        finally { window.Close(); }
+        Assert.False(view.IsHeroRotationRunning);
+    }
+
+    [AvaloniaFact]
+    public void SearchInputsShareLiveSearchShapeAndIconWithoutInterceptingInput()
+    {
+        using var context = new Context();
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var global = window.FindControl<TextBox>("GlobalSearch")!;
+            var globalIcon = window.FindControl<PathIcon>("GlobalSearchIcon")!;
+            Assert.Equal(34, global.Bounds.Height);
+            Assert.Equal(new Avalonia.CornerRadius(6), global.CornerRadius);
+            Assert.Equal(new Avalonia.Thickness(30, 0, 10, 0), global.Padding);
+            Assert.Equal(14, globalIcon.Bounds.Width);
+            Assert.False(globalIcon.IsHitTestVisible);
+            var hero = window.GetVisualDescendants().OfType<HomeView>().Single().FindControl<Border>("HeroCard")!;
+            Assert.Equal(new Avalonia.CornerRadius(6), hero.CornerRadius);
+            context.Main.Navigate(AppPage.Search);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var searchView = window.GetVisualDescendants().OfType<SearchView>().Single();
+            var result = searchView.FindControl<TextBox>("ResultSearch")!;
+            Assert.Equal(global.CornerRadius, result.CornerRadius);
+            Assert.Equal(global.Padding, result.Padding);
+            Assert.Equal(34, result.Bounds.Height);
+            Assert.False(searchView.FindControl<PathIcon>("ResultSearchIcon")!.IsHitTestVisible);
+            Assert.False(window.FindControl<Grid>("GlobalSearchContainer")!.IsEffectivelyVisible);
+            context.Main.Navigate(AppPage.Live);
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var liveSearch = window.GetVisualDescendants().OfType<LiveView>().Single().FindControl<TextBox>("ChannelSearch")!;
+            Assert.Equal(result.CornerRadius, liveSearch.CornerRadius);
+            Assert.Equal(result.Padding, liveSearch.Padding);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task HistoryRecentMatchesHomeEvenWhenEveryEntryIsFromBeforeToday()
+    {
+        using var context = new Context();
+        var entries = Enumerable.Range(0, 35).Select(i => new HistoryEntry
+        {
+            SourceKey = i is 0 or 20 ? "live" : "source", SourceName = "站点", MediaId = $"old-{i}",
+            Title = i is 0 or 20 ? "CCTV-1综合" : $"历史-{i}",
+            UpdatedAt = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.Now.AddDays(-2).AddMinutes(-i).ToUnixTimeMilliseconds()),
+        }).ToArray();
+        foreach (var entry in entries) await Done(context.Services.Store.SaveHistoryAsync(entry));
+        await Done(context.Main.Home.LoadAsync());
+        await Done(context.Main.History.LoadAsync());
+        var history = context.Main.History;
+        Assert.Equal(context.Main.Home.Recent, history.Recent);
+        Assert.Equal(20, history.Recent.Count);
+        Assert.Equal(entries.Skip(20), history.Earlier);
+        Assert.Empty(history.Recent.Intersect(history.Earlier));
+        Assert.True(history.ShowRecentArea);
+
+        var view = new HistoryView { DataContext = context.Main };
+        var window = new Window { Content = view, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var scroller = view.FindControl<ScrollViewer>("RecentScroller")!;
+            Assert.Equal(520, scroller.Bounds.Height);
+            var outer = view.FindControl<ScrollViewer>("HistoryScroller")!;
+            var content = view.FindControl<StackPanel>("HistoryContent")!;
+            Assert.Equal(0, outer.Padding.Right);
+            Assert.Equal(0, content.Margin.Right);
+            var outerBar = outer.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>()
+                .Single(bar => bar.Orientation == Avalonia.Layout.Orientation.Vertical && ReferenceEquals(bar.GetVisualAncestors().OfType<ScrollViewer>().First(), outer));
+            Assert.Equal(view.Bounds.Width, outerBar.TranslatePoint(new Avalonia.Point(outerBar.Bounds.Width, 0), view)!.Value.X, 1);
+            var recentBar = scroller.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>()
+                .Single(bar => bar.Orientation == Avalonia.Layout.Orientation.Vertical);
+            var contentRight = content.TranslatePoint(new Avalonia.Point(content.Bounds.Width, 0), view)!.Value.X;
+            var recentRight = recentBar.TranslatePoint(new Avalonia.Point(recentBar.Bounds.Width, 0), view)!.Value.X;
+            Assert.Equal(contentRight, recentRight, 1);
+            Assert.Equal(0, Math.Max(0, outerBar.TranslatePoint(default, view)!.Value.X - recentRight), 1);
+            var earlier = view.FindControl<ItemsControl>("EarlierList")!;
+            var posters = earlier.GetVisualDescendants().OfType<RemotePoster>().ToArray();
+            Assert.Equal(15, posters.Length);
+            foreach (var poster in posters)
+            {
+                Assert.Equal(Avalonia.Media.Stretch.Uniform, poster.Stretch);
+                var entry = Assert.IsType<HistoryEntry>(poster.DataContext);
+                Assert.Equal(entry.SourceKey == "live" ? entry.Title : null, poster.ChannelName);
+                var frame = Assert.IsType<Border>(poster.Parent!.Parent);
+                Assert.Equal(96, frame.Bounds.Width);
+                Assert.Equal(144, frame.Bounds.Height);
+                Assert.Equal(2d / 3, frame.Bounds.Width / frame.Bounds.Height, 6);
+            }
+            var recentPosters = scroller.GetVisualDescendants().OfType<RemotePoster>().ToArray();
+            Assert.Equal(20, recentPosters.Length);
+            foreach (var poster in recentPosters)
+            {
+                var entry = Assert.IsType<HistoryEntry>(poster.DataContext);
+                Assert.Equal(entry.SourceKey == "live" ? entry.Title : null, poster.ChannelName);
+                Assert.Equal(entry.SourceKey == "live" ? Avalonia.Media.Stretch.Uniform : Avalonia.Media.Stretch.UniformToFill, poster.Stretch);
+            }
+            var resumeButtons = earlier.GetVisualDescendants().OfType<Button>().Where(button => button.Name == "EarlierResumeButton").ToArray();
+            Assert.Equal(15, resumeButtons.Length);
+            foreach (var button in resumeButtons)
+            {
+                Assert.Equal(26, button.Bounds.Height);
+                Assert.InRange(button.Bounds.Width, 30, 64);
+                Assert.InRange(Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(button.Background).Color.A, (byte)0, (byte)32);
+            }
+            await Done(history.ClearAllCommand.ExecuteAsync(null));
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.Empty(history.Recent);
+            Assert.Empty(history.Earlier);
+            Assert.False(history.ShowRecentArea);
+            Assert.True(history.ShowEmpty);
+            Assert.False(scroller.IsEffectivelyVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task Home_RecentIsCappedAtTwentyForTheSingleRow()
+    {
+        using var context = new Context();
+        var requested = -1;
+        context.Store.ReadHistory = (limit, _) =>
+        {
+            requested = limit;
+            return Task.FromResult<IReadOnlyList<HistoryEntry>>(
+                Enumerable.Range(0, 50).Select(i => new HistoryEntry
+                {
+                    SourceKey = "source", SourceName = "站点", MediaId = $"m{i}", Title = $"片{i}",
+                }).ToArray());
+        };
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        await Done(home.LoadAsync());
+        // 首页最近观看永远只有一行、最多前 20 条：既要求上限，也要求 Home 不吞下全部 50 条。
+        Assert.Equal(20, requested);
+        Assert.Equal(20, home.Recent.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task ResumeEntry_RoutesLiveHistoryToLivePlaybackInsteadOfDetail()
+    {
+        using var context = new Context();
+        var live = context.Main.Live;
+        // 直播源就绪：一个真实频道，历史里以 source_key="live" 记录它的地址。
+        var channel = new LiveChannel { Name = "CCTV-1", Number = 1, Group = "央视", Logo = "https://example.com/cctv1.png", Uris = ["http://example.com/live1"] };
+        live.Groups.Add(new LiveGroup("央视", [channel], Locked: false));
+        await Done(live.RefreshLibraryTabsAsync());
+
+        context.Main.ResumeEntry(new HistoryEntry
+        {
+            SourceKey = "live", SourceName = "直播", MediaId = "http://example.com/live1", Title = "CCTV-1",
+        });
+
+        // 关键：不能再当成点播站点去查详情页，否则会报「在当前配置中不可用」。
+        Assert.Equal("", context.Main.Detail.Hint);
+        Assert.DoesNotContain("在当前配置中不可用", context.Main.StatusMessage);
+        await Until(() => context.Engine.Opened.Count == 1);
+        var opened = Assert.Single(context.Engine.Opened);
+        Assert.Equal("http://example.com/live1", opened.Request.Uri);
+        Assert.Equal("https://example.com/cctv1.png", opened.Request.Poster);
+        Assert.True(opened.Request.IsLive);
+        Assert.Equal("live", opened.Request.SourceKey);
+    }
+
+    [AvaloniaFact]
+    public async Task ResumeEntry_LiveChannelMissingFromSourceExplainsWhyInsteadOfSiteUnavailable()
+    {
+        using var context = new Context();
+        context.Main.ResumeEntry(new HistoryEntry
+        {
+            SourceKey = "live", SourceName = "直播", MediaId = "http://example.com/gone", Title = "已下架频道",
+        });
+        // 频道不在当前直播源里时，文案必须指向频道本身，而不是误导为「站点不可用」。
+        Assert.Contains("已下架频道", context.Main.StatusMessage);
+        Assert.Contains("不在当前直播源", context.Main.StatusMessage);
+        Assert.DoesNotContain("在当前配置中不可用", context.Main.StatusMessage);
+        Assert.Equal(AppPage.Live, context.Main.Page);
     }
 
     private sealed class Context : IDisposable

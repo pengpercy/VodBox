@@ -313,7 +313,7 @@ public static class DesignData
             });
         foreach (var entry in History(3))
             main.History.Entries.Add(entry);
-        main.History.SplitByDay();
+        main.History.SplitHistory();
     }
 
     private static void FillSettings(MainViewModel main)

@@ -7,21 +7,45 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <ScrollViewer Padding="28,12,28,28">
-    <StackPanel Spacing="22" DataContext="{Binding History}">
+  <ScrollViewer x:Name="HistoryScroller" Padding="0" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel x:Name="HistoryContent" Spacing="22" Margin="28,12,0,28" DataContext="{Binding History}">
 
       <!-- 无痕模式横幅（设计稿 ②） -->
-      <Border CornerRadius="8" Background="#26FFB900" BorderBrush="#4DFFB900" BorderThickness="1" Padding="14,9"
-              IsVisible="{Binding IncognitoBanner}">
+      <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="#26FFB900" BorderBrush="#4DFFB900" BorderThickness="1" Padding="14,9"
+              Margin="0,0,28,0" IsVisible="{Binding IncognitoBanner}">
         <StackPanel Orientation="Horizontal" Spacing="8" TextElement.Foreground="#FFB900">
           <PathIcon Data="{StaticResource Icon.Incognito}" Width="18" Height="18" VerticalAlignment="Center" />
           <TextBlock Text="无痕模式已开启 — 本次观看不会写入历史" FontSize="12.5" VerticalAlignment="Center" />
         </StackPanel>
       </Border>
 
-      <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding Loading}" />
-      <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
+      <ProgressBar IsIndeterminate="True" Height="3" Margin="0,0,28,0" IsVisible="{Binding Loading}" />
+      <TextBlock Text="{Binding Hint}" Margin="0,0,28,0" TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
                  IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+      <!-- 标题行：历史 · 最近观看 + 右侧 全部历史 / 清空（设计稿） -->
+      <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30" Margin="0,0,28,0">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <PathIcon Data="{StaticResource Icon.History}" Width="24" Height="24" VerticalAlignment="Center" />
+          <TextBlock Text="历史 · 最近观看" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Cursor="Hand">
+            <TextBlock Text="全部历史" FontSize="12" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Command="{Binding ClearAllCommand}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,5"
+                  Background="{DynamicResource CardHoverBrush}" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource Icon.Delete}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="清空" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <!-- 最近观看固定两行高度，内容与加载占位共用同一视口。 -->
+      <Panel Height="520" IsVisible="{Binding ShowRecentArea}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowSkeleton}">
       <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowSkeleton}">
         <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate><DataTemplate>
@@ -32,106 +56,98 @@
           </StackPanel>
         </DataTemplate></ItemsControl.ItemTemplate>
       </ItemsControl>
-      <!-- 标题行：历史 · 今天 + 右侧 全部历史 / 清空（设计稿） -->
-      <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30">
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <PathIcon Data="{StaticResource Icon.History}" Width="24" Height="24" VerticalAlignment="Center" />
-          <TextBlock Text="历史 · 今天" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Cursor="Hand">
-            <TextBlock Text="全部历史" FontSize="12" VerticalAlignment="Center" />
-            <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" VerticalAlignment="Center" />
-          </StackPanel>
-          <Button Command="{Binding ClearAllCommand}" CornerRadius="7" Padding="12,5"
-                  Background="{DynamicResource CardHoverBrush}" Foreground="#FF6B6B" BorderThickness="0" FontSize="12" Cursor="Hand">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource Icon.Delete}" Width="18" Height="18" VerticalAlignment="Center" />
-              <TextBlock Text="清空" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-        </StackPanel>
-      </Grid>
 
-      <!-- 今天：卡片行（海报内嵌进度文案 + 底部进度条；直播=黄条，设计稿） -->
-      <ItemsControl ItemsSource="{Binding Today}">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate>
-            <StackPanel Orientation="Horizontal" Spacing="16" />
-          </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <StackPanel Width="150" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
-              <Border CornerRadius="8" Height="190" Background="#274064" ClipToBounds="True">
-                <Panel>
-                  <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  <views:RemotePoster Url="{Binding Poster}" />
-                  <StackPanel VerticalAlignment="Bottom">
-                    <Border Background="#66000000" Padding="8,16,8,6">
-                      <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
-                    </Border>
-                  </StackPanel>
-                </Panel>
-              </Border>
-              <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0"
-                         TextTrimming="CharacterEllipsis" />
-              <!-- 直播=黄条（全程），点播=蓝条按比例 -->
-              <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Margin="0,6,0,0">
-                <Border Background="#4CC2FF" Height="3" CornerRadius="2"
-                        Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}}" />
-              </Border>
-            </StackPanel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-
-      <!-- 更早 -->
-      <TextBlock Text="更早" FontSize="16" FontWeight="SemiBold"
-                 IsVisible="{Binding Earlier.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
-      <ListBox Classes="virtualRows" ItemsSource="{Binding Earlier}" Background="Transparent" BorderThickness="0" Padding="0">
-        <ListBox.ItemTemplate>
-          <DataTemplate>
-            <Border CornerRadius="8" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
-                    Padding="14" Margin="0,0,0,10" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
-              <Grid ColumnDefinitions="110,*,Auto,Auto">
-                <Border Grid.Column="0" CornerRadius="6" Height="150" Width="100" Background="#274064"
-                        VerticalAlignment="Top" ClipToBounds="True">
+      </ScrollViewer>
+      <!-- 最近观看按可用宽度换行，视口始终容纳两行，通过上下滚动查看其余记录。 -->
+      <ScrollViewer x:Name="RecentScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding !ShowSkeleton}">
+        <ItemsControl ItemsSource="{Binding Recent}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel ItemWidth="166" ItemHeight="260" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Width="150" Height="244" Margin="0,0,16,16" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
+                <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="190" Background="#274064" ClipToBounds="True">
                   <Panel>
-                    <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  <views:RemotePoster Url="{Binding Poster}" />
+                    <Panel IsVisible="{Binding #RecentPoster.HasImage, Converter={x:Static views:BoolConverters.Not}}">
+                      <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsNotLive}}" />
+                      <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsLive}}" />
+                    </Panel>
+                    <views:RemotePoster x:Name="RecentPoster" Url="{Binding Poster}" ChannelName="{Binding Converter={x:Static views:HistoryConverters.ChannelName}}" Stretch="{Binding Converter={x:Static views:HistoryConverters.CoverStretch}}" />
+                    <StackPanel VerticalAlignment="Bottom">
+                      <Border Background="#66000000" Padding="8,16,8,6">
+                        <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="White" TextTrimming="CharacterEllipsis" />
+                      </Border>
+                    </StackPanel>
                   </Panel>
                 </Border>
-                <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding SourceName}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0"
+                           TextTrimming="CharacterEllipsis" />
+                <!-- 直播=黄条（全程），点播=蓝条按比例 -->
+                <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Margin="0,6,0,0">
+                  <Border Background="#4CC2FF" Height="3" CornerRadius="2"
+                          Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}}" />
+                </Border>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      </Panel>
+
+      <!-- 更早 -->
+      <TextBlock Text="更早" FontSize="16" FontWeight="SemiBold" Margin="0,0,28,0"
+                 IsVisible="{Binding Earlier.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
+      <ItemsControl x:Name="EarlierList" ItemsSource="{Binding Earlier}" Margin="0,0,16,0">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
+                    Padding="12" Margin="0,0,12,12" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
+              <Grid ColumnDefinitions="104,*,Auto" RowDefinitions="Auto,Auto">
+                <Border Grid.Column="0" Grid.RowSpan="2" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="144" Width="96" Background="#274064"
+                        VerticalAlignment="Top" ClipToBounds="True">
+                  <Panel>
+                    <Panel IsVisible="{Binding #EarlierPoster.HasImage, Converter={x:Static views:BoolConverters.Not}}">
+                      <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsNotLive}}" />
+                      <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsLive}}" />
+                    </Panel>
+                  <views:RemotePoster x:Name="EarlierPoster" Url="{Binding Poster}" ChannelName="{Binding Converter={x:Static views:HistoryConverters.ChannelName}}" Stretch="Uniform" />
+                  </Panel>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="10,0,8,0" Spacing="6" VerticalAlignment="Center">
                   <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding SourceName}" FontSize="12" Foreground="#4CC2FF" />
+                  <TextBlock Text="{Binding SourceName}" FontSize="12" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" />
                   <TextBlock FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}">
                     <Run Text="看到 " /><Run Text="{Binding PositionMs, Converter={x:Static views:MillisecondConverters.ToTime}, Mode=OneWay}" /><Run Text=" / " /><Run Text="{Binding DurationMs, Converter={x:Static views:MillisecondConverters.ToTime}, Mode=OneWay}" />
                   </TextBlock>
-                  <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Width="260" HorizontalAlignment="Left" Margin="0,4,0,0">
+                  <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" HorizontalAlignment="Stretch" Margin="0,4,0,0">
                     <Border Background="#4CC2FF" Height="3" CornerRadius="2"
                             Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}, Mode=OneWay}" />
                   </Border>
                 </StackPanel>
-                <Button Grid.Column="2" Click="OnResumeClick" Tag="{Binding}"
-                        Background="#0078D4" Foreground="White" BorderThickness="0" CornerRadius="7"
-                        Padding="14,7" VerticalAlignment="Center" Cursor="Hand">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" VerticalAlignment="Center" />
+                <Button x:Name="EarlierResumeButton" Grid.Column="1" Grid.Row="1" HorizontalAlignment="Left" Margin="10,6,0,0" Click="OnResumeClick" Tag="{Binding}"
+                        Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" CornerRadius="5"
+                        Padding="8,3" Height="26" MinHeight="0" FontSize="11" VerticalAlignment="Center" Cursor="Hand">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <PathIcon Data="{StaticResource Icon.Play}" Width="12" Height="12" VerticalAlignment="Center" />
                     <TextBlock Text="续播" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
-                <Button Grid.Column="3" Click="OnDelete" Tag="{Binding}" ToolTip.Tip="删除记录"
-                        Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0" CornerRadius="7"
+                <Button Grid.Column="2" Grid.RowSpan="2" Click="OnDelete" Tag="{Binding}" ToolTip.Tip="删除记录"
+                        Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="30" Height="30" Padding="0" VerticalAlignment="Center" Cursor="Hand">
                   <PathIcon Data="{StaticResource Icon.Close}" Width="18" Height="18" />
                 </Button>
               </Grid>
             </Border>
           </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
 
       <TextBlock Text="暂无观看记录" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"
                  Margin="0,20,0,0" IsVisible="{Binding ShowEmpty}" />
