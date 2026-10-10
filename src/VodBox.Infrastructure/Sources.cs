@@ -1,12 +1,14 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Net;
+using System.Text.RegularExpressions;
 using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-/// <summary>苹果 CMS V10 JSON 采集站点源（site.type=0，api 形如 https://xx/api.php/provide/vod）。</summary>
-public sealed class MacCmsSource : IContentSource
+/// <summary>苹果 CMS JSON/XML 采集站点源（api 形如 https://xx/api.php/provide/vod）。</summary>
+public sealed partial class MacCmsSource : IContentSource
 {
     private readonly Func<string, CancellationToken, Task<string>> _fetch;
     private readonly SourceInfo _site;
@@ -24,29 +26,37 @@ public sealed class MacCmsSource : IContentSource
         _fetch = fetch;
     }
 
+    private static string NormalizeResponse(string response) => response.TrimStart('\uFEFF');
     private static bool IsXml(string response) => response.TrimStart('\uFEFF', ' ', '\t', '\r', '\n').StartsWith('<');
     private static MacCmsListResponse ParseList(string response) => IsXml(response)
-        ? MacCmsXml.Parse(response)
-        : JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsListResponse>())
+        ? MacCmsXml.Parse(NormalizeResponse(response))
+        : JsonSerializer.Deserialize(NormalizeResponse(response), Json.TypeInfo<MacCmsListResponse>())
             ?? throw new InvalidDataException("列表响应解析失败");
 
     private string Api(string action, IReadOnlyDictionary<string, string> args)
     {
-        var query = string.Join("&", args.Select(p => $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));
-        var api = _site.Api!;
-        if (!api.Contains('?')) api += "?";
-        else api += "&";
-        return $"{api}ac={action}&{query}";
+        if (!Uri.TryCreate(_site.Api, UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https"))
+            throw new InvalidDataException("采集接口必须是有效的 HTTP(S) 地址。");
+        var builder = new UriBuilder(endpoint) { Fragment = "" };
+        // 保留站点自定义参数，但移除旧请求参数；列表/搜索/详情不能继承旧 ids、wd 或分类。
+        var controlled = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "ac", "pg", "t", "ids", "wd", "year", "area", "lang", "class" };
+        var retained = endpoint.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Where(pair => !controlled.Contains(Uri.UnescapeDataString(pair.Split('=', 2)[0].Replace("+", " ")))).ToList();
+        retained.Add("ac=" + Uri.EscapeDataString(action));
+        retained.AddRange(args.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value)}"));
+        builder.Query = string.Join("&", retained);
+        return builder.Uri.AbsoluteUri;
     }
 
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default)
     {
         var url = Api("list", new Dictionary<string, string>());
         var response = await _fetch(url, ct);
-        var classes = IsXml(response) ? MacCmsXml.Parse(response).Classes
-            : (JsonSerializer.Deserialize(response, Json.TypeInfo<MacCmsCategoryResponse>())
+        var classes = IsXml(response) ? MacCmsXml.Parse(NormalizeResponse(response)).Classes
+            : (JsonSerializer.Deserialize(NormalizeResponse(response), Json.TypeInfo<MacCmsCategoryResponse>())
                 ?? throw new InvalidDataException("分类响应解析失败")).Classes;
-        return classes
+        return (classes ?? [])
             .Where(c => !string.IsNullOrWhiteSpace(c.TypeId))
             .Select(c => new Category(c.TypeId, c.TypeName))
             .ToList();
@@ -68,14 +78,14 @@ public sealed class MacCmsSource : IContentSource
         var response = await _fetch(Api("videolist", args), ct);
         var parsed = ParseList(response);
         var page_ = parsed.Page <= 0 ? page : parsed.Page;
-        return new MediaPage(parsed.List.Select(ToItem).ToList(), page_, parsed.PageCount);
+        return new MediaPage((parsed.List ?? []).Where(vod => !string.IsNullOrWhiteSpace(vod.VodId)).Select(ToItem).ToList(), page_, Math.Max(page_, parsed.PageCount));
     }
 
     public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
     {
         var response = await _fetch(Api("videolist", new Dictionary<string, string> { ["ids"] = mediaId }), ct);
         var parsed = ParseList(response);
-        var vod = parsed.List.FirstOrDefault() ?? throw new InvalidDataException($"未找到条目 {mediaId}");
+        var vod = (parsed.List ?? []).FirstOrDefault(item => item.VodId == mediaId) ?? throw new InvalidDataException($"未找到条目 {mediaId}");
         return ToDetail(vod);
     }
 
@@ -84,7 +94,7 @@ public sealed class MacCmsSource : IContentSource
         var args = new Dictionary<string, string> { ["wd"] = query, ["pg"] = page.ToString(CultureInfo.InvariantCulture) };
         var response = await _fetch(Api("videolist", args), ct);
         var parsed = ParseList(response);
-        return new MediaPage(parsed.List.Select(ToItem).ToList(), parsed.Page <= 0 ? page : parsed.Page, Math.Max(1, parsed.PageCount));
+        return new MediaPage((parsed.List ?? []).Where(vod => !string.IsNullOrWhiteSpace(vod.VodId)).Select(ToItem).ToList(), parsed.Page <= 0 ? page : parsed.Page, Math.Max(Math.Max(1, parsed.Page), parsed.PageCount));
     }
 
     internal static MediaItem ToItem(MacCmsVod vod) => new()
@@ -104,19 +114,23 @@ public sealed class MacCmsSource : IContentSource
         var lines = new List<PlaybackLine>();
         var froms = (vod.VodPlayFrom ?? "").Split("$$$", StringSplitOptions.None);
         var urls = (vod.VodPlayUrl ?? "").Split("$$$", StringSplitOptions.None);
-        for (var i = 0; i < froms.Length && i < urls.Length; i++)
+        for (var i = 0; i < urls.Length; i++)
         {
             var episodes = new List<Episode>();
             var pairs = urls[i].Split('#', StringSplitOptions.RemoveEmptyEntries);
             foreach (var pair in pairs)
             {
                 var sep = pair.IndexOf('$');
-                if (sep <= 0) continue;
-                var title = pair[..sep].Trim();
-                var uri = pair[(sep + 1)..].Trim();
-                if (uri.Length > 0) episodes.Add(new Episode(uri, title, uri));
+                var title = sep > 0 ? pair[..sep].Trim() : $"第{episodes.Count + 1}集";
+                var uri = (sep >= 0 ? pair[(sep + 1)..] : pair).Trim();
+                // 不把 HTTP 以外的脚本或畸形值交给播放器；网页 HTTP 地址仍留给解析器。
+                if (Uri.TryCreate(uri, UriKind.Absolute, out var address) && address.Scheme is "http" or "https")
+                    episodes.Add(new Episode(uri, title, uri));
             }
-            if (episodes.Count > 0) lines.Add(new PlaybackLine(froms[i].Trim(), froms[i].Trim(), episodes));
+            var name = i < froms.Length && !string.IsNullOrWhiteSpace(froms[i]) ? froms[i].Trim() : $"线路{i + 1}";
+            // 同名线路区分身份，常见唯一线路保留旧 ID 兼容历史。
+            var id = lines.Any(line => line.Id == name) ? name + ":" + i.ToString(CultureInfo.InvariantCulture) : name;
+            if (episodes.Count > 0) lines.Add(new PlaybackLine(id, name, episodes));
         }
         var content = (vod.VodContent ?? "").Trim();
         if (content.StartsWith("<") || content.Contains("<p>")) content = StripTags(content);
@@ -130,12 +144,13 @@ public sealed class MacCmsSource : IContentSource
         };
     }
 
-    private static string StripTags(string html) => html
-        .Replace("<br>", "\n", StringComparison.OrdinalIgnoreCase)
-        .Replace("<br/>", "\n", StringComparison.OrdinalIgnoreCase)
-        .Replace("<p>", "\n", StringComparison.OrdinalIgnoreCase)
-        .Replace("</p>", "", StringComparison.OrdinalIgnoreCase)
-        .Split('<')[0].Trim();
+    private static string StripTags(string html) => WebUtility.HtmlDecode(
+        DescriptionTags().Replace(DescriptionBreaks().Replace(html, "\n"), "")).Trim();
+
+    [GeneratedRegex(@"<\s*(?:br\s*/?|/p|/div)\s*>", RegexOptions.IgnoreCase)]
+    private static partial Regex DescriptionBreaks();
+    [GeneratedRegex(@"<[^>]*>")]
+    private static partial Regex DescriptionTags();
 }
 
 /// <summary>直播源工厂：把 TVBox lives 配置转为 LiveGroup 集合。</summary>
