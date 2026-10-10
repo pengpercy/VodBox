@@ -124,7 +124,7 @@ public sealed class ConfigLoader(DefaultHttp http)
             if (string.IsNullOrWhiteSpace(site.Key) || string.IsNullOrWhiteSpace(site.Name)) continue;
             // csp_ 入口：已用 C# 原生重写的提升为 NativeSpider，其余（无桌面实现）保持 Node 并丢弃
             var runtime = site.Runtime;
-            if (runtime == SourceRuntime.Node && NativeSpiders.IsSupported(site.Api))
+            if (runtime == SourceRuntime.Node && NativeSpiders.IsSupported(site))
                 runtime = SourceRuntime.NativeSpider;
             if (runtime == SourceRuntime.Node) continue;
             // .js 入口：按站点 key 有原生实现的提升为 NativeSpider（如 虎牙js→虎牙直播）；

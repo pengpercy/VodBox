@@ -28,6 +28,7 @@ public static class NativeSpiders
             ["csp_Huya"] = info => new HuyaSource(info),
             ["csp_AppGet"] = info => new AppGetSource(info),
             ["csp_App99"] = info => new App99Source(info),
+            ["csp_Push"] = info => new PushSource(info),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>
@@ -41,6 +42,24 @@ public static class NativeSpiders
 
     /// <summary>判断某 api 是否有原生 C# 实现。</summary>
     public static bool IsSupported(string api) => TryGetFactory(api, out _);
+
+    /// <summary>有限规则适配按定义检查，不能把特定音频站支持扩大成通用 XBPQ。</summary>
+    public static bool IsSupported(TvBoxSite site) => IsSupported(site.Api) ||
+        site.Api == "csp_XBPQ" && IsAudioRule(site.Ext is { ValueKind: System.Text.Json.JsonValueKind.String } value ? value.GetString() : site.Ext?.GetRawText());
+
+    internal static bool IsAudioRule(string? ext)
+    {
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(ext ?? "{}");
+            if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("主页url", out var home) || home.ValueKind != System.Text.Json.JsonValueKind.String) return false;
+            return Uri.TryCreate(home.GetString(), UriKind.Absolute, out var address) && address.Scheme == "https" && address.Port == 443 &&
+                address.Host is "www.xsmp3.com" or "www.psmp3.com" && address.AbsolutePath == "/" &&
+                address.Query.Length == 0 && address.Fragment.Length == 0 && address.UserInfo.Length == 0;
+        }
+        catch (System.Text.Json.JsonException) { return false; }
+    }
 
     /// <summary>判断某站点 key 是否有原生 C# 实现（js 入口的原生适配）。</summary>
     public static bool IsSupportedKey(string key) =>
@@ -63,6 +82,7 @@ public static class NativeSpiders
     {
         if (!string.IsNullOrWhiteSpace(info.Key) && KeyFactories.TryGetValue(info.Key.Trim(), out var byKey))
             return byKey(info);
+        if (info.Api == "csp_XBPQ" && IsAudioRule(info.Ext)) return new AudioSiteSource(info);
         return TryGetFactory(info.Api ?? "", out var factory) ? factory(info) : null;
     }
 
