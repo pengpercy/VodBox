@@ -14,12 +14,17 @@
         WindowDecorations="Full"
         FontSize="13">
 
-  <!-- 原生窗口材质：Windows Mica，其他平台回退 Acrylic/Blur；底色仅轻度着色。 -->
+  <!-- 原生窗口材质：Windows Mica，其他平台回退 Acrylic/Blur。
+       材质只在侧边栏列透出（对齐 App Store）；内容区用不透明底色盖住，避免右侧也透出背景。 -->
   <Panel>
     <views:LocalWallpaper HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Path="{Binding WallpaperPath}" Stretch="UniformToFill" IsHitTestVisible="False" />
-    <Rectangle x:Name="PageBackdrop" Fill="{DynamicResource PageBackgroundBrush}" Opacity="0.40" />
+    <!-- 侧边栏区域：半透明着色，让窗口材质/壁纸透出来 -->
+    <Rectangle x:Name="SidebarBackdrop" Grid.Column="0" Fill="{DynamicResource PageBackgroundBrush}" Opacity="0.40"
+               HorizontalAlignment="Left" Width="216" VerticalAlignment="Stretch" IsHitTestVisible="False" />
     <Grid RowDefinitions="44,*" ColumnDefinitions="216,*"
           chrome:WindowDecorationProperties.ElementRole="User">
+      <!-- 内容区：不透明底，右侧不再透出窗口材质 -->
+      <Rectangle x:Name="PageBackdrop" Grid.RowSpan="2" Grid.Column="1" Fill="{DynamicResource PageBackgroundBrush}" IsHitTestVisible="False" />
 
       <!-- 标题栏：只把非交互背景标为拖拽区；搜索框保留客户端输入。 -->
       <Border x:Name="SidebarTitleBar" Grid.Row="0" Grid.Column="0" Background="Transparent"
@@ -28,10 +33,15 @@
       <Grid x:Name="TitleBar" Grid.Row="0" Grid.Column="1"
             Background="Transparent" Margin="0,0,132,0"
             chrome:WindowDecorationProperties.ElementRole="TitleBar">
-        <TextBox IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsNotSearch}}" x:Name="GlobalSearch" Grid.Column="0" Text="{Binding SearchKeyword}" PlaceholderText="搜索影片、剧集…"
-                 Width="380" Height="30" CornerRadius="15" HorizontalAlignment="Center"
-                 chrome:WindowDecorationProperties.ElementRole="User"
-                 KeyDown="OnSearchKeyDown" VerticalContentAlignment="Center" />
+        <Grid x:Name="GlobalSearchContainer" IsVisible="{Binding ShowGlobalSearch}" Width="380" Height="34"
+              HorizontalAlignment="Center" VerticalAlignment="Center" chrome:WindowDecorationProperties.ElementRole="User">
+          <TextBox x:Name="GlobalSearch" IsVisible="{Binding ShowGlobalSearch}" Text="{Binding SearchKeyword}" PlaceholderText="搜索影片、剧集…"
+                   Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="30,0,10,0"
+                   chrome:WindowDecorationProperties.ElementRole="User"
+                   KeyDown="OnSearchKeyDown" VerticalContentAlignment="Center" />
+          <PathIcon x:Name="GlobalSearchIcon" Data="{StaticResource Icon.Search}" Width="14" Height="14" Margin="10,0,0,0"
+                    HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
+        </Grid>
       </Grid>
 
       <!-- 主 Shell -->
@@ -41,13 +51,8 @@
         <Border x:Name="SidebarDragArea" Grid.Column="0" Background="Transparent"
                 chrome:WindowDecorationProperties.ElementRole="TitleBar">
           <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="10,4,10,14">
-              <Image x:Name="BrandIcon" Source="/Assets/Icons/linux/256/vodbox.png" Width="34" Height="34" />
-              <StackPanel>
-                <TextBlock Text="VodBox" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding CurrentSourceName}" FontSize="10.5" Opacity="0.55" />
-              </StackPanel>
-            </StackPanel>
+            <!-- 顶部不再显示品牌 logo 与名称，只保留当前源状态；收紧留白让菜单整体上移。 -->
+            <TextBlock Grid.Row="0" Text="{Binding CurrentSourceName}" FontSize="11" Opacity="0.55" Margin="22,4,22,6" />
 
             <views:NavItemView Grid.Row="1" Icon="{StaticResource Icon.Home}" Label="首页" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHomeCommand}" />
             <views:NavItemView Grid.Row="2" Icon="{StaticResource Icon.Movie}" Label="点播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoVodCommand}" />
@@ -63,7 +68,7 @@
         </Border>
 
         <!-- 页面容器 -->
-        <Panel Grid.Column="1">
+        <Panel Grid.Column="1" Margin="{Binding PageContentMargin}">
           <views:HomeView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" />
           <views:VodView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" />
           <views:LiveView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsLive}, ConverterParameter=0, Mode=OneWay}" />

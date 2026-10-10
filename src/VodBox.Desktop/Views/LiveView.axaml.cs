@@ -10,10 +10,22 @@ namespace VodBox.Desktop.Views;
 
 public partial class LiveView : UserControl
 {
+    private readonly Avalonia.Threading.DispatcherTimer _scrollIdleTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private readonly Avalonia.Threading.DispatcherTimer _programmeTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     public LiveView()
     {
         InitializeComponent();
+        _scrollIdleTimer.Tick += (_, _) =>
+        {
+            _scrollIdleTimer.Stop();
+            if (DataContext is MainViewModel main) main.Live.IsChannelScrolling = false;
+        };
+        AddHandler(ScrollViewer.ScrollChangedEvent, OnChannelScrollChanged, RoutingStrategies.Bubble, handledEventsToo: true);
+        // 在滚轮事件进入布局前就暂停台标，让随后的虚拟行创建直接走缓存/占位路径。
+        AddHandler(PointerWheelChangedEvent, (_, _) =>
+        {
+            if (this.FindControl<ListBox>("ChannelCardGrid")?.IsPointerOver == true) MarkChannelScrolling();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
         _programmeTimer.Tick += (_, _) =>
         {
             if (IsVisible && DataContext is MainViewModel main) main.Live.RefreshProgrammeClock(DateTimeOffset.Now);
@@ -22,8 +34,27 @@ public partial class LiveView : UserControl
         {
             if (Avalonia.Application.Current is VodBox.Desktop.App) _programmeTimer.Start();
         };
-        DetachedFromVisualTree += (_, _) => _programmeTimer.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _programmeTimer.Stop();
+            _scrollIdleTimer.Stop();
+            if (DataContext is MainViewModel main) main.Live.IsChannelScrolling = false;
+        };
     }
+    private void OnChannelScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (e.OffsetDelta == default) return;
+        MarkChannelScrolling();
+    }
+
+    private void MarkChannelScrolling()
+    {
+        if (DataContext is not MainViewModel main) return;
+        main.Live.IsChannelScrolling = true;
+        _scrollIdleTimer.Stop();
+        _scrollIdleTimer.Start();
+    }
+
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
     private LiveViewModel VM => ((MainViewModel)DataContext!).Live;
@@ -31,7 +62,7 @@ public partial class LiveView : UserControl
     private void OnCardViewportSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (DataContext is MainViewModel main)
-            main.Live.SetCardViewportWidth(Math.Max(1, e.NewSize.Width - 18));
+            main.Live.SetCardViewportWidth(Math.Max(1, e.NewSize.Width - 52));
     }
 
     private void OnPlayCard(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -92,20 +123,4 @@ public partial class LiveView : UserControl
 
     private void OnCatchup(object? sender, RoutedEventArgs e) => VM.CatchupCommand.Execute(null);
 
-    private void OnTabGroups(object? sender, RoutedEventArgs e) => SelectTab(0);
-    private void OnTabFavorites(object? sender, RoutedEventArgs e) => SelectTab(1);
-    private void OnTabHistory(object? sender, RoutedEventArgs e) => SelectTab(2);
-
-    /// <summary>Tab 视觉切换（底部蓝线 + 文字对比度）；数据切换 S4 接收藏/历史频道。</summary>
-    private async void SelectTab(int index)
-    {
-        try { await VM.RefreshLibraryTabsAsync(); VM.ChannelTab = index; }
-        catch (Exception error) { if (DataContext is MainViewModel main) main.StatusMessage = $"频道列表加载失败：{error.Message}"; }
-        if (this.FindControl<Button>("TabGroups") is not { } groups) return;
-        var tabs = new[] { groups, this.FindControl<Button>("TabFavorites"), this.FindControl<Button>("TabHistory")};
-        for (var i = 0; i < tabs.Length; i++)
-        {
-            tabs[i]!.Classes.Set("selected", i == index);
-        }
-    }
 }

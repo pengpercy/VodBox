@@ -57,6 +57,7 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/Icons/linux/256/vodbox.png" />
+    <AvaloniaResource Include="Assets/ChannelLogos/index.json" />
     <!-- 显式包含图标资源字典（SDK 默认 glob 偶发漏检子目录新文件） -->
     <AvaloniaXaml Include="Resources/Icons.xaml" SubType="Designer" />
   </ItemGroup>

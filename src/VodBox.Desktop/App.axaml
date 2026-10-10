@@ -7,6 +7,7 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://VodBox.Desktop/Resources/Icons.xaml" />
         <ResourceInclude Source="avares://VodBox.Desktop/Resources/Theme.axaml" />
+        <ResourceInclude Source="avares://VodBox.Desktop/Resources/Shapes.axaml" />
       </ResourceDictionary.MergedDictionaries>
       <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
       <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
@@ -14,12 +15,11 @@
       <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
       <SolidColorBrush x:Key="WarnBrush" Color="#FFB900" />
       <SolidColorBrush x:Key="OkBrush" Color="#6CCB5F" />
-      <CornerRadius x:Key="CornerRadiusLarge">12</CornerRadius>
-      <CornerRadius x:Key="CornerRadiusMedium">8</CornerRadius>
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://VodBox.Desktop/Resources/ShapeStyles.axaml" />
     <!-- 悬浮子面板（ContextMenu）统一小一号字号，减少遮挡 -->
     <Style Selector="ContextMenu"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="ContextMenu MenuItem"><Setter Property="FontSize" Value="12" /></Style>

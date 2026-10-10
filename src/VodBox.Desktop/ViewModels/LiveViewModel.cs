@@ -31,7 +31,7 @@ public sealed partial class LiveViewModel : ObservableObject
     }
     private void PlayCurrentLine(LiveChannel channel)=>_main.Player.Play(new PlaybackRequest
     {
-        Uri=channel.Uris[_lineIndex],Title=channel.Name,SourceKey="live",SourceName="直播",MediaId=channel.Uris[0],IsLive=true,
+        Uri=channel.Uris[_lineIndex],Title=channel.Name,Poster=channel.Logo,SourceKey="live",SourceName="直播",MediaId=channel.Uris[0],IsLive=true,
         Headers=new Dictionary<string,string>(channel.Headers),
     });
     private readonly HashSet<string> _unlockedGroups=new();
@@ -157,6 +157,21 @@ public sealed partial class LiveViewModel : ObservableObject
     }
 
     public ObservableCollection<LiveGroup> Groups { get; } = [];
+    public IReadOnlyList<LiveGroup> GroupOptions { get; private set; } = [];
+    private LiveGroup? _allChannelsGroup;
+
+    private void RefreshGroupOptions()
+    {
+        var selected = SelectedGroup;
+        var useAll = selected is null || ReferenceEquals(selected, _allChannelsGroup) || !Groups.Contains(selected);
+        var channels = Groups.SelectMany(group => group.Channels).ToArray();
+        _allChannelsGroup = new LiveGroup("全部频道", channels, false, channels.Length);
+        GroupOptions = new[] { _allChannelsGroup }.Concat(Groups).ToArray();
+        OnPropertyChanged(nameof(GroupOptions));
+        var next = useAll ? _allChannelsGroup : selected;
+        if (ReferenceEquals(SelectedGroup, next)) ApplyFilter();
+        else SelectedGroup = next;
+    }
     public ObservableCollection<LiveChannel> Favorites { get; } = [];
     public ObservableCollection<LiveChannel> RecentChannels { get; } = [];
     [ObservableProperty] private int _channelTab;
@@ -202,6 +217,7 @@ public sealed partial class LiveViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowChannelEmpty));
     }
     [ObservableProperty] private string _filterText = "";
+    [ObservableProperty] private bool _isChannelScrolling;
 
     /// <summary>频道面板行集合：组头（LiveGroupHeader）+ 频道行（LiveChannel）混排，UI 按类型选模板。</summary>
     public ObservableCollection<object> VisibleChannels { get; } = [];
@@ -252,6 +268,8 @@ public sealed partial class LiveViewModel : ObservableObject
         _services = services;
         _main = main;
         _loadGroups = loadGroups;
+        Groups.CollectionChanged += (_, _) => RefreshGroupOptions();
+        RefreshGroupOptions();
         ChannelCards.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(ShowChannelSkeleton));
@@ -260,7 +278,12 @@ public sealed partial class LiveViewModel : ObservableObject
 
     }
 
-    partial void OnSelectedGroupChanged(LiveGroup? value) => ApplyFilter();
+    partial void OnSelectedGroupChanged(LiveGroup? value)
+    {
+        ChannelTab = 0;
+        if (value is { Locked: true } && !_unlockedGroups.Contains(value.Name)) RequestGroupUnlock(value.Name);
+        ApplyFilter();
+    }
     partial void OnFilterTextChanged(string value) => ApplyFilter();
 
     private void ApplyFilter()
@@ -281,6 +304,25 @@ public sealed partial class LiveViewModel : ObservableObject
         {
             var source = ChannelTab == 1 ? Favorites : RecentChannels;
             foreach (var channel in source.Where(channel => !IsLocked(channel)&&(string.IsNullOrWhiteSpace(FilterText) || channel.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase))))
+                VisibleChannels.Add(channel);
+            return;
+        }
+        if (ReferenceEquals(SelectedGroup, _allChannelsGroup) && _allChannelsGroup is not null)
+        {
+            foreach (var group in Groups)
+            {
+                if (group.Locked && !_unlockedGroups.Contains(group.Name)) continue;
+                foreach (var channel in group.Channels)
+                    if (string.IsNullOrWhiteSpace(FilterText) || channel.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase))
+                        VisibleChannels.Add(channel);
+            }
+            return;
+        }
+        if (SelectedGroup is { } selected)
+        {
+            if (selected.Locked && !_unlockedGroups.Contains(selected.Name)) return;
+            foreach (var channel in selected.Channels.Where(channel => string.IsNullOrWhiteSpace(FilterText) ||
+                         channel.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase)))
                 VisibleChannels.Add(channel);
             return;
         }
@@ -380,7 +422,7 @@ public sealed partial class LiveViewModel : ObservableObject
                 var keep = CurrentChannel;
                 Groups.Clear();_unlockedGroups.Clear();
                 foreach (var group in groups) Groups.Add(group);
-                SelectedGroup = Groups.FirstOrDefault();
+                SelectedGroup = _allChannelsGroup;
                 ApplyFilter();
                 var replacement = keep is null ? null : groups.SelectMany(group => group.Channels)
                     .FirstOrDefault(channel => channel.Name == keep.Name && channel.Uris.FirstOrDefault() == keep.Uris.FirstOrDefault());
@@ -437,6 +479,7 @@ public sealed partial class LiveViewModel : ObservableObject
         {
             Uri = uri,
             Title = channel.Name,
+            Poster = channel.Logo,
             // MediaId 用频道地址，否则所有直播频道会挤进历史表同一行（source_key+media_id 是主键）
             SourceKey = "live",
             SourceName = "直播",
@@ -444,6 +487,30 @@ public sealed partial class LiveViewModel : ObservableObject
             IsLive = true,
             Headers = new Dictionary<string, string>(channel.Headers),
         });
+    }
+
+    /// <summary>
+    /// 按历史记录里的频道地址续播直播。历史表用 source_key="live" 存直播，
+    /// 这个键是合成的、不在内容源注册表里，所以首页/历史点击必须走这里而不是详情页。
+    /// </summary>
+    public bool TryPlayByUri(string mediaId)
+    {
+        if (string.IsNullOrEmpty(mediaId)) return false;
+        var channel = Groups.SelectMany(group => group.Channels)
+            .FirstOrDefault(item => item.Uris.FirstOrDefault() == mediaId);
+        if (channel is null)
+        {
+            // 区分「频道确实不在源里」和「直播源还没加载好」：后者给等待提示，别谎称频道不存在。
+            if (Loading) _main.StatusMessage = "直播源正在加载，请稍后再试";
+            return false;
+        }
+        if (IsLocked(channel))
+        {
+            _main.StatusMessage = "请先解锁频道分组";
+            return false;
+        }
+        PlayChannel(channel);
+        return true;
     }
 
     /// <summary>仅更新选中态与 EPG 时间轴，不触播放（设计数据 / 无 URI 频道复用）。</summary>

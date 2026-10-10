@@ -153,4 +153,164 @@ public sealed class RemotePosterTests
         }
         finally { window.Close(); }
     }
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedM3uLogoFallsBackToIndexedUrlAndUnknownNameStaysEmpty(bool timeout)
+    {
+        var attempted = new List<Uri>();
+        using var cache = new PosterCache((uri, _) =>
+        {
+            attempted.Add(uri);
+            return uri.Host == "logos.invalid"
+                ? Task.FromException<Bitmap>(timeout ? new TaskCanceledException("timeout") : new IOException("offline"))
+                : Task.FromResult(PosterCacheTests.Image());
+        });
+        var poster = new RemotePoster(cache) { Url = "https://logos.invalid/broken", ChannelName = "CCTV-1 综合高清" };
+        var window = new Window { Content = poster };
+        try
+        {
+            window.Show();
+            await Done(poster.LoadingTask);
+            Assert.True(poster.HasImage);
+            Assert.NotNull(poster.Source);
+            Assert.Equal("logos.invalid", attempted[0].Host);
+            Assert.Equal(VodBox.Desktop.Services.BuiltInChannelLogos.Find(poster.ChannelName), attempted[1]);
+            poster.ChannelName = "不存在的频道-XYZ";
+            await Done(poster.LoadingTask);
+            Assert.False(poster.HasImage);
+            Assert.Null(poster.Source);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task SuccessfulM3uLogoTakesPriorityOverBuiltInImage()
+    {
+        var bitmap = PosterCacheTests.Image();
+        using var cache = new PosterCache((_, _) => Task.FromResult(bitmap));
+        var poster = new RemotePoster(cache) { Url = "https://logos.invalid/good", ChannelName = "CCTV1" };
+        var window = new Window { Content = poster };
+        try
+        {
+            window.Show();
+            await Done(poster.LoadingTask);
+            Assert.Same(bitmap, poster.Source);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void BuiltInLogoLookupKeepsSportsPlusDistinctAndIndexContainsOnlyHttpsUrls()
+    {
+        var normal = VodBox.Desktop.Services.BuiltInChannelLogos.Find("CCTV-5高清");
+        var plus = VodBox.Desktop.Services.BuiltInChannelLogos.Find("CCTV5+ 体育赛事HD");
+        Assert.NotNull(normal); Assert.NotNull(plus); Assert.NotEqual(normal, plus);
+        using var stream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://VodBox.Desktop/Assets/ChannelLogos/index.json"));
+        using var json = System.Text.Json.JsonDocument.Parse(stream);
+        Assert.Equal(3266, json.RootElement.EnumerateObject().Count());
+        foreach (var entry in json.RootElement.EnumerateObject())
+        {
+            var uri = new Uri(entry.Value.GetString()!);
+            Assert.Equal("https", uri.Scheme);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task RapidLogoRecyclingStartsOnlyTheLatestDownload()
+    {
+        var requested = new List<Uri>();
+        using var cache = new PosterCache((uri, _) =>
+        {
+            requested.Add(uri);
+            return Task.FromResult(PosterCacheTests.Image());
+        });
+        var poster = new RemotePoster(cache) { ChannelName = "CCTV1", Url = "https://logos.invalid/start" };
+        var window = new Window { Content = poster };
+        try
+        {
+            window.Show();
+            var loads = new List<Task> { poster.LoadingTask };
+            for (var i = 0; i < 20; i++)
+            {
+                poster.Url = $"https://logos.invalid/{i}";
+                loads.Add(poster.LoadingTask);
+            }
+            await Done(Task.WhenAll(loads));
+            Assert.Equal("/19", Assert.Single(requested).AbsolutePath);
+            Assert.True(poster.HasImage);
+            Assert.Null(poster.Transitions);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ScrollingImmediatelyFinishesLogoFadeAndDoesNotReplayItAfterStopping()
+    {
+        using var cache = new PosterCache((_, _) => Task.FromResult(PosterCacheTests.Image()));
+        var poster = new RemotePoster(cache) { ChannelName = "CCTV1", Url = "https://logos.invalid/first" };
+        var window = new Window { Content = poster };
+        try
+        {
+            window.Show();
+            await Done(poster.LoadingTask);
+            Assert.True(poster.IsLogoFading);
+            Assert.True(poster.Opacity < 1);
+            poster.ChannelIsScrolling = true;
+            Assert.False(poster.IsLogoFading);
+            Assert.Equal(1, poster.Opacity);
+            poster.ChannelIsScrolling = false;
+            Assert.False(poster.IsLogoFading);
+            Assert.Equal(1, poster.Opacity);
+            poster.ChannelIsScrolling = true;
+            poster.Url = "https://logos.invalid/while-scrolling";
+            await Done(poster.LoadingTask);
+            Assert.False(poster.IsLogoFading);
+            Assert.False(poster.HasImage); // 新台标延后到停止滚动后才加载。
+            Assert.Equal(0, poster.Opacity);
+            poster.ChannelIsScrolling = false;
+            poster.Url = "https://logos.invalid/after-scrolling";
+            await Done(poster.LoadingTask);
+            Assert.True(poster.IsLogoFading);
+            window.Content = null;
+            Assert.False(poster.IsLogoFading);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ScrollUsesCachedLogoImmediatelyAndDefersUncachedLogoUntilIdle()
+    {
+        var calls = 0;
+        using var cache = new PosterCache((_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            return Task.FromResult(PosterCacheTests.Image());
+        });
+        using (var preloaded = await cache.AcquireAsync(new Uri("https://logos.invalid/cached")).WaitAsync(TimeSpan.FromSeconds(10))) { }
+        var poster = new RemotePoster(cache)
+        {
+            ChannelName = "CCTV1", Url = "https://logos.invalid/cached", ChannelIsScrolling = true,
+        };
+        var window = new Window { Content = poster };
+        try
+        {
+            window.Show();
+            Assert.True(poster.HasImage);
+            Assert.Equal(1, poster.Opacity);
+            Assert.False(poster.IsLogoFading);
+            Assert.Equal(1, calls);
+            poster.Url = "https://logos.invalid/not-cached";
+            await Done(poster.LoadingTask);
+            Assert.False(poster.HasImage);
+            Assert.Equal(1, calls);
+            poster.ChannelIsScrolling = false;
+            await Done(poster.LoadingTask);
+            Assert.True(poster.HasImage);
+            Assert.Equal(2, calls);
+            Assert.True(poster.IsLogoFading);
+        }
+        finally { window.Close(); }
+    }
+
 }

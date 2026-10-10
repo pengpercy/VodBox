@@ -1,0 +1,10 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- 统一圆角：交互控件和海报 6px，大面板/弹窗 8px；圆形图标与细进度条保留原形状。 -->
+  <CornerRadius x:Key="AppControlCornerRadius">6</CornerRadius>
+  <CornerRadius x:Key="AppPosterCornerRadius">6</CornerRadius>
+  <CornerRadius x:Key="AppPanelCornerRadius">8</CornerRadius>
+  <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+  <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+  <CornerRadius x:Key="CornerRadiusLarge">8</CornerRadius>
+  <CornerRadius x:Key="CornerRadiusMedium">6</CornerRadius>
+</ResourceDictionary>

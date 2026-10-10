@@ -9,6 +9,9 @@ namespace VodBox.Desktop.Views;
 internal sealed class PosterCache : IDisposable
 {
     internal static readonly PosterCache Shared = new(LoadBitmapAsync);
+    internal static readonly PosterCache ChannelLogos = new(LoadLogoBitmapAsync,
+        maxBytes: 8 * 1024 * 1024, maxImages: 128, maxConcurrentLoads: 2,
+        abandonDelay: TimeSpan.FromMilliseconds(100));
     private static readonly VodBox.Infrastructure.PosterDiskCache Disk=new(
         Path.Combine(VodBox.Infrastructure.AppPaths.DataDirectory,"posters"),FetchPosterBytesAsync);
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
@@ -38,6 +41,31 @@ internal sealed class PosterCache : IDisposable
         _downloads = new(maxConcurrentLoads);
         _abandonDelay = abandonDelay ?? TimeSpan.FromSeconds(2);
         ArgumentOutOfRangeException.ThrowIfLessThan(_abandonDelay, TimeSpan.Zero);
+    }
+
+    /// <summary>已经解码的图像直接租用，不排后台任务、不重复解码。</summary>
+    internal Lease? TryAcquireCached(Uri uri)
+    {
+        lock (_gate)
+        {
+            if (_disposed || !_entries.TryGetValue(uri, out var entry) || entry.Retired || entry.Bitmap is null) return null;
+            entry.Consumers++;
+            entry.IdleVersion++;
+            if (entry.IdleNode is not null)
+            {
+                _idle.Remove(entry.IdleNode);
+                entry.IdleNode = null;
+            }
+            return new Lease(this, entry, entry.Bitmap);
+        }
+    }
+
+    internal (long Bytes, int Images, int Pending, int Leases) Statistics
+    {
+        get
+        {
+            lock (_gate) return (_bytes, _images, _entries.Values.Count(entry => entry.Loading), _entries.Values.Sum(entry => entry.Consumers));
+        }
     }
 
     internal async Task<Lease> AcquireAsync(Uri uri, CancellationToken cancellationToken = default)
@@ -267,13 +295,16 @@ internal sealed class PosterCache : IDisposable
         public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Release(_entry);
     }
 
-    private static async Task<Bitmap> LoadBitmapAsync(Uri uri,CancellationToken cancellationToken)
+    private static Task<Bitmap> LoadBitmapAsync(Uri uri, CancellationToken cancellationToken) => DecodeAsync(uri, 460, cancellationToken);
+    private static Task<Bitmap> LoadLogoBitmapAsync(Uri uri, CancellationToken cancellationToken) => DecodeAsync(uri, 200, cancellationToken);
+
+    private static async Task<Bitmap> DecodeAsync(Uri uri, int width, CancellationToken cancellationToken)
     {
         var bytes=await Disk.GetAsync(uri,cancellationToken).ConfigureAwait(false);
         try
         {
             using var input=new MemoryStream(bytes);cancellationToken.ThrowIfCancellationRequested();
-            return Bitmap.DecodeToWidth(input,460);
+            return Bitmap.DecodeToWidth(input,width);
         }
         catch(Exception error)when(error is not (OutOfMemoryException or OperationCanceledException))
         {

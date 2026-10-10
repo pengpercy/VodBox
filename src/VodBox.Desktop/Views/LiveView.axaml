@@ -8,171 +8,63 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <UserControl.Styles>
-    <Style Selector="Button.liveTab">
-      <Setter Property="Height" Value="38" />
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="Padding" Value="8,0" />
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border x:Name="TabSurface" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
-            <ContentPresenter Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}"
-                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-          </Border>
-        </ControlTemplate>
-      </Setter>
-    </Style>
-    <Style Selector="Button.liveTab.selected">
-      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-    </Style>
-    <Style Selector="Button.liveTab:pointerover /template/ Border#TabSurface">
-      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
-    </Style>
-    <Style Selector="Button.liveTab:pressed /template/ Border#TabSurface">
-      <Setter Property="Background" Value="{DynamicResource StrokeBrush}" />
-    </Style>
-  </UserControl.Styles>
-  <Grid ColumnDefinitions="320,*" DataContext="{Binding Live}">
-
-    <!-- 频道面板：分组/收藏/历史 三 Tab + 筛选（对齐设计稿 p-live ①） -->
-    <Border Grid.Column="0" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,0,1,0">
-      <Grid RowDefinitions="Auto,Auto,*">
-        <!-- 等宽等高、相同圆角与图标规格，悬停背景覆盖整个按钮。 -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,*,*" Margin="0,14,0,6">
-          <Button Grid.Column="0" Click="OnTabGroups" x:Name="TabGroups" Classes="liveTab selected" Cursor="Hand">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource Icon.Folder}" Width="18" Height="18" VerticalAlignment="Center" />
-              <TextBlock Text="分组" FontSize="13" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-          <Button Grid.Column="1" Click="OnTabFavorites" x:Name="TabFavorites" Classes="liveTab" Cursor="Hand">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" VerticalAlignment="Center" />
-              <TextBlock Text="收藏" FontSize="13" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-          <Button Grid.Column="2" Click="OnTabHistory" x:Name="TabHistory" Classes="liveTab" Cursor="Hand">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource Icon.History}" Width="18" Height="18" VerticalAlignment="Center" />
-              <TextBlock Text="历史" FontSize="13" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-        </Grid>
-        <Grid Grid.Row="1" Margin="12,4,12,10">
-          <TextBox Text="{Binding FilterText}" PlaceholderText="筛选频道…" Height="32"
-                   Padding="32,0,10,0" VerticalContentAlignment="Center" CornerRadius="7" />
-          <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" Margin="10,0,0,0"
-                    HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" />
-        </Grid>
-        <!-- 频道列表：组头（可折叠 + 计数）+ 频道行（台标+EPG 单行） -->
-        <ListBox Grid.Row="2" ItemsSource="{Binding VisibleChannels}" Margin="6,0,6,12"
-                 Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-          <ListBox.Styles>
-            <!-- 统一实际绘制 hover 的容器，而不是只给模板中的频道内容加圆角。 -->
-            <Style Selector="ListBoxItem">
-              <Setter Property="Padding" Value="0" />
-              <Setter Property="Margin" Value="0,2" />
-              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-              <Setter Property="Template">
-                <ControlTemplate>
-                  <Border x:Name="ChannelRowSurface" CornerRadius="7" Background="Transparent" ClipToBounds="True">
-                    <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      HorizontalContentAlignment="Stretch" />
-                  </Border>
-                </ControlTemplate>
-              </Setter>
-            </Style>
-            <Style Selector="ListBoxItem:selected /template/ Border#ChannelRowSurface">
-              <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
-            </Style>
-            <Style Selector="ListBoxItem:pointerover /template/ Border#ChannelRowSurface">
-              <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
-            </Style>
-            <Style Selector="ListBoxItem:pressed /template/ Border#ChannelRowSurface">
-              <Setter Property="Background" Value="{DynamicResource StrokeBrush}" />
-            </Style>
-          </ListBox.Styles>
-          <ListBox.DataTemplates>
-            <!-- 组头行：展开箭头 + 锁定状态 + 名称 + 计数。 -->
-            <DataTemplate x:DataType="vm:LiveViewModel+LiveGroupHeader">
-              <Grid x:Name="GroupHeaderRow" PointerPressed="OnGroupHeader" Tag="{Binding}" Cursor="Hand" Height="36" Background="Transparent">
-                <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
-                <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12"
-                          IsVisible="{Binding Expanded, Converter={x:Static views:BoolConverters.Not}}" VerticalAlignment="Center" />
-                <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12"
-                          IsVisible="{Binding Expanded}" VerticalAlignment="Center" />
-                <PathIcon Data="{StaticResource Icon.Lock}" Width="12" Height="12"
-                          IsVisible="{Binding Locked}" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" MaxWidth="180" />
-                <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Grid>
-            </DataTemplate>
-            <!-- 频道行 -->
-            <DataTemplate x:DataType="core:LiveChannel">
-              <!-- 频道行容器：选中态整行蓝灰底 -->
-              <Border x:Name="Row" CornerRadius="7" Padding="2,4" Background="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}">
-                <Grid ColumnDefinitions="30,*,Auto" ColumnSpacing="8" Cursor="Hand"
-                            PointerPressed="OnPlayChannel" Tag="{Binding}">
-                  <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
-                             Grid.Column="0" VerticalAlignment="Center" />
-                  <!--
-                    台标与频道名占同一网格行，两者垂直居中对齐（此前“名称+EPG”整块居中会让名称高出
-                    台标中心 6~8px）。台标本身不画背景色：品牌图多为透明 PNG，原来的彩色占位方块会
-                    透出来变成“背景色”；占位只在没有台标或加载失败时显示。
-                  -->
-                  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
-                        Grid.Column="1" VerticalAlignment="Center">
-                    <Panel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
-                           Width="{x:Static views:LiveLayout.BadgeWidth}" Height="{x:Static views:LiveLayout.BadgeHeight}">
-                      <Border x:Name="BadgePlaceholder" CornerRadius="7"
-                              Background="{Binding BadgeColor, Converter={x:Static views:BrushConverters.FromHex}}"
-                              IsVisible="{Binding #ChannelLogo.HasImage, Converter={x:Static views:BoolConverters.Not}}">
-                        <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="White" HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" FontWeight="SemiBold" />
-                      </Border>
-                      <views:RemotePoster x:Name="ChannelLogo" Url="{Binding Logo}" Stretch="Uniform" />
-                    </Panel>
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" FontSize="13"
-                               Margin="{x:Static views:LiveLayout.NameMargin}" VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
-                    <!-- 无 EPG 时折叠整行，避免每行白占一个行高。 -->
-                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding EpgNow}" FontSize="10.5"
-                               Foreground="{DynamicResource TextTertiaryBrush}" Margin="{x:Static views:LiveLayout.EpgMargin}"
-                               IsVisible="{Binding EpgNow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               TextTrimming="CharacterEllipsis" />
-                  </Grid>
-                  <Border Grid.Column="2" Background="Transparent" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
-                          Padding="6,1" VerticalAlignment="Center" IsVisible="{Binding IsCurrent}">
-                    <TextBlock Text="LIVE" FontSize="9.5" Foreground="#4CC2FF" FontWeight="SemiBold" />
-                  </Border>
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ListBox.DataTemplates>
-        </ListBox>
-      </Grid>
-    </Border>
+  <Grid DataContext="{Binding Live}">
 
     <!-- 主窗口仅浏览频道，播放交给独立窗口。 -->
-    <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto" Margin="18,14,12,12">
-      <Grid ColumnDefinitions="*,Auto" Margin="0,0,6,12">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="频道列表" FontSize="20" FontWeight="Bold" />
-          <TextBlock Text="{Binding ChannelCards.Count, StringFormat='共 {0} 个频道'}"
-                     FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+    <Grid RowDefinitions="Auto,*" Margin="0">
+      <!-- 紧凑工具栏：选中组名单行显示，搜索固定宽度，弹出菜单才使用两行。 -->
+      <Grid x:Name="LiveToolbar" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="28,0,20,12" MinHeight="38">
+        <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock Text="频道列表" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ChannelCards.Count, StringFormat='共 {0} 个频道'}" FontSize="10.5" Opacity="0.6" />
         </StackPanel>
-        <TextBlock Grid.Column="1" Text="独立窗口播放" FontSize="11" VerticalAlignment="Center"
-                   Foreground="{DynamicResource TextTertiaryBrush}" />
+        <ComboBox x:Name="GroupSelector" Grid.Column="1" ItemsSource="{Binding GroupOptions}" SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
+                  MinWidth="150" MaxWidth="280" Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,0" VerticalAlignment="Center"
+                  HorizontalContentAlignment="Stretch" MaxDropDownHeight="360" PlaceholderText="选择频道分组">
+          <ComboBox.Styles>
+            <Style Selector="ComboBoxItem:selected">
+              <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            </Style>
+            <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            </Style>
+            <Style Selector="ComboBoxItem">
+              <Setter Property="Padding" Value="10,8" />
+              <Setter Property="Margin" Value="4,2" />
+              <Setter Property="CornerRadius" Value="7" />
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            </Style>
+          </ComboBox.Styles>
+          <ComboBox.SelectionBoxItemTemplate>
+            <DataTemplate x:DataType="core:LiveGroup">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="7">
+                <PathIcon Data="{StaticResource Icon.Folder}" Width="14" Height="14" Opacity="0.65" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              </Grid>
+            </DataTemplate>
+          </ComboBox.SelectionBoxItemTemplate>
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="core:LiveGroup">
+              <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="3">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="250" />
+                  <PathIcon Data="{StaticResource Icon.Lock}" Width="12" Height="12" IsVisible="{Binding Locked}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Grid.Row="1" Text="{Binding Count, StringFormat='{}{0} 个频道'}" FontSize="11" Opacity="0.6" />
+                <PathIcon Grid.Column="1" Grid.RowSpan="2" Data="{StaticResource Icon.Check}" Width="16" Height="16"
+                          Margin="12,0,0,0" VerticalAlignment="Center" IsVisible="{Binding $parent[ComboBoxItem].IsSelected}" />
+              </Grid>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Grid Grid.Column="2" Width="210" VerticalAlignment="Center">
+          <TextBox x:Name="ChannelSearch" Text="{Binding FilterText, Mode=TwoWay}"
+                   PlaceholderText="搜索频道" Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="30,0,10,0" VerticalContentAlignment="Center" />
+          <PathIcon Data="{StaticResource Icon.Search}" Width="14" Height="14" Margin="10,0,0,0"
+                    HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
+        </Grid>
       </Grid>
       <Panel Grid.Row="1">
         <!-- ListBox owns the finite viewport; only visible rows and a small cache are realized. -->
@@ -197,7 +89,7 @@
           </ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:LiveViewModel+ChannelCardRow">
-              <ItemsControl ItemsSource="{Binding Channels}" Height="194">
+              <ItemsControl ItemsSource="{Binding Channels}" Height="194" Margin="28,0,6,0">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <UniformGrid Rows="1" Columns="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.CardColumns}" />
@@ -206,23 +98,23 @@
                 <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="core:LiveChannel">
                 <Button x:Name="ChannelCard" Tag="{Binding}" Click="OnPlayCard" Margin="0,0,14,14"
-                        Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="7"
+                        Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         HorizontalAlignment="Stretch" VerticalAlignment="Top" HorizontalContentAlignment="Stretch"
                         ToolTip.Tip="{Binding Name}">
                   <Grid RowDefinitions="128,Auto,Auto">
-                    <Border CornerRadius="6" Background="{DynamicResource CardHoverBrush}"
+                    <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource CardHoverBrush}"
                             BorderThickness="1" BorderBrush="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}"
                             ClipToBounds="True">
                       <Grid>
                         <Path Data="M 0,128 L 260,0 L 260,128 Z" Fill="#06FFFFFF" Stretch="Fill" IsHitTestVisible="False" />
                         <Panel Width="100" Height="54" HorizontalAlignment="Center" VerticalAlignment="Center">
-                          <Border Background="Transparent" IsVisible="{Binding #CardLogo.HasImage, Converter={x:Static views:BoolConverters.Not}}">
+                          <Border x:Name="CardPlaceholder" Background="Transparent" IsVisible="{Binding #CardLogo.HasImage, Converter={x:Static views:BoolConverters.Not}}">
                             <StackPanel Spacing="3" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
                               <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" />
                               <TextBlock Text="TV" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
                           </Border>
-                          <views:RemotePoster x:Name="CardLogo" Url="{Binding Logo}" Stretch="Uniform" />
+                          <views:RemotePoster x:Name="CardLogo" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Stretch="Uniform" />
                         </Panel>
                         <Border Background="#B0202020" CornerRadius="3" Padding="5,2" Margin="5"
                                 HorizontalAlignment="Left" VerticalAlignment="Bottom">
@@ -238,7 +130,7 @@
                     </Border>
                     <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,7,0,0">
                       <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      <views:RemotePoster Grid.Column="1" Url="{Binding Logo}" Width="32" Height="18" Stretch="Uniform" Margin="6,0,0,0" />
+                      <views:RemotePoster Grid.Column="1" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Width="32" Height="18" Stretch="Uniform" Margin="6,0,0,0" />
                     </Grid>
                     <TextBlock Grid.Row="2" Text="{Binding EpgNow}" Margin="0,2,0,0" FontSize="11"
                                Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis"
@@ -251,7 +143,7 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
-        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowChannelSkeleton}">
+        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowChannelSkeleton}" Margin="28,0,6,0">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding CardColumns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate><DataTemplate>
             <StackPanel Margin="0,0,14,14" Spacing="8">
@@ -264,7 +156,7 @@
         <TextBlock Text="暂无频道，请先导入直播源或调整筛选条件" HorizontalAlignment="Center" VerticalAlignment="Center"
                    TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
                    IsVisible="{Binding ShowChannelEmpty}" />
-        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="12,8" Margin="0,0,12,12"
+        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="12,8" Margin="0,0,12,12"
                 HorizontalAlignment="Left" VerticalAlignment="Bottom" IsVisible="{Binding Loading}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <ProgressBar IsIndeterminate="True" Width="34" Height="4" VerticalAlignment="Center" />
@@ -272,33 +164,9 @@
           </StackPanel>
         </Border>
       </Panel>
-      <StackPanel Grid.Row="2" Spacing="6" Margin="0,8,6,0">
-        <TextBlock Text="{Binding CurrentChannel.Name, StringFormat='当前频道：{0}'}" FontSize="12"
-                   IsVisible="{Binding CurrentChannel, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <WrapPanel>
-          <Button Content="上一台" Click="OnPrevChannel" Margin="0,0,6,6" FontSize="11" />
-          <Button Content="下一台" Click="OnNextChannel" Margin="0,0,6,6" FontSize="11" />
-          <Button Content="{Binding CurrentLineLabel}" Click="OnSwitchLine" Margin="0,0,6,6" FontSize="11" />
-          <Button Content="收藏/取消" Command="{Binding ToggleChannelFavoriteCommand}" Margin="0,0,6,6" FontSize="11" />
-          <Button Content="导入节目表" Click="OnImportEpg" Margin="0,0,6,6" FontSize="11" />
-          <Button Content="回看" Click="OnCatchup" Margin="0,0,6,6" FontSize="11" />
-          <Button Content="重新锁定" Command="{Binding LockGroupsCommand}" Margin="0,0,6,6" FontSize="11" />
-        </WrapPanel>
-        <ItemsControl ItemsSource="{Binding EpgTimeline}">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:LiveEpgCard">
-              <Border Tag="{Binding}" PointerPressed="OnEpgSeek" Cursor="Hand" Padding="8,5" Margin="0,0,6,4"
-                      Background="{DynamicResource CardHoverBrush}" CornerRadius="5">
-                <StackPanel><TextBlock Text="{Binding Title}" FontSize="11" MaxWidth="160" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding Range}" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}" /></StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </StackPanel>
+
     </Grid>
-    <Border Grid.ColumnSpan="2" IsVisible="{Binding GroupUnlockOpen}" Background="{DynamicResource SurfaceBrush}" Padding="24" CornerRadius="12" Width="360" HorizontalAlignment="Center" VerticalAlignment="Center">
+    <Border IsVisible="{Binding GroupUnlockOpen}" Background="{DynamicResource SurfaceBrush}" Padding="24" CornerRadius="{DynamicResource AppPanelCornerRadius}" Width="360" HorizontalAlignment="Center" VerticalAlignment="Center">
       <StackPanel Spacing="12"><TextBlock Text="{Binding LockedGroupName}" /><TextBox Text="{Binding GroupPassword}" PasswordChar="●" PlaceholderText="分组密码" />
       <Button Content="解锁" Command="{Binding UnlockGroupCommand}" /><Button Content="取消" Command="{Binding CancelGroupUnlockCommand}" /></StackPanel>
     </Border>

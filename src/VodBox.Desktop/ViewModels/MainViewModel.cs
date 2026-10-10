@@ -123,6 +123,34 @@ public sealed partial class MainViewModel : ObservableObject
             ? $"当前源：{_services.Registry.VisibleSources[0].Name}"
             : "未配置";
 
+    /// <summary>
+    /// 统一的续播入口：历史/收藏里的记录按 source_key 分流。
+    /// "live" 是直播的合成键、不在内容源注册表里，交给直播页按频道地址续播；
+    /// 其余键才走详情页，避免把直播记录当成点播站点而报「在当前配置中不可用」。
+    /// </summary>
+    public void ResumeEntry(HistoryEntry entry)
+    {
+        switch (entry.SourceKey)
+        {
+            case "live":
+                if (Live.TryPlayByUri(entry.MediaId)) return;
+                // 频道已不在当前直播源里：给出明确原因，而不是"站点不可用"这种误导性文案。
+                // 直播源仍在加载时 TryPlayByUri 已给出等待提示，此处不得覆盖。
+                if (!Live.Loading) StatusMessage = $"直播频道「{entry.Title}」不在当前直播源中，无法续播";
+                Navigate(AppPage.Live);
+                return;
+            case "catchup":
+                StatusMessage = "回看记录需要所在频道仍在当前直播源中，无法直接续播";
+                return;
+            case "local":
+                PlayLocalFile(entry.MediaId);
+                return;
+            default:
+                Detail.Resume(entry);
+                return;
+        }
+    }
+
     /// <summary>跨线程回 UI 线程（播放器事件线程 → UI）。</summary>
     public void RunOnUi(Action action)
     {
@@ -140,8 +168,17 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void AttachDispatcher(Avalonia.Threading.Dispatcher dispatcher) => uidispatcher = dispatcher;
 
+    public bool ShowGlobalSearch => Page is not (AppPage.Search or AppPage.Live);
+    public Avalonia.Thickness PageContentMargin => GetPageContentMargin(Page, OperatingSystem.IsMacOS());
+
+    // macOS 的窗口按钮位于左侧；其他平台保留完整标题栏高度，避免右侧工具栏覆盖窗口按钮。
+    internal static Avalonia.Thickness GetPageContentMargin(AppPage page, bool isMacOS) =>
+        page == AppPage.Live && isMacOS ? new(0, -24, 0, 0) : new(0);
+
     partial void OnPageChanged(AppPage value)
     {
+        OnPropertyChanged(nameof(ShowGlobalSearch));
+        OnPropertyChanged(nameof(PageContentMargin));
         if (value != AppPage.Detail) Detail.CancelPending();
         if (value == AppPage.Settings && !_designTime) Settings.RefreshSites();
         if (_designTime) return; // 设计时假数据已就位，不触网、不覆盖

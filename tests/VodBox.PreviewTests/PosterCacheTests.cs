@@ -235,4 +235,30 @@ public sealed class PosterCacheTests
         using var nextLease = await Done(next);
         Assert.Equal(2, calls);
     }
+    [AvaloniaFact]
+    public async Task CompletedCacheFastPathSharesBitmapAndKeepsIdleMemoryWithinBudget()
+    {
+        var calls = 0;
+        using var cache = new PosterCache((_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            return Task.FromResult(Image());
+        }, maxBytes: 512, maxImages: 2);
+        for (var i = 0; i < 100; i++)
+        {
+            using (var loaded = await Done(cache.AcquireAsync(Url($"logo-{i}"))))
+            using (var reused = cache.TryAcquireCached(Url($"logo-{i}")))
+            {
+                Assert.NotNull(reused);
+                Assert.Same(loaded.Bitmap, reused.Bitmap);
+            }
+            Assert.InRange(cache.Statistics.Bytes, 0, 512);
+            Assert.InRange(cache.Statistics.Images, 0, 2);
+            Assert.Equal(0, cache.Statistics.Leases);
+        }
+        Assert.Equal(100, calls);
+        Assert.Null(cache.TryAcquireCached(Url("logo-0")));
+        Assert.Null(cache.TryAcquireCached(Url("unknown")));
+    }
+
 }
