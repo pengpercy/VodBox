@@ -119,7 +119,7 @@ public sealed partial class HomeViewModel : ObservableObject
                 SourceName = source.Name;
                 foreach (var item in page.Items.Take(24)) Recommendations.Add(item);
                 SetHero(page.Items.FirstOrDefault());
-                RecommendationsHint = Recommendations.Count == 0 ? "该站点暂时没有返回推荐内容" : "";
+                RecommendationsHint = Recommendations.Count == 0 ? source is IInformationalContentSource notice ? notice.Notice : "该站点暂时没有返回推荐内容" : "";
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }

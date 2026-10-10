@@ -29,6 +29,7 @@ public static class NativeSpiders
             ["csp_AppGet"] = info => new AppGetSource(info),
             ["csp_App99"] = info => new App99Source(info),
             ["csp_Push"] = info => new PushSource(info),
+            ["csp_AppRJ"] = info => new AppRjSource(info),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>
@@ -45,7 +46,13 @@ public static class NativeSpiders
 
     /// <summary>有限规则适配按定义检查，不能把特定音频站支持扩大成通用 XBPQ。</summary>
     public static bool IsSupported(TvBoxSite site) => IsSupported(site.Api) ||
+        (site.Api == "csp_XPath" && (site.Ext is null || site.Ext.Value.ValueKind == System.Text.Json.JsonValueKind.Null)) ||
+        (site.Api == "csp_AppYs" && IsAppYsRule(site.Ext is { ValueKind: System.Text.Json.JsonValueKind.String } ext ? ext.GetString() : null)) ||
         site.Api == "csp_XBPQ" && IsAudioRule(site.Ext is { ValueKind: System.Text.Json.JsonValueKind.String } value ? value.GetString() : site.Ext?.GetRawText());
+
+    internal static bool IsAppYsRule(string? ext) => Uri.TryCreate(ext, UriKind.Absolute, out var address) &&
+        address.Scheme is "http" or "https" && address.UserInfo.Length == 0 && address.Query.Length == 0 &&
+        (address.AbsolutePath.Contains("api.php/app", StringComparison.Ordinal) || address.AbsolutePath.Contains("xgapp", StringComparison.Ordinal));
 
     internal static bool IsAudioRule(string? ext)
     {
@@ -82,6 +89,8 @@ public static class NativeSpiders
     {
         if (!string.IsNullOrWhiteSpace(info.Key) && KeyFactories.TryGetValue(info.Key.Trim(), out var byKey))
             return byKey(info);
+        if (info.Api == "csp_AppYs" && IsAppYsRule(info.Ext)) return new AppYsSource(info);
+        if (info.Api == "csp_XPath" && (string.IsNullOrWhiteSpace(info.Ext) || info.Ext == "null")) return new XPathNoticeSource(info);
         if (info.Api == "csp_XBPQ" && IsAudioRule(info.Ext)) return new AudioSiteSource(info);
         return TryGetFactory(info.Api ?? "", out var factory) ? factory(info) : null;
     }

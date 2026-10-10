@@ -196,7 +196,7 @@ public sealed partial class VodViewModel : ObservableObject
         if (source is null || category is null)
         {
             Loading = false; Paging = false; _request = null;
-            ItemsHint = source is null ? "尚未配置内容源，请到设置中添加 TVBox 配置地址" : "该站点暂无分类";
+            ItemsHint = source is null ? "尚未配置内容源，请到设置中添加 TVBox 配置地址" : source is IInformationalContentSource notice ? notice.Notice : "该站点暂无分类";
             return;
         }
         var requestedPage = Page;

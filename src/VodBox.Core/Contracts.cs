@@ -14,6 +14,12 @@ public interface IContentSource
     Task<MediaPage> SearchAsync(string query, int page, CancellationToken ct = default);
 }
 
+/// <summary>非视频内容入口的说明；不通过虚构分类或视频条目呈现导航/提示信息。</summary>
+public interface IInformationalContentSource : IContentSource
+{
+    string Notice { get; }
+}
+
 /// <summary>播放地址解析器（对应 TVBox Parse 的 type 1 JSON 接口）。</summary>
 public interface IPlayResolver
 {
