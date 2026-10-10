@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Animation;
 using Avalonia.Media;
 using Avalonia.Threading;
 
@@ -33,6 +34,11 @@ public sealed class RemotePoster : Image
     {
         _cache = cache;
         Stretch = Stretch.UniformToFill;
+        Opacity = 0;
+        Transitions = new Transitions
+        {
+            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(180) }
+        };
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -61,6 +67,7 @@ public sealed class RemotePoster : Image
         _load = null;
         previous?.Cancel();
         // Clear the UI reference before releasing its lease; only the cache owns Bitmap disposal.
+        Opacity = 0;
         Source = null;
         HasImage = false;
         _lease?.Dispose();
@@ -88,6 +95,7 @@ public sealed class RemotePoster : Image
                 _lease = lease;
                 Source = lease.Bitmap;
                 HasImage = true;
+                Opacity = 1;
                 lease = null;
             });
         }

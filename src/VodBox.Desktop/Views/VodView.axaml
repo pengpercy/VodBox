@@ -81,9 +81,10 @@
       </StackPanel>
     </ScrollViewer>
 
-    <!-- 海报网格 -->
-    <!-- 海报网格：分块行 + ListBox 虚拟化（数据量大时只实例化可见行） -->
-    <ListBox x:Name="PosterList" Classes="virtualRows" Grid.Row="3" ItemsSource="{Binding Rows}" Background="Transparent" BorderThickness="0"
+    <!-- 海报网格：分块行 + ListBox 虚拟化（数据量大时只实例化可见行）。
+         加载态与网格同格叠加：首屏/切分类显示骨架，翻页只加底部加载条，都不清空已有内容。 -->
+    <Panel Grid.Row="3" x:Name="GridHost">
+    <ListBox x:Name="PosterList" Classes="virtualRows" ItemsSource="{Binding Rows}" IsVisible="{Binding !Loading}" Background="Transparent" BorderThickness="0"
              Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListBox.ItemTemplate>
         <DataTemplate>
@@ -118,9 +119,43 @@
       </ListBox.ItemTemplate>
     </ListBox>
 
+    <!-- 首屏 / 切分类骨架：按当前列数与海报尺寸铺占位卡，避免加载期间白屏 -->
+    <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding Loading}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <UniformGrid Columns="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.Columns}" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Width="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterWidth}" Margin="0,0,18,18">
+            <Border Classes="skeleton poster" Height="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterHeight}" />
+            <Border Classes="skeleton" Height="13" Width="112" Margin="0,8,0,0" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="11" Width="78" Margin="0,2,0,0" HorizontalAlignment="Left" />
+          </StackPanel>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- 翻页：保留当前页，只在左下角提示进度（与直播页一致的加载条样式） -->
+    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="12,8" Margin="0,0,12,12"
+            HorizontalAlignment="Left" VerticalAlignment="Bottom" IsVisible="{Binding Paging}">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <ProgressBar IsIndeterminate="True" Width="34" Height="4" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding Page, StringFormat='正在加载第 {0} 页…'}" FontSize="12" />
+      </StackPanel>
+    </Border>
+
+    <!-- 空态 / 错误态：非空文案覆盖网格位置 -->
+    <TextBlock Text="{Binding ItemsHint}" Margin="0,4" FontSize="12.5" TextWrapping="Wrap"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Foreground="{DynamicResource TextTertiaryBrush}"
+               IsVisible="{Binding ItemsHint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+    </Panel>
+
     <!-- 分页 -->
     <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,16,0,0">
-      <Button Command="{Binding PrevPageCommand}" ToolTip.Tip="上一页" Width="30" Height="30" CornerRadius="6"
+      <Button Command="{Binding PrevPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="上一页" Width="30" Height="30" CornerRadius="6"
               Background="{DynamicResource CardHoverBrush}" BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Padding="0">
         <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="18" Height="18" />
       </Button>
@@ -129,7 +164,7 @@
       </Border>
       <TextBlock Text=" / " Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
       <TextBlock Text="{Binding PageCount}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-      <Button Command="{Binding NextPageCommand}" ToolTip.Tip="下一页" Width="30" Height="30" CornerRadius="6"
+      <Button Command="{Binding NextPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="下一页" Width="30" Height="30" CornerRadius="6"
               Background="{DynamicResource CardHoverBrush}" BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Padding="0">
         <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" />
       </Button>

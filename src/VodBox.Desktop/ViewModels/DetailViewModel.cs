@@ -22,7 +22,27 @@ public sealed partial class DetailViewModel : ObservableObject
     [ObservableProperty] private PlaybackLine? _selectedLine;
     [ObservableProperty] private Episode? _selectedEpisode;
     [ObservableProperty] private bool _loading;
+    /// <summary>详情空态/错误态文案（非空时覆盖内容位置，避免整页白屏）。</summary>
+    [ObservableProperty] private string _hint = "";
     [ObservableProperty] private bool _isFavorite;
+
+    /// <summary>加载中且尚无详情 → 整页骨架（首屏不留白）。</summary>
+    public bool ShowSkeleton => Loading && Detail is null;
+    /// <summary>已拿到详情 → 显示真实内容（线路 + 选集）。</summary>
+    public bool ShowContent => Detail is not null;
+    /// <summary>加载结束仍无详情且无失败文案 → 占位空态（失败时由 <see cref="Hint"/> 承担）。</summary>
+    public bool ShowEmpty => !Loading && Detail is null && Hint.Length == 0;
+
+    partial void OnLoadingChanged(bool value) => NotifyDetailState();
+    partial void OnDetailChanged(MediaDetail? value) => NotifyDetailState();
+    partial void OnHintChanged(string value) => NotifyDetailState();
+
+    private void NotifyDetailState()
+    {
+        OnPropertyChanged(nameof(ShowSkeleton));
+        OnPropertyChanged(nameof(ShowContent));
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
     private string _sourceKey = "";
     [ObservableProperty] private string _sourceName = "";
     [ObservableProperty] private bool _episodesReversed;
@@ -123,6 +143,7 @@ public sealed partial class DetailViewModel : ObservableObject
             SelectedLine = null;
             SelectedEpisode = null;
             IsFavorite = false;
+            Hint = "";
             ApplyResume(null);
             _sourceKey = "";
             SourceName = "";
@@ -130,6 +151,7 @@ public sealed partial class DetailViewModel : ObservableObject
             if (source is null)
             {
                 _main.StatusMessage = $"站点 {resume?.SourceName ?? sourceKey} 在当前配置中不可用";
+                Hint = $"站点 {resume?.SourceName ?? sourceKey} 在当前配置中不可用";
                 return;
             }
             scope = new CancellationTokenSource();
@@ -165,7 +187,10 @@ public sealed partial class DetailViewModel : ObservableObject
             await _main.RunOnUiAsync(() =>
             {
                 if (generation == _generation && !ct.IsCancellationRequested)
+                {
                     _main.StatusMessage = $"详情加载失败：{error.Message}";
+                    Hint = $"详情加载失败：{error.Message}";
+                }
             });
         }
         finally

@@ -34,7 +34,7 @@
               </LinearGradientBrush>
             </Border.Background>
           </Border>
-          <StackPanel VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="8">
+          <StackPanel VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="8" IsVisible="{Binding !Loading}">
             <TextBlock Text="今日推荐 · TOP 1" FontSize="11.5" Foreground="#4CC2FF" LetterSpacing="2" />
             <TextBlock Text="{Binding HeroTitle}" FontSize="30" FontWeight="SemiBold" />
             <TextBlock Text="{Binding HeroRemarks}" FontSize="13" Foreground="#4CC2FF" />
@@ -58,6 +58,19 @@
               </Button>
             </StackPanel>
           </StackPanel>
+          <!-- 英雄区骨架：网络首屏未就绪时占位，避免标题/简介空白 -->
+          <StackPanel VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="10" IsVisible="{Binding Loading}">
+            <Border Classes="skeleton" Height="11.5" Width="120" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="30" Width="320" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="13" Width="200" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="12" Width="460" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="12" Width="340" HorizontalAlignment="Left" />
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+              <Border Classes="skeleton" Height="38" Width="126" />
+              <Border Classes="skeleton" Height="38" Width="76" />
+              <Border Classes="skeleton" Height="38" Width="92" />
+            </StackPanel>
+          </StackPanel>
           <!-- 轮播指示器（右下角，当前位为胶囊） -->
           <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24">
             <Border CornerRadius="4" Width="22" Height="7" Background="#4CC2FF" />
@@ -79,7 +92,8 @@
             <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
-        <ItemsControl ItemsSource="{Binding Recent}">
+        <Panel>
+        <ItemsControl ItemsSource="{Binding Recent}" IsVisible="{Binding !ShowRecentSkeleton}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <StackPanel Orientation="Horizontal" Spacing="16" />
@@ -108,6 +122,30 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <!-- 最近观看骨架：本地库读取中占位（读得快，通常一闪而过，不留空白） -->
+        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Recent}" IsVisible="{Binding ShowRecentSkeleton}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="16" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Width="150">
+                <Border Classes="skeleton poster" Height="225" />
+                <Border Classes="skeleton" Height="13" Width="112" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                <Border Classes="skeleton" Height="3" Margin="0,6,0,0" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Bottom" IsVisible="{Binding RecentLoading}" />
+        <TextBlock Text="{Binding RecentHint}" TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
+                   IsVisible="{Binding RecentHint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+        <!-- 空态：加载结束仍无观看记录 -->
+        <TextBlock Text="暂无观看记录" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}"
+                   Margin="2,4,0,0" VerticalAlignment="Center" IsVisible="{Binding ShowRecentEmpty}" />
+        </Panel>
       </StackPanel>
 
       <!-- 推荐 -->
@@ -122,7 +160,8 @@
             <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
-        <ItemsControl ItemsSource="{Binding Recommendations}">
+        <Panel>
+        <ItemsControl ItemsSource="{Binding Recommendations}" IsVisible="{Binding !Loading}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <UniformGrid Columns="6" />
@@ -149,6 +188,29 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Bottom" IsVisible="{Binding Loading}" />
+        <!-- 推荐区骨架：站点头屏加载中 -->
+        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding Loading}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Margin="0,0,16,0">
+                <Border Classes="skeleton poster" Height="210" />
+                <Border Classes="skeleton" Height="13" Width="112" Margin="0,9,0,0" HorizontalAlignment="Left" />
+                <Border Classes="skeleton" Height="11" Width="78" Margin="0,6,0,0" HorizontalAlignment="Left" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <!-- 空态 / 错误态：非空文案覆盖网格位置，不留白屏 -->
+        <TextBlock Text="{Binding RecommendationsHint}" Margin="0,4,0,0" FontSize="12.5"
+                   Foreground="{DynamicResource TextTertiaryBrush}"
+                   IsVisible="{Binding RecommendationsHint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+        </Panel>
       </StackPanel>
     </StackPanel>
   </ScrollViewer>

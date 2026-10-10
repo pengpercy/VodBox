@@ -29,8 +29,12 @@ public partial class VodView : UserControl
     public VodView()
     {
         InitializeComponent();
-        if(this.FindControl<ListBox>("PosterList") is {} grid)grid.SizeChanged+=(_,_)=>
-        {if(DataContext is MainViewModel main)main.Vod.SetGridWidth(grid.Bounds.Width);};
+        // 网格宽度决定列数。网格与骨架互斥显示，两个宿主都上报宽度：
+        // 首次加载时只有骨架可见，靠 GridHost 也能算出正确列数（SetGridWidth 忽略 0 宽度）。
+        foreach (var name in new[] { "GridHost", "PosterList" })
+            if (this.FindControl<Control>(name) is { } host)
+                host.SizeChanged += (_, _) =>
+                { if (DataContext is MainViewModel main) main.Vod.SetGridWidth(host.Bounds.Width); };
     }
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 

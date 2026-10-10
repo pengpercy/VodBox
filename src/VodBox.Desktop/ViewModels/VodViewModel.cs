@@ -30,11 +30,14 @@ public sealed partial class VodViewModel : ObservableObject
     private int _columns=6;
     public double PosterWidth=>_services.Prefs.GetInt("ui.poster-density",1) switch {0=>190,2=>130,_=>158};
     public double PosterHeight=>PosterWidth*1.42;
+    /// <summary>当前海报列数；骨架屏按同一列数铺占位卡，避免加载完成时跳列。</summary>
+    public int Columns=>_columns;
     public void SetGridWidth(double width)
     {
+        if(width<=0)return; // 隐藏时布局宽度为 0，忽略以免把列数压成 1
         _gridWidth=width;
         var columns=Math.Max(1,(int)Math.Floor(Math.Max(0,width-16)/(PosterWidth+18)));
-        if(columns==_columns)return;_columns=columns;RebuildRows();
+        if(columns==_columns)return;_columns=columns;OnPropertyChanged(nameof(Columns));RebuildRows();
     }
     public void RefreshPosterDensity()
     {
@@ -66,6 +69,33 @@ public sealed partial class VodViewModel : ObservableObject
     [ObservableProperty] private int _page = 1;
     [ObservableProperty] private int _pageCount = 1;
     [ObservableProperty] private bool _loading;
+    /// <summary>翻页请求中：保留当前页内容，仅在底部显示加载条（不清空网格、不显示骨架）。</summary>
+    [ObservableProperty] private bool _paging;
+    /// <summary>网格空态/错误态文案（非空时覆盖网格位置，不留白屏）。</summary>
+    [ObservableProperty] private string _itemsHint = "";
+
+    /// <summary>已加载内容所属的站点键；null = 从未加载（导航复用据此判断是否重发请求）。</summary>
+    private string? _loadedSourceKey;
+    /// <summary>网格当前内容对应的页码；翻页失败时回滚计数（Page 已被翻页命令先行自增）。</summary>
+    private int _loadedPage = 1;
+
+    public string LoadedSourceKey => _loadedSourceKey ?? "";
+
+    /// <summary>配置换源后调用：丢弃已加载内容，下次进入点播页重新加载。</summary>
+    public void Invalidate()
+    {
+        CancelPending();
+        Categories.Clear(); Items.Clear(); Rows.Clear();
+        _loadedSourceKey = null; _loadedPage = 1; ItemsHint = "";
+    }
+
+    /// <summary>导航进入点播页：同一站点已加载过则复用，否则（重新）加载。</summary>
+    public void EnsureLoaded()
+    {
+        var source = _getDefault();
+        if (_loadedSourceKey is not null && _loadedSourceKey == (source?.Key ?? "")) return;
+        _ = LoadAsync();
+    }
 
     partial void OnSelectedCategoryChanged(Category? value)
     {
@@ -84,7 +114,7 @@ public sealed partial class VodViewModel : ObservableObject
 
     public void CancelPending()
     {
-        ++_generation;_request?.Cancel();_request=null;Loading=false;
+        ++_generation;_request?.Cancel();_request=null;Loading=false;Paging=false;
     }
 
     public Task LoadAsync() => LoadSourceAsync(_getDefault());
@@ -108,10 +138,18 @@ public sealed partial class VodViewModel : ObservableObject
         OnPropertyChanged(nameof(SupportsBasicFilters));
         OnPropertyChanged(nameof(SourceCountLabel));
         Categories.Clear(); Items.Clear(); Rows.Clear();
+        ItemsHint="";Paging=false;_loadedSourceKey=source?.Key??"";
+        // 换源是一次内容切换：分页与总页数必须回到第一页，不能沿用上一个站点的进度。
+        Page=1;PageCount=1;_loadedPage=1;
         _settingCategory = true;
         SelectedCategory = null;
         _settingCategory = false;
-        if (source is null) { Loading = false; _request=null; return; }
+        if (source is null)
+        {
+            Loading = false; _request=null;
+            ItemsHint = "尚未配置内容源，请到设置中添加 TVBox 配置地址";
+            return;
+        }
         Loading = true;
         try
         {
@@ -130,12 +168,24 @@ public sealed partial class VodViewModel : ObservableObject
         catch (OperationCanceledException) when (scope.IsCancellationRequested) { }
         catch (Exception error)
         {
-            if (generation == _generation) _main.StatusMessage = $"分类加载失败：{error.Message}";
+            if (generation == _generation)
+            {
+                _main.StatusMessage = $"分类加载失败：{error.Message}";
+                ItemsHint = _main.StatusMessage;
+                _loadedSourceKey = null;
+            }
         }
         finally { if (generation == _generation) { Loading = false; _request = null; } }
     }
 
-    internal async Task ReloadAsync()
+    internal Task ReloadAsync() => ReloadAsync(keepContent: false);
+
+    /// <summary>
+    /// 重新拉取当前分类。
+    /// <paramref name="keepContent"/> 为真（翻页）时保留已展示的一页，只在底部显示加载条；
+    /// 为假（切分类/筛选/换源）时先清空网格再显示骨架，避免把上一个分类的内容留在屏幕上。
+    /// </summary>
+    private async Task ReloadAsync(bool keepContent)
     {
         _request?.Cancel();
         var generation = ++_generation;
@@ -143,8 +193,17 @@ public sealed partial class VodViewModel : ObservableObject
         _request = scope;
         var source = _source;
         var category = SelectedCategory;
-        if (source is null || category is null) { Loading = false; _request=null; return; }
-        Loading = true;
+        if (source is null || category is null)
+        {
+            Loading = false; Paging = false; _request = null;
+            ItemsHint = source is null ? "尚未配置内容源，请到设置中添加 TVBox 配置地址" : "该站点暂无分类";
+            return;
+        }
+        var requestedPage = Page;
+        var previousPage = _loadedPage;
+        ItemsHint = "";
+        if (keepContent) { Loading = false; Paging = true; }
+        else { Paging = false; Items.Clear(); RebuildRows(); ItemsHint = ""; Loading = true; }
         try
         {
             if(_filterCategory!=category.Id)
@@ -165,7 +224,7 @@ public sealed partial class VodViewModel : ObservableObject
                 ["lang"] = FilterLanguage.Trim(), ["class"] = FilterClass.Trim(),
             };
             foreach(var (key,value) in _dynamicValues)filters[key]=value;
-            var result = await source.GetItemsAsync(category.Id, Page, filters, scope.Token);
+            var result = await source.GetItemsAsync(category.Id, requestedPage, filters, scope.Token);
             scope.Token.ThrowIfCancellationRequested();
             await _main.RunOnUiAsync(() =>
             {
@@ -174,26 +233,34 @@ public sealed partial class VodViewModel : ObservableObject
                 foreach (var item in result.Items) Items.Add(item);
                 RebuildRows();
                 PageCount = Math.Max(1, result.PageCount);
+                _loadedPage = requestedPage;
+                ItemsHint = Items.Count == 0 ? "该分类暂无内容，可切换分类或调整筛选" : "";
             });
         }
         catch (OperationCanceledException) when (scope.IsCancellationRequested) { }
         catch (Exception error)
         {
-            if (generation == _generation) _main.StatusMessage = $"加载失败：{error.Message}";
+            if (generation != _generation) return;
+            // 翻页失败时网格里仍是旧页内容，把页码一起退回去，避免指针和内容对不上。
+            if (keepContent && Page == requestedPage) Page = previousPage;
+            _main.StatusMessage = $"加载失败：{error.Message}";
+            if (!keepContent) ItemsHint = $"加载失败：{error.Message}";
         }
-        finally { if (generation == _generation) { Loading = false; _request = null; } }
+        finally { if (generation == _generation) { Loading = false; Paging = false; _request = null; } }
     }
 
     [RelayCommand]
     public async Task NextPage()
     {
-        if (Page < PageCount) { Page++; await ReloadAsync(); }
+        if (Loading || Paging) return;
+        if (Page < PageCount) { Page++; await ReloadAsync(keepContent: true); }
     }
 
     [RelayCommand]
     public async Task PrevPage()
     {
-        if (Page > 1) { Page--; await ReloadAsync(); }
+        if (Loading || Paging) return;
+        if (Page > 1) { Page--; await ReloadAsync(keepContent: true); }
     }
 
     [RelayCommand]

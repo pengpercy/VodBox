@@ -104,8 +104,10 @@
         </ListBox>
       </Border>
 
-      <!-- 结果网格：按行分块（ResultRowVM.Items = 5 张卡），ListBox 垂直虚拟化 -->
-      <ListBox x:Name="ResultsList" Classes="virtualRows" SizeChanged="OnResultsSizeChanged" Grid.Column="2" ItemsSource="{Binding ResultRows}" Background="Transparent"
+      <!-- 结果网格：按行分块（ResultRowVM.Items = 5 张卡），ListBox 垂直虚拟化。
+           加载态与结果同格叠加：搜索中显示骨架，结束显示空态/失败文案，都不留白屏。 -->
+      <Panel Grid.Column="2">
+      <ListBox x:Name="ResultsList" Classes="virtualRows" SizeChanged="OnResultsSizeChanged" ItemsSource="{Binding ResultRows}" Background="Transparent"
                BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.ItemTemplate>
           <DataTemplate>
@@ -139,6 +141,31 @@
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
+
+      <!-- 搜索中骨架：按当前列数铺占位卡，清空旧结果后不出现空白区 -->
+      <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowSkeleton}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="{Binding $parent[views:SearchView].((vm:MainViewModel)DataContext).Search.Columns}" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Width="170" Margin="0,0,18,18">
+              <Border Classes="skeleton poster" Height="216" />
+              <Border Classes="skeleton" Height="13" Width="112" Margin="0,8,0,0" HorizontalAlignment="Left" />
+              <Border Classes="skeleton" Height="11" Width="78" Margin="0,2,0,0" HorizontalAlignment="Left" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- 空态 / 失败态：非空文案覆盖结果位置 -->
+      <TextBlock Text="{Binding Hint}" Margin="0,24,0,0" FontSize="12.5" TextWrapping="Wrap" MaxWidth="420"
+                 HorizontalAlignment="Center" VerticalAlignment="Top" TextAlignment="Center"
+                 Foreground="{DynamicResource TextTertiaryBrush}"
+                 IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+      </Panel>
     </Grid>
   </Grid>
 </UserControl>

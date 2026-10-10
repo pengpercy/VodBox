@@ -251,9 +251,19 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowChannelSkeleton}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding CardColumns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate><DataTemplate>
+            <StackPanel Margin="0,0,14,14" Spacing="8">
+              <Border Classes="skeleton poster" Height="136" />
+              <Border Classes="skeleton" Height="13" Width="96" HorizontalAlignment="Left" />
+              <Border Classes="skeleton" Height="11" Width="72" HorizontalAlignment="Left" />
+            </StackPanel>
+          </DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
         <TextBlock Text="暂无频道，请先导入直播源或调整筛选条件" HorizontalAlignment="Center" VerticalAlignment="Center"
                    TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
-                   IsVisible="{Binding !ChannelCards.Count}" />
+                   IsVisible="{Binding ShowChannelEmpty}" />
         <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="12,8" Margin="0,0,12,12"
                 HorizontalAlignment="Left" VerticalAlignment="Bottom" IsVisible="{Binding Loading}">
           <StackPanel Orientation="Horizontal" Spacing="8">

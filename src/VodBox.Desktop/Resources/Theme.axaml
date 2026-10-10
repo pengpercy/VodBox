@@ -10,6 +10,7 @@
       <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
+      <SolidColorBrush x:Key="SkeletonBrush" Color="#1FFFFFFF" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Light">
       <SolidColorBrush x:Key="PageBackgroundBrush" Color="#F3F3F3" />
@@ -21,6 +22,7 @@
       <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7202020" />
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#99202020" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#66202020" />
+      <SolidColorBrush x:Key="SkeletonBrush" Color="#14000000" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Default">
       <SolidColorBrush x:Key="PageBackgroundBrush" Color="#202020" />
@@ -32,6 +34,7 @@
       <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
+      <SolidColorBrush x:Key="SkeletonBrush" Color="#1FFFFFFF" />
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

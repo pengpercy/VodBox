@@ -21,6 +21,10 @@ public sealed partial class HomeViewModel : ObservableObject
     public ObservableCollection<HistoryEntry> Recent { get; } = [];
 
     [ObservableProperty] private bool _loading;
+    [ObservableProperty] private bool _recentLoading;
+    [ObservableProperty] private string _recentHint = "";
+    /// <summary>推荐区空态/错误态文案（非空时显示在网格位置，避免白屏）。</summary>
+    [ObservableProperty] private string _recommendationsHint = "";
     [ObservableProperty] private string? _heroPoster;
     [ObservableProperty] private string _heroTitle = "";
     [ObservableProperty] private string _heroRemarks = "";
@@ -34,6 +38,22 @@ public sealed partial class HomeViewModel : ObservableObject
         _getSource = getSource;
         _store = store;
         _main = main;
+        Recent.CollectionChanged += (_, _) => NotifyRecentState();
+    }
+
+    /// <summary>最近观看：加载中且尚无内容 → 骨架行（本地库读取极快，只在首屏占位）。</summary>
+    public bool ShowRecentSkeleton => RecentLoading && Recent.Count == 0;
+
+    /// <summary>最近观看：加载结束仍为空 → 空态文案，不留一段空白。</summary>
+    public bool ShowRecentEmpty => !RecentLoading && Recent.Count == 0 && string.IsNullOrEmpty(RecentHint);
+
+    partial void OnRecentLoadingChanged(bool value) => NotifyRecentState();
+    partial void OnRecentHintChanged(string value) => NotifyRecentState();
+
+    private void NotifyRecentState()
+    {
+        OnPropertyChanged(nameof(ShowRecentSkeleton));
+        OnPropertyChanged(nameof(ShowRecentEmpty));
     }
 
     public async Task LoadAsync()
@@ -50,7 +70,9 @@ public sealed partial class HomeViewModel : ObservableObject
             source = _getSource();
             Loading = true;
             Recommendations.Clear();
-            Recent.Clear();
+            RecentLoading = true;
+            RecentHint = "";
+            RecommendationsHint = "";
             _sourceKey = "";
             SourceName = "";
             SetHero(null);
@@ -58,19 +80,33 @@ public sealed partial class HomeViewModel : ObservableObject
         var ct = scope!.Token;
         try
         {
-            var recent = await _store.GetHistoryAsync(12, ct);
-            ct.ThrowIfCancellationRequested();
+            // 两个分区并行加载、独立收尾，慢站点不阻塞最近观看。
+            await Task.WhenAll(LoadRecentAsync(generation, ct), LoadRecommendationsAsync(source, generation, ct));
+        }
+        finally
+        {
             await _main.RunOnUiAsync(() =>
             {
-                if (generation != _generation || ct.IsCancellationRequested) return;
-                foreach (var entry in recent) Recent.Add(entry);
+                if (generation != _generation) return;
+                _request = null;
+                Loading = false;
+                RecentLoading = false;
             });
+            scope.Dispose();
+        }
+    }
+
+    private async Task LoadRecommendationsAsync(IContentSource? source, long generation, CancellationToken ct)
+    {
+        try
+        {
             if (source is null)
             {
                 await _main.RunOnUiAsync(() =>
                 {
-                    if (generation == _generation && !ct.IsCancellationRequested)
-                        _main.StatusMessage = "尚未配置内容源，请到设置中添加 TVBox 配置地址";
+                    if (generation != _generation || ct.IsCancellationRequested) return;
+                    _main.StatusMessage = "尚未配置内容源，请到设置中添加 TVBox 配置地址";
+                    RecommendationsHint = _main.StatusMessage;
                 });
                 return;
             }
@@ -83,6 +119,36 @@ public sealed partial class HomeViewModel : ObservableObject
                 SourceName = source.Name;
                 foreach (var item in page.Items.Take(24)) Recommendations.Add(item);
                 SetHero(page.Items.FirstOrDefault());
+                RecommendationsHint = Recommendations.Count == 0 ? "该站点暂时没有返回推荐内容" : "";
+            });
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation != _generation || ct.IsCancellationRequested) return;
+                _main.StatusMessage = $"加载推荐失败：{error.Message}";
+                RecommendationsHint = _main.StatusMessage;
+            });
+        }
+        finally
+        {
+            await _main.RunOnUiAsync(() => { if (generation == _generation) Loading = false; });
+        }
+    }
+
+    private async Task LoadRecentAsync(long generation, CancellationToken ct)
+    {
+        try
+        {
+            var recent = await _store.GetHistoryAsync(12, ct);
+            ct.ThrowIfCancellationRequested();
+            await _main.RunOnUiAsync(() =>
+            {
+                if (generation != _generation || ct.IsCancellationRequested) return;
+                Recent.Clear();
+                foreach (var entry in recent) Recent.Add(entry);
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -91,18 +157,12 @@ public sealed partial class HomeViewModel : ObservableObject
             await _main.RunOnUiAsync(() =>
             {
                 if (generation == _generation && !ct.IsCancellationRequested)
-                    _main.StatusMessage = $"加载推荐失败：{error.Message}";
+                    RecentHint = $"最近观看加载失败：{error.Message}";
             });
         }
         finally
         {
-            await _main.RunOnUiAsync(() =>
-            {
-                if (generation != _generation) return;
-                _request = null;
-                Loading = false;
-            });
-            scope.Dispose();
+            await _main.RunOnUiAsync(() => { if (generation == _generation) RecentLoading = false; });
         }
     }
 

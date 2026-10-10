@@ -124,7 +124,7 @@ public sealed partial class LiveViewModel : ObservableObject
 
     public async Task ImportXmlTvAsync(Stream stream, bool gzip = false,CancellationToken ct=default)
     {
-        using var decompressed = gzip ? new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress, leaveOpen: true) : null;
+        await using var decompressed = gzip ? new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress, leaveOpen: true) : null;
         var generation = Interlocked.Increment(ref _epgImportGeneration);
         using var reader = new StreamReader(decompressed ?? stream, leaveOpen: true);
         var buffer = new char[8192];
@@ -171,10 +171,10 @@ public sealed partial class LiveViewModel : ObservableObject
             var channels = Groups.SelectMany(group => group.Channels).ToArray();
             Favorites.Clear();
             foreach (var entry in favorites)
-                if (channels.FirstOrDefault(channel => channel.Uris.FirstOrDefault() == entry.MediaId) is { } channel) Favorites.Add(channel);
+                if (channels.FirstOrDefault(liveChannel => liveChannel.Uris.FirstOrDefault() == entry.MediaId) is { } channel) Favorites.Add(channel);
             RecentChannels.Clear();
             foreach (var entry in history.Where(entry => entry.SourceKey == "live"))
-                if (channels.FirstOrDefault(channel => channel.Uris.FirstOrDefault() == entry.MediaId) is { } channel && !RecentChannels.Contains(channel)) RecentChannels.Add(channel);
+                if (channels.FirstOrDefault(liveChannel => liveChannel.Uris.FirstOrDefault() == entry.MediaId) is { } channel && !RecentChannels.Contains(channel)) RecentChannels.Add(channel);
             ApplyFilter();
         });
     }
@@ -194,6 +194,13 @@ public sealed partial class LiveViewModel : ObservableObject
     [ObservableProperty] private LiveGroup? _selectedGroup;
     [ObservableProperty] private LiveChannel? _currentChannel;
     [ObservableProperty] private bool _loading;
+    public bool ShowChannelSkeleton => Loading && ChannelCards.Count == 0;
+    public bool ShowChannelEmpty => !Loading && ChannelCards.Count == 0;
+    partial void OnLoadingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowChannelSkeleton));
+        OnPropertyChanged(nameof(ShowChannelEmpty));
+    }
     [ObservableProperty] private string _filterText = "";
 
     /// <summary>频道面板行集合：组头（LiveGroupHeader）+ 频道行（LiveChannel）混排，UI 按类型选模板。</summary>
@@ -245,6 +252,11 @@ public sealed partial class LiveViewModel : ObservableObject
         _services = services;
         _main = main;
         _loadGroups = loadGroups;
+        ChannelCards.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(ShowChannelSkeleton));
+            OnPropertyChanged(nameof(ShowChannelEmpty));
+        };
 
     }
 

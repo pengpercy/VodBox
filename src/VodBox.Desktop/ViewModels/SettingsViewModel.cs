@@ -197,6 +197,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             _main.UpdateSourceName();
             await RecordSubscriptionAsync(requestedUrl);
             Message = $"加载成功：{_services.Registry.Sources.Count} 个站点"+(_services.Registry.ImportWarnings.Count>0?"；导入警告："+string.Join("；",_services.Registry.ImportWarnings):"");
+            // 换配置后旧的分类/海报属于已失效的站点，进点播页必须重新加载而不是复用缓存。
+            _main.Vod.Invalidate();
             await _main.Home.LoadAsync();
         }
         catch (Exception error)

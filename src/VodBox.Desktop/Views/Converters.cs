@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Avalonia.Data.Converters;
 using VodBox.Desktop.ViewModels;
 
@@ -32,6 +34,7 @@ public static class PageConverters
 public static class StringConverters
 {
     public static readonly IValueConverter IsNotNullOrEmpty = new NotNullOrEmptyConverter();
+    public static readonly IValueConverter IsNullOrEmpty = new NullOrEmptyConverter();
 
     private sealed class NotNullOrEmptyConverter : IValueConverter
     {
@@ -41,6 +44,30 @@ public static class StringConverters
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();
     }
+
+    private sealed class NullOrEmptyConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is not string s || s.Length == 0;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+}
+
+/// <summary>骨架屏占位槽位（XAML 经 x:Static 绑定，避免每个 VM 重复定义占位集合）。</summary>
+public static class SkeletonData
+{
+    /// <summary>海报/结果卡占位（覆盖 6 列 × 3 行的常见首屏吞吐）。</summary>
+    public static IReadOnlyList<int> Cards { get; } = Enumerable.Range(0, 18).ToArray();
+    /// <summary>详情页选集骨架槽位（20 个，约两行）。</summary>
+    public static IReadOnlyList<int> Episodes { get; } = Enumerable.Range(0, 20).ToArray();
+    /// <summary>站点/线路等横向短条骨架。</summary>
+    public static IReadOnlyList<int> Bars { get; } = Enumerable.Range(0, 5).ToArray();
+    /// <summary>首页「最近观看」横向卡骨架槽位（6 张）。</summary>
+    public static IReadOnlyList<int> Recent { get; } = Enumerable.Range(0, 6).ToArray();
+    /// <summary>收藏/历史列表行骨架槽位（4 行）。</summary>
+    public static IReadOnlyList<int> Rows { get; } = Enumerable.Range(0, 4).ToArray();
 }
 
 /// <summary>进度毫秒 → 0..1 比例。</summary>

@@ -19,6 +19,19 @@
         </StackPanel>
       </Border>
 
+      <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding Loading}" />
+      <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
+                 IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+      <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowSkeleton}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate><DataTemplate>
+          <StackPanel Width="158" Margin="0,0,18,18" Spacing="8">
+            <Border Classes="skeleton poster" Height="225" />
+            <Border Classes="skeleton" Height="13" Width="112" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="11" Width="78" HorizontalAlignment="Left" />
+          </StackPanel>
+        </DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl>
       <!-- 标题行：历史 · 今天 + 右侧 全部历史 / 清空（设计稿） -->
       <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -121,7 +134,7 @@
       </ListBox>
 
       <TextBlock Text="暂无观看记录" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"
-                 Margin="0,20,0,0" IsVisible="{Binding Entries.Count, Converter={x:Static views:CountConverters.IsZero}}" />
+                 Margin="0,20,0,0" IsVisible="{Binding ShowEmpty}" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

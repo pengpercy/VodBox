@@ -112,6 +112,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task ShutdownAsync()
     {
         Detail.CancelPending();Vod.CancelPending();Search.CancelPending();Live.CancelPending();Settings.CancelSubtitleSearch();
+        Favorites.CancelPending();History.CancelPending();
         await _services.LocalControl.DisposeAsync();
         Settings.ClearPairingPresentation();
         await Player.CloseCommand.ExecuteAsync(null);
@@ -143,6 +144,16 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (value != AppPage.Detail) Detail.CancelPending();
         if (value == AppPage.Settings && !_designTime) Settings.RefreshSites();
+        if (_designTime) return; // 设计时假数据已就位，不触网、不覆盖
+        if (value != AppPage.Favorites) Favorites.CancelPending();
+        if (value != AppPage.History) History.CancelPending();
+        // 列表页在导航进入时才发起加载（首屏只预载首页/直播），各自做加载过渡与代次门控。
+        switch (value)
+        {
+            case AppPage.Vod: Vod.EnsureLoaded(); break;
+            case AppPage.Favorites: Favorites.EnsureLoaded(); break;
+            case AppPage.History: History.EnsureLoaded(); break;
+        }
     }
 
     public void Navigate(AppPage page) => Page = page;

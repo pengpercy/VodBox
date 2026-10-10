@@ -1,0 +1,14 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- 骨架占位块：静态半透明，跟随亮/暗主题（SkeletonBrush）。
+       刻意不加脉动动画——应用没有“减少动画”偏好可供沿用，无条件动画无法按偏好关闭。
+       加载进度由各分区 ProgressBar 指示，海报就绪后使用短淡入，不循环闪烁。 -->
+  <Style Selector="Border.skeleton">
+    <Setter Property="Background" Value="{DynamicResource SkeletonBrush}" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+  <Style Selector="Border.skeleton.poster">
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+</Styles>

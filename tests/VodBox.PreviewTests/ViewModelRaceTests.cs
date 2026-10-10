@@ -541,6 +541,58 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public async Task Home_RecentEmptyFinishesWhileRecommendationsAreStillLoading()
+    {
+        using var context = new Context();
+        var recommendations = Gate<MediaPage>();
+        context.Source.Home = _ => recommendations.Task;
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var load = home.LoadAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(home.Loading);
+        Assert.False(home.RecentLoading);
+        Assert.False(home.ShowRecentSkeleton);
+        Assert.True(home.ShowRecentEmpty);
+        recommendations.SetResult(new MediaPage([], 1, 1));
+        await Done(load);
+        Assert.False(home.Loading);
+        Assert.NotEmpty(home.RecommendationsHint);
+    }
+
+    [AvaloniaFact]
+    public async Task Home_RecentFailureDoesNotPreventRecommendationsFromLoading()
+    {
+        using var context = new Context();
+        context.Store.ReadHistory = (_, _) => Task.FromException<IReadOnlyList<HistoryEntry>>(new IOException("history unavailable"));
+        context.Source.Home = _ => Task.FromResult(new MediaPage([new MediaItem { Id = "ok", Title = "推荐" }], 1, 1));
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        await Done(home.LoadAsync());
+        Assert.Equal("ok", Assert.Single(home.Recommendations).Id);
+        Assert.NotEmpty(home.RecentHint);
+        Assert.False(home.ShowRecentEmpty);
+        Assert.False(home.RecentLoading);
+        Assert.False(home.Loading);
+    }
+
+    [AvaloniaFact]
+    public async Task Home_RecommendationsFinishWhileRecentHistoryIsStillLoading()
+    {
+        using var context = new Context();
+        var history = Gate<IReadOnlyList<HistoryEntry>>();
+        context.Store.ReadHistory = (_, _) => history.Task;
+        context.Source.Home = _ => Task.FromResult(new MediaPage([new MediaItem { Id = "ok", Title = "推荐" }], 1, 1));
+        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var load = home.LoadAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(home.Loading);
+        Assert.True(home.ShowRecentSkeleton);
+        Assert.Single(home.Recommendations);
+        history.SetResult([]);
+        await Done(load);
+        Assert.False(home.RecentLoading);
+    }
+
+    [AvaloniaFact]
     public async Task Home_HeroUsesTheSourceThatProvidedRecommendations()
     {
         using var context = new Context();
@@ -988,6 +1040,40 @@ public sealed class ViewModelRaceTests
         Assert.Same(channel, Assert.Single(live.VisibleChannels));
         await Done(live.ToggleChannelFavoriteCommand.ExecuteAsync(null));
         Assert.Empty(await context.Services.Store.GetFavoritesAsync(FavoriteKind.Live));
+    }
+
+    [AvaloniaFact]
+    public async Task Vod_PagingKeepsCurrentCardsAndRollsBackOnFailure()
+    {
+        using var context = new Context();
+        var next = Gate<MediaPage>();
+        context.Source.Items = (_, page, _) => page == 1
+            ? Task.FromResult(new MediaPage([new MediaItem { Id = "first", Title = "第一页" }], 1, 2))
+            : next.Task;
+        var vod = new VodViewModel(context.Services, context.Main, () => context.Source);
+        await Done(vod.LoadAsync());
+        var paging = vod.NextPage();
+        Assert.True(vod.Paging);
+        Assert.False(vod.Loading);
+        Assert.Equal("first", Assert.Single(vod.Items).Id);
+        next.SetException(new IOException("next page failed"));
+        await Done(paging);
+        Assert.Equal(1, vod.Page);
+        Assert.False(vod.Paging);
+        Assert.False(vod.Loading);
+        Assert.Equal("first", Assert.Single(vod.Items).Id);
+    }
+
+    [AvaloniaFact]
+    public async Task Vod_EmptyCategoriesFinishWithInlineHint()
+    {
+        using var context = new Context();
+        context.Source.Categories = _ => Task.FromResult<IReadOnlyList<Category>>([]);
+        var vod = new VodViewModel(context.Services, context.Main, () => context.Source);
+        await Done(vod.LoadAsync());
+        Assert.False(vod.Loading);
+        Assert.False(vod.Paging);
+        Assert.NotEmpty(vod.ItemsHint);
     }
 
     [AvaloniaFact]
@@ -2542,7 +2628,8 @@ public sealed class ViewModelRaceTests
         }
         public IReadOnlyList<FilterGroup> Filters {get;set;}=[];
         public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)=>Task.FromResult(Filters);
-        public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Category>>([new Category("a", "分类")]);
+        public Func<CancellationToken, Task<IReadOnlyList<Category>>> Categories { get; set; } = _ => Task.FromResult<IReadOnlyList<Category>>([new Category("a", "分类")]);
+        public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default) => Categories(ct);
         public Func<CancellationToken, Task<MediaPage>> Home { get; set; } = _ => Task.FromResult(new MediaPage([], 1, 1));
         public Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => Home(ct);
         public Func<string, int, CancellationToken, Task<MediaPage>> Items { get; set; } = (_, _, _) => Task.FromResult(new MediaPage([], 1, 1));
@@ -2563,7 +2650,8 @@ public sealed class ViewModelRaceTests
         public Task SaveHistoryAsync(HistoryEntry entry, CancellationToken ct = default) { Saved.Add(entry); return Save(entry); }
         public Task<bool> IsFavoriteAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Favorite(sourceKey, mediaId, ct);
         public Task<HistoryEntry?> FindHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => History(sourceKey, mediaId, ct);
-        public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<HistoryEntry>>(Saved.ToArray());
+        public Func<int, CancellationToken, Task<IReadOnlyList<HistoryEntry>>>? ReadHistory { get; set; }
+        public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default) => ReadHistory?.Invoke(limit, ct) ?? Task.FromResult<IReadOnlyList<HistoryEntry>>(Saved.ToArray());
         public Task DeleteHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.CompletedTask;
         public Task ClearHistoryAsync(CancellationToken ct = default) => Task.CompletedTask;
         public Func<FavoriteEntry, bool, Task> SetFavorite { get; set; } = (_, _) => Task.CompletedTask;

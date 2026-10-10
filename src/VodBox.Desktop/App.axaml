@@ -25,6 +25,7 @@
     <Style Selector="ContextMenu MenuItem"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="Window"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /></Style>
     <StyleInclude Source="avares://VodBox.Desktop/Views/VirtualRows.axaml" />
+    <StyleInclude Source="avares://VodBox.Desktop/Resources/Skeleton.axaml" />
     <!-- Material Design 3 风格滑杆：4px 圆头轨道 + 14px 圆 thumb，配 MDI 图标 -->
     <Style Selector="Slider.md">
       <Setter Property="MinHeight" Value="24" />

@@ -31,8 +31,24 @@ public sealed partial class SearchViewModel : ObservableObject
     [ObservableProperty] private bool _searching;
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private bool _showSuggestions;
+    /// <summary>结果区空态/错误态文案（非空时覆盖网格位置，避免白屏）。</summary>
+    [ObservableProperty] private string _hint = "";
     /// <summary>当前选中的站点结果组（右侧网格随它切换）；null = 全部结果。</summary>
     [ObservableProperty] private SearchSiteResult? _selectedSite;
+
+    /// <summary>搜索中且尚无任何结果 → 结果区骨架（清空旧结果后不留白屏）。</summary>
+    public bool ShowSkeleton => Searching && ResultRows.Count == 0;
+    /// <summary>搜索结束且没有结果 → 空态/失败文案提示。</summary>
+    public bool ShowEmpty => !Searching && ResultRows.Count == 0;
+
+    partial void OnSearchingChanged(bool value) => NotifyResultState();
+    partial void OnHintChanged(string value) => NotifyResultState();
+
+    private void NotifyResultState()
+    {
+        OnPropertyChanged(nameof(ShowSkeleton));
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
 
     public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main, services.Prefs)
     { _detailedSearch=services.Registry.SearchWithFailuresAsync; }
@@ -86,6 +102,7 @@ public sealed partial class SearchViewModel : ObservableObject
             generation = ++_generation;
             Searching = true;
             Summary = $"「{query}」搜索中…";
+            Hint = "";
             SelectedSite = null;
             SiteResults.Clear();
             AllResults.Clear();
@@ -119,6 +136,7 @@ public sealed partial class SearchViewModel : ObservableObject
                 RebuildResultRows();
                 Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {retained.Length} 条结果";
                 if(aggregate?.Failures.Count>0)Summary+=$"；{aggregate.Failures.Count} 个站点失败："+string.Join("；",aggregate.Failures.Take(5).Select(failure=>failure.Site.Name+"："+failure.Error));
+                Hint = retained.Length == 0 ? "没有找到匹配的结果，换个关键词或站点试试" : "";
                 ShowSuggestions = false;
                 SearchHistory.Remove(query);
                 SearchHistory.Insert(0, query);
@@ -131,7 +149,11 @@ public sealed partial class SearchViewModel : ObservableObject
         {
             await _main.RunOnUiAsync(() =>
             {
-                if (generation == _generation && !ct.IsCancellationRequested) Summary = $"搜索失败：{error.Message}";
+                if (generation == _generation && !ct.IsCancellationRequested)
+                {
+                    Summary = $"搜索失败：{error.Message}";
+                    Hint = $"搜索失败：{error.Message}";
+                }
             });
         }
         finally
@@ -168,11 +190,16 @@ public sealed partial class SearchViewModel : ObservableObject
 
     private int _columns = 5;
 
+    /// <summary>当前结果列数；骨架屏按同一列数铺占位卡，避免加载完成时跳列。</summary>
+    public int Columns => _columns;
+
     public void SetResultWidth(double width)
     {
+        if (width <= 0) return; // 隐藏时布局宽度为 0，忽略以免把列数压成 1
         var columns = Math.Max(1, (int)Math.Floor(Math.Max(0, width - 16) / 188));
         if (columns == _columns) return;
         _columns = columns;
+        OnPropertyChanged(nameof(Columns));
         RebuildResultRows();
     }
 
@@ -184,6 +211,7 @@ public sealed partial class SearchViewModel : ObservableObject
         ResultRows.Clear();
         for (var i = 0; i < items.Count; i += _columns)
             ResultRows.Add(new ResultRow(items.Skip(i).Take(_columns).ToList()));
+        NotifyResultState();
     }
 
 }

@@ -9,7 +9,57 @@
   </Design.DataContext>
 
   <ScrollViewer Padding="28,12,28,28">
-    <StackPanel Spacing="22" DataContext="{Binding Detail}">
+    <Panel>
+    <!-- 详情骨架：加载中占位（海报 + 元信息 + 线路 + 选集），避免整页白屏 -->
+    <StackPanel Spacing="22" IsVisible="{Binding Detail.ShowSkeleton}">
+      <Grid ColumnDefinitions="200,36,*,28,280">
+        <Border Grid.Column="0" Classes="skeleton poster" Height="300" />
+        <StackPanel Grid.Column="2" Spacing="12">
+          <Border Classes="skeleton" Height="26" Width="280" HorizontalAlignment="Left" />
+          <Border Classes="skeleton" Height="13" Width="140" HorizontalAlignment="Left" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Border Classes="skeleton" Height="26" Width="64" />
+            <Border Classes="skeleton" Height="26" Width="64" />
+            <Border Classes="skeleton" Height="26" Width="80" />
+          </StackPanel>
+          <Border Classes="skeleton" Height="12" Width="360" HorizontalAlignment="Left" />
+          <Border Classes="skeleton" Height="12" Width="420" HorizontalAlignment="Left" />
+          <Border Classes="skeleton" Height="12" Width="300" HorizontalAlignment="Left" />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+            <Border Classes="skeleton" Height="38" Width="126" />
+            <Border Classes="skeleton" Height="38" Width="96" />
+            <Border Classes="skeleton" Height="38" Width="112" />
+          </StackPanel>
+        </StackPanel>
+        <Border Grid.Column="4" Classes="skeleton poster" Height="158" />
+      </Grid>
+      <StackPanel Spacing="10">
+        <Border Classes="skeleton" Height="18" Width="80" HorizontalAlignment="Left" />
+        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Bars}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate><Border Classes="skeleton" Height="32" Width="88" /></DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <StackPanel Spacing="10">
+        <Border Classes="skeleton" Height="18" Width="60" HorizontalAlignment="Left" />
+        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Episodes}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate><Border Classes="skeleton" Height="37" Width="132" Margin="0,0,8,10" /></DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+
+    <!-- 详情内容：拿到数据后显示（加载中为 null，由上面的骨架接管） -->
+    <StackPanel Spacing="22" DataContext="{Binding Detail}"
+                IsVisible="{Binding $parent[views:DetailView].((vm:MainViewModel)DataContext).Detail.ShowContent}">
 
       <Grid ColumnDefinitions="200,36,*,28,280">
         <!-- 海报 -->
@@ -181,5 +231,16 @@
       </StackPanel>
 
     </StackPanel>
+
+    <!-- 失败/不可用文案：非空时覆盖内容位置，不留白屏 -->
+    <TextBlock Text="{Binding Detail.Hint}" FontSize="12.5" TextWrapping="Wrap" MaxWidth="420"
+               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="0,40,0,0"
+               Foreground="{DynamicResource TextTertiaryBrush}"
+               IsVisible="{Binding Detail.Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+    <!-- 空态：加载结束仍没有可展示的详情 -->
+    <TextBlock Text="没有可展示的详情内容" FontSize="12.5"
+               HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,0"
+               Foreground="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding Detail.ShowEmpty}" />
+    </Panel>
   </ScrollViewer>
 </UserControl>

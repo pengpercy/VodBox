@@ -65,6 +65,19 @@
         </StackPanel>
       </Grid>
 
+      <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding Loading}" />
+      <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}"
+                 IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+      <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowSkeleton}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate><DataTemplate>
+          <StackPanel Width="158" Margin="0,0,18,18" Spacing="8">
+            <Border Classes="skeleton poster" Height="225" />
+            <Border Classes="skeleton" Height="13" Width="112" HorizontalAlignment="Left" />
+            <Border Classes="skeleton" Height="11" Width="78" HorizontalAlignment="Left" />
+          </StackPanel>
+        </DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl>
       <!-- 收藏网格：分块行虚拟化（6 张/行，收藏无上限时只渲染可见行） -->
       <ListBox Classes="virtualRows" ItemsSource="{Binding VodRows}" Background="Transparent" BorderThickness="0"
                Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" MaxHeight="480">
@@ -108,7 +121,7 @@
 
       <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}"
                   HorizontalAlignment="Center" Margin="0,20,0,0"
-                  IsVisible="{Binding Vod.Count, Converter={x:Static views:CountConverters.IsZero}}">
+                  IsVisible="{Binding ShowEmpty}">
         <TextBlock Text="暂无收藏 — 在详情页点击" FontSize="12.5" VerticalAlignment="Center" />
         <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" VerticalAlignment="Center" />
         <TextBlock Text="收藏" FontSize="12.5" VerticalAlignment="Center" />
