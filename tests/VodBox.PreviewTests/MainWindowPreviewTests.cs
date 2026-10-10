@@ -103,9 +103,13 @@ public sealed class MainWindowPreviewTests
             Assert.Equal(AppPage.Home, main.Page);
             window.MouseDown(menuPoint, MouseButton.Left);
             window.MouseUp(menuPoint, MouseButton.Left);
-            Assert.Equal(AppPage.Settings, main.Page);
-            Assert.True(settings.IsSelected);
-            main.Page = AppPage.Home;
+            // 设置现在是独立窗口：点击后不切页（切过去只会留下空白内容区），而是弹出窗口。
+            Assert.Equal(AppPage.Home, main.Page);
+            Assert.NotNull(window.OpenSettingsWindow);
+            Assert.True(window.OpenSettingsWindow!.IsVisible);
+            Assert.False(settings.IsSelected);
+            window.OpenSettingsWindow.Close();
+            Assert.Null(window.OpenSettingsWindow);
 
             var searchPoint = search.TranslatePoint(new Point(search.Bounds.Width / 2, search.Bounds.Height / 2), window)!.Value;
             window.MouseDown(searchPoint, MouseButton.Left);

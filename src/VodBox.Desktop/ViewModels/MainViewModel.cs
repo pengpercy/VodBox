@@ -171,6 +171,19 @@ public sealed partial class MainViewModel : ObservableObject
     public bool ShowGlobalSearch => Page is not (AppPage.Search or AppPage.Live);
     public Avalonia.Thickness PageContentMargin => GetPageContentMargin(Page, OperatingSystem.IsMacOS());
 
+    /// <summary>设置改为独立窗口后，由主窗口订阅此事件来打开窗口（VM 不直接创建窗口）。</summary>
+    public event Action? SettingsRequested;
+
+    /// <summary>
+    /// 打开设置窗口。设置不再是主窗口的一页，所以这里**不切页**（切过去只会留下空白内容区），
+    /// 而是刷新站点列表并请求主窗口开窗口。侧边栏、远程配置、推送回调都走这一条路径。
+    /// </summary>
+    public void OpenSettings()
+    {
+        if (!_designTime) Settings.RefreshSites();
+        SettingsRequested?.Invoke();
+    }
+
     // macOS 的窗口按钮位于左侧；其他平台保留完整标题栏高度，避免右侧工具栏覆盖窗口按钮。
     internal static Avalonia.Thickness GetPageContentMargin(AppPage page, bool isMacOS) =>
         page == AppPage.Live && isMacOS ? new(0, -24, 0, 0) : new(0);
@@ -180,7 +193,6 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowGlobalSearch));
         OnPropertyChanged(nameof(PageContentMargin));
         if (value != AppPage.Detail) Detail.CancelPending();
-        if (value == AppPage.Settings && !_designTime) Settings.RefreshSites();
         if (_designTime) return; // 设计时假数据已就位，不触网、不覆盖
         if (value != AppPage.Favorites) Favorites.CancelPending();
         if (value != AppPage.History) History.CancelPending();
@@ -217,7 +229,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void GoFiles() => Navigate(AppPage.Files);
 
     [RelayCommand]
-    private void GoSettings() => Navigate(AppPage.Settings);
+    private void GoSettings() => OpenSettings();
 
     [RelayCommand]
     private void SubmitSearch()

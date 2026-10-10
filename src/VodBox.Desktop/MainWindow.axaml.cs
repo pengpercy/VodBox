@@ -14,12 +14,17 @@ public partial class MainWindow : Window
 {
     private PlayerViewModel? _observedPlayer;
     internal Views.PlayerWindow? PlaybackWindow { get; private set; }
+    private Views.SettingsWindow? _settingsWindow;
     private bool _shutdownStarted;
     private bool _shutdownComplete;
     public MainWindow()
     {
         InitializeComponent();
-        Closed += (_, _) => StopObservingPlayer();
+        Closed += (_, _) =>
+        {
+            if (DataContext is MainViewModel main) main.SettingsRequested -= ShowSettingsWindow;
+            StopObservingPlayer();
+        };
         Closing+=OnClosing;
         // 拖放：m3u/m3u8 作为直播源打开，媒体文件直接播放。
         DragDrop.SetAllowDrop(this, true);
@@ -98,6 +103,7 @@ public partial class MainWindow : Window
         {
             _observedPlayer = playerOwner.Player;
             _observedPlayer.PropertyChanged += OnPlayerVisibilityChanged;
+            playerOwner.SettingsRequested += ShowSettingsWindow;
             SyncPlayerWindow();
         }
         if (DataContext is MainViewModel vm && Avalonia.Application.Current is App)
@@ -146,6 +152,36 @@ public partial class MainWindow : Window
     {
         // Visible 决定窗口的存在；Title 变化说明换了台/换了集，此时要把窗口提到最前。
         if (e.PropertyName is nameof(PlayerViewModel.Visible) or nameof(PlayerViewModel.Title)) SyncPlayerWindow();
+    }
+
+    /// <summary>当前已打开的设置窗口（只读观察用，没有副作用：不会顺手创建一个）。</summary>
+    internal Views.SettingsWindow? OpenSettingsWindow => _settingsWindow;
+
+    /// <summary>UI smoke 用：拿到（必要时先创建）设置窗口，以便逐个分区验证渲染。</summary>
+    internal Views.SettingsWindow? SettingsWindowForSmoke
+    {
+        get
+        {
+            if (_settingsWindow is null) ShowSettingsWindow();
+            return _settingsWindow;
+        }
+    }
+
+    /// <summary>设置改为独立窗口：已开则提到最前（并切到请求的分区），否则新建一个。</summary>
+    private void ShowSettingsWindow()
+    {
+        if (DataContext is not MainViewModel main) return;
+        if (_settingsWindow is { } existing)
+        {
+            existing.SyncSelectionFrom(main.Settings);
+            existing.Activate();
+            return;
+        }
+        var window = new Views.SettingsWindow(main.Settings);
+        _settingsWindow = window;
+        window.Closed += (_, _) => { if (ReferenceEquals(_settingsWindow, window)) _settingsWindow = null; };
+        // 非模态、不设 Owner：与播放窗口一致，主窗口仍可独立操作。
+        window.Show();
     }
 
     private void SyncPlayerWindow()

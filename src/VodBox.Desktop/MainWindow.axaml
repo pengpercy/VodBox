@@ -76,7 +76,6 @@
           <views:FavoritesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" />
           <views:HistoryView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" />
           <views:FilesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" />
-          <views:SettingsView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" />
           <views:DetailView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsDetail}, ConverterParameter=0, Mode=OneWay}" />
         </Panel>
       </Grid>

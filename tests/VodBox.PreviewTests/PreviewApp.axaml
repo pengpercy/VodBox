@@ -48,6 +48,7 @@
     </Style>
     <FluentTheme />
     <StyleInclude Source="avares://VodBox.Desktop/Resources/ShapeStyles.axaml" />
+    <StyleInclude Source="avares://VodBox.Desktop/Resources/SettingsCardStyles.axaml" />
     <!-- 悬浮子面板（ContextMenu）统一小一号字号，减少遮挡 -->
     <Style Selector="ContextMenu"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="ContextMenu MenuItem"><Setter Property="FontSize" Value="12" /></Style>

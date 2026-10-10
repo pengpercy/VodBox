@@ -456,7 +456,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [RelayCommand]
     public void OpenRemoteSettings()
-    {ConfigDialogOpen=false;_main.Navigate(AppPage.Settings);Section=6;}
+    {ConfigDialogOpen=false;_main.OpenSettings();Section=6;}
 
     [RelayCommand]
     private async Task StartLocalControl()
@@ -486,7 +486,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 }
             }),configure:url=>_main.RunOnUiAsync(()=>
             {
-                _main.Navigate(AppPage.Settings);Section=0;DialogUrl=url;ConfigDialogOpen=true;
+                _main.OpenSettings();Section=0;DialogUrl=url;ConfigDialogOpen=true;
                 Message="收到配置地址，请在桌面确认加载";
             }),status:async()=>
             {
