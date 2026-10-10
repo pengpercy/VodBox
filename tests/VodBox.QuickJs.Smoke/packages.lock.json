@@ -14,7 +14,7 @@
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.2.1, )"
+          "VodBox.Core": "[0.2.4, )"
         }
       }
     }
