@@ -40,6 +40,7 @@ jobs:
         run: |
           python3 -m pip install --quiet pyyaml
           python3 build/ci_lint.py
+          python3 -B -m unittest discover -s build -p test_release_publish.py -v
   build:
     needs: [version, lint]
     uses: ./.github/workflows/build.yml

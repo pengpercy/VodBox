@@ -65,6 +65,7 @@ jobs:
     needs: [version, package]
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v7
       - name: Verify existing package metadata
         if: inputs.package_run != ''
         env:
@@ -102,12 +103,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${{ github.ref_name }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then tag="v${{ needs.version.outputs.value }}"; fi
-          sha="${{ needs.version.outputs.sha }}"
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
-            gh release create "$tag" artifacts/release/* --repo "$GITHUB_REPOSITORY" --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
-          else
-            gh release create "$tag" artifacts/release/* --repo "$GITHUB_REPOSITORY" --target "$sha" --title "VodBox ${{ needs.version.outputs.value }}" --generate-notes
-          fi
+          VERSION: ${{ needs.version.outputs.value }}
+          SOURCE_SHA: ${{ needs.version.outputs.sha }}
+        shell: bash
+        run: python3 build/release_publish.py
