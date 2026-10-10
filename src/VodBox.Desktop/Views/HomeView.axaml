@@ -60,15 +60,15 @@
           </StackPanel>
           <!-- 英雄区骨架：网络首屏未就绪时占位，避免标题/简介空白 -->
           <StackPanel VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="10" IsVisible="{Binding Loading}">
-            <Border Classes="skeleton" Height="11.5" Width="120" HorizontalAlignment="Left" />
-            <Border Classes="skeleton" Height="30" Width="320" HorizontalAlignment="Left" />
-            <Border Classes="skeleton" Height="13" Width="200" HorizontalAlignment="Left" />
-            <Border Classes="skeleton" Height="12" Width="460" HorizontalAlignment="Left" />
-            <Border Classes="skeleton" Height="12" Width="340" HorizontalAlignment="Left" />
+            <Border Classes="skeleton hero" Height="11.5" Width="120" HorizontalAlignment="Left" />
+            <Border Classes="skeleton hero" Height="30" Width="320" HorizontalAlignment="Left" />
+            <Border Classes="skeleton hero" Height="13" Width="200" HorizontalAlignment="Left" />
+            <Border Classes="skeleton hero" Height="12" Width="460" HorizontalAlignment="Left" />
+            <Border Classes="skeleton hero" Height="12" Width="340" HorizontalAlignment="Left" />
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
-              <Border Classes="skeleton" Height="38" Width="126" />
-              <Border Classes="skeleton" Height="38" Width="76" />
-              <Border Classes="skeleton" Height="38" Width="92" />
+              <Border Classes="skeleton hero" Height="38" Width="126" />
+              <Border Classes="skeleton hero" Height="38" Width="76" />
+              <Border Classes="skeleton hero" Height="38" Width="92" />
             </StackPanel>
           </StackPanel>
           <!-- 轮播指示器（右下角，当前位为胶囊） -->

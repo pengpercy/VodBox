@@ -143,10 +143,11 @@
       </ListBox>
 
       <!-- 搜索中骨架：按当前列数铺占位卡，清空旧结果后不出现空白区 -->
+      <ScrollViewer IsVisible="{Binding ShowSkeleton}" HorizontalScrollBarVisibility="Disabled">
       <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding ShowSkeleton}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <UniformGrid Columns="{Binding $parent[views:SearchView].((vm:MainViewModel)DataContext).Search.Columns}" />
+            <WrapPanel />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
@@ -159,6 +160,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </ScrollViewer>
 
       <!-- 空态 / 失败态：非空文案覆盖结果位置 -->
       <TextBlock Text="{Binding Hint}" Margin="0,24,0,0" FontSize="12.5" TextWrapping="Wrap" MaxWidth="420"

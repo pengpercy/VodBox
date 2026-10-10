@@ -120,10 +120,11 @@
     </ListBox>
 
     <!-- 首屏 / 切分类骨架：按当前列数与海报尺寸铺占位卡，避免加载期间白屏 -->
+    <ScrollViewer IsVisible="{Binding Loading}" HorizontalScrollBarVisibility="Disabled">
     <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding Loading}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
-          <UniformGrid Columns="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.Columns}" />
+          <WrapPanel />
         </ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
@@ -136,6 +137,7 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
+    </ScrollViewer>
 
     <!-- 翻页：保留当前页，只在左下角提示进度（与直播页一致的加载条样式） -->
     <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="12,8" Margin="0,0,12,12"

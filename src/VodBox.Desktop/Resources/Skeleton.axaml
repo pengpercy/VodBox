@@ -11,4 +11,8 @@
   <Style Selector="Border.skeleton.poster">
     <Setter Property="CornerRadius" Value="8" />
   </Style>
+  <!-- 横幅始终使用深色渐变，不能继承浅色主题的深色占位笔刷。 -->
+  <Style Selector="Border.skeleton.hero">
+    <Setter Property="Background" Value="#33FFFFFF" />
+  </Style>
 </Styles>
