@@ -39,6 +39,15 @@ public class App : Application
             var main=new MainViewModel(Services);
             var window=new MainWindow{DataContext=main};
             desktop.MainWindow=window;
+            if (desktop.Args?.Contains("--ui-smoke") != true)
+            {
+                window.Opened += async (_, _) =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(20));
+                    if (window.IsVisible && main.Settings.AutoCheckUpdates)
+                        await main.Settings.CheckUpdateAsync(); // Only updates the settings label; never interrupts playback.
+                };
+            }
             if(desktop.Args?.Contains("--ui-smoke")==true)
             {
                 if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VODBOX_DATA_DIR")))throw new InvalidOperationException("UI smoke requires an isolated VODBOX_DATA_DIR.");

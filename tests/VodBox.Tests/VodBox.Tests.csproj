@@ -17,4 +17,7 @@
   <ItemGroup>
     <None Include="fixtures/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../src/VodBox.Desktop/Services/AppUpdater.cs" Link="AppUpdater.cs" />
+  </ItemGroup>
 </Project>

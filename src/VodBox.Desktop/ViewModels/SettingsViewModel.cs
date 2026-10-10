@@ -45,6 +45,76 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnProxyPushedMediaChanged(bool value) => _services.Prefs.Set("push.use-proxy", value);
     [ObservableProperty] private bool _applying;
     [ObservableProperty] private string _message = "";
+    [ObservableProperty] private string _updateMessage = "尚未检查更新";
+    [ObservableProperty] private bool _autoCheckUpdates = true;
+    partial void OnAutoCheckUpdatesChanged(bool value) => _services.Prefs.Set("updates.auto-check", value);
+    public string AppVersion => typeof(App).Assembly.GetName().Version?.ToString(3) ?? "未知";
+    public UpdateOffer? AvailableUpdate { get; private set; }
+    public bool UpdateBusy { get; private set; }
+    private CancellationTokenSource? _updateCancellation;
+
+    public async Task CheckUpdateAsync()
+    {
+        if (UpdateBusy) return;
+        UpdateBusy = true;
+        UpdateMessage = "正在检查更新…";
+        try
+        {
+            AvailableUpdate = await AppUpdater.CheckAsync(AppVersion);
+            UpdateMessage = AvailableUpdate is { } offer
+                ? OperatingSystem.IsLinux()
+                    ? offer.Name.Length == 0 ? $"发现新版本 {offer.Version}；请查看发行说明并选择适合系统的安装包" : $"发现新版本 {offer.Version}；可下载 {offer.Name}，请通过系统包管理器安装"
+                    : $"发现新版本 {offer.Version}"
+                : "当前已是最新版本，或暂无可用的安全更新包";
+            if (!OperatingSystem.IsLinux() && !AppUpdater.IsPackaged(Environment.ProcessPath ?? "")) UpdateMessage += "；开发模式请安装正式发行包";
+        }
+        catch (Exception error) { UpdateMessage = $"检查更新失败：{error.Message}"; }
+        finally { UpdateBusy = false; }
+    }
+
+    public void CancelUpdate() => _updateCancellation?.Cancel();
+
+    public async Task InstallUpdateAsync()
+    {
+        if (UpdateBusy || AvailableUpdate is not { } offer) return;
+        if (OperatingSystem.IsLinux())
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = offer.Url.AbsoluteUri, UseShellExecute = true });
+                UpdateMessage = offer.Name.Length == 0 ? "已打开发行说明页面；请选择适合系统的安装包" : $"已打开 {offer.Name} 下载地址；请通过系统包管理器安装";
+            }
+            catch (Exception error) { UpdateMessage = $"打开下载地址失败：{error.Message}"; }
+            return;
+        }
+        UpdateBusy = true;
+        using var cancellation = new CancellationTokenSource();
+        _updateCancellation = cancellation;
+        var cache = Path.Combine(Path.GetTempPath(), "vodbox-update-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            if (!AppUpdater.IsPackaged(Environment.ProcessPath ?? "")) throw new InvalidOperationException("当前是开发模式，不能原地更新。");
+            UpdateMessage = "正在下载并校验更新包…";
+            var progress = new Progress<long>(bytes => UpdateMessage = $"正在下载更新包：{bytes / (1024d * 1024):F1} MiB…");
+            var archive = await AppUpdater.DownloadAsync(offer, cache, cancellation.Token, progress);
+            UpdateMessage = "正在验证并准备更新器…";
+            await AppUpdater.PrepareAndLaunchAsync(archive, Environment.ProcessPath!, cache, cancellation.Token);
+            UpdateMessage = "更新器已启动；关闭 VodBox 后将替换并重启。";
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown();
+        }
+        catch (OperationCanceledException) { UpdateMessage = "已取消更新"; }
+        catch (Exception error) { UpdateMessage = $"更新失败：{error.Message}"; }
+        finally
+        {
+            _updateCancellation = null;
+            UpdateBusy = false;
+            // Detached updater still needs its script and staged payload after this process exits.
+            if (!UpdateMessage.StartsWith("更新器已启动", StringComparison.Ordinal) && Directory.Exists(cache)) Directory.Delete(cache, true);
+        }
+    }
+
+
     [ObservableProperty] private string _subtitleCredential="";
     [ObservableProperty] private string _subtitleQuery="";
     [ObservableProperty] private bool _subtitleSearching;
@@ -168,6 +238,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public SettingsViewModel(AppServices services, MainViewModel main)
     {
         _services = services;
+        AutoCheckUpdates = services.Prefs.GetBool("updates.auto-check", true);
         _main = main;
         VodConfigUrl = services.CurrentVodConfig ?? "";
         LiveConfigUrl = services.CurrentLiveConfig ?? "";

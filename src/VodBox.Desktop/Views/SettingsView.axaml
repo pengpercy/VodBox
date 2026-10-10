@@ -184,7 +184,15 @@
           </StackPanel>
           <StackPanel x:Name="AboutSection" Spacing="12" IsVisible="{Binding IsAboutSection}">
             <TextBlock Text="关于" FontSize="20" />
-          <TextBlock Text="VodBox 0.2.4 · Avalonia 12 + .NET 10 · NativeAOT" FontSize="11.5" />
+            <TextBlock Text="{Binding AppVersion, StringFormat='VodBox {0}'}" FontSize="11.5" />
+            <CheckBox Content="启动时自动检查更新" IsChecked="{Binding AutoCheckUpdates}" />
+            <TextBlock Text="{Binding UpdateMessage}" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="检查更新" Click="OnCheckUpdate" />
+              <Button Content="获取更新" Click="OnInstallUpdate" />
+              <Button Content="取消下载" Click="OnCancelUpdate" />
+            </StackPanel>
+            <TextBlock Text="Linux 系统包会打开下载地址或发行说明，下载后请通过系统包管理器安装；Windows/macOS 确认后会在关闭应用时替换并重启。" TextWrapping="Wrap" FontSize="11.5" />
           </StackPanel>
 
           <!-- 诊断：日志开关 + 目录/文件 + 尾部预览。排障时“复现一次 → 刷新 → 复制内容”即可。 -->
