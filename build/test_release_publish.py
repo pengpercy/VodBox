@@ -50,6 +50,48 @@ class ReleasePublishTests(unittest.TestCase):
             finally:
                 os.chdir(old)
 
+    def test_published_release_is_read_only_when_all_assets_match(self):
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("artifacts/release").mkdir(parents=True)
+                Path("artifacts/release/package.zip").write_bytes(b"package")
+                calls = []
+                def gh(*args):
+                    calls.append(args)
+                    if "matching-refs" in " ".join(args):
+                        return json.dumps([{"ref": "refs/tags/v1.0.0", "object": {"type": "commit", "sha": "abc"}}])
+                    if args[-1] == "assets":
+                        return json.dumps([[{"name": "package.zip", "size": 7, "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
+                    return json.dumps([[{"tag_name": "v1.0.0", "draft": False, "assets_url": "assets"}]])
+                with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
+                    self.assertEqual(0, publish.main())
+                self.assertFalse(any(args[0] == "release" or "POST" in args for args in calls))
+            finally:
+                os.chdir(old)
+
+    def test_tag_creation_failure_stops_without_release_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("artifacts/release").mkdir(parents=True)
+                Path("artifacts/release/package.zip").write_bytes(b"package")
+                calls = []
+                def gh(*args):
+                    calls.append(args)
+                    if "matching-refs" in " ".join(args):
+                        return "[]"
+                    raise RuntimeError("HTTP 403: Resource not accessible by integration")
+                with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
+                    with self.assertRaises(RuntimeError):
+                        publish.main()
+                self.assertEqual(2, len(calls))
+                self.assertFalse(any(args[0] == "release" for args in calls))
+            finally:
+                os.chdir(old)
+
     def test_mismatched_tag_stops_before_publication(self):
         with tempfile.TemporaryDirectory() as directory:
             old = os.getcwd()
