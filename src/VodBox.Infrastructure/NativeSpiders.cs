@@ -30,6 +30,11 @@ public static class NativeSpiders
             ["csp_App99"] = info => new App99Source(info),
             ["csp_Push"] = info => new PushSource(info),
             ["csp_AppRJ"] = info => new AppRjSource(info),
+            ["csp_QiutongTY"] = info => new QiutongTySource(info),
+            ["csp_QingtingFM"] = info => new QingtingFmSource(info),
+            ["csp_KafeiTY"] = info => new KafeiTySource(info),
+            ["csp_GuaziTY"] = info => new GuaziTySource(info),
+            ["csp_919TY"] = info => new Sports919Source(info),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>

@@ -31,6 +31,19 @@
 - 额外适配专用测试 10/10；Push 原有测试另计。
 - 真实在线站点实播、全部插件版本兼容未验收；六平台 CI 待本次提交运行结果。
 
+## 追加五个独立 C# 协议（2026-10-10）
+
+- `csp_QiutongTY`：球通体育 room/page 与 room/info，分类、分页列表、详情、FLV/HLS 两线路与直播请求。
+- `csp_QingtingFM`：蜻蜓 FM GraphQL 分类/搜索及 radio 详情、直播音频地址，GraphQL 字符串转义。
+- `csp_KafeiTY`：咖啡体育 schedule 与 room-info，比赛列表、直播信号与播放地址。
+- `csp_GuaziTY`：瓜子体育 AES-CBC 加密 sports/detail 请求响应、赛程和直播线路；独立 OpenSSL 密文向量验证。
+- `csp_919TY`：919体育赛程和详情，复合比赛身份、主播 FLV/HLS 多线路。
+- 除蜻蜓 FM 外，另外四项公开协议无搜索入口，明确报不支持；不存在自动伪造搜索。
+- 五项已独立注册，与既有三项及 Guard 别名不重复。未执行 Java/JAR。
+- 源码契约依据：`5q68fs6b86-netizen/CatVodSpider-maintainable` 的对应 Java 入口，核对提交 `3ac7e6ea46339e6cfdf94dec4ff8e2e573638802`。未声称上游站点永久可用。
+- Release 主测试 386/386、预览 159/159，TreatWarningsAsErrors=true；本机 osx-x64 NativeAOT 编译发布通过，无 IL2026/IL3050 输出。此次发布编译跳过 QuickJS 重建，不等于完整六平台安装包运行验收。
+- 真实网络站点播放未验收；五项的完成口径是实现/离线协议契约/本机AOT，六平台结果单独报告。
+
 ## 验证边界
 - 本轮音频适配使用离线 HTTP fixture；未声称网络站点实播或全部十项完成。
 - 待全量测试、云端与真实站点验证后逐项更新。
