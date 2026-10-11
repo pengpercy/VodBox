@@ -62,6 +62,7 @@ class PackageTests(unittest.TestCase):
                 (jre / 'Contents/Home/bin/java').write_bytes(macho)
                 (jre / 'Contents/Home/lib/server').mkdir(parents=True)
                 (jre / 'Contents/Home/lib/server/libjvm.dylib').write_bytes(macho)
+                (jre / 'Contents/Home/lib/Fixture.class').write_bytes(b'\xca\xfe\xba\xbe\x00\x00\x00\x3d')
                 (jre / 'Contents/Home/lib/libjvm.dylib').symlink_to('server/libjvm.dylib')
                 (jre / 'Contents/Home/legal/java.base').mkdir(parents=True)
                 (jre / 'Contents/Home/legal/java.base/LICENSE').write_text('JRE license')
@@ -79,7 +80,7 @@ class PackageTests(unittest.TestCase):
                 (corresponding / '.source-metadata').write_text('source metadata')
                 output = root / 'output'; output.mkdir()
                 app = output / 'osx-arm64/VodBox.app'
-                copied_jre = app / 'Contents/MacOS/JavaHost/jre'
+                copied_jre = app / 'Contents/Resources/JavaHost/jre'
                 commands = []
                 def capture(*args, **kwargs):
                     commands.append(args)
@@ -91,12 +92,15 @@ class PackageTests(unittest.TestCase):
                     package.package_macos('osx-arm64', source, output, '0.2.1')
                 signing = [args for args in commands if args[0] == 'codesign' and '--sign' in args]
                 targets = [args[-1] for args in signing]
-                self.assertEqual(6, len(targets))
-                for relative in ('Contents/Home/bin/java', 'Contents/Home/lib/server/libjvm.dylib',
-                                 'Contents/MacOS/libjli.dylib'):
+                self.assertEqual(4, len(targets))
+                for relative in ('Contents/Home/bin/java', 'Contents/Home/lib/server/libjvm.dylib'):
                     self.assertLess(targets.index(copied_jre / relative), targets.index(copied_jre))
                 desktop = app / 'Contents/MacOS/VodBox.Desktop'
-                self.assertLess(targets.index(copied_jre), targets.index(desktop))
+                self.assertNotIn(desktop, targets)
+                self.assertNotIn(copied_jre / 'Contents/MacOS/libjli.dylib', targets)
+                self.assertNotIn(copied_jre / 'Contents/Home/lib/Fixture.class', targets)
+                self.assertFalse((app / 'Contents/MacOS/JavaHost').exists())
+                self.assertLess(targets.index(copied_jre), targets.index(app))
                 self.assertEqual(app, targets[-1])
                 for args in signing:
                     self.assertEqual(identity, args[args.index('--sign') + 1])
@@ -104,7 +108,7 @@ class PackageTests(unittest.TestCase):
                     self.assertEqual(identity != '-', '--options' in args)
                 verify = ('codesign', '--verify', '--deep', '--strict', app)
                 self.assertEqual(verify, commands[len(signing)])
-                copied_source = app / 'Contents/MacOS/JavaHost/corresponding-source'
+                copied_source = app / 'Contents/Resources/JavaHost/corresponding-source'
                 for relative in ('native/historical.dylib', 'LICENSE', '.source-metadata'):
                     self.assertEqual((corresponding / relative).read_bytes(),
                                      (copied_source / relative).read_bytes())

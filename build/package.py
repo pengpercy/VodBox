@@ -31,6 +31,9 @@ def package_macos(rid, source: Path, output: Path, version: str):
                     ignore=shutil.ignore_patterns("*.pdb", "*.dbg", "*.dSYM"))
     resources = contents / "Resources"
     resources.mkdir(parents=True)
+    java_host = contents / "MacOS/JavaHost"
+    if java_host.is_dir():
+        shutil.move(str(java_host), resources / "JavaHost")
     assets = contents / "MacOS" / "Assets"
     if assets.is_dir():
         shutil.move(str(assets), resources / "Assets")
@@ -49,7 +52,7 @@ def package_macos(rid, source: Path, output: Path, version: str):
             shutil.rmtree(detritus, ignore_errors=True) if detritus.is_dir() else detritus.unlink(missing_ok=True)
     # Remove the upstream resource seal only in the copied runtime. Keep Info.plist so
     # codesign recognizes the JRE as a nested bundle and builds a fresh resource seal.
-    runtime = contents / "MacOS/JavaHost/jre"
+    runtime = resources / "JavaHost/jre"
     runtime_bundles = []
     if (runtime / "Contents/Info.plist").is_file():
         runtime_bundles.append(runtime)
@@ -72,18 +75,42 @@ def package_macos(rid, source: Path, output: Path, version: str):
     identity = os.environ.get("CODESIGN_IDENTITY") or "-"
     macho = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",
              b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca", b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca")
-    targets = list(runtime_bundles)
+    # Passing a bundle's main executable to codesign signs its containing bundle.
+    # Leave those executables to the explicit bundle pass after all nested code.
+    bundle_executables = {contents / "MacOS/VodBox.Desktop"}
+    for bundle in runtime_bundles:
+        with (bundle / "Contents/Info.plist").open("rb") as file:
+            executable = plistlib.load(file).get("CFBundleExecutable")
+        if executable:
+            bundle_executables.add(bundle / "Contents/MacOS" / executable)
+    targets = []
     for file in contents.rglob("*"):
         relative = file.relative_to(contents)
-        if "corresponding-source" in relative.parts or relative.parts[0] != "MacOS":
+        if "corresponding-source" in relative.parts:
             continue
-        if file.is_file() and not file.is_symlink():
-            with file.open("rb") as content:
-                if content.read(4) in macho:
-                    targets.append(file)
-    # The runtime's Mach-O files precede its bundle, which in turn precedes the
-    # desktop executable and outer app. Never sign source/license resources as code.
-    for target in sorted(targets, key=lambda item: len(item.parts), reverse=True) + [app]:
+        if relative.parts[0] != "MacOS" and not file.is_relative_to(runtime):
+            continue
+        if file in bundle_executables or file.is_symlink() or not file.is_file() or file.suffix == ".class":
+            continue
+        with file.open("rb") as content:
+            header = content.read(8)
+        if header[:4] not in macho:
+            continue
+        # Java class files share CAFEBABE with fat Mach-O, but their version
+        # field is not a plausible fat architecture count.
+        if header[:4] in macho[4:]:
+            byteorder = "big" if header[:4] in (macho[4], macho[6]) else "little"
+            architectures = int.from_bytes(header[4:8], byteorder)
+            entry_size = 32 if header[:4] in (macho[6], macho[7]) else 20
+            if len(header) < 8 or not 1 <= architectures <= 64:
+                continue
+            if file.stat().st_size < 8 + architectures * entry_size:
+                continue
+        targets.append(file)
+    # Sign standalone runtime code first, then seal the JRE, then the outer app.
+    # Source/license resources remain intact and are sealed by the outer app.
+    ordered_targets = sorted(targets, key=lambda item: (-len(item.parts), str(item)))
+    for target in ordered_targets + runtime_bundles + [app]:
         command = ["codesign", "--force", "--sign", identity]
         if identity != "-":
             command += ["--options", "runtime", "--timestamp"]

@@ -101,16 +101,19 @@ public static class JarPluginHostLocator
     public static string DefaultWorkRoot() =>
         Path.Combine(Path.GetTempPath(), "vodbox-jarhost");
 
-    /// <summary>按 环境变量 → PATH → JAVA_HOME 的顺序找一个可用的 java 可执行文件；找不到返回 null。</summary>
-    public static string? FindJava()
+    /// <summary>按 环境变量 → 随包 JRE → PATH → JAVA_HOME 的顺序找 Java；找不到返回 null。</summary>
+    public static string? FindJava(string? baseDirectory = null)
     {
         var configured = Environment.GetEnvironmentVariable(JavaEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return configured;
         var executable = OperatingSystem.IsWindows() ? "java.exe" : "java";
-        var bundledJava = Path.Combine(AppContext.BaseDirectory, BundledJavaRelativeDirectory, "bin", executable);
-        if (File.Exists(bundledJava)) return bundledJava;
-        var macBundledJava = Path.Combine(AppContext.BaseDirectory, BundledJavaRelativeDirectory, "Contents", "Home", "bin", executable);
-        if (File.Exists(macBundledJava)) return macBundledJava;
+        foreach (var directory in BundledHostDirectories(baseDirectory ?? AppContext.BaseDirectory))
+        {
+            var bundledJava = Path.Combine(directory, "jre", "bin", executable);
+            if (File.Exists(bundledJava)) return bundledJava;
+            var macBundledJava = Path.Combine(directory, "jre", "Contents", "Home", "bin", executable);
+            if (File.Exists(macBundledJava)) return macBundledJava;
+        }
         var path = Environment.GetEnvironmentVariable("PATH") ?? "";
         foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -127,11 +130,21 @@ public static class JarPluginHostLocator
     }
 
     /// <summary>宿主 JAR：优先环境变量，其次随包目录；找不到返回 null。</summary>
-    public static string? FindHostJar()
+    public static string? FindHostJar(string? baseDirectory = null)
     {
         var configured = Environment.GetEnvironmentVariable(HostJarEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return Path.GetFullPath(configured);
-        var bundled = Path.Combine(AppContext.BaseDirectory, BundledHostRelativePath);
-        return File.Exists(bundled) ? bundled : null;
+        foreach (var directory in BundledHostDirectories(baseDirectory ?? AppContext.BaseDirectory))
+        {
+            var bundled = Path.Combine(directory, "host.jar");
+            if (File.Exists(bundled)) return bundled;
+        }
+        return null;
+    }
+
+    private static IEnumerable<string> BundledHostDirectories(string baseDirectory)
+    {
+        yield return Path.GetFullPath(Path.Combine(baseDirectory, "..", "Resources", "JavaHost"));
+        yield return Path.GetFullPath(Path.Combine(baseDirectory, "JavaHost"));
     }
 }

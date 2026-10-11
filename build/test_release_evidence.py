@@ -189,6 +189,35 @@ def rewrite_zip(path: pathlib.Path, changes: dict[str, bytes | None]) -> None:
             archive.writestr(name, data)
 
 
+def write_linked_package(path: pathlib.Path, fixture: pathlib.Path,
+                         links: dict[str, tuple[bytes, str]],
+                         changes: dict[str, bytes] | None = None) -> pathlib.Path:
+    """Build real tar/deb bytes with links, including forward references."""
+    payload = io.BytesIO()
+    with zipfile.ZipFile(fixture) as source, tarfile.open(fileobj=payload, mode="w") as output:
+        for name, (kind, target) in links.items():
+            info = tarfile.TarInfo(name)
+            info.type = kind
+            info.linkname = target
+            output.addfile(info)
+        contents = {name: source.read(name) for name in source.namelist() if name not in links}
+        contents.update(changes or {})
+        for name, data in contents.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            output.addfile(info, io.BytesIO(data))
+    data = payload.getvalue()
+    if path.suffix == ".deb":
+        def member(name: str, content: bytes) -> bytes:
+            header = (f"{name + '/':<16}{0:<12}{0:<6}{0:<6}{'100644':<8}"
+                      f"{len(content):<10}`\n").encode("ascii")
+            return header + content + (b"\n" if len(content) % 2 else b"")
+
+        data = b"!<arch>\n" + member("debian-binary", b"2.0\n") + member("data.tar", data)
+    path.write_bytes(data)
+    return path
+
+
 class MemberInspectionTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
@@ -360,6 +389,91 @@ class RidVerdictTests(unittest.TestCase):
                 {"Backend.class": b"class", "natives/linux_64/libunicorn.so": NATIVE_BYTES})})
             with self.assertRaises(evidence.ReleaseEvidenceError):
                 evidence.verify_rid("win-arm64", path)
+
+    def test_notice_paths_use_posix_spelling_on_every_platform(self):
+        notices = (pathlib.PureWindowsPath("licenses/media/asset.json"),)
+        with unittest.mock.patch.object(evidence, "MEDIA_NOTICES", notices):
+            verdict = evidence.verify_licenses("win-x64", pathlib.Path("package.zip"), host_members())
+            self.assertEqual(verdict["mediaNotices"], ["licenses/media/asset.json"])
+            self.assertTrue(evidence._retain_member("licenses/media/asset.json"))
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "licenses/media/asset.json"):
+                evidence.verify_licenses("win-x64", pathlib.Path("package.zip"),
+                                         [m for m in host_members() if m != "licenses/media/asset.json"])
+
+    def test_tar_and_deb_links_resolve_to_actual_payload_bytes(self):
+        for suffix in ("tar", "deb"):
+            with self.subTest(format=suffix), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                fixture = write_zip(root / "VodBox.1.linux-x64.zip", host_members(),
+                                    prefix="opt/vodbox/")
+                links = {
+                    "opt/vodbox/libmpv.so": (tarfile.SYMTYPE, "libmpv.so.2"),
+                    "opt/vodbox/libmpv.so.2": (tarfile.SYMTYPE, "lib/libmpv.so.2.0"),
+                    "opt/vodbox/libmpv-hard.so": (tarfile.LNKTYPE, "./opt/vodbox/libmpv.so"),
+                    "opt/vodbox/lib/license": (tarfile.SYMTYPE, "../JavaHost/LICENSE-tvbox-silicon"),
+                    "opt/vodbox/JavaHost/jre/legal/java.base/LICENSE":
+                        (tarfile.SYMTYPE, "../../LICENSE"),
+                }
+                asset = write_linked_package(root / f"vodbox_1_linux-x64.{suffix}", fixture, links,
+                                             {"opt/vodbox/lib/libmpv.so.2.0": b"real mpv bytes",
+                                              "opt/vodbox/JavaHost/jre/LICENSE": b"runtime license"})
+                with evidence.extracted_package(asset) as payload:
+                    for name in ("libmpv.so", "libmpv.so.2", "libmpv-hard.so"):
+                        path = payload / "opt/vodbox" / name
+                        self.assertFalse(path.is_symlink())
+                        self.assertEqual(path.read_bytes(), b"real mpv bytes")
+                self.assertEqual(evidence.verify_rid("linux-x64", asset)["rid"], "linux-x64")
+                receipts = root / "receipts"
+                receipt = evidence.write_package_receipt("linux-x64", asset, receipts)
+                data = evidence._read_package_receipt(receipt)
+                self.assertEqual(data["files"]["opt/vodbox/libmpv.so"]["sha256"],
+                                 hashlib.sha256(b"real mpv bytes").hexdigest())
+                evidence.verify_package_receipt("linux-x64", asset, receipts)
+
+    def test_tar_and_deb_unsafe_or_unresolvable_links_are_refused(self):
+        cases = [
+            {"alias": (tarfile.SYMTYPE, "/etc/passwd")},
+            {"alias": (tarfile.LNKTYPE, "/JavaHost/host.jar")},
+            {"alias": (tarfile.SYMTYPE, "../outside")},
+            {"alias": (tarfile.LNKTYPE, "../outside")},
+            {"alias": (tarfile.SYMTYPE, "C:/outside")},
+            {"alias": (tarfile.SYMTYPE, "missing")},
+            {"alias": (tarfile.SYMTYPE, "JavaHost")},
+            {"alias": (tarfile.SYMTYPE, "alias")},
+            {"alias": (tarfile.SYMTYPE, "other"), "other": (tarfile.LNKTYPE, "alias")},
+            {"alias": (tarfile.SYMTYPE, "JavaHost/host.jar/../host.jar")},
+            {"JavaHost": (tarfile.SYMTYPE, "elsewhere")},
+        ]
+        for suffix in ("tar", "deb"):
+            for links in cases:
+                with self.subTest(format=suffix, links=links), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                    root = pathlib.Path(directory)
+                    fixture = write_zip(root / "VodBox.1.linux-x64.zip", host_members())
+                    asset = write_linked_package(root / f"vodbox_1_linux-x64.{suffix}", fixture, links)
+                    with self.assertRaises(evidence.ReleaseEvidenceError):
+                        evidence.verify_rid("linux-x64", asset)
+                    self.assertEqual(sorted(p.name for p in root.iterdir()),
+                                     sorted([fixture.name, asset.name]))
+
+    def test_linked_source_native_and_license_bytes_are_still_verified(self):
+        source = "JavaHost/corresponding-source/" + SOURCE_PREFIX
+        members = {
+            source + "dependency-sources/archives/engine.tar": b"changed source",
+            "JavaHost/deps/unidbg-unicorn2-0.9.8.jar": jar_bytes({
+                "Backend.class": b"class", native_entry_for("linux-x64"): b"changed native"}),
+            "JavaHost/jre/legal/java.base/LICENSE": b"",
+        }
+        for suffix in ("tar", "deb"):
+            for name, changed in members.items():
+                with self.subTest(format=suffix, member=name), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                    root = pathlib.Path(directory)
+                    fixture = write_zip(root / "VodBox.1.linux-x64.zip", host_members())
+                    target = name + ".actual"
+                    links = {name: (tarfile.SYMTYPE, pathlib.PurePosixPath(target).name)}
+                    asset = write_linked_package(root / f"vodbox_1_linux-x64.{suffix}", fixture,
+                                                 links, {target: changed})
+                    with self.assertRaises(evidence.ReleaseEvidenceError):
+                        evidence.verify_rid("linux-x64", asset)
 
     def test_tar_payload_is_verified_and_unknown_formats_fail_closed(self):
         with tempfile.TemporaryDirectory(dir=ALMA) as directory:

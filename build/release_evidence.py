@@ -37,6 +37,7 @@ import sys
 import tarfile
 import tempfile
 import zipfile
+from collections import deque
 from pathlib import Path, PurePosixPath
 
 import native_coverage
@@ -97,7 +98,8 @@ def normalize_member(name: str) -> str:
 def _member_path(root: Path, name: str) -> Path:
     name = normalize_member(name)
     parts = PurePosixPath(name)
-    if not name or parts.is_absolute() or ".." in parts.parts or "\\" in name:
+    if not name or parts.is_absolute() or ".." in parts.parts or "\\" in name or \
+            (parts.parts and ":" in parts.parts[0]):
         raise ReleaseEvidenceError(f"unsafe package member {name!r}")
     return root.joinpath(*parts.parts)
 
@@ -120,7 +122,7 @@ def _command_to_file(command: list[str], target: Path) -> None:
 
 
 def _extract_package(archive: Path, root: Path) -> None:
-    """Materialize real file bytes; never extract links or trust a filename-only listing."""
+    """Materialize real file bytes, resolving tar links only to files within the payload."""
     suffix = next((s for s in ARCHIVE_SUFFIXES if archive.name.lower().endswith(s)), None)
     if suffix is None:
         raise ReleaseEvidenceError(f"{archive.name}: unsupported package format")
@@ -147,26 +149,112 @@ def _extract_package(archive: Path, root: Path) -> None:
         return
     payload = archive
     if suffix == ".deb":
-        names = _command(["ar", "t", str(archive)]).decode().splitlines()
-        data = [n for n in names if n in ("data.tar", "data.tar.gz", "data.tar.xz", "data.tar.zst")]
-        if len(data) != 1:
+        payloads = []
+        with archive.open("rb") as container:
+            if container.read(8) != b"!<arch>\n":
+                raise ReleaseEvidenceError("invalid DEB ar header")
+            while header := container.read(60):
+                if len(header) != 60 or header[58:] != b"`\n":
+                    raise ReleaseEvidenceError("invalid DEB ar member header")
+                name = header[:16].decode("ascii").strip().rstrip("/")
+                size = int(header[48:58].decode("ascii").strip())
+                if size < 0:
+                    raise ReleaseEvidenceError("invalid DEB member size")
+                if name in ("data.tar", "data.tar.gz", "data.tar.xz", "data.tar.zst"):
+                    payload = root.parent / name
+                    with payload.open("wb") as output:
+                        remaining = size
+                        while remaining:
+                            block = container.read(min(1024 * 1024, remaining))
+                            if not block: raise ReleaseEvidenceError("truncated DEB payload")
+                            output.write(block)
+                            remaining -= len(block)
+                    payloads.append(payload)
+                else:
+                    container.seek(size, 1)
+                if size % 2: container.read(1)
+        if len(payloads) != 1:
             raise ReleaseEvidenceError(f"{archive.name}: expected exactly one data.tar payload")
-        payload = root.parent / data[0]
-        _command_to_file(["ar", "p", str(archive), data[0]], payload)
+        payload = payloads[0]
     if suffix.startswith(".tar") or suffix == ".deb":
         try:
             with tarfile.open(payload) as reader:
+                entries = {}
+                directories = {""}
                 for info in reader.getmembers():
-                    _member_path(root, info.name)
-                    if info.isfile():
-                        with reader.extractfile(info) as stream:
-                            write(info.name, stream)
-                    elif not info.isdir():
+                    target = _member_path(root, info.name)
+                    name = target.relative_to(root).as_posix()
+                    if name == "." and info.isdir():
+                        continue
+                    if name == "." or name in entries:
+                        raise ReleaseEvidenceError(f"duplicate or invalid package member {info.name!r}")
+                    if not (info.isfile() or info.isdir() or info.issym() or info.islnk()):
                         raise ReleaseEvidenceError(f"{archive.name}: non-file member {info.name}")
+                    entries[name] = info
+                    directories.update(parent.as_posix() if parent != PurePosixPath(".") else ""
+                                       for parent in PurePosixPath(name).parents)
+                    if info.isdir():
+                        directories.add(name)
+                for name in directories - {""}:
+                    if name in entries and not entries[name].isdir():
+                        raise ReleaseEvidenceError(f"{archive.name}: conflicting package directory {name}")
+
+                def resolve(name: str) -> str:
+                    pending = deque(PurePosixPath(name).parts)
+                    resolved = []
+                    active = set()
+                    while pending:
+                        part = pending.popleft()
+                        if isinstance(part, tuple):
+                            active.remove(part[0])
+                            continue
+                        if part in ("", "."):
+                            continue
+                        if part == "..":
+                            if not resolved:
+                                raise ReleaseEvidenceError(f"{archive.name}: escaping link {name}")
+                            resolved.pop()
+                            continue
+                        candidate = "/".join([*resolved, part])
+                        info = entries.get(candidate)
+                        if info is not None and (info.issym() or info.islnk()):
+                            link = PurePosixPath(info.linkname)
+                            if not info.linkname or link.is_absolute() or "\\" in info.linkname or \
+                                    (link.parts and ":" in link.parts[0]):
+                                raise ReleaseEvidenceError(f"{archive.name}: unsafe link {candidate}")
+                            if candidate in active:
+                                raise ReleaseEvidenceError(f"{archive.name}: cyclic link {name}")
+                            active.add(candidate)
+                            if info.islnk():
+                                resolved = []  # Tar hardlink names are relative to the archive root.
+                            pending.extendleft(reversed([*link.parts, (candidate,)]))
+                            continue
+                        if candidate not in directories and (info is None or not info.isfile()):
+                            raise ReleaseEvidenceError(f"{archive.name}: unresolved link {name}")
+                        if info is not None and info.isfile() and any(
+                                isinstance(item, str) for item in pending):
+                            raise ReleaseEvidenceError(f"{archive.name}: non-directory link target {name}")
+                        resolved.append(part)
+                    result = "/".join(resolved)
+                    if result not in entries or not entries[result].isfile():
+                        raise ReleaseEvidenceError(f"{archive.name}: link does not resolve to a file {name}")
+                    return result
+
+                for name, info in entries.items():
+                    if not info.isdir():
+                        actual = entries[resolve(name)]
+                        with reader.extractfile(actual) as stream:
+                            write(name, stream)
             return
         except tarfile.ReadError:
-            # libarchive can read compression formats unavailable to this Python runtime.
-            pass
+            # Convert unsupported compression to tar, preserving link metadata for the same checks.
+            reader = shutil.which("bsdtar")
+            if reader is None:
+                raise ReleaseEvidenceError(f"{archive.name}: no archive reader for {suffix}")
+            converted = root.parent / "converted.tar"
+            _command([reader, "-cf", str(converted), "--format=pax", "@" + str(payload)])
+            _extract_package(converted, root)
+            return
     if suffix == ".dmg":
         if sys.platform != "darwin":
             raise ReleaseEvidenceError(f"{archive.name}: DMG requires a macOS package evidence receipt")
@@ -301,7 +389,8 @@ def verify_licenses(rid: str, archive: Path, members: list[str]) -> dict:
     # The notice tree is nested under the app root on every platform (`JavaHost`, `VodBox.app/
     # Contents/MacOS`, `opt/vodbox`), so each notice is matched by suffix: the check is that the
     # notices are physically present, not that a platform prefix was guessed.
-    missing = [str(name) for name in MEDIA_NOTICES if not any(m.endswith(str(name)) for m in members)]
+    missing = [name.as_posix() for name in MEDIA_NOTICES
+               if not any(m.endswith(name.as_posix()) for m in members)]
     if missing:
         raise ReleaseEvidenceError(
             f"{rid}: {archive.name} does not retain the media notices {', '.join(sorted(missing))}")
@@ -313,7 +402,8 @@ def verify_licenses(rid: str, archive: Path, members: list[str]) -> dict:
     return {
         "archive": archive.name,
         "licenseFiles": len(license_like),
-        "mediaNotices": [str(name) for name in MEDIA_NOTICES if any(m.endswith(str(name)) for m in members)],
+        "mediaNotices": [name.as_posix() for name in MEDIA_NOTICES
+                         if any(m.endswith(name.as_posix()) for m in members)],
         "jreNotice": jre_notice,
     }
 
@@ -522,7 +612,7 @@ def _retain_member(name: str) -> bool:
             return True
     return ("licenses" in parts or
             Path(name).name.lower().startswith(("license", "copying", "notice", "copyright")) or
-            any(name.endswith(str(notice)) for notice in MEDIA_NOTICES))
+            any(name.endswith(notice.as_posix()) for notice in MEDIA_NOTICES))
 
 
 def _payload_manifest(root: Path) -> dict:
