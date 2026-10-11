@@ -127,7 +127,7 @@ case "$RID" in
     "$CC" -m64 -o unicorn.dll -shared -O3 -static -DNDEBUG \
       -I "$ENGINE/include" "${BRIDGE_SRCS[@]}" \
       -I "$JAVA_INC" -I "$JAVA_PLATFORM_INC" -fPIC \
-      "$ENGINE_A"
+      "$ENGINE_A" -lpthread
     mv unicorn.dll "$OUT/$RID/"
     ;;
   *)

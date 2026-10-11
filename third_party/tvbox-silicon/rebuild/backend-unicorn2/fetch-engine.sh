@@ -49,6 +49,7 @@ if [[ "${RID:-}" == "win-x64" ]]; then
   CC="${CC//\\//}"
   [[ "$("$CC" -dumpmachine)" == "x86_64-w64-mingw32" ]] || {
     echo "FATAL: $CC is not an x86_64 MinGW compiler" >&2; exit 1; }
+  export PATH="$(dirname "$CC"):/usr/bin:$PATH"
   GENERATOR="${VODBOX_ENGINE_GENERATOR:-MinGW Makefiles}"
   MAKE="${VODBOX_ENGINE_MAKE:-}"
   if [[ -z "$MAKE" ]]; then
