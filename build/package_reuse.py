@@ -5,6 +5,75 @@ import argparse
 import json
 from pathlib import Path
 
+from ci_reuse import api, ensure_commit, source_hash, version_at
+
+
+REQUIRED_RIDS = ('win-x64', 'win-arm64', 'osx-x64', 'osx-arm64', 'linux-x64', 'linux-arm64')
+ENTRY_WORKFLOWS = ('.github/workflows/ci.yml', '.github/workflows/release.yml',
+                   '.github/workflows/native-acceptance.yml')
+
+
+def successful_aot(jobs, rid):
+    return next((job for job in jobs if job.get('conclusion') == 'success'
+                 and job.get('name', '').split(' / ')[-1] == 'AOT ' + rid), None)
+
+
+def trusted_run(run, repo):
+    if (run.get('path') not in ENTRY_WORKFLOWS
+            or run.get('head_repository', {}).get('full_name') != repo
+            or run.get('repository', {}).get('full_name') != repo
+            or run.get('event') not in ('push', 'workflow_dispatch')):
+        raise ValueError('Untrusted build repository or workflow entry')
+
+
+def load_run(repo, run_id):
+    if not re.fullmatch(r'[0-9]+', str(run_id)):
+        raise ValueError('Invalid artifact/source run ID')
+    run = api(f'repos/{repo}/actions/runs/{run_id}')
+    trusted_run(run, repo)
+    jobs = []
+    page = 1
+    while True:
+        batch = api(f'repos/{repo}/actions/runs/{run_id}/jobs?filter=latest&per_page=100&page={page}')['jobs']
+        jobs.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+    return {**run, 'jobs': jobs}
+
+
+def validate_provenance(meta, run, rid, version, source_sha, repo, source_run):
+    """The source run needs six green RIDs; the binary's original run needs only this RID."""
+    trusted_run(run, repo)
+    if run.get('conclusion') == 'cancelled':
+        raise ValueError('Source run was cancelled')
+    for required_rid in REQUIRED_RIDS:
+        if successful_aot(run['jobs'], required_rid) is None:
+            raise ValueError('Required native verification job did not succeed: ' + required_rid)
+    artifact_run_id = str(meta.get('artifactRunId') or meta.get('sourceRunId') or source_run)
+    if meta.get('sourceRunId') and str(meta['sourceRunId']) != artifact_run_id:
+        raise ValueError('Conflicting artifact source run IDs: ' + rid)
+    artifact_run = run if artifact_run_id == str(source_run) else load_run(repo, artifact_run_id)
+    if successful_aot(artifact_run['jobs'], rid) is None:
+        raise ValueError('Artifact native verification job did not succeed: ' + rid)
+    # Always read the actual producer's checkout, including Release/manual dispatches.
+    producer = restore_missing_source({'reused': False}, artifact_run, rid, repo)
+    actual_sha = producer['sourceSha']
+    if meta.get('sourceSha') not in (None, actual_sha):
+        raise ValueError('Artifact producer source mismatch: ' + rid)
+    if meta.get('rid', rid) != rid or meta.get('version') != version:
+        raise ValueError('Build source/version mismatch: ' + rid)
+    for sha in (actual_sha, source_sha):
+        if not ensure_commit(sha):
+            raise ValueError('Build input commit unavailable: ' + sha)
+        if version_at(sha) != version:
+            raise ValueError('Build source/version mismatch: ' + rid)
+    fingerprint = source_hash(actual_sha)
+    if source_hash(source_sha) != fingerprint or meta.get('fingerprint', fingerprint) != fingerprint:
+        raise ValueError('Build input fingerprint mismatch: ' + rid)
+    return {**meta, 'sourceSha': actual_sha, 'artifactRunId': artifact_run_id,
+            'fingerprint': fingerprint, 'packageSourceSha': source_sha}
+
 
 def verified_checkout_sha(text):
     """Read the receipt emitted by actions/checkout, never infer a dispatch source from run HEAD."""
@@ -21,14 +90,14 @@ def verified_checkout_sha(text):
 def restore_missing_source(meta, run, rid, repo):
     if meta.get('sourceSha') or meta.get('reused'):
         return meta
-    job = next((j for j in run['jobs'] if j.get('conclusion') == 'success'
-                and j['name'].endswith('AOT ' + rid)), None)
+    job = successful_aot(run['jobs'], rid)
     if job is None:
         raise ValueError('No verified native build job: ' + rid)
-    result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job['databaseId']}/logs"],
+    job_id = job.get('id') or job.get('databaseId')
+    result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job_id}/logs"],
                             capture_output=True, text=True, encoding="utf-8")
     if result.returncode and 'allow-escape-sequences' in result.stderr:
-        result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job['databaseId']}/logs",
+        result = subprocess.run(['gh', 'api', f"repos/{repo}/actions/jobs/{job_id}/logs",
                                  '--allow-escape-sequences'], capture_output=True, text=True, encoding="utf-8")
     if result.returncode:
         raise ValueError('Checkout log download failed: ' + result.stderr.strip())
@@ -37,14 +106,9 @@ def restore_missing_source(meta, run, rid, repo):
 
 def validate(meta, jobs, rid, version, source_sha, reuse_packages=False, run=None):
     actual_sha = meta.get('sourceSha')
-    if actual_sha is None and meta.get('reused') is False and run:
-        # Older fresh metadata omitted the SHA. Accept only a verified push of this exact release tag;
-        # that workflow builds its tag HEAD, unlike a dispatch that may override source_sha.
-        if run.get('event') == 'push' and run.get('headBranch') == 'v' + version:
-            actual_sha = run.get('headSha')
     if meta.get('rid', rid) != rid or meta.get('version') != version or actual_sha != source_sha:
         raise ValueError('Build source/version mismatch: ' + rid)
-    if not any(j.get('conclusion') == 'success' and j['name'].endswith('AOT ' + rid) for j in jobs):
+    if successful_aot(jobs, rid) is None:
         raise ValueError('Native verification job did not succeed: ' + rid)
     return reuse_packages and any(j.get('conclusion') == 'success' and
                                  j['name'].startswith('package / ') and
@@ -59,11 +123,18 @@ if __name__ == '__main__':
     p.add_argument('--version', required=True)
     p.add_argument('--source-sha', required=True)
     p.add_argument('--reuse-packages', action='store_true')
-    p.add_argument('--repo', default='')
+    p.add_argument('--repo', required=True)
+    p.add_argument('--source-run', required=True)
     a = p.parse_args()
-    meta = json.loads(a.meta.read_text())
-    run = json.loads(a.jobs.read_text())
-    if a.repo:
-        meta = restore_missing_source(meta, run, a.rid, a.repo)
-    reuse = validate(meta, run['jobs'], a.rid, a.version, a.source_sha, a.reuse_packages, run)
+    original_meta = json.loads(a.meta.read_text())
+    run = load_run(a.repo, a.source_run)
+    meta = validate_provenance(original_meta, run, a.rid, a.version, a.source_sha,
+                               a.repo, a.source_run)
+    # A native binary can match the input tree across commits. An existing package/receipt
+    # may be reused only for the commit that was actually packaged.
+    same_package_source = original_meta.get('packageSourceSha', original_meta.get('sourceSha')) == a.source_sha
+    reuse = validate(meta, run['jobs'], a.rid, a.version, meta['sourceSha'],
+                     a.reuse_packages and same_package_source, run)
+    a.meta.write_text(json.dumps(meta, indent=2) + '\n')
+    a.jobs.write_text(json.dumps(run, indent=2) + '\n')
     print('reuse_package=' + str(reuse).lower())

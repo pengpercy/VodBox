@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
       - name: Test packaging reuse guards
         shell: bash
         run: python3 build/test_package_reuse.py
@@ -45,12 +46,11 @@ jobs:
         run: |
           case "$ORIGIN_RUN" in ''|*[!0-9]*) exit 1;; esac
           mkdir -p artifacts/meta
-          gh run view "$ORIGIN_RUN" --repo "$GITHUB_REPOSITORY" --json jobs,headSha,event,headBranch > artifacts/jobs.json
           gh run download "$ORIGIN_RUN" --repo "$GITHUB_REPOSITORY" -n vodbox-meta.${{ matrix.rid }} -D artifacts/meta
           reuse_arg=()
           if [ -n "${{ inputs.source_run }}" ]; then reuse_arg=(--reuse-packages); fi
           python3 build/package_reuse.py --rid ${{ matrix.rid }} --version "$VERSION" --source-sha "$SOURCE_SHA" \
-            --repo "$GITHUB_REPOSITORY" --meta artifacts/meta/${{ matrix.rid }}.json --jobs artifacts/jobs.json "${reuse_arg[@]}" >> "$GITHUB_OUTPUT"
+            --repo "$GITHUB_REPOSITORY" --source-run "$ORIGIN_RUN" --meta artifacts/meta/${{ matrix.rid }}.json --jobs artifacts/jobs.json "${reuse_arg[@]}" >> "$GITHUB_OUTPUT"
       - name: Reuse successful package
         if: steps.source.outputs.reuse_package == 'true'
         shell: bash
@@ -94,8 +94,8 @@ jobs:
           p = Path('artifacts/meta/${{ matrix.rid }}.json')
           meta = json.loads(p.read_text())
           original = json.loads(Path('artifacts/jobs.json').read_text())
-          meta['sourceSha'] = os.environ['SOURCE_SHA']
-          meta['packagingWorkflowSha'] = original['headSha'] if os.environ['REUSED'] == 'true' else os.environ['TOOL_SHA']
+          meta['packageSourceSha'] = os.environ['SOURCE_SHA']
+          meta['packagingWorkflowSha'] = original['head_sha'] if os.environ['REUSED'] == 'true' else os.environ['TOOL_SHA']
           meta['packageReused'] = os.environ['REUSED'] == 'true'
           p.write_text(json.dumps(meta, indent=2) + '\n')
           PY

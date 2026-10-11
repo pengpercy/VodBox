@@ -88,7 +88,11 @@ else
   curl -fL --retry 3 -o "$ARCHIVE" "$ENGINE_URL"
 fi
 
-actual="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+if command -v sha256sum >/dev/null 2>&1; then
+  actual="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+else
+  actual="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+fi
 if [[ "$actual" != "$ENGINE_SHA" ]]; then
   echo "FATAL: engine archive sha256 mismatch" >&2
   echo "  expected $ENGINE_SHA" >&2

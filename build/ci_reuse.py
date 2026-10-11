@@ -21,7 +21,7 @@ from pathlib import Path
 ARTIFACT_NAME = "vodbox.{rid}"
 # Tracked paths that can change the published binaries. Docs/logs are deliberately excluded.
 SOURCE_PATHS = (
-    "src", "tests", "build", "Directory.Build.props", "Directory.Packages.props",
+    "src", "tests", "build", "third_party/tvbox-silicon", "Directory.Build.props", "Directory.Packages.props",
     "global.json", "VodBox.slnx", "NuGet.Config", "VERSION",
     ".github/workflows/build.yml", ".github/workflows/ci.yml",
 )
@@ -37,6 +37,8 @@ def api(path: str) -> dict:
 
 
 def source_hash(ref: str) -> str:
+    # Hash tracked entries at the producing commit, never generated working-tree files
+    # such as JavaHost/target (which is absent from git ls-files).
     listing = git("ls-tree", "-r", ref, "--", *SOURCE_PATHS)
     blobs = "\n".join(line for line in listing.splitlines() if line.strip())
     return hashlib.sha256(blobs.encode()).hexdigest()
@@ -128,6 +130,7 @@ def main() -> int:
         data = json.loads(path.read_text()) if path.exists() else {"reused": False}
         if not data.get("reused"):
             data["sourceSha"] = git("rev-parse", "HEAD").strip()
+        data["fingerprint"] = source_hash(data["sourceSha"])
         data["artifactRunId"] = str(data.get("sourceRunId") or args.current_run)
         Path(args.meta).write_text(json.dumps(data, indent=2))
         return 0
