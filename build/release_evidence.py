@@ -24,13 +24,20 @@ Nothing here mutates repository state and nothing here trusts a summary flag.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
+import shutil
+import stat
+import subprocess
 import sys
+import tarfile
+import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import native_coverage
+import rebuild_native_backend as rebuild
 
 # The six RIDs a release publishes, in the order the packaging matrix declares them. A release with
 # any of them missing is refused: "five of six" is not a distribution of this product.
@@ -58,7 +65,7 @@ MEDIA_NOTICES = (Path("licenses") / "media" / "asset.json",)
 JRE_NOTICES = ("LICENSE", "legal/java.base/LICENSE")
 
 # Package extensions the packaging matrix produces (package.py / package.yml).
-ARCHIVE_SUFFIXES = (".zip", ".dmg", ".deb", ".rpm")
+ARCHIVE_SUFFIXES = (".zip", ".tar", ".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".dmg", ".deb", ".rpm")
 
 
 class ReleaseEvidenceError(RuntimeError):
@@ -77,53 +84,112 @@ def normalize_member(name: str) -> str:
     return name
 
 
-def members_of(archive: Path) -> list[str]:
-    """Every file member of a published package, by name only (no extraction)."""
-    suffix = archive.suffix.lower()
+def _member_path(root: Path, name: str) -> Path:
+    name = normalize_member(name)
+    parts = PurePosixPath(name)
+    if not name or parts.is_absolute() or ".." in parts.parts or "\\" in name:
+        raise ReleaseEvidenceError(f"unsafe package member {name!r}")
+    return root.joinpath(*parts.parts)
+
+
+def _command(command: list[str]) -> bytes:
+    result = subprocess.run(command, capture_output=True)
+    if result.returncode:
+        raise ReleaseEvidenceError(
+            f"cannot read package: {' '.join(command)}: {result.stderr.decode(errors='replace').strip()}")
+    return result.stdout
+
+
+def _extract_package(archive: Path, root: Path) -> None:
+    """Materialize real file bytes; never extract links or trust a filename-only listing."""
+    suffix = next((s for s in ARCHIVE_SUFFIXES if archive.name.lower().endswith(s)), None)
+    if suffix is None:
+        raise ReleaseEvidenceError(f"{archive.name}: unsupported package format")
+    seen: set[Path] = set()
+
+    def write(name: str, data: bytes) -> None:
+        target = _member_path(root, name)
+        if target in seen:
+            raise ReleaseEvidenceError(f"duplicate package member {name!r}")
+        seen.add(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
+    if suffix == ".zip" or (suffix == ".dmg" and zipfile.is_zipfile(archive)):
+        with zipfile.ZipFile(archive) as reader:
+            for info in reader.infolist():
+                _member_path(root, info.filename)
+                if stat.S_ISLNK(info.external_attr >> 16):
+                    raise ReleaseEvidenceError(f"{archive.name}: linked member {info.filename}")
+                if not info.is_dir():
+                    write(info.filename, reader.read(info))
+        return
+    payload = archive
+    if suffix == ".deb":
+        names = _command(["ar", "t", str(archive)]).decode().splitlines()
+        data = [n for n in names if n in ("data.tar", "data.tar.gz", "data.tar.xz", "data.tar.zst")]
+        if len(data) != 1:
+            raise ReleaseEvidenceError(f"{archive.name}: expected exactly one data.tar payload")
+        payload = root.parent / data[0]
+        payload.write_bytes(_command(["ar", "p", str(archive), data[0]]))
+    if suffix.startswith(".tar") or suffix == ".deb":
+        try:
+            with tarfile.open(payload) as reader:
+                for info in reader.getmembers():
+                    _member_path(root, info.name)
+                    if info.isfile():
+                        with reader.extractfile(info) as stream:
+                            write(info.name, stream.read())
+                    elif not info.isdir():
+                        raise ReleaseEvidenceError(f"{archive.name}: non-file member {info.name}")
+            return
+        except tarfile.ReadError:
+            # libarchive can read compression formats unavailable to this Python runtime.
+            pass
+    if suffix == ".dmg":
+        mount = root.parent / "mount"
+        mount.mkdir()
+        _command(["hdiutil", "attach", str(archive), "-readonly", "-nobrowse",
+                  "-mountpoint", str(mount)])
+        try:
+            for path in mount.rglob("*"):
+                if path.is_symlink():
+                    # macOS DMGs commonly carry an Applications shortcut, not runtime evidence.
+                    continue
+                if path.is_file():
+                    write(path.relative_to(mount).as_posix(), path.read_bytes())
+        finally:
+            _command(["hdiutil", "detach", str(mount)])
+        return
+    # Read each payload member through the available archive reader rather than extracting links.
+    reader = shutil.which("bsdtar")
+    if reader is None:
+        raise ReleaseEvidenceError(f"{archive.name}: no archive reader for {suffix}")
+    for name in _command([reader, "-tf", str(payload)]).decode().splitlines():
+        _member_path(root, name)
+        if not name.endswith("/"):
+            write(name, _command([reader, "-xOf", str(payload), "--", name]))
+
+
+@contextlib.contextmanager
+def extracted_package(archive: Path):
+    archive = Path(archive).resolve()
     try:
-        if suffix in (".zip", ".dmg"):
-            with zipfile.ZipFile(archive) as reader:
-                return [normalize_member(n) for n in reader.namelist() if not n.endswith("/")]
-        if suffix in (".deb", ".rpm"):
-            # deb is an `ar` archive whose data.tar.{xz,gz,zst} member carries the payload; rpm's
-            # payload is compressed and the file list lives in a binary index. Both are read here
-            # from a single real command rather than re-implemented in Python, because the point of
-            # this check is the *package's* content, not a Python archive parser.
-            return _package_members(archive)
-    except zipfile.BadZipFile as error:
-        raise ReleaseEvidenceError(f"{archive.name}: not a readable package archive: {error}") from error
-    raise ReleaseEvidenceError(f"{archive.name}: unsupported package format {archive.suffix!r}")
+        with tempfile.TemporaryDirectory(prefix=".release-evidence-", dir=archive.parent) as directory:
+            root = Path(directory) / "payload"
+            root.mkdir()
+            _extract_package(archive, root)
+            yield root
+    except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile,
+            native_coverage.NativeCoverageError, rebuild.RebuildError, KeyError,
+            TypeError, AttributeError, UnicodeError) as error:
+        raise ReleaseEvidenceError(f"{archive.name}: cannot verify package bytes: {error}") from error
 
 
-def _package_members(archive: Path) -> list[str]:
-    import subprocess
-    import tarfile
-
-    if archive.suffix.lower() == ".deb":
-        listing = subprocess.run(["ar", "t", str(archive)], capture_output=True, text=True)
-        if listing.returncode:
-            raise ReleaseEvidenceError(f"{archive.name}: cannot read the deb archive: {listing.stderr.strip()}")
-        members: list[str] = []
-        for name in ("data.tar.xz", "data.tar.gz", "data.tar.zst", "data.tar"):
-            if name in listing.stdout.split():
-                extract = subprocess.run(["ar", "x", str(archive), name], cwd=archive.parent,
-                                         capture_output=True, text=True)
-                if extract.returncode:
-                    raise ReleaseEvidenceError(
-                        f"{archive.name}: cannot extract {name}: {extract.stderr.strip()}")
-                payload = archive.parent / name
-                try:
-                    with tarfile.open(payload) as tar:
-                        members = [normalize_member(f"./{m.name}") for m in tar.getmembers() if m.isfile()]
-                finally:
-                    payload.unlink(missing_ok=True)
-                return members
-        raise ReleaseEvidenceError(f"{archive.name}: the deb carries no data.tar payload")
-
-    listing = subprocess.run(["rpm", "-qlp", str(archive)], capture_output=True, text=True)
-    if listing.returncode:
-        raise ReleaseEvidenceError(f"{archive.name}: cannot list the rpm payload: {listing.stderr.strip()}")
-    return [normalize_member(line) for line in listing.stdout.splitlines() if line.strip()]
+def members_of(archive: Path) -> list[str]:
+    """Read the package payload using the same reader as the byte verification."""
+    with extracted_package(archive) as root:
+        return sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
 
 
 def package_java_host(members: list[str]) -> str | None:
@@ -144,6 +210,10 @@ def package_java_host(members: list[str]) -> str | None:
 def verify_java_host(rid: str, archive: Path, members: list[str]) -> dict:
     """Verify the RID's real Java host: archive hash, host files, deps and the packaged receipt."""
     digest = sha256_file(archive)
+    prefixes = {member.removesuffix("host.jar") for member in members
+                if member.endswith("JavaHost/host.jar")}
+    if len(prefixes) > 1:
+        raise ReleaseEvidenceError(f"{rid}: {archive.name} carries multiple JavaHost trees")
     prefix = package_java_host(members)
     if prefix is None:
         raise ReleaseEvidenceError(
@@ -248,22 +318,157 @@ def verify_receipt_artifact(rid: str, receipts_dir: Path) -> dict:
             "engineSource": (backend.get("engine") or {}).get("source_archive_sha256")}
 
 
+def _read_object(path: Path) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ReleaseEvidenceError(f"{path.name}: expected a JSON object")
+    return data
+
+
+def verify_packaged_evidence(rid: str, host: Path) -> dict:
+    """Bind the packaged receipt to native bytes and the source/notices actually distributed."""
+    receipt = _read_object(host / RECEIPT_NAME)
+    if receipt.get("rid") != rid:
+        raise ReleaseEvidenceError(f"{rid}: packaged receipt is for {receipt.get('rid')!r}")
+    backend = receipt.get("backend") or {}
+    unicorn1 = receipt.get("unicorn1") or {}
+    if backend.get("coordinate") != rebuild.BACKEND_COORDINATE or \
+            unicorn1.get("coordinate") != rebuild.UNICORN1_COORDINATE:
+        raise ReleaseEvidenceError(f"{rid}: packaged receipt has unexpected backend/unicorn coordinates")
+    deps = host / DEPS_DIRECTORY
+    for jar in deps.glob("*.jar"):
+        with zipfile.ZipFile(jar) as reader:
+            if reader.testzip() is not None or len(reader.namelist()) != len(set(reader.namelist())):
+                raise ReleaseEvidenceError(f"{rid}: corrupt or duplicate jar members in {jar.name}")
+    coverage = native_coverage.verify_deps(deps, rid)
+    problems = rebuild.verify_receipt(receipt, deps=deps)
+    problems += native_coverage.published_input_problems(receipt, deps)
+    if not backend.get("excluded"):
+        problems += native_coverage.receipt_problems(receipt)
+    if problems:
+        raise ReleaseEvidenceError(f"{rid}: packaged receipt: {'; '.join(problems)}")
+    integration = backend["jar_integration"]
+    backend_jar = rebuild._maven_jar(deps, rebuild.BACKEND_JAR_GLOB, rebuild.BACKEND_COORDINATE)
+    if not integration.get("post_rewrite_jar_sha256"):
+        raise ReleaseEvidenceError(f"{rid}: receipt records no rewritten backend jar hash")
+    if not backend.get("excluded"):
+        with zipfile.ZipFile(backend_jar) as reader:
+            native = reader.read(integration["native_entry"])
+        output = backend["output_library"]
+        if not native or hashlib.sha256(native).hexdigest() != output.get("sha256") or \
+                len(native) != output.get("size"):
+            raise ReleaseEvidenceError(f"{rid}: output native bytes hash/size does not match receipt")
+    u1 = rebuild._maven_jar(deps, rebuild.UNICORN1_JAR_GLOB, rebuild.UNICORN1_COORDINATE)
+    if not unicorn1.get("post_quarantine_jar_sha256") or \
+            sha256_file(u1) != unicorn1["post_quarantine_jar_sha256"]:
+        raise ReleaseEvidenceError(f"{rid}: unicorn quarantine jar hash does not match receipt")
+    with zipfile.ZipFile(u1) as reader:
+        if not any(name.endswith(".class") for name in reader.namelist()):
+            raise ReleaseEvidenceError(f"{rid}: unicorn parent classes are missing")
+
+    source = host / "corresponding-source"
+    retained = source / "third_party/tvbox-silicon"
+    manifest = _read_object(retained / "dependency-sources/native-source-manifest.json")
+    entries = native_coverage._manifest_artifacts(manifest)
+    for coordinate in native_coverage.DISTRIBUTED_SOURCE_ARTIFACTS:
+        if coordinate not in entries:
+            raise ReleaseEvidenceError(f"{rid}: packaged source manifest omits {coordinate}")
+        artifact = coordinate.split(":")
+        expected = deps / f"{artifact[-2]}-{artifact[-1]}.jar"
+        if not expected.is_file():
+            raise ReleaseEvidenceError(f"{rid}: distributed dependency is missing: {expected.name}")
+
+    def require_hash(path: Path, digest: str, label: str) -> None:
+        if not digest or not path.is_file() or not path.stat().st_size or sha256_file(path) != digest:
+            raise ReleaseEvidenceError(f"{rid}: packaged {label} hash does not match retained evidence")
+
+    engine = backend["engine"]
+    pin = _read_object(retained / "rebuild/backend-unicorn2/engine-pin.json")["engine"]
+    pinned = rebuild._engines()
+    if pin.get("archive_sha256") != pinned["archive_sha256"] or \
+            engine.get("source_archive_sha256") != pinned["archive_sha256"]:
+        raise ReleaseEvidenceError(f"{rid}: packaged engine source does not match the pinned archive")
+    require_hash(_member_path(source, engine.get("source_archive", "")),
+                 engine.get("source_archive_sha256"), "engine source archive")
+    u1_source = unicorn1["source_evidence"]
+    require_hash(_member_path(source, u1_source.get("archive", "")),
+                 u1_source.get("archive_sha256"), "unicorn source archive")
+    bridge = backend["bridge"]
+    bridge_path = rebuild.NATIVE_INPUTS.relative_to(rebuild.ROOT).as_posix()
+    if bridge.get("source_tree") != bridge_path:
+        raise ReleaseEvidenceError(f"{rid}: packaged bridge source tree does not match receipt")
+    combined = hashlib.sha256()
+    files = {}
+    for name in rebuild.BRIDGE_SOURCES + rebuild.BRIDGE_HEADERS:
+        path = source / bridge_path / name
+        if not path.is_file() or not path.stat().st_size:
+            raise ReleaseEvidenceError(f"{rid}: packaged bridge source is missing: {name}")
+        files[name] = sha256_file(path)
+        combined.update(name.encode("utf-8"))
+        combined.update(b"\0")
+        combined.update(bytes.fromhex(files[name]))
+    if combined.hexdigest() != bridge.get("source_digest_sha256") or files != bridge.get("files"):
+        raise ReleaseEvidenceError(f"{rid}: packaged bridge source digest does not match receipt")
+
+    # Use the retaining manifest's required texts; resolve them in the shipped source tree.
+    reference_entries = native_coverage._manifest_artifacts(native_coverage._source_manifest())
+    notices: set[Path] = set()
+    for coordinate, obligation in native_coverage.NATIVE_COMPONENT_OBLIGATIONS.items():
+        if obligation["class"] == "permissive-notice-only":
+            required = native_coverage._notice_files(reference_entries.get(coordinate, {}), obligation)
+            if not required:
+                raise ReleaseEvidenceError(f"{rid}: no retained license evidence for {coordinate}")
+            notices.update(required)
+    # The GPL engine and quarantined Unicorn1 also retain all their upstream license texts.
+    notices.update(path for path in (native_coverage.DEPENDENCY_NOTICES / "unicorn-1.0.14").rglob("*")
+                   if path.is_file() and path.name.lower().startswith(("license", "copying", "notice")))
+    if not notices:
+        raise ReleaseEvidenceError(f"{rid}: no retained dependency licenses")
+    for reference in sorted(notices):
+        require_hash(retained / reference.relative_to(rebuild.SOURCE),
+                     sha256_file(reference), f"license {reference.name}")
+    for path in (host / "LICENSE-tvbox-silicon", source / "LICENSE"):
+        if not path.is_file() or not path.read_bytes().strip():
+            raise ReleaseEvidenceError(f"{rid}: retained license is missing or empty: {path.name}")
+    if not any((host / "jre" / name).is_file() and (host / "jre" / name).read_bytes().strip()
+               for name in JRE_NOTICES):
+        raise ReleaseEvidenceError(f"{rid}: bundled runtime license is missing or empty")
+    return {"packagedReceipt": receipt, "nativeCoverage": coverage,
+            "sourceEvidence": {"bridgeDigest": combined.hexdigest(), "retainedLicenses": len(notices)}}
+
+
 def verify_rid(rid: str, archive: Path, meta: Path | None = None,
                receipts_dir: Path | None = None) -> dict:
-    """One RID's full verdict: artifact + hash + host + deps + receipt + licenses, from real bytes."""
+    """One RID's full verdict, from the package's own receipt, binaries, sources and licenses."""
     if not archive.is_file():
         raise ReleaseEvidenceError(f"{rid}: no package artifact matches {archive.name}")
     if archive.stat().st_size == 0:
         raise ReleaseEvidenceError(f"{rid}: {archive.name} is empty")
-    members = members_of(archive)
-    if not members:
-        raise ReleaseEvidenceError(f"{rid}: {archive.name} contains no files")
-    verdict = {"rid": rid, **verify_java_host(rid, archive, members)}
-    verdict.update(verify_licenses(rid, archive, members))
-    verdict["meta"] = verify_meta(rid, meta) if meta is not None else None
-    verdict["receiptArtifact"] = (verify_receipt_artifact(rid, receipts_dir)
-                                  if receipts_dir is not None else None)
-    return verdict
+    with extracted_package(archive) as root:
+        members = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
+        if not members:
+            raise ReleaseEvidenceError(f"{rid}: {archive.name} contains no files")
+        verdict = {"rid": rid, **verify_java_host(rid, archive, members)}
+        verdict.update(verify_licenses(rid, archive, members))
+        host = root / verdict["hostPrefix"]
+        packaged = verify_packaged_evidence(rid, host)
+        receipt = packaged.pop("packagedReceipt")
+        verdict.update(packaged)
+        for member in members:
+            if Path(member).name.lower().startswith(("license", "copying", "notice", "copyright")):
+                if not (root / member).read_bytes().strip():
+                    raise ReleaseEvidenceError(f"{rid}: retained license/notice is empty: {member}")
+        app = host.parent
+        for name in MEDIA_NOTICES:
+            _read_object(app / name)
+        verdict["meta"] = verify_meta(rid, meta) if meta is not None else None
+        verdict["receiptArtifact"] = None
+        if receipts_dir is not None:
+            verdict["receiptArtifact"] = verify_receipt_artifact(rid, receipts_dir)
+            sidecar = Path(receipts_dir) / f"native-backend-receipt.{rid}.json"
+            if _read_object(sidecar) != receipt:
+                raise ReleaseEvidenceError(f"{rid}: sidecar receipt differs from the packaged receipt")
+        return verdict
 
 
 def verify_meta(rid: str, meta: Path) -> dict:
@@ -283,7 +488,7 @@ def verify_meta(rid: str, meta: Path) -> dict:
 def find_archive(rid: str, archives_dir: Path) -> Path:
     """The single package artifact for `rid` inside the downloaded artifact directory."""
     matches = [path for path in sorted(Path(archives_dir).iterdir())
-               if path.is_file() and path.suffix.lower() in ARCHIVE_SUFFIXES
+               if path.is_file() and any(path.name.lower().endswith(s) for s in ARCHIVE_SUFFIXES)
                and f".{rid}." in path.name]
     if not matches:
         raise ReleaseEvidenceError(

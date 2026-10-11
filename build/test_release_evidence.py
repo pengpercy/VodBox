@@ -11,6 +11,7 @@ import io
 import json
 import pathlib
 import sys
+import tarfile
 import tempfile
 import unittest
 import unittest.mock
@@ -44,6 +45,10 @@ def host_members(backend: str = "unidbg-unicorn2-0.9.8.jar", receipt: bool = Tru
     if backend:
         members.append(f"JavaHost/deps/{backend}")
     members += [f"JavaHost/deps/{name}" for name in deps]
+    if backend or deps:
+        members += [f"JavaHost/deps/{coordinate.split(':')[-2]}-{coordinate.split(':')[-1]}.jar"
+                    for coordinate in native_coverage.DISTRIBUTED_SOURCE_ARTIFACTS
+                    if coordinate != native_coverage.BACKEND_COORDINATE]
     if not licenses:
         members = [m for m in members if not m.startswith("licenses/")]
         members = [m for m in members if not m.endswith("legal/java.base/LICENSE")]
@@ -51,47 +56,111 @@ def host_members(backend: str = "unidbg-unicorn2-0.9.8.jar", receipt: bool = Tru
 
 
 def write_zip(path: pathlib.Path, members: list[str], prefix: str = "") -> pathlib.Path:
+    rid = next((rid for rid in evidence.RIDS if f".{rid}." in path.name), "osx-arm64")
+    contents = {member: b"payload:" + member.encode() for member in members}
+    for member in members:
+        if member.endswith(".jar"):
+            contents[member] = jar_bytes({"Dependency.class": b"class"})
+    backend = {"Backend.class": b"class"}
+    if rid != "win-arm64":
+        backend[native_entry_for(rid)] = NATIVE_BYTES
+    if "JavaHost/deps/unidbg-unicorn2-0.9.8.jar" in contents:
+        contents["JavaHost/deps/unidbg-unicorn2-0.9.8.jar"] = jar_bytes(backend)
+    if "JavaHost/deps/unicorn-1.0.14.jar" in contents:
+        contents["JavaHost/deps/unicorn-1.0.14.jar"] = jar_bytes({"Unicorn.class": b"class"})
+    if "JavaHost/native-backend-receipt.json" in contents:
+        contents["JavaHost/native-backend-receipt.json"] = json.dumps(receipt_for(rid)).encode()
+    if "licenses/media/asset.json" in contents:
+        contents["licenses/media/asset.json"] = b"{}"
+    if "JavaHost/corresponding-source/LICENSE" in contents:
+        source = "JavaHost/corresponding-source/"
+        vendor = source + SOURCE_PREFIX
+        contents[vendor + "dependency-sources/native-source-manifest.json"] = native_coverage.SOURCE_MANIFEST.read_bytes()
+        contents[vendor + "rebuild/backend-unicorn2/engine-pin.json"] = json.dumps(
+            {"engine": {"archive_sha256": SOURCE_HASH}}).encode()
+        for name in ("engine", "unicorn"):
+            contents[vendor + f"dependency-sources/archives/{name}.tar"] = SOURCE_BYTES
+        for name, data in BRIDGE_FILES.items():
+            contents[source + BRIDGE_PATH + "/" + name] = data
+        entries = native_coverage._manifest_artifacts(native_coverage._source_manifest())
+        notices = set()
+        for coordinate, obligation in native_coverage.NATIVE_COMPONENT_OBLIGATIONS.items():
+            if obligation["class"] == "permissive-notice-only":
+                notices.update(native_coverage._notice_files(entries.get(coordinate, {}), obligation))
+        notices.update(p for p in (native_coverage.DEPENDENCY_NOTICES / "unicorn-1.0.14").rglob("*")
+                       if p.is_file() and p.name.lower().startswith(("license", "copying", "notice")))
+        for notice in notices:
+            contents[vendor + notice.relative_to(evidence.rebuild.SOURCE).as_posix()] = notice.read_bytes()
     with zipfile.ZipFile(path, "w") as archive:
-        for member in members:
-            archive.writestr(prefix + member, b"payload:" + member.encode())
+        for member, data in contents.items():
+            archive.writestr(prefix + member, data)
     return path
 
 
+def jar_bytes(files: dict[str, bytes]) -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(zipfile.ZipInfo(name), data)
+    return output.getvalue()
+
+
+def source_archive() -> bytes:
+    output = io.BytesIO()
+    with tarfile.open(fileobj=output, mode="w") as archive:
+        info = tarfile.TarInfo("source/engine.c")
+        data = b"/* retained source fixture */"
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    return output.getvalue()
+
+
+SOURCE_BYTES = source_archive()
+SOURCE_HASH = hashlib.sha256(SOURCE_BYTES).hexdigest()
+NATIVE_BYTES = b"rebuilt native fixture"
+SOURCE_PREFIX = "third_party/tvbox-silicon/"
+BRIDGE_PATH = evidence.rebuild.NATIVE_INPUTS.relative_to(ROOT).as_posix()
+BRIDGE_FILES = {name: ("/* bridge " + name + " */").encode()
+                for name in evidence.rebuild.BRIDGE_SOURCES + evidence.rebuild.BRIDGE_HEADERS}
+
+
 def receipt_for(rid: str) -> dict:
-    """A receipt shaped exactly like `rebuild_native_backend.py` writes, for `rid`."""
-    if rid in ("win-arm64",):
-        return {
-            "schema": 1,
-            "rid": rid,
-            "sourceRebuilt": False,
-            "backend": {
-                "coordinate": "com.github.zhkl0228:unidbg-unicorn2:0.9.8",
-                "excluded": True,
-                "exclusion_reason": f"{rid} has no upstream JNI native; every natives/ entry withheld",
-                "engine": {"source_archive_sha256": "a" * 64},
-                "bridge": {"source_digest_sha256": "b" * 64},
-                "output_library": None,
-                "jar_integration": {"native_entry": None, "jar_native_entries": [],
-                                    "excluded_native_entries": ["natives/linux_64/libunicorn.so"]},
-            },
-            "unicorn1": {"coordinate": "com.github.zhkl0228:unicorn:1.0.14", "kept_dependency": True,
-                         "source_evidence": {"archive_sha256": "d" * 64}},
-        }
+    """A complete receipt bound to the fixture's real jars and source bytes."""
+    excluded = rid == "win-arm64"
+    native = None if excluded else native_entry_for(rid)
+    backend_files = {"Backend.class": b"class"}
+    if native:
+        backend_files[native] = NATIVE_BYTES
+    bridge_digest = hashlib.sha256()
+    bridge_hashes = {}
+    for name, data in BRIDGE_FILES.items():
+        digest = hashlib.sha256(data).hexdigest()
+        bridge_hashes[name] = digest
+        bridge_digest.update(name.encode() + b"\0" + bytes.fromhex(digest))
     return {
-        "schema": 1,
-        "rid": rid,
-        "sourceRebuilt": True,
+        "schema": 1, "rid": rid, "sourceRebuilt": not excluded,
         "backend": {
-            "coordinate": "com.github.zhkl0228:unidbg-unicorn2:0.9.8",
-            "excluded": False,
-            "engine": {"source_archive_sha256": "a" * 64},
-            "bridge": {"source_digest_sha256": "b" * 64},
-            "output_library": {"sha256": "c" * 64, "size": 1234},
-            "jar_integration": {"native_entry": native_entry_for(rid),
-                                "jar_native_entries": [native_entry_for(rid)]},
+            "coordinate": evidence.rebuild.BACKEND_COORDINATE, "excluded": excluded,
+            "exclusion_reason": "no upstream native" if excluded else None,
+            "engine": {"source_archive": SOURCE_PREFIX + "dependency-sources/archives/engine.tar",
+                       "source_archive_sha256": SOURCE_HASH},
+            "bridge": {"source_tree": BRIDGE_PATH, "files": bridge_hashes,
+                       "source_digest_sha256": bridge_digest.hexdigest()},
+            "toolchain": {"compiler": "fixture"},
+            "output_library": None if excluded else {
+                "sha256": hashlib.sha256(NATIVE_BYTES).hexdigest(), "size": len(NATIVE_BYTES)},
+            "jar_integration": {
+                "native_entry": native, "jar_native_entries": [] if excluded else [native],
+                "post_rewrite_jar_sha256": hashlib.sha256(jar_bytes(backend_files)).hexdigest()},
         },
-        "unicorn1": {"coordinate": "com.github.zhkl0228:unicorn:1.0.14", "kept_dependency": True,
-                     "source_evidence": {"archive_sha256": "d" * 64}},
+        "unicorn1": {
+            "coordinate": evidence.rebuild.UNICORN1_COORDINATE, "kept_dependency": True,
+            "removed_native_entries": ["natives/linux_64/libunicorn_java.so"],
+            "post_quarantine_jar_sha256": hashlib.sha256(jar_bytes({"Unicorn.class": b"class"})).hexdigest(),
+            "source_evidence": {
+                "archive": SOURCE_PREFIX + "dependency-sources/archives/unicorn.tar",
+                "archive_sha256": SOURCE_HASH},
+        },
     }
 
 
@@ -102,9 +171,26 @@ def native_entry_for(rid: str) -> str:
     return f"natives/{directory}/{name}"
 
 
+def rewrite_zip(path: pathlib.Path, changes: dict[str, bytes | None]) -> None:
+    with zipfile.ZipFile(path) as archive:
+        contents = {name: archive.read(name) for name in archive.namelist()}
+    for name, data in changes.items():
+        if data is None:
+            contents.pop(name, None)
+        else:
+            contents[name] = data
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, data in contents.items():
+            archive.writestr(name, data)
+
+
 class MemberInspectionTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
+                                         return_value={"archive_sha256": SOURCE_HASH})
+        pin.start()
+        self.addCleanup(pin.stop)
 
     def test_java_host_prefix_is_discovered_not_assumed(self):
         # A Windows zip roots the host at JavaHost/, a macOS app nests it under
@@ -136,6 +222,10 @@ class MemberInspectionTests(unittest.TestCase):
 class RidVerdictTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
+                                         return_value={"archive_sha256": SOURCE_HASH})
+        pin.start()
+        self.addCleanup(pin.stop)
 
     def test_a_complete_rid_package_is_accepted(self):
         with tempfile.TemporaryDirectory(dir=ALMA) as directory:
@@ -199,9 +289,107 @@ class RidVerdictTests(unittest.TestCase):
                 evidence.verify_meta("osx-arm64", root / "wrong.json")
 
 
+    def test_names_with_placeholder_bytes_do_not_prove_evidence(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            path = pathlib.Path(directory) / "VodBox.1.osx-arm64.zip"
+            with zipfile.ZipFile(path, "w") as archive:
+                for name in host_members():
+                    archive.writestr(name, b"placeholder")
+            with self.assertRaises(evidence.ReleaseEvidenceError):
+                evidence.verify_rid("osx-arm64", path)
+
+    def test_native_bytes_are_hashed_even_when_the_jar_hash_was_updated(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            path = write_zip(pathlib.Path(directory) / "VodBox.1.osx-arm64.zip", host_members())
+            changed = jar_bytes({"Backend.class": b"class", native_entry_for("osx-arm64"): b"other native"})
+            receipt = receipt_for("osx-arm64")
+            receipt["backend"]["jar_integration"]["post_rewrite_jar_sha256"] = hashlib.sha256(changed).hexdigest()
+            rewrite_zip(path, {"JavaHost/deps/unidbg-unicorn2-0.9.8.jar": changed,
+                               "JavaHost/native-backend-receipt.json": json.dumps(receipt).encode()})
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "output native bytes"):
+                evidence.verify_rid("osx-arm64", path)
+
+    def test_packaged_source_and_license_bytes_are_required(self):
+        source = "JavaHost/corresponding-source/"
+        coordinate = "net.java.dev.jna:jna:5.10.0"
+        entries = native_coverage._manifest_artifacts(native_coverage._source_manifest())
+        license_path = native_coverage._notice_files(
+            entries[coordinate], native_coverage.NATIVE_COMPONENT_OBLIGATIONS[coordinate])[0]
+        cases = {
+            source + SOURCE_PREFIX + "dependency-sources/archives/engine.tar": b"changed engine",
+            source + SOURCE_PREFIX + "dependency-sources/archives/unicorn.tar": b"changed unicorn",
+            source + BRIDGE_PATH + "/unicorn.c": b"changed bridge",
+            source + license_path.relative_to(ROOT).as_posix(): b"replacement license",
+            "JavaHost/jre/legal/java.base/LICENSE": b"",
+        }
+        for name, data in cases.items():
+            with self.subTest(member=name), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                path = write_zip(pathlib.Path(directory) / "VodBox.1.osx-arm64.zip", host_members())
+                rewrite_zip(path, {name: data})
+                with self.assertRaises(evidence.ReleaseEvidenceError):
+                    evidence.verify_rid("osx-arm64", path)
+                self.assertEqual(sorted(p.name for p in path.parent.iterdir()), [path.name])
+
+    def test_sidecar_cannot_replace_or_disagree_with_packaged_receipt(self):
+        for mode in ("missing", "invalid", "wrong-rid", "different"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                path = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+                receipt = receipt_for("osx-arm64")
+                (root / "native-backend-receipt.osx-arm64.json").write_text(json.dumps(receipt))
+                if mode == "missing":
+                    data = None
+                elif mode == "invalid":
+                    data = b"{invalid"
+                else:
+                    receipt["rid" if mode == "wrong-rid" else "extra"] = "linux-x64"
+                    data = json.dumps(receipt).encode()
+                rewrite_zip(path, {"JavaHost/native-backend-receipt.json": data})
+                with self.assertRaises(evidence.ReleaseEvidenceError):
+                    evidence.verify_rid("osx-arm64", path, receipts_dir=root)
+
+    def test_win_arm64_exclusion_cannot_carry_foreign_native(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            path = write_zip(pathlib.Path(directory) / "VodBox.1.win-arm64.zip", host_members())
+            rewrite_zip(path, {"JavaHost/deps/unidbg-unicorn2-0.9.8.jar": jar_bytes(
+                {"Backend.class": b"class", "natives/linux_64/libunicorn.so": NATIVE_BYTES})})
+            with self.assertRaises(evidence.ReleaseEvidenceError):
+                evidence.verify_rid("win-arm64", path)
+
+    def test_tar_payload_is_verified_and_unknown_formats_fail_closed(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            path = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+            tar_path = root / "VodBox.1.osx-arm64.tar.gz"
+            with zipfile.ZipFile(path) as source, tarfile.open(tar_path, "w:gz") as output:
+                for name in source.namelist():
+                    data = source.read(name)
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data)
+                    output.addfile(info, io.BytesIO(data))
+            self.assertEqual(evidence.verify_rid("osx-arm64", tar_path)["rid"], "osx-arm64")
+            unknown = root / "VodBox.1.osx-arm64.unknown"
+            unknown.write_bytes(path.read_bytes())
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "unsupported package format"):
+                evidence.verify_rid("osx-arm64", unknown)
+
+    def test_archive_traversal_and_duplicate_receipts_are_refused(self):
+        for name in ("../outside", "JavaHost/native-backend-receipt.json"):
+            with self.subTest(member=name), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                path = write_zip(pathlib.Path(directory) / "VodBox.1.osx-arm64.zip", host_members())
+                with zipfile.ZipFile(path, "a") as archive:
+                    archive.writestr(name, b"invalid")
+                with self.assertRaises(evidence.ReleaseEvidenceError):
+                    evidence.verify_rid("osx-arm64", path)
+
+
 class SixRidClosureTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
+                                         return_value={"archive_sha256": SOURCE_HASH})
+        pin.start()
+        self.addCleanup(pin.stop)
 
     def _release(self, root: pathlib.Path, rids, **kwargs) -> pathlib.Path:
         archives = root / "release"
@@ -309,6 +497,10 @@ class SixRidClosureTests(unittest.TestCase):
 class CommandLineTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
+                                         return_value={"archive_sha256": SOURCE_HASH})
+        pin.start()
+        self.addCleanup(pin.stop)
 
     def _run(self, *argv):
         out, err = io.StringIO(), io.StringIO()
