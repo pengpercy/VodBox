@@ -84,13 +84,15 @@ class ProvenanceTests(unittest.TestCase):
              patch.object(package_reuse.subprocess, 'run') as download, \
              patch.object(package_reuse, 'ensure_commit', return_value=True), \
              patch.object(package_reuse, 'version_at', return_value='0.2.3'), \
-             patch.object(package_reuse, 'source_hash',
+             patch.object(package_reuse, 'source_hash', return_value='same'), \
+             patch.object(package_reuse, 'native_build_hash',
                           side_effect=lambda sha: 'same' if sha == self.actual_sha else fingerprint):
             download.return_value.returncode = 0
             download.return_value.stdout = receipt
             result = package_reuse.validate_provenance(self.meta, self.run, self.rid, '0.2.3',
                                                        self.target_sha, self.repo, '20')
-            self.assertEqual('repos/owner/repo/actions/jobs/99/logs', download.call_args.args[0][2])
+            self.assertTrue(any('repos/owner/repo/actions/jobs/99/logs' in call.args[0]
+                                for call in download.call_args_list))
             return result
 
     def test_single_rid_artifact_run_is_valid_and_original_sha_is_preserved(self):

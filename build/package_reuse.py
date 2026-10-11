@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from ci_reuse import api, ensure_commit, source_hash, version_at
+from ci_reuse import api, ensure_commit, native_build_hash, source_hash, version_at
 
 
 REQUIRED_RIDS = ('win-x64', 'win-arm64', 'osx-x64', 'osx-arm64', 'linux-x64', 'linux-arm64')
@@ -69,10 +69,19 @@ def validate_provenance(meta, run, rid, version, source_sha, repo, source_run):
         if version_at(sha) != version:
             raise ValueError('Build source/version mismatch: ' + rid)
     fingerprint = source_hash(actual_sha)
-    if source_hash(source_sha) != fingerprint or meta.get('fingerprint', fingerprint) != fingerprint:
+    # Authenticate legacy metadata against the producer's original full input tree.
+    # Packaging-only changes are allowed only in the separate native comparison.
+    if (meta.get('fingerprint', fingerprint) != fingerprint
+            or meta.get('originalFingerprint', fingerprint) != fingerprint):
         raise ValueError('Build input fingerprint mismatch: ' + rid)
+    native_hash = native_build_hash(actual_sha)
+    if (native_build_hash(source_sha) != native_hash
+            or meta.get('nativeBuildHash', native_hash) != native_hash):
+        raise ValueError('Native build input fingerprint mismatch: ' + rid)
     return {**meta, 'sourceSha': actual_sha, 'artifactRunId': artifact_run_id,
-            'fingerprint': fingerprint, 'packageSourceSha': source_sha}
+            'fingerprint': fingerprint, 'originalFingerprint': fingerprint,
+            'nativeBuildHash': native_hash, 'packageSourceSha': source_sha,
+            'targetPackageInput': source_hash(source_sha)}
 
 
 def verified_checkout_sha(text):

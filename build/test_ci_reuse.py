@@ -22,6 +22,7 @@ class ReuseTests(unittest.TestCase):
             return {'conclusion': 'failure', 'event': event, 'path': path}
         with patch.object(reuse, 'api', side_effect=api), patch.object(reuse, 'git', return_value='head'), \
              patch.object(reuse, 'source_hash', side_effect=lambda ref: 'same' if ref=='head' else tree), \
+             patch.object(reuse, 'native_build_hash', side_effect=lambda ref: 'same' if ref=='head' else tree), \
              patch.object(reuse, 'version_at', return_value=version), patch.object(reuse, 'ensure_commit', return_value=True):
             return reuse.probe('win-x64', '0.2.1', 'owner/repo')['reused']
 

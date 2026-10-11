@@ -26,6 +26,23 @@ SOURCE_PATHS = (
     ".github/workflows/build.yml", ".github/workflows/ci.yml",
 )
 
+# Keep SOURCE_PATHS/source_hash unchanged: existing metadata uses that exact key.
+# Native compilation, bundled dependencies and verification/receipt inputs only.
+NATIVE_BUILD_PATHS = (
+    "src", "tests", "third_party", "Directory.Build.*", "Directory.Packages.*",
+    "global.json", "VodBox.slnx", "NuGet.Config", "VERSION", "**/packages*.lock.json",
+    ".github/workflows/build.yml",
+    "build/tvbox-host.py", "build/rebuild_native_backend.py", "build/quickjs",
+    "build/bundle.py", "build/native-assets.json", "build/nativeverify.py",
+    "build/native_coverage.py", "build/verify_java_host.py", "build/verify_mpv_bundle.py",
+    "build/archive.py", "build/licenses", "build/publish-aot.sh", "build/dev-natives.sh",
+    "build/smoke.py", "build/dex-acceptance.sh", "build/dex_fixture.py",
+    "build/dex-deps.json", "build/fetch-dex-deps.py", "build/test-desktop-smoke.sh",
+    "build/media-fixtures", "build/generate-icons.py",
+    "build/test_bundle.py", "build/test_nativeverify.py", "build/test_native_coverage.py",
+    "build/test_rebuild_native_backend.py", "build/test_archive.py",
+)
+
 
 def git(*args: str, check: bool = True) -> str:
     return subprocess.run(["git", *args], check=check, capture_output=True, text=True).stdout
@@ -44,6 +61,12 @@ def source_hash(ref: str) -> str:
     return hashlib.sha256(blobs.encode()).hexdigest()
 
 
+def native_build_hash(ref: str) -> str:
+    listing = git("ls-tree", "-r", ref, "--", *NATIVE_BUILD_PATHS)
+    blobs = "\n".join(line for line in listing.splitlines() if line.strip())
+    return hashlib.sha256(blobs.encode()).hexdigest()
+
+
 def version_at(ref: str) -> str:
     return git("show", f"{ref}:VERSION").strip()
 
@@ -57,7 +80,7 @@ def ensure_commit(sha: str) -> bool:
 
 def probe(rid: str, version: str, repo: str) -> dict:
     head = git("rev-parse", "HEAD").strip()
-    trees = {head: source_hash(head)}
+    trees = {head: native_build_hash(head)}
     try:
         artifacts = api(f"repos/{repo}/actions/artifacts?name={ARTIFACT_NAME.format(rid=rid)}&per_page=100")
     except Exception as error:  # noqa: BLE001 -任何 API 问题都必须回退到重新构建
@@ -91,7 +114,7 @@ def probe(rid: str, version: str, repo: str) -> dict:
         except subprocess.CalledProcessError:
             continue
         if sha not in trees:
-            trees[sha] = source_hash(sha)
+            trees[sha] = native_build_hash(sha)
         if trees[sha] != trees[head]:
             continue
         return {
@@ -131,6 +154,8 @@ def main() -> int:
         if not data.get("reused"):
             data["sourceSha"] = git("rev-parse", "HEAD").strip()
         data["fingerprint"] = source_hash(data["sourceSha"])
+        data["originalFingerprint"] = data["fingerprint"]
+        data["nativeBuildHash"] = native_build_hash(data["sourceSha"])
         data["artifactRunId"] = str(data.get("sourceRunId") or args.current_run)
         Path(args.meta).write_text(json.dumps(data, indent=2))
         return 0
