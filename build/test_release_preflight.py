@@ -48,11 +48,13 @@ def run_gate(rids=None, allow_incomplete=False):
     return status, out.getvalue() + err.getvalue()
 
 
-def run_source_gate(allow_incomplete=False, receipts_dir=None):
+def run_source_gate(allow_incomplete=False, receipts_dir=None, deps=None,
+                    allow_unrebuilt_receipts=False):
     """Capture the release gate's stdout+stderr and return (status, printed)."""
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        status = preflight.check_source_closure(allow_incomplete, receipts_dir)
+        status = preflight.check_source_closure(allow_incomplete, receipts_dir, deps,
+                                                allow_unrebuilt_receipts=allow_unrebuilt_receipts)
     return status, out.getvalue() + err.getvalue()
 
 
@@ -185,6 +187,42 @@ class SourceGateTests(unittest.TestCase):
         status, output = run_source_gate(allow_incomplete=True)
         self.assertEqual(status, 0)
         self.assertIn('WARNING', output)
+
+    def test_pre_build_pass_does_not_demand_a_receipt_the_build_has_not_produced(self):
+        # The correction: the pre-build gate runs before the source rebuild, so an absent receipt is
+        # expected. It must not refuse the release for demanding an artifact that does not exist yet.
+        status, output = run_source_gate(allow_unrebuilt_receipts=True)
+        self.assertEqual(status, 0)
+        self.assertIn('not produced yet', output)
+        # Without the declaration pass the same state is still a hard failure (the default).
+        self.assertEqual(run_source_gate()[0], 1)
+
+    def test_pre_build_pass_still_fails_closed_on_a_real_defect(self):
+        # The allowance is narrow: a receipt that exists but records no output hash, an unretained
+        # notice, or an unclassified native is a defect at any stage and must still stop the release.
+        receipt = valid_backend_receipt()
+        receipt['backend']['output_library'] = {}
+        with tempfile.TemporaryDirectory() as directory:
+            pathlib.Path(directory, 'backend-0.9.8.json').write_text(json.dumps(receipt))
+            status, _ = run_source_gate(receipts_dir=pathlib.Path(directory),
+                                        allow_unrebuilt_receipts=True)
+        self.assertEqual(status, 1)
+
+    def test_pre_build_pass_never_closes_a_hand_edited_summary_or_a_status_token(self):
+        # Flipping the summary and stamping every status token must not let the pre-build pass clear.
+        manifest = json.loads(native_coverage.SOURCE_MANIFEST.read_text())
+        edited = json.loads(json.dumps(manifest))
+        edited['corresponding_source_complete'] = True
+        for entry in edited.get('dependencies') or []:
+            entry['status'] = 'matched-release-source-collected'
+            entry['corresponding_source_complete'] = True
+        for entry in edited.get('additional_native_dependencies') or []:
+            entry['status'] = 'matched-release-source-collected'
+            entry['corresponding_source_complete'] = True
+        with patch.object(native_coverage, '_source_manifest', return_value=edited):
+            self.assertEqual(run_source_gate(allow_unrebuilt_receipts=True)[0], 0)  # wide-open dry run
+            # But the *no-allowance* pass — the one a release uses — still refuses.
+            self.assertEqual(run_source_gate()[0], 1)
 
     def test_gate_passes_when_every_component_is_closed(self):
         # All notices retained AND the GPL engine rebuilt: the gate clears.

@@ -101,6 +101,20 @@ jobs:
           name: vodbox-meta.${{ matrix.rid }}
           path: artifacts/meta/${{ matrix.rid }}.json
           retention-days: 14
+      # The per-RID source-rebuild receipt, published as its own artifact so the release job can
+      # verify exactly the receipt that travelled with this package instead of a workspace copy.
+      - name: Collect the packaged source-rebuild receipt
+        shell: bash
+        run: |
+          receipt=$(find artifacts/publish/${{ matrix.rid }} -name native-backend-receipt.json -print -quit)
+          test -n "$receipt"
+          mkdir -p artifacts/receipts
+          cp "$receipt" artifacts/receipts/native-backend-receipt.${{ matrix.rid }}.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-backend-receipt.${{ matrix.rid }}
+          path: artifacts/receipts/native-backend-receipt.${{ matrix.rid }}.json
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: package.${{ matrix.rid }}

@@ -25,6 +25,7 @@ src/VodBox.PluginHost/JavaHost/sqlite-jdbc/
 src/VodBox.PluginHost/JavaHost/corresponding-source/
 src/VodBox.PluginHost/JavaHost/upstream-runtime.json
 src/VodBox.PluginHost/JavaHost/LICENSE-tvbox-silicon
+src/VodBox.PluginHost/JavaHost/native-backend-receipt.json
 
 # Source archives fetched with fixed URLs and hashes before component packaging
 third_party/tvbox-silicon/dependency-sources/archives/

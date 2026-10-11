@@ -1013,11 +1013,18 @@ public sealed class ViewModelRaceTests
     {
         using var context = new Context();
         var old = Gate<List<LiveGroup>>();
+        var started = Gate<bool>();
+        var epg = Gate<byte[]>();
         var channel = new LiveChannel { Name = "新频道", Uris = ["https://example.com/new"] };
         context.Services.CurrentLiveConfig = "https://example.com/old";
-        var live = new LiveViewModel(context.Services, context.Main, (url, _) => url.EndsWith("old")
-            ? old.Task : Task.FromResult(new List<LiveGroup> { new("新组", [channel], false) }));
+        var live = new LiveViewModel(context.Services, context.Main, (url, _) =>
+        {
+            if (!url.EndsWith("old")) return Task.FromResult(new List<LiveGroup> { new("新组", [channel], false) });
+            started.TrySetResult(true);
+            return old.Task;
+        }, (_, _) => epg.Task);
         var first = live.LoadAsync();
+        await Done(started.Task);
         context.Services.CurrentLiveConfig = "https://example.com/new";
         await Done(live.LoadAsync());
         live.SetCurrent(channel);
@@ -1028,6 +1035,9 @@ public sealed class ViewModelRaceTests
         Assert.False(live.Loading);
         await Done(live.LoadAsync());
         Assert.Same(channel, live.CurrentChannel);
+        Assert.False(epg.Task.IsCompleted);
+        epg.SetResult([]);
+        await Done(live.EnsureBuiltInEpgAsync());
     }
 
     [AvaloniaFact]
@@ -1035,10 +1045,18 @@ public sealed class ViewModelRaceTests
     {
         using var context = new Context();
         var pending = Gate<List<LiveGroup>>();
+        var started = Gate<bool>();
+        var epg = Gate<byte[]>();
         CancellationToken token = default;
-        var live = new LiveViewModel(context.Services, context.Main, (_, ct) => { token = ct; return pending.Task; });
+        var live = new LiveViewModel(context.Services, context.Main, (_, ct) =>
+        {
+            token = ct;
+            started.TrySetResult(true);
+            return pending.Task;
+        }, (_, _) => epg.Task);
         context.Services.CurrentLiveConfig = "https://example.com/list";
         var loading = live.LoadAsync();
+        await Done(started.Task);
         context.Services.CurrentLiveConfig = null;
         await Done(live.LoadAsync());
         Assert.True(token.IsCancellationRequested);
@@ -1048,6 +1066,9 @@ public sealed class ViewModelRaceTests
         Assert.Empty(live.VisibleChannels);
         Assert.False(live.Loading);
         Assert.Null(live.CurrentChannel);
+        Assert.False(epg.Task.IsCompleted);
+        epg.SetResult([]);
+        await Done(live.EnsureBuiltInEpgAsync());
     }
 
     [AvaloniaFact]

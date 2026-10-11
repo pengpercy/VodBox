@@ -27,13 +27,15 @@ corresponding-source obligation travels with the distribution.
 Boundaries (enforced by the gate that reads the receipt, not by claims here):
   * No build is executed by this module's authoring environment. `build` runs the recipe; the
     receipt records what actually happened and the hashes of what was produced.
-  * `win-arm64` is not supported: the backend has no upstream JNI native and the rebuild covers
-    only the five RIDs in `dex-deps.json` -> `nativeCoverage.backendRids.supported`. A plain Java
-    package may still ship for `win-arm64`; it must not carry an unprovenanced GPL engine library.
+  * `win-arm64` has no upstream JNI native and no source rebuild, so it gets a **classes-only
+    exclusion receipt** instead of a compiled library: the staged backend jar is rewritten to drop
+    every `natives/` entry (there is nothing rebuilt to keep) and the receipt records the exclusion.
+    A plain Java package still ships for `win-arm64`; it must not carry an unprovenanced GPL engine.
 
 Usage:
     python3 build/rebuild_native_backend.py plan
     python3 build/rebuild_native_backend.py build  --rid osx-x64 --deps <JavaHost/deps> [--engine-cache DIR] [--out DIR]
+    python3 build/rebuild_native_backend.py build  --rid win-arm64 --deps <JavaHost/deps>
     python3 build/rebuild_native_backend.py verify --receipt <receipt.json> [--deps <JavaHost/deps>]
 """
 
@@ -89,6 +91,16 @@ RID_OUTPUT_NAME = {
 
 SUPPORTED_RIDS = ("linux-x64", "linux-arm64", "osx-x64", "osx-arm64", "win-x64")
 UNSUPPORTED_RIDS = ("win-arm64",)
+
+# `win-arm64` is not a *supported source rebuild*: the upstream backend has no windows_arm64 JNI
+# native, so there is nothing to compile. But a Java-only package still ships there, and it must
+# not carry an unprovenanced GPL engine for some other platform. So `win-arm64` gets a
+# **classes-only exclusion receipt**: the backend jar is rewritten to drop every `natives/` entry
+# (there is no rebuilt library to keep), and the receipt records the exclusion rather than an
+# output library. This is deliberately a receipt, not a `throw`: the RID is a legitimate package
+# target, it just has no source-rebuilt native to carry.
+EXCLUSION_RIDS = ("win-arm64",)
+ALL_RIDS = SUPPORTED_RIDS + EXCLUSION_RIDS
 
 # Bridge C sources compiled by the recipe, and the retained bridge headers it consumes.
 BRIDGE_SOURCES = ("unicorn.c", "sample_arm.c", "sample_arm64.c")
@@ -200,10 +212,18 @@ def toolchain_probe(rid: str) -> dict:
         probe["command"] = ["xcrun", "-sdk", "macosx", "clang"]
         probe["version"] = _tool_version(["xcrun", "-sdk", "macosx", "clang", "--version"])
         probe["deployment_target"] = "11.6"
+        if "-mmacosx-version-min=11.6" not in probe["flags"].split():
+            probe["flags"] += " -mmacosx-version-min=11.6"
+        # The static engine archive is linked into the bridge library, so the engine's own CMake
+        # build must be held to the same minimum OS; otherwise the engine's default (the runner SDK)
+        # raises the linked library's min-OS above the bridge's -mmacosx-version-min and the bundle's
+        # 11.6 floor is not what actually ships. CI must pass this CMake knob (see build.yml).
+        probe["engine_cmake_flags"] = "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.6"
         probe["deployment_target_note"] = (
             "The bundled JRE is built with a macOS 11 deployment target; the backend library is "
             "held to the same -mmacosx-version-min so the JNI library loads on the same minimum OS. "
-            "Do not raise this to the runner's SDK default (the host must not borrow the system JDK).")
+            "The linked static engine is built with -DCMAKE_OSX_DEPLOYMENT_TARGET=11.6 for the same "
+            "reason. Do not raise either to the runner's SDK default (the host must not borrow it).")
     elif rid.startswith("linux"):
         compiler = os.environ.get("CROSS_CC") or ("aarch64-linux-gnu-gcc" if rid == "linux-arm64" else "gcc")
         probe["command"] = [compiler]
@@ -363,15 +383,59 @@ def _maven_jar(deps: Path, glob: str, coordinate: str) -> Path:
     return matches[0]
 
 
+def exclude_backend_natives(jar: Path, rid: str, *, work: Path) -> dict:
+    """Rewrite `unidbg-unicorn2` for a RID with no source-rebuilt native: drop every `natives/` entry.
+
+    `win-arm64` has no upstream JNI native and no rebuild recipe, so there is nothing to keep — but
+    the upstream jar's *other-platform* natives must not ride along into a package that never
+    rebuilt them. The classes are copied verbatim (the jar stays on the classpath). The recorded
+    `native_entry` is `None` and `excluded_native_entries` lists what was withheld.
+    """
+    original_hash = sha256_file(jar)
+    staged = work / (jar.name + ".staged")
+    removed: list[str] = []
+    with zipfile.ZipFile(jar) as source, zipfile.ZipFile(staged, "w", zipfile.ZIP_DEFLATED) as output:
+        for info in source.infolist():
+            name = info.filename
+            if name.endswith("/"):
+                continue
+            if name.startswith("natives/"):
+                removed.append(name)
+                continue
+            output.writestr(info, source.read(name))
+    shutil.move(str(staged), str(jar))
+    with zipfile.ZipFile(jar) as archive:
+        present = sorted(n for n in archive.namelist()
+                         if n.startswith("natives/") and not n.endswith("/"))
+        classes = [n for n in archive.namelist() if n.endswith(".class")]
+    if present:
+        raise RebuildError(f"{jar.name}: exclusion left foreign natives behind: {present}")
+    if not classes:
+        raise RebuildError(f"{jar.name}: exclusion also dropped the Java classes; the backend jar "
+                           f"must stay linkable on the classpath")
+    return {
+        "jar": jar.name,
+        "rid": rid,
+        "native_entry": None,
+        "jar_native_entries": [],
+        "excluded_native_entries": sorted(removed),
+        "remaining_class_count": len(classes),
+        "pre_rewrite_jar_sha256": original_hash,
+        "post_rewrite_jar_sha256": sha256_file(jar),
+        "reason": (f"{rid} has no upstream JNI native and no source rebuild; every natives/ entry is "
+                   f"withheld so the package carries no unprovenanced GPL engine on this RID."),
+    }
+
+
 def build(rid: str, deps: Path, *, engine_cache: Path, out_root: Path) -> dict:
     """Run the recipe for `rid` and integrate the rebuilt native into the staged jars."""
-    if rid not in SUPPORTED_RIDS:
-        raise RebuildError(
-            f"{rid} is not built from source (unsupported: {', '.join(UNSUPPORTED_RIDS)}). A plain "
-            f"Java package may still ship for it, but it must not carry an unprovenanced engine.")
+    if rid not in ALL_RIDS:
+        raise RebuildError(f"unknown RID: {rid} (known: {', '.join(ALL_RIDS)})")
     deps = Path(deps).resolve()
     if not deps.is_dir():
         raise RebuildError(f"deps directory does not exist: {deps}")
+    if rid in EXCLUSION_RIDS:
+        return build_exclusion(rid, deps)
 
     lock = backend_artifact_lock()
     engine = _engines()
@@ -386,7 +450,9 @@ def build(rid: str, deps: Path, *, engine_cache: Path, out_root: Path) -> dict:
     env = {
         "RID": rid,
         "VODBOX_BUILD_ENGINE": "1",
-        "VODBOX_REBUILD_CACHE": str(engine_cache),
+        "VODBOX_REBUILD_CACHE": str(Path(engine_cache).resolve()),
+        "VODBOX_REBUILD_OUT": str(Path(out_root).resolve()),
+        "VODBOX_ENGINE_CMAKE_FLAGS": toolchain.get("engine_cmake_flags", ""),
     }
     _run(["bash", str(REBUILD / "fetch-engine.sh")], env=env)
     _run(["bash", str(REBUILD / "build-backend.sh")], env=env)
@@ -446,6 +512,74 @@ def build(rid: str, deps: Path, *, engine_cache: Path, out_root: Path) -> dict:
     return receipt
 
 
+def build_exclusion(rid: str, deps: Path) -> dict:
+    """The classes-only exclusion receipt for a RID with no source-rebuilt native (`win-arm64`).
+
+    This is deliberately *not* a throw: the RID is a legitimate Java package target, it simply has
+    no native backend to source-rebuild. The receipt records the same provenance frame (engine pin,
+    bridge digest, toolchain absence) plus the explicit exclusion of every `natives/` entry, so a
+    release gate can tell "no native was rebuilt for this RID, and none was carried" apart from
+    "a native was rebuilt but its evidence is missing".
+    """
+    engine = _engines()
+    bridge_digest, bridge_files = bridge_source_digest()
+    archive = engine_archive()
+    archive_hash = sha256_file(archive)
+    if archive_hash != engine["archive_sha256"]:
+        raise RebuildError(
+            f"engine archive sha256 mismatch: expected {engine['archive_sha256']}, got {archive_hash}")
+    with tempfile.TemporaryDirectory(prefix=f"native-receipt-{rid}-") as scratch:
+        work = Path(scratch)
+        backend_jar = _maven_jar(deps, BACKEND_JAR_GLOB, BACKEND_COORDINATE)
+        integration = exclude_backend_natives(backend_jar, rid, work=work)
+        unicorn1: dict | None = None
+        try:
+            unicorn1_jar = _maven_jar(deps, UNICORN1_JAR_GLOB, UNICORN1_COORDINATE)
+        except RebuildError:
+            unicorn1_jar = None
+        if unicorn1_jar is not None:
+            unicorn1 = quarantine_unicorn1_native(unicorn1_jar, work=work)
+            unicorn1["source_evidence"] = unicorn1_source_evidence()
+    return {
+        "schema": RECEIPT_SCHEMA,
+        "rid": rid,
+        "sourceRebuilt": False,
+        "backend": {
+            "coordinate": BACKEND_COORDINATE,
+            "excluded": True,
+            "exclusion_reason": (
+                f"{rid} has no upstream JNI native in {BACKEND_COORDINATE} and the source rebuild "
+                f"covers only {', '.join(SUPPORTED_RIDS)}; a Java-only package still ships, with no "
+                f"native backend library distributed for this RID."),
+            "engine": {
+                "repo": engine["repo"],
+                "branch": engine["branch"],
+                "commit": engine["commit"],
+                "tag": engine["tag"],
+                "build_system": engine["build_system"],
+                "build_command": engine["build_command"],
+                "source_archive": str(archive.relative_to(ROOT)) if archive.is_relative_to(ROOT) else str(archive),
+                "source_archive_sha256": archive_hash,
+                "not_claimed": engine_pin_not_claimed(),
+            },
+            "bridge": {
+                "source_tree": str(NATIVE_INPUTS.relative_to(ROOT)),
+                "source_commit": _bridge_commit(),
+                "source_digest_sha256": bridge_digest,
+                "files": bridge_files,
+            },
+            "toolchain": {"declared_compiler": None, "flags": None,
+                          "note": "no compilation is performed for an exclusion RID"},
+            "flags": None,
+            "declared_toolchain_source": None,
+            "output_library": None,
+            "jar_integration": integration,
+        },
+        "unicorn1": unicorn1,
+        "lock_output_sha256": backend_artifact_lock().get("output_sha256"),
+    }
+
+
 def engine_pin_not_claimed() -> list[str]:
     return json.loads(ENGINE_PIN.read_text(encoding="utf-8")).get("not_claimed", [])
 
@@ -460,18 +594,34 @@ def verify_receipt(receipt: dict, *, deps: Path | None) -> list[str]:
     if receipt.get("schema") != RECEIPT_SCHEMA:
         problems.append(f"receipt schema {receipt.get('schema')!r} is not {RECEIPT_SCHEMA}")
     rid = receipt.get("rid")
-    if rid not in SUPPORTED_RIDS:
-        problems.append(f"receipt is for {rid!r}, not one of the five rebuilt RIDs")
     backend = receipt.get("backend") or {}
-    native = (backend.get("output_library") or {})
-    if not native.get("sha256"):
-        problems.append("receipt records no output library sha256")
     jar = backend.get("jar_integration") or {}
+    exclusion = bool(backend.get("excluded"))
+    if rid not in ALL_RIDS:
+        problems.append(f"receipt is for {rid!r}, not one of {', '.join(ALL_RIDS)}")
+    elif exclusion and rid not in EXCLUSION_RIDS:
+        problems.append(f"receipt marks {rid!r} as an exclusion, but it is a source-rebuilt RID")
+    elif not exclusion and rid not in SUPPORTED_RIDS:
+        problems.append(f"receipt is for {rid!r}, not one of the five rebuilt RIDs")
     entries = jar.get("jar_native_entries") or []
-    if len(entries) != 1 or entries != [jar.get("native_entry")]:
-        problems.append(
-            f"receipt does not record exactly this RID's native entry (got {entries}); other RIDs "
-            f"must be removed from the package, not carried")
+    if exclusion:
+        # Classes-only exclusion: withhold every native and record that nothing was rebuilt.
+        if entries:
+            problems.append(
+                f"exclusion receipt still records native entries {entries}; the RID must carry no "
+                f"unprovenanced engine library")
+        if not (backend.get("exclusion_reason") or "").strip():
+            problems.append("exclusion receipt records no reason for withholding the native")
+        if backend.get("output_library"):
+            problems.append("exclusion receipt records an output library; nothing was compiled")
+    else:
+        native = (backend.get("output_library") or {})
+        if not native.get("sha256"):
+            problems.append("receipt records no output library sha256")
+        if len(entries) != 1 or entries != [jar.get("native_entry")]:
+            problems.append(
+                f"receipt does not record exactly this RID's native entry (got {entries}); other "
+                f"RIDs must be removed from the package, not carried")
     if not backend.get("bridge", {}).get("source_digest_sha256"):
         problems.append("receipt records no bridge source digest")
     if not (backend.get("engine") or {}).get("source_archive_sha256"):
@@ -490,7 +640,7 @@ def verify_receipt(receipt: dict, *, deps: Path | None) -> list[str]:
             problems.append("unicorn:1.0.14 dependency must stay (parent types), only its native is withheld")
     if deps is not None:
         deps = Path(deps)
-        if rid in SUPPORTED_RIDS:
+        if rid in ALL_RIDS:
             jar_path = _maven_jar(deps, BACKEND_JAR_GLOB, BACKEND_COORDINATE)
             with zipfile.ZipFile(jar_path) as archive:
                 actual = sorted(n for n in archive.namelist()
@@ -519,9 +669,11 @@ def _command_plan(_args: argparse.Namespace) -> int:
         target = toolchain_record(rid)
         print(f"  {rid:<12} -> natives/{Path(target['output']).parent.name}/{RID_OUTPUT_NAME[rid]}"
               f"  via {target['compiler']}")
-    for rid in UNSUPPORTED_RIDS:
-        print(f"  {rid:<12} not built from source (no upstream JNI native; ordinary Java may ship)")
+    for rid in EXCLUSION_RIDS:
+        print(f"  {rid:<12} classes only: no source rebuild; every natives/* entry withheld "
+              f"(Java-only package may ship)")
     print("  unicorn:1.0.14 -> keep classes (parent types), strip natives/* (GPL), record pinned source")
+    print("  receipt -> <JavaHost>/native-backend-receipt.json, also archived inside the package")
     return 0
 
 
@@ -536,9 +688,13 @@ def _command_build(args: argparse.Namespace) -> int:
         for problem in problems:
             print(f"FAIL {problem}", file=sys.stderr)
         return 1
-    if args.receipt:
-        Path(args.receipt).write_text(json.dumps(receipt, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"receipt written: {args.receipt}")
+    # Default placement is beside the staged Java host, so the receipt travels with the package;
+    # `--receipt` overrides it for a caller that wants the file elsewhere.
+    destination = Path(args.receipt) if args.receipt else (Path(args.deps).resolve().parent
+                                                           / "native-backend-receipt.json")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(receipt, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"receipt written: {destination}")
     return 0
 
 
@@ -549,8 +705,12 @@ def _command_verify(args: argparse.Namespace) -> int:
         for problem in problems:
             print(f"FAIL {problem}", file=sys.stderr)
         return 1
-    print(f"OK receipt for {receipt['rid']}: exactly one native entry "
-          f"({receipt['backend']['jar_integration']['native_entry']}), source + toolchain recorded")
+    if receipt.get("backend", {}).get("excluded"):
+        print(f"OK receipt for {receipt['rid']}: classes-only exclusion, every native withheld, "
+              f"engine source recorded")
+    else:
+        print(f"OK receipt for {receipt['rid']}: exactly one native entry "
+              f"({receipt['backend']['jar_integration']['native_entry']}), source + toolchain recorded")
     return 0
 
 
@@ -563,11 +723,13 @@ def main() -> int:
         func=_command_plan)
 
     build_parser = subparsers.add_parser("build", help="为单个 RID 执行重建并改写 deps/ 中的 jar")
-    build_parser.add_argument("--rid", required=True, choices=SUPPORTED_RIDS)
+    build_parser.add_argument("--rid", required=True, choices=ALL_RIDS,
+                              help="固定源码重建 RID；win-arm64 只产出仅类排除回执（无原生可重建）")
     build_parser.add_argument("--deps", required=True, help="已 stage 的 JavaHost/deps 目录")
     build_parser.add_argument("--engine-cache", default="", help="引擎源码/静态库缓存目录")
     build_parser.add_argument("--out", default="", help="重建产物的输出根目录（默认 rebuild/out）")
-    build_parser.add_argument("--receipt", default="", help="把回执写入该路径")
+    build_parser.add_argument("--receipt", default="",
+                              help="把回执写入该路径（默认 <deps 上级>/native-backend-receipt.json）")
     build_parser.set_defaults(func=_command_build)
 
     verify_parser = subparsers.add_parser("verify", help="核验一份回执（可选对照 deps/ 实测）")

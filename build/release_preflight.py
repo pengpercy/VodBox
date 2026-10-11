@@ -92,11 +92,25 @@ def check_native_coverage(rids: list[str] | None, allow_incomplete: bool) -> int
 
 
 def check_source_closure(allow_incomplete: bool, receipts_dir: Path | None = None,
-                         deps: Path | None = None) -> int:
+                         deps: Path | None = None, allow_unrebuilt_receipts: bool = False) -> int:
     """Gate a release on the redistribution obligation for the distributed native components.
 
-    This is the release gate. It walks every native the package distributes and decides, **from real
-    evidence**, whether the redistribution obligation is discharged:
+    This is the **build-time** gate: it runs before a package exists, so it decides from the
+    repository's own trees whether a release *may* proceed. It is deliberately not the pre-publish
+    gate — the artifacts are verified against the actual downloaded packages by
+    `build/release_evidence.py` after they exist, because this gate cannot see them yet.
+
+    With `allow_unrebuilt_receipts` (the pre-build declaration pass) a distributed GPL native whose
+    *only* missing evidence is an executed from-pinned-source rebuild receipt is reported as a
+    WARNING rather than a failure: the rebuild happens later in the build, so requiring the receipt
+    here would be demanding an artifact that does not exist yet. Everything else still fails closed:
+    a missing manifest entry, an unclassified native, an unretained notice, a receipt that exists
+    but records no output hash/source digest, or an exclusion receipt offered as a source proof. The
+    release itself never publishes on this pass — the pre-publish verification re-derives the whole
+    verdict from the real packages and accepts no such allowance.
+
+    It walks every native the package distributes and decides, **from real evidence**, whether the
+    redistribution obligation is discharged:
 
       * a GPL/copyleft native (the Unicorn2 engine, and Unicorn1's quarantined native) is closed
         only by an executed from-pinned-source rebuild receipt that records the rebuilt library hash,
@@ -131,6 +145,17 @@ def check_source_closure(allow_incomplete: bool, receipts_dir: Path | None = Non
     if state["complete"]:
         print("Redistribution obligation discharged for every distributed native artifact")
         return 0
+    unrebuilt = [coordinate for coordinate in state["pending"]
+                 if all("no rebuild receipt closes" in problem
+                        for problem in state["problems"].get(coordinate, []))]
+    if allow_unrebuilt_receipts and unrebuilt and \
+            len(unrebuilt) == len(state["pending"]) and not state["unclassified"]:
+        # The pre-build declaration pass: the source rebuild has not run yet, so an absent receipt
+        # is expected rather than a defect. Nothing else may be wrong, and this pass never publishes.
+        print(f"WARNING: the corresponding-source receipt for {', '.join(unrebuilt)} is not produced "
+              f"yet (the source rebuild runs later in the build). The pre-publish verification "
+              f"re-derives the whole verdict from the downloaded packages and accepts no allowance.")
+        return 0
     message = ("Redistribution obligation incomplete: at least one distributed native's obligation "
                "is not discharged (a GPL native with no executed-rebuild receipt, or a notice-only "
                "native whose recorded license text is not retained).")
@@ -164,7 +189,13 @@ def main() -> int:
     parser.add_argument("--receipts-dir", default="",
                         help="Directory of rebuild_native_backend receipts (default: dependency-sources/rebuild-receipts).")
     parser.add_argument("--deps", default="",
-                        help="Staged JavaHost/deps to cross-check receipts against the actual package input.")
+                        help="Staged JavaHost/deps to cross-check receipts against the actual package input. "
+                             "When the packages are already downloaded, point this at the unpacked host so the "
+                             "receipts verified are the ones that travel with the packages.")
+    parser.add_argument("--allow-unrebuilt-receipts", action="store_true",
+                        help="Pre-build declaration pass only: a source-rebuild receipt that the build has "
+                             "not produced yet is a warning, not a failure. Never use before publishing; the "
+                             "pre-publish verification reads the real packages and accepts no allowance.")
     args = parser.parse_args()
     rids = [rid.strip() for rid in args.rids.split(",") if rid.strip()]
     receipts_dir = Path(args.receipts_dir) if args.receipts_dir else None
@@ -174,7 +205,8 @@ def main() -> int:
     status = check_native_coverage(rids, args.allow_incomplete)
     if status:
         return status
-    status = check_source_closure(args.allow_incomplete, receipts_dir, deps)
+    status = check_source_closure(args.allow_incomplete, receipts_dir, deps,
+                                  allow_unrebuilt_receipts=args.allow_unrebuilt_receipts)
     if status or args.skip_permissions:
         return status
 

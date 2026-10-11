@@ -28,7 +28,9 @@ class BundleTests(unittest.TestCase):
             output = pathlib.Path(directory)
             prebuilt = output / 'prebuilt.jar'; prebuilt.write_bytes(b'host-bytes')
             (output / 'deps').mkdir(); (output / 'deps/runtime.jar').write_bytes(b'dependency')
-            self._write_backend_jar(output / 'deps')
+            # The staged backend jar is the *source-rebuilt* one: only this RID's native survives.
+            self._write_backend_jar(output / 'deps', 'osx-arm64')
+            self._write_receipt(output, 'osx-arm64', 'natives/osx_arm64/libunicorn.dylib')
             (output / 'corresponding-source').mkdir(); (output / 'corresponding-source/pom.xml').write_text('<project/>')
             (output / 'upstream-runtime.json').write_text('{}')
             (output / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
@@ -60,12 +62,15 @@ class BundleTests(unittest.TestCase):
             (source / 'corresponding-source').mkdir(); (source / 'corresponding-source/pom.xml').write_text('<project/>')
             (source / 'upstream-runtime.json').write_text('{}')
             (source / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
+            self._write_receipt(source, 'osx-arm64', 'natives/osx_arm64/libunicorn.dylib')
             target = root / 'publish'; target.mkdir()
             with patch.dict(bundle.os.environ, {'VODBOX_JAR_HOST': str(source / 'host.jar')}):
-                bundle.build_host_jar(target / 'host.jar')
+                bundle.build_host_jar(target / 'host.jar', 'osx-arm64')
             self.assertEqual((target / 'deps/runtime.jar').read_bytes(), b'dependency')
             self.assertTrue((target / 'corresponding-source/pom.xml').is_file())
             self.assertTrue((target / 'LICENSE-tvbox-silicon').is_file())
+            # The source-rebuild receipt travels with the staged component.
+            self.assertTrue((target / 'native-backend-receipt.json').is_file())
 
     def test_prebuilt_component_with_empty_deps_is_rejected(self):
         # An empty deps/ cannot link the upstream classes: the host starts and fails to load a
@@ -90,7 +95,10 @@ class BundleTests(unittest.TestCase):
                 backend = output / 'component'; backend.mkdir()
                 (backend / 'host.jar').write_bytes(b'host-bytes')
                 (backend / 'deps').mkdir()
-                self._write_backend_jar(backend / 'deps')
+                # Source-rebuilt deps: the RID's own native, or none at all for an exclusion RID.
+                self._write_backend_jar(backend / 'deps', rid)
+                self._write_receipt(backend, rid, None if not supported else
+                                    {'linux-arm64': 'natives/linux_arm64/libunicorn.so'}[rid])
                 (backend / 'corresponding-source').mkdir(); (backend / 'corresponding-source/pom.xml').write_text('<project/>')
                 (backend / 'upstream-runtime.json').write_text('{}')
                 (backend / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
@@ -99,6 +107,7 @@ class BundleTests(unittest.TestCase):
                 notice = bundle.json.loads((output / 'JavaHost' / 'java-host.json').read_text())
                 self.assertEqual(notice['nativeBackend']['supported'], supported)
                 self.assertIn(rid, notice['nativeBackend']['verdict'])
+                self.assertEqual(notice['nativeBackend']['excluded'], not supported)
                 if not supported:
                     self.assertIn('unsupported_native_library', notice['nativeBackend']['verdict'])
 
@@ -110,8 +119,9 @@ class BundleTests(unittest.TestCase):
             component = output / 'component'; component.mkdir()
             (component / 'host.jar').write_bytes(b'host-bytes')
             (component / 'deps').mkdir()
-            # Only macOS natives: every declared Linux/Windows RID is overstated.
+            # Only macOS natives: the staged jar cannot serve the linux-x64 bundle being built.
             self._write_backend_jar(component / 'deps', 'osx-arm64')
+            self._write_receipt(component, 'osx-arm64', 'natives/osx_arm64/libunicorn.so')
             (component / 'corresponding-source').mkdir(); (component / 'corresponding-source/pom.xml').write_text('<project/>')
             (component / 'upstream-runtime.json').write_text('{}')
             (component / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
@@ -122,11 +132,31 @@ class BundleTests(unittest.TestCase):
     def _write_backend_jar(self, deps, rid=None):
         import zipfile
         directories = {'osx-x64': ['osx_64'], 'osx-arm64': ['osx_arm64'], 'win-x64': ['windows_64'],
-                       'win-arm64': ['windows_arm64'], 'linux-x64': ['linux_64'], 'linux-arm64': ['linux_arm64']}
+                       'win-arm64': [], 'linux-x64': ['linux_64'], 'linux-arm64': ['linux_arm64']}
         with zipfile.ZipFile(deps / 'unidbg-unicorn2-0.9.8.jar', 'w') as archive:
-            selected = directories[rid] if rid else [d for key, values in directories.items() if key != "win-arm64" for d in values]
+            # A source-rebuilt jar carries only the requested RID's native (win-arm64 carries none);
+            # without a rid the legacy upstream jar carries all five supported natives.
+            selected = directories[rid] if rid else [d for key, values in directories.items()
+                                                     if key != "win-arm64" for d in values]
             for directory in selected:
                 archive.writestr(f'natives/{directory}/libunicorn.so', b'\x7fELF')
+
+    def _write_receipt(self, component, rid, native_entry):
+        """A source-rebuild receipt shaped like `rebuild_native_backend.py` writes (classes-only
+        when `native_entry` is None, i.e. an exclusion RID such as win-arm64)."""
+        entries = [native_entry] if native_entry else []
+        (component / 'native-backend-receipt.json').write_text(bundle.json.dumps({
+            'schema': 1,
+            'rid': rid,
+            'backend': {
+                'excluded': native_entry is None,
+                'exclusion_reason': '' if native_entry else f'{rid} has no upstream JNI native',
+                'jar_integration': {
+                    'native_entry': native_entry,
+                    'jar_native_entries': entries,
+                },
+            },
+        }))
 
     def test_windows_exe_only_asset_must_fail(self):
         import zipfile

@@ -81,6 +81,7 @@ DISTRIBUTED_SOURCE_ARTIFACTS = (
 UPSTREAM_POM = ROOT / "third_party/tvbox-silicon/Runtime/JavaHost/pom.xml"
 BACKEND_ARTIFACT_PREFIX = "unidbg-unicorn2"
 BACKEND_VERSION = "0.9.8"
+BACKEND_COORDINATE = "com.github.zhkl0228:unidbg-unicorn2:0.9.8"
 
 # Where `rebuild_native_backend.py` writes its per-RID receipts. A receipt is the *evidence* a
 # distributed native was rebuilt from pinned source: it records the built library hash, the engine
@@ -94,8 +95,9 @@ RECEIPTS_DIR = ROOT / "third_party/tvbox-silicon/dependency-sources/rebuild-rece
 # obligation classes exist and they must not be merged:
 #
 #   * "gpl-corresponding-source"  — a GPL/copyleft native statically linked into a distributed
-#     library. Only an executed from-pinned-source rebuild with a recorded output hash (a
-#     `rebuild_native_backend` receipt) closes it, or removal from the distribution.
+#     library (or the GPL native journal that accompanies it). Only an executed from-pinned-source
+#     rebuild with a recorded output hash (a `rebuild_native_backend` receipt) closes it, or removal
+#     from the distribution.
 #   * "permissive-notice-only"    — a permissive (BSD/ISC/MIT/zlib/Apache) native. Redistribution
 #     requires the upstream license text(s) + copyright + disclaimer be *retained*; there is no
 #     source obligation. Closed by the retained notice files actually being present on disk.
@@ -106,16 +108,22 @@ RECEIPTS_DIR = ROOT / "third_party/tvbox-silicon/dependency-sources/rebuild-rece
 # blanket is replaced by reading the real per-component obligation. For `unidbg-android` the
 # manifest additionally records the exact retained notice paths (`licenses_physically_retained`),
 # and those are re-resolved to real files rather than trusted as strings.
+#
+# `receipt_coordinate` names the coordinate *inside* a receipt that proves this component. It is not
+# always the component itself: the engine's rebuild receipt journals the quarantined
+# `unicorn:1.0.14` native under `unicorn1`, so the receipt that closes the Unicorn1 journal is
+# identified by the coordinate its `unicorn1` record carries — a receipt whose backend names a
+# different engine does not close the Unicorn1 obligation.
 NATIVE_COMPONENT_OBLIGATIONS = {
     "com.github.zhkl0228:unidbg-unicorn2:0.9.8": {
         "class": "gpl-corresponding-source",
-        "receipts": ("backend-0.9.8",),
+        "receipt_coordinate": "backend",
         "note": "Unicorn2 engine statically linked into the distributed libunicorn.{so,dylib}/"
                 "unicorn.dll; the only full-source obligation. Closed by an executed rebuild receipt.",
     },
     "com.github.zhkl0228:unicorn:1.0.14": {
         "class": "gpl-corresponding-source",
-        "receipts": ("backend-0.9.8",),
+        "receipt_coordinate": "unicorn1",
         "note": "Unicorn1 Java parent types keep their classes, but the GPL native natives/* is "
                 "quarantined; the receipt records the removed entries + pinned source archive.",
     },
@@ -316,7 +324,7 @@ def _manifest_artifacts(manifest: dict) -> dict[str, dict]:
 
 
 def load_receipts(receipts_dir: Path | None = None) -> dict[str, dict]:
-    """Every `rebuild_native_backend` receipt on disk, keyed by the key its filename carries.
+    """Every `rebuild_native_backend` receipt on disk, keyed by the coordinate each one proves.
 
     A receipt is the *evidence* a distributed native was rebuilt from pinned source. The gate reads
     the receipts rather than trusting the manifest's summary: a receipt records the built library
@@ -324,8 +332,18 @@ def load_receipts(receipts_dir: Path | None = None) -> dict[str, dict]:
     foreign native. A release with no receipt for a distributed GPL native is blocked — the default
     "old library, no receipt" case stays closed.
 
-    Receipt files are named `<key>.json` (e.g. `backend-0.9.8.json`) or carry a `"key"` field; a
-    bare `backend-<version>.json` is what `rebuild_native_backend.py --receipt` writes.
+    The receipts a real rebuild writes are **one file per RID**, named by the RID
+    (`build/rebuild_native_backend.py build --rid <rid>` defaults to
+    `<JavaHost>/native-backend-receipt.json`, and CI downloads them per RID as
+    `native-backend-receipt.<rid>.json`). Each of the six is evidence about *that* RID's distributed
+    native, so each files itself under both coordinates it can close: its backend coordinate and, on
+    the same receipt, the quarantined Unicorn1 coordinate its `unicorn1` record names. One RID's
+    receipt therefore never stands in for another RID's — that is exactly why the per-RID packages
+    are verified individually against their own receipt.
+
+    A receipt is also accepted under its legacy single-file key (`backend-0.9.8` / a `"key"` field),
+    so the earlier shape keeps working. A bare `backend-<version>.json` is what the old single-RID
+    `--receipt` wrote.
     """
     directory = Path(receipts_dir) if receipts_dir is not None else RECEIPTS_DIR
     receipts: dict[str, dict] = {}
@@ -336,9 +354,72 @@ def load_receipts(receipts_dir: Path | None = None) -> dict[str, dict]:
             receipt = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        key = receipt.get("key") or path.stem
-        receipts[key] = receipt
+        receipt.setdefault("key", path.stem)
+        receipt.setdefault("_receipt_file", path.name)
+        backend_coordinate = (receipt.get("backend") or {}).get("coordinate")
+        unicorn1_coordinate = ((receipt.get("unicorn1") or {}).get("coordinate")
+                               if receipt.get("unicorn1") else None)
+        keys = {path.stem}
+        if backend_coordinate:
+            keys.add(backend_coordinate)
+        if unicorn1_coordinate:
+            # The same file closes the Unicorn1 journal obligation too; `_receipt_file` keeps both
+            # keys pointing at the one real file.
+            keys.add(unicorn1_coordinate)
+        for key in keys:
+            receipts.setdefault(key, receipt)
     return receipts
+
+
+def load_package_receipts(deps: Path) -> dict[str, dict]:
+    """The rebuild receipts that actually travel with a package, read from beside `deps`.
+
+    A real release verifies the *distributed* receipts, not a workspace copy: CI downloads each RID's
+    `native-backend-receipt.<rid>.json` next to the unpacked package, and `bundle.py` stages
+    `native-backend-receipt.json` inside `JavaHost/`. Both live beside (or in) this `deps`
+    directory, so they are found here without the release having to place them in the build tree.
+    Keyed the same way as `load_receipts`, so a packaged receipt and a repository receipt are
+    interchangeable evidence about the same coordinate.
+    """
+    deps = Path(deps)
+    found: dict[str, dict] = {}
+    candidates: list[Path] = []
+    for root in (deps, deps.parent):
+        if root.is_dir():
+            candidates += sorted(root.glob("native-backend-receipt*.json"))
+    for path in candidates:
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        receipt.setdefault("key", path.stem)
+        receipt.setdefault("_receipt_file", path.name)
+        backend_coordinate = (receipt.get("backend") or {}).get("coordinate")
+        unicorn1_coordinate = ((receipt.get("unicorn1") or {}).get("coordinate")
+                               if receipt.get("unicorn1") else None)
+        for key in {path.name, path.stem, backend_coordinate, unicorn1_coordinate} - {None}:
+            found.setdefault(key, receipt)
+    return found
+
+
+def receipt_problems_for(coordinate: str, receipts: dict[str, dict]) -> list[str]:
+    """The evidence problems of every receipt that claims to prove `coordinate`.
+
+    Used for reporting: an obligation that is *closed* still reports what its receipt recorded, so a
+    receipt accepted for one coordinate that records an incomplete frame elsewhere cannot hide.
+    """
+    problems: list[str] = []
+    seen: set[int] = set()
+    for receipt in receipts.values():
+        if id(receipt) in seen:
+            continue
+        seen.add(id(receipt))
+        if ((receipt.get("backend") or {}).get("coordinate") != coordinate and
+                (receipt.get("unicorn1") or {}).get("coordinate") != coordinate):
+            continue
+        label = receipt.get("_receipt_file") or receipt.get("key") or "receipt"
+        problems += [f"{label}: {problem}" for problem in receipt_problems(receipt)]
+    return problems
 
 
 def receipt_problems(receipt: dict) -> list[str]:
@@ -348,9 +429,19 @@ def receipt_problems(receipt: dict) -> list[str]:
     back for the gate: a recorded output library hash, the engine source-archive hash, the bridge
     source digest and the jar integration that keeps exactly this RID's rebuilt native. A receipt
     that records only a status or a version string does not close anything.
+
+    A **classes-only exclusion** receipt (`win-arm64`: no upstream JNI native, so every `natives/`
+    entry was withheld and *nothing was compiled*) is explicitly **not** evidence that a distributed
+    GPL engine came from pinned source. It is a legitimate receipt for that RID's package, but it
+    cannot close the engine's corresponding-source obligation — accepting it would be exactly the
+    "hand the obligation a receipt-shaped file" failure the gate exists to prevent.
     """
     problems: list[str] = []
     backend = receipt.get("backend") or {}
+    if backend.get("excluded"):
+        problems.append(
+            "receipt is a classes-only exclusion (no native was rebuilt), so it is not evidence that "
+            "a distributed GPL engine was built from the pinned source")
     library = backend.get("output_library") or {}
     if not library.get("sha256"):
         problems.append("no rebuilt output library sha256")
@@ -366,12 +457,21 @@ def receipt_problems(receipt: dict) -> list[str]:
         problems.append(
             f"the package would still carry foreign natives ({entries}); only the rebuilt native "
             f"may be distributed")
+    if (receipt.get("backend") or {}).get("coordinate") == BACKEND_COORDINATE and \
+            not receipt.get("rid"):
+        problems.append("receipt records no RID, so it is not tied to a distributed package")
     unicorn1 = receipt.get("unicorn1")
     if unicorn1 is None:
         problems.append("no unicorn:1.0.14 quarantine record (its GPL native must be withheld)")
     else:
         if unicorn1.get("kept_dependency") is not True:
             problems.append("unicorn:1.0.14 must stay (parent types) with only its native withheld")
+        if unicorn1.get("removed_native_entries") is None:
+            problems.append("unicorn:1.0.14 records no withheld native entries; the GPL native's "
+                            "withholding is not evidenced")
+        elif not unicorn1.get("removed_native_entries"):
+            problems.append("unicorn:1.0.14 records an empty withheld-native list; nothing was "
+                            "quarantined, which is not evidence of a rewrite")
         if not (unicorn1.get("source_evidence") or {}).get("archive_sha256"):
             problems.append("unicorn:1.0.14 has no pinned source archive hash")
     return problems
@@ -482,21 +582,30 @@ def _component_verdict(coordinate: str, entry: dict | None, receipts: dict[str, 
     if kind == "gpl-corresponding-source":
         problems: list[str] = []
         matched = False
-        for key in obligation.get("receipts", ()):
-            receipt = receipts.get(key)
-            if receipt is None:
+        # The receipt that proves this component is the one whose recorded coordinate *is* this
+        # coordinate: the engine's own `backend.coordinate` for the emulation native, the
+        # quarantined journal's `unicorn1.coordinate` for Unicorn1. A receipt for a different
+        # component must not close this one, and a stale legacy key must not either.
+        slot = obligation.get("receipt_coordinate")
+        candidates = [receipts[key] for key in obligation.get("receipts", ()) if key in receipts]
+        if slot in ("backend", "unicorn1"):
+            candidates += [receipt for receipt in receipts.values()
+                           if ((receipt.get(slot) or {}).get("coordinate")) == coordinate]
+        seen: set[int] = set()
+        for receipt in candidates:
+            if id(receipt) in seen:
                 continue
-            # A receipt proves the source of the native it rewrote; the coordinate must be the one
-            # the receipt wrote, or the evidence belongs to a different component.
-            if receipt.get("backend", {}).get("coordinate") != coordinate and \
-                    (receipt.get("unicorn1") or {}).get("coordinate") != coordinate:
+            seen.add(id(receipt))
+            if slot in ("backend", "unicorn1") and \
+                    ((receipt.get(slot) or {}).get("coordinate")) != coordinate:
                 continue
             matched = True
+            label = receipt.get("_receipt_file") or receipt.get("key") or "receipt"
             for problem in receipt_problems(receipt):
-                problems.append(f"{key}: {problem}")
+                problems.append(f"{label}: {problem}")
             if deps is not None:
                 for problem in published_input_problems(receipt, deps):
-                    problems.append(f"{key}: {problem}")
+                    problems.append(f"{label}: {problem}")
         if not matched:
             # The default blocked case: a distributed GPL native with no executed-rebuild receipt.
             problems.append(
@@ -537,19 +646,27 @@ def source_closure_state(receipts_dir: Path | None = None, deps: Path | None = N
     partial/hand-edited summary is visible, but `complete` is derived from the per-component
     evidence alone: flipping the summary does not close anything.
 
-    When `deps` is supplied (a staged `JavaHost/deps` directory), each closing receipt is also
-    cross-checked against the *actual* package input on disk — the backend jar's `natives/` tree and
-    the quarantined `unicorn:1.0.14` jar — so a receipt for a jar the release is not shipping (or a
-    jar that changed after the rebuild) does not close the obligation.
+    When `deps` is supplied (a staged `JavaHost/deps` directory — the release-time path), the
+    receipts searched are the ones that travel with a real package: any `native-backend-receipt*.json`
+    in `deps` and its parent, i.e. the receipts downloaded with the per-RID artifacts, *before*
+    falling back to the build-tree receipts directory. A workspace-only receipt is not evidence
+    about the distributed archive, and a receipt is additionally cross-checked against the actual
+    package input on disk — the backend jar's `natives/` tree and the quarantined
+    `unicorn:1.0.14` jar — so a receipt for a jar the release is not shipping (or a jar that
+    changed after the rebuild) does not close the obligation.
 
     Returns {'complete': bool, 'summary_complete': bool, 'pending': [...], 'unclassified': [...],
              'artifacts': {coordinate: status}, 'obligations': {coordinate: class},
-             'problems': {coordinate: [reasons]}, 'receipts': [...keys]}.
+             'problems': {coordinate: [reasons]}, 'receipts': [...keys], 'receipt_files': [...]}.
     """
     manifest = _source_manifest()
     summary_complete = bool(manifest.get(SOURCE_MANIFEST_COMPLETE_FIELD, False))
     entries = _manifest_artifacts(manifest)
     receipts = load_receipts(receipts_dir)
+    if deps is not None:
+        for receipt in load_package_receipts(deps).values():
+            key = receipt.get("_receipt_file") or receipt.get("key")
+            receipts.setdefault(key, receipt)
     artifacts: dict[str, str] = {}
     obligations: dict[str, str] = {}
     problems: dict[str, list[str]] = {}
@@ -558,12 +675,19 @@ def source_closure_state(receipts_dir: Path | None = None, deps: Path | None = N
     for coordinate in DISTRIBUTED_SOURCE_ARTIFACTS:
         entry = entries.get(coordinate)
         artifacts[coordinate] = str((entry or {}).get("status", "no-manifest-entry"))
-        closed, reasons, kind = _component_verdict(coordinate, entry, receipts, deps)
+        closed, gate_reasons, kind = _component_verdict(coordinate, entry, receipts, deps)
         obligations[coordinate] = kind
         if kind == "unclassified":
             unclassified.append(coordinate)
-        if reasons:
-            problems[coordinate] = reasons
+        if gate_reasons:
+            # The OPEN problems are the gate's reasons; the closed components' own evidence
+            # problems are reported too, so a receipt that is accepted for one coordinate while
+            # recording something incomplete is still visible rather than silently dropped.
+            problems[coordinate] = gate_reasons
+        else:
+            closed_problems = receipt_problems_for(coordinate, receipts)
+            if closed_problems:
+                problems[coordinate] = closed_problems
         if not closed:
             pending.append(coordinate)
     return {
@@ -576,6 +700,9 @@ def source_closure_state(receipts_dir: Path | None = None, deps: Path | None = N
         "obligations": obligations,
         "problems": problems,
         "receipts": sorted(receipts),
+        "receipt_files": sorted({receipt.get("_receipt_file") for receipt in receipts.values()
+                                 if receipt.get("_receipt_file")}),
+        "packaged_receipts": (sorted(load_package_receipts(deps)) if deps is not None else []),
     }
 
 
@@ -635,17 +762,49 @@ def backend_jar(deps: Path) -> Path:
     return matches[0]
 
 
-def verify_deps(deps: Path) -> dict:
+def verify_deps(deps: Path, rid: str | None = None) -> dict:
     """Re-derive the backend coverage from the real jars and compare it to the declared table.
 
     Returns {'jar': name, 'observed': [...], 'declared': [...]}. Raises NativeCoverageError when
     the declared supported set overstates the jars — the exact failure that ships as
     "we support Windows ARM64" while the backend has no library for it.
+
+    When `rid` is supplied the check is **per-RID against the rebuilt source jar**: after
+    `rebuild_native_backend.py` rewrites the staged backend jar for one RID, that jar deliberately
+    carries exactly one native (this RID's) and drops every foreign one, so it can no longer satisfy
+    the whole-table comparison. Passing `rid` instead verifies that the RID the bundle is being
+    built for is the one native actually present — the rebuilt library — rather than demanding the
+    five upstream RIDs the source rebuild intentionally removed.
     """
     deps = Path(deps)
     jar = backend_jar(deps)
     observed = jar_native_rids(jar)
     declared = set(_declared().get("backendRids", {}).get("supported", []))
+    if rid is not None:
+        if rid not in RIDS:
+            raise NativeCoverageError(f"unknown runtime identifier: {rid}")
+        declared_rids = set(_declared().get("backendRids", {}).get("supported", []))
+        if rid not in declared_rids:
+            # A RID with no source-rebuilt native (win-arm64): the rebuilt jar must carry *no*
+            # native at all, so an unprovenanced engine cannot ride along on a Java-only package.
+            if observed:
+                raise NativeCoverageError(
+                    f"{jar.name}: {rid} has no source-rebuilt native, but the jar still carries "
+                    f"{', '.join(sorted(observed))}; every foreign native must be withheld.")
+            return {"jar": jar.name, "observed": [], "declared": sorted(declared),
+                    "rid": rid, "sourceRebuilt": False, "excluded": True}
+        if rid not in observed:
+            raise NativeCoverageError(
+                f"{jar.name}: no source-rebuilt native for {rid} (observed: "
+                f"{', '.join(sorted(observed)) or 'none'}); the staged backend jar does not carry "
+                f"this RID's rebuilt library.")
+        foreign = observed - {rid}
+        if foreign:
+            raise NativeCoverageError(
+                f"{jar.name}: foreign natives survived the source rebuild for {rid}: "
+                f"{', '.join(sorted(foreign))}; only the rebuilt native may be distributed.")
+        return {"jar": jar.name, "observed": sorted(observed), "declared": sorted(declared),
+                "rid": rid, "sourceRebuilt": True, "excluded": False}
     overstated = declared - observed
     if overstated:
         raise NativeCoverageError(
@@ -670,7 +829,12 @@ def _command_list(_args: argparse.Namespace) -> int:
 
 
 def _command_verify(args: argparse.Namespace) -> int:
-    result = verify_deps(args.deps)
+    rid = getattr(args, "rid", "") or None
+    result = verify_deps(args.deps, rid)
+    if rid:
+        print(f"OK {result['jar']}：{rid} 的固定源码重建原生已随包（实测 {', '.join(result['observed'])}，"
+              f"无外来原生）")
+        return 0
     print(f"OK {result['jar']}：实测覆盖 {', '.join(result['observed'])}")
     print(f"   声明覆盖 {', '.join(result['declared'])}（不超出实测）")
     return 0
@@ -734,6 +898,9 @@ def main() -> int:
     subparsers.add_parser("list", help="打印六 RID 的原生后端覆盖结论").set_defaults(func=_command_list)
     verify = subparsers.add_parser("verify", help="从实际 deps/*.jar 重新推导覆盖并比对声明")
     verify.add_argument("--deps", type=Path, required=True, help="已 stage 的 JavaHost/deps 目录")
+    verify.add_argument("--rid", default="",
+                        help="按该 RID 校验固定源码重建后的 jar（只应含该 RID 的重建原生）；"
+                             "留空则校验完整上游覆盖表")
     verify.set_defaults(func=_command_verify)
     closure = subparsers.add_parser(
         "closure", help="打印/校验发布所需的原生二进制覆盖（默认六 RID 全覆盖才算完整）")

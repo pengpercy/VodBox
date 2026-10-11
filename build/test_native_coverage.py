@@ -79,6 +79,38 @@ class CoverageTests(unittest.TestCase):
             with self.assertRaisesRegex(coverage.NativeCoverageError, 'not staged'):
                 coverage.verify_deps(pathlib.Path(directory))
 
+    def test_verify_deps_with_rid_accepts_a_source_rebuilt_single_native_jar(self):
+        # After the per-RID source rebuild the backend jar deliberately carries only this RID's
+        # native and dropped every foreign one; verify_deps(rid) must accept that, not demand the
+        # five upstream RIDs the rebuild intentionally removed.
+        with self._deps(['osx_arm64']) as deps:
+            result = coverage.verify_deps(deps, 'osx-arm64')
+        self.assertEqual(result['observed'], ['osx-arm64'])
+        self.assertTrue(result['sourceRebuilt'])
+
+    def test_verify_deps_with_rid_rejects_a_foreign_native_left_in_the_jar(self):
+        # The rebuild's whole point: no foreign native may ride along. A jar that still carries
+        # another RID's library must fail even though "its own" native is present.
+        with self._deps(['osx_arm64', 'linux_64']) as deps:
+            with self.assertRaisesRegex(coverage.NativeCoverageError, 'foreign'):
+                coverage.verify_deps(deps, 'osx-arm64')
+
+    def test_verify_deps_with_rid_rejects_a_missing_rebuilt_native(self):
+        with self._deps(['linux_64']) as deps:
+            with self.assertRaisesRegex(coverage.NativeCoverageError, 'no source-rebuilt native'):
+                coverage.verify_deps(deps, 'osx-arm64')
+
+    def test_verify_deps_with_exclusion_rid_requires_no_native_at_all(self):
+        # win-arm64 has no source-rebuilt native: the jar must be classes-only. A jar that still
+        # carries any native for it would be distributing an unprovenanced engine.
+        with self._deps([]) as deps:
+            result = coverage.verify_deps(deps, 'win-arm64')
+        self.assertEqual(result['observed'], [])
+        self.assertTrue(result['excluded'])
+        with self._deps(['osx_arm64']) as deps:
+            with self.assertRaisesRegex(coverage.NativeCoverageError, 'no source-rebuilt native'):
+                coverage.verify_deps(deps, 'win-arm64')
+
     def test_lock_table_and_module_agree_on_the_unsupported_rid(self):
         lock = json.loads((ROOT / 'build' / 'dex-deps.json').read_text())
         declared = lock['nativeCoverage']['backendRids']
@@ -175,6 +207,76 @@ class CoverageTests(unittest.TestCase):
         self.assertFalse(manifest['minimal_rebuild_path']['executed'])
         # The source manifest carries no RID-split "5/6" table at all: the number is not its shape.
         self.assertNotIn('nativeCoverage', manifest)
+
+    def test_per_rid_receipts_are_read_from_the_package_they_travel_with(self):
+        # A real release verifies the receipts inside the downloaded packages, not a workspace copy.
+        # The six receipts CI downloads are one file per RID; each is keyed by the coordinate it
+        # proves, so a per-RID receipt closes the engine obligation exactly like a legacy key.
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            deps = pathlib.Path(directory) / 'JavaHost' / 'deps'
+            deps.mkdir(parents=True)
+            receipt = {
+                'schema': 1, 'rid': 'osx-arm64', 'sourceRebuilt': True,
+                'backend': {
+                    'coordinate': 'com.github.zhkl0228:unidbg-unicorn2:0.9.8',
+                    'engine': {'source_archive_sha256': 'a' * 64},
+                    'bridge': {'source_digest_sha256': 'b' * 64},
+                    'output_library': {'sha256': 'c' * 64},
+                    'jar_integration': {'native_entry': 'natives/osx_arm64/libunicorn.dylib',
+                                        'jar_native_entries': ['natives/osx_arm64/libunicorn.dylib']},
+                },
+                'unicorn1': {'coordinate': 'com.github.zhkl0228:unicorn:1.0.14', 'kept_dependency': True,
+                             'removed_native_entries': ['natives/osx_64/libunicorn_java.dylib'],
+                             'source_evidence': {'archive_sha256': 'd' * 64}},
+            }
+            (deps.parent / 'native-backend-receipt.json').write_text(json.dumps(receipt))
+            loaded = coverage.load_package_receipts(deps)
+            state = coverage.source_closure_state(deps=deps)
+        self.assertIn('com.github.zhkl0228:unidbg-unicorn2:0.9.8', loaded)
+        # The one real receipt also closes the Unicorn1 journal obligation it records.
+        self.assertIn('com.github.zhkl0228:unicorn:1.0.14', loaded)
+        self.assertNotIn('com.github.zhkl0228:unidbg-unicorn2:0.9.8', state['pending'])
+        self.assertNotIn('com.github.zhkl0228:unicorn:1.0.14', state['pending'])
+
+    def test_a_classes_only_exclusion_receipt_does_not_close_the_engine_obligation(self):
+        # The new win-arm64 receipt shape: it legitimately withholds every native and compiles
+        # nothing. It is a valid receipt for that RID's package, but it cannot be evidence that a
+        # distributed GPL engine was built from pinned source.
+        receipt = {
+            'schema': 1, 'rid': 'win-arm64', 'sourceRebuilt': False,
+            'backend': {
+                'coordinate': 'com.github.zhkl0228:unidbg-unicorn2:0.9.8', 'excluded': True,
+                'exclusion_reason': 'win-arm64 has no upstream JNI native',
+                'engine': {'source_archive_sha256': 'a' * 64},
+                'bridge': {'source_digest_sha256': 'b' * 64}, 'output_library': None,
+                'jar_integration': {'native_entry': None, 'jar_native_entries': [],
+                                    'excluded_native_entries': ['natives/linux_64/libunicorn.so']},
+            },
+            'unicorn1': {'coordinate': 'com.github.zhkl0228:unicorn:1.0.14', 'kept_dependency': True,
+                         'removed_native_entries': ['natives/windows_64/unicorn_java.dll'],
+                         'source_evidence': {'archive_sha256': 'd' * 64}},
+        }
+        problems = coverage.receipt_problems(receipt)
+        self.assertTrue(any('classes-only exclusion' in problem for problem in problems))
+        self.assertTrue(any('no rebuilt output library sha256' in problem for problem in problems))
+
+    def test_a_receipt_whose_coordinate_is_another_component_does_not_close(self):
+        # A receipt proves only the coordinate it records. A stale legacy key whose content belongs
+        # to a different component must not close this one.
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            pathlib.Path(directory, 'backend-0.9.8.json').write_text(json.dumps({
+                'schema': 1, 'rid': 'linux-x64',
+                'backend': {'coordinate': 'com.github.zhkl0228:some-other-engine:1.0',
+                            'engine': {'source_archive_sha256': 'a' * 64},
+                            'bridge': {'source_digest_sha256': 'b' * 64},
+                            'output_library': {'sha256': 'c' * 64},
+                            'jar_integration': {'native_entry': 'natives/linux_64/libunicorn.so',
+                                                'jar_native_entries': ['natives/linux_64/libunicorn.so']}},
+            }))
+            state = coverage.source_closure_state(pathlib.Path(directory))
+        self.assertIn('com.github.zhkl0228:unidbg-unicorn2:0.9.8', state['pending'])
 
     def test_gpl_engine_stays_open_with_no_rebuild_receipt(self):
         # The default blocked case: the old, un-rebuilt library has no executed-rebuild receipt, so

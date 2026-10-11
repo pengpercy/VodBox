@@ -32,7 +32,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NATIVE="$HERE/../../dependency-sources/upstream-evidence/native-provenance/release-inputs/backend/unicorn2/src/main/native"
 CACHE="${VODBOX_REBUILD_CACHE:-$HERE/.cache}"
 ENGINE="$CACHE/unicorn-548eda466eb9a2c69723a0f74888aa7b889b4ed9"
-OUT="$HERE/out"
+OUT="${VODBOX_REBUILD_OUT:-$HERE/out}"
+# Compilation changes directory to the retained sources; resolve caller-relative output first.
+mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
 
 RID="${RID:?set RID to one of: linux-x64 linux-arm64 osx-x64 osx-arm64 win-x64}"
 
@@ -101,6 +104,7 @@ case "$RID" in
   osx-arm64)
     # retained: osx_build_arm64.sh
     xcrun -sdk macosx clang -m64 -o libunicorn.dylib -shared -O3 -DNDEBUG -arch arm64 \
+      -mmacosx-version-min=11.6 \
       -I "$ENGINE/include" "${BRIDGE_SRCS[@]}" \
       -I "$JAVA_INC" -I "$JAVA_PLATFORM_INC" -fPIC \
       "$ENGINE_A"

@@ -274,12 +274,13 @@ public sealed partial class LiveViewModel : ObservableObject
         };
     }
 
-    internal LiveViewModel(AppServices services, MainViewModel main, Func<string, CancellationToken, Task<List<LiveGroup>>> loadGroups)
+    internal LiveViewModel(AppServices services, MainViewModel main, Func<string, CancellationToken, Task<List<LiveGroup>>> loadGroups,
+        Func<Uri, CancellationToken, Task<byte[]>>? fetchEpg = null)
     {
         _services = services;
         _main = main;
         _loadGroups = loadGroups;
-        _epg = new VodBox.Desktop.Services.EpgService(Path.Combine(services.DataDir, "epg"), services.Prefs);
+        _epg = new VodBox.Desktop.Services.EpgService(Path.Combine(services.DataDir, "epg"), services.Prefs, fetchEpg);
         _epg.Changed += OnEpgChanged;
         Groups.CollectionChanged += (_, _) => RefreshGroupOptions();
         RefreshGroupOptions();
@@ -517,7 +518,16 @@ public sealed partial class LiveViewModel : ObservableObject
     {
         await LoadConfigurationAsync(_services.CurrentLiveConfig, false);
         // 首次打开直播立即读缓存并发起内置刷新；与直播源加载互不阻塞、互不影响播放。
-        await EnsureBuiltInEpgAsync();
+        _ = RefreshBuiltInEpgInBackgroundAsync();
+    }
+
+    private async Task RefreshBuiltInEpgInBackgroundAsync()
+    {
+        try { await EnsureBuiltInEpgAsync(); }
+        catch (Exception error)
+        {
+            VodBox.Core.VodBoxLog.Warn("epg", $"内置节目表刷新失败：{error.Message}");
+        }
     }
 
     public Task<bool> ApplyConfigurationAsync(string url) => LoadConfigurationAsync(url, true);

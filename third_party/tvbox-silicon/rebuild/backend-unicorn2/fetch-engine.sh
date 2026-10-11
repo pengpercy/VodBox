@@ -33,7 +33,11 @@ ENGINE_COMMIT="548eda466eb9a2c69723a0f74888aa7b889b4ed9"
 ENGINE_SHA="c90a485e10674c576c2977ba84afb190277530d74fd43db1ba94afb526928a4b"
 ENGINE_URL="https://codeload.github.com/zhkl0228/unicorn/tar.gz/${ENGINE_COMMIT}"
 # CMake build (this tree has no make.sh). Static archive via BUILD_SHARED_LIBS=OFF.
-ENGINE_BUILD_CMD='cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DUNICORN_ARCH="arm;aarch64" . && cmake --build build -j'
+# VODBOX_ENGINE_CMAKE_FLAGS carries per-host knobs the caller must supply, e.g. the macOS
+# deployment target: the static engine is linked into the bridge library, so its own CMake build
+# must share the bridge's -mmacosx-version-min (11.6) or the shipped library's minimum OS is the
+# engine's default (the runner SDK) instead of the bundle's 11.6 floor.
+ENGINE_BUILD_CMD="cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DUNICORN_ARCH=\"arm;aarch64\" ${VODBOX_ENGINE_CMAKE_FLAGS:-} . && cmake --build build -j"
 
 # Symbols the bridge C source REQUIRES from the engine. If the pinned tree stops providing
 # any of these, the pin is wrong (regressed back to Unicorn1) and we fail closed.

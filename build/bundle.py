@@ -310,7 +310,9 @@ JAVA_HOST_DIRECTORY = "JavaHost"
 # and the native coverage question is about the upstream closure, so `deps/` must be present.
 JAVA_HOST_REQUIRED_COMPONENT = "deps"
 JAVA_HOST_REQUIRED_FILES = ("upstream-runtime.json", "LICENSE-tvbox-silicon")
-
+# The per-RID source-rebuild receipt, written by `rebuild_native_backend.py` and shipped inside the
+# package (it is the evidence that the distributed native was built from the pinned source).
+RECEIPT_NAME = "native-backend-receipt.json"
 
 def java_host_source() -> Path:
     return ROOT / "src" / "VodBox.PluginHost" / "JavaHost"
@@ -327,22 +329,32 @@ def stage_prebuilt_host(source: Path, destination: Path) -> Path:
         # A component whose deps/ is empty links nothing: the host starts and then fails to find
         # the upstream classes. Reject it here rather than shipping a host that cannot load a plugin.
         raise ValueError(f"prebuilt upstream component has an empty {JAVA_HOST_REQUIRED_COMPONENT}/")
+    # The source-rebuild receipt must exist beside the staged host: it is the evidence the package
+    # distributes a native rebuilt from pinned source, and it has to travel with the package.
+    if not (component / RECEIPT_NAME).is_file():
+        raise ValueError(
+            f"prebuilt upstream component is missing {RECEIPT_NAME}; the per-RID source-native "
+            f"rebuild (build/rebuild_native_backend.py) must run before staging the host")
     if source.resolve() != destination.resolve():
         shutil.copy2(source, destination)
     if component.resolve() != destination.parent.resolve():
         for name in (JAVA_HOST_REQUIRED_COMPONENT, "corresponding-source"):
             shutil.copytree(component / name, destination.parent / name, dirs_exist_ok=True)
-        for name in JAVA_HOST_REQUIRED_FILES:
+        for name in JAVA_HOST_REQUIRED_FILES + (RECEIPT_NAME,):
             shutil.copy2(component / name, destination.parent / name)
     return destination
 
 
-def build_host_jar(destination: Path) -> Path:
+def build_host_jar(destination: Path, rid: str) -> Path:
     """Produce `host.jar` for the bundle.
 
     Java bytecode is architecture-independent, so compiling with the build host's JDK is correct:
     only the *runtime* has to match the target RID. A prebuilt jar (VODBOX_JAR_HOST) wins over
     compiling, which lets CI build the host once on one runner and reuse it on every RID.
+
+    In the in-repo (non-prebuilt) path the per-RID source rebuild runs here too, so the staged host
+    carries this RID's rebuilt backend native and its receipt; a prebuilt host is expected to have
+    been rebuilt already, and `stage_prebuilt_host` enforces the receipt is present.
     """
     prebuilt = os.environ.get("VODBOX_JAR_HOST")
     if prebuilt:
@@ -351,6 +363,8 @@ def build_host_jar(destination: Path) -> Path:
             raise ValueError(f"VODBOX_JAR_HOST does not exist: {source}")
         return stage_prebuilt_host(source, destination)
     run(sys.executable, ROOT / "build" / "tvbox-host.py", "--output", destination.parent)
+    run(sys.executable, ROOT / "build" / "rebuild_native_backend.py", "build",
+        "--rid", rid, "--deps", destination.parent / "deps")
     return destination
 
 
@@ -370,24 +384,42 @@ def bundle_java_host(rid: str, output: Path, host_jar=None):
             raise ValueError(f"--java-host-jar does not exist: {source}")
         stage_prebuilt_host(source, jar)
     else:
-        build_host_jar(jar)
+        build_host_jar(jar, rid)
     stage = ROOT / "build" / "fetch-dex-deps.py"
     run(sys.executable, stage, "jre", "--rid", rid, "--extract", host / "jre")
     architecture = verify_jre(host / "jre", rid)
     lock = json.loads((ROOT / "build" / "dex-deps.json").read_text(encoding="utf-8"))
-    # Record whether the RID can actually run the upstream native ARM64 backend. The JRE is only a
-    # Java runtime: a matching JRE proves nothing about the plugin's native libraries, so the bundle
-    # carries an explicit verdict instead of leaving "has a JRE" to be read as "native backend works".
+    # The full upstream host is staged first (host.jar + original Maven deps + corresponding source);
+    # the per-RID source rebuild then rewrites the backend jar inside that staged host, and this is
+    # where the *result* is verified. After a source rebuild the backend jar deliberately carries
+    # only this RID's native (every foreign one was removed), so the check is per-RID: `verify_deps`
+    # is asked to confirm this RID's rebuilt native is present and no foreign native rode along,
+    # rather than demanding the five upstream RIDs the rebuild intentionally dropped.
     try:
-        coverage = verify_deps(host / "deps")
+        coverage = verify_deps(host / "deps", rid)
     except NativeCoverageError as error:
         # The lock table and the shipped jars disagree: treat it as a broken build, not a warning.
         raise ValueError(f"{rid}: native coverage table does not match the bundled deps: {error}") from error
+    # The receipt is the evidence that ties the packaged native to its pinned source. It is written
+    # by `rebuild_native_backend.py` next to the staged host and must travel *inside* the package,
+    # so a later release gate can read it from the archive rather than only from the build tree.
+    receipt_path = host / RECEIPT_NAME
+    if not receipt_path.is_file():
+        raise ValueError(
+            f"{rid}: {RECEIPT_NAME} is missing from the staged Java host; the source-native rebuild "
+            f"step must run before bundling so the package carries its rebuild receipt")
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if receipt.get("rid") != rid:
+        raise ValueError(f"{rid}: staged receipt is for {receipt.get('rid')!r}, not {rid}")
     native = {
         "backend": "unidbg-unicorn2",
         "supported": backend_supports(rid),
         "verdict": describe(rid),
         "bundledJar": coverage["jar"],
+        "sourceRebuilt": bool(coverage.get("sourceRebuilt")),
+        "receipt": RECEIPT_NAME,
+        "receiptRid": receipt.get("rid"),
+        "excluded": bool(receipt.get("backend", {}).get("excluded")),
     }
     with jar.open("rb") as handle:
         digest = hashlib.file_digest(handle, "sha256").hexdigest()
