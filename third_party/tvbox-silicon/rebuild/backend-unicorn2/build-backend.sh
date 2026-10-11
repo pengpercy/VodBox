@@ -55,8 +55,8 @@ done
 
 # Static engine archive: Linux/Darwin use libunicorn.a, MinGW uses unicorn.a (Makefile AR naming).
 engine_static() {
-  if [[ -f "$ENGINE/libunicorn.a" ]]; then echo "$ENGINE/libunicorn.a"
-  elif [[ -f "$ENGINE/unicorn.a" ]]; then echo "$ENGINE/unicorn.a"
+  if [[ -f "$ENGINE/build/libunicorn.a" ]]; then echo "$ENGINE/build/libunicorn.a"
+  elif [[ -f "$ENGINE/build/unicorn.a" ]]; then echo "$ENGINE/build/unicorn.a"
   else echo "FATAL: engine static archive not found under $ENGINE (run fetch-engine.sh with VODBOX_BUILD_ENGINE=1)" >&2; exit 1
   fi
 }
@@ -135,5 +135,3 @@ echo "Record these hashes in dependency-sources/rebuild-lock.json after review."
 #     com.github.unidbg.arm.backend.unicorn.Unicorn
 # }
 # ---------------------------------------------------------------------------
------------------------------------
---------------------------------------------------------------------

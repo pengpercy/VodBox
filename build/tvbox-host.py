@@ -26,7 +26,7 @@ def maven():
 
 def source_archives():
     root = SOURCE / 'dependency-sources'
-    for entry in json.loads((root / 'download-archives.json').read_text()):
+    for entry in json.loads((root / 'download-archives.json').read_text(encoding="utf-8")):
         archive = root / 'archives' / entry['file']
         archive.parent.mkdir(parents=True, exist_ok=True)
         if not archive.exists():

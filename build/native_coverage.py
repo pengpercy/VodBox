@@ -99,7 +99,7 @@ class NativeCoverageError(RuntimeError):
 
 
 def _declared() -> dict:
-    lock = json.loads((ROOT / "build" / "dex-deps.json").read_text())
+    lock = json.loads((ROOT / "build" / "dex-deps.json").read_text(encoding="utf-8"))
     return lock.get("nativeCoverage", {})
 
 
@@ -207,7 +207,7 @@ def require_closure(target_rids: list[str] | None = None) -> dict:
 def _source_manifest() -> dict:
     """The retaining manifest for distributed-native corresponding source, parsed as JSON."""
     try:
-        return json.loads(SOURCE_MANIFEST.read_text())
+        return json.loads(SOURCE_MANIFEST.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
         raise NativeCoverageError(
             f"source manifest is missing at {SOURCE_MANIFEST.relative_to(ROOT)}; the source-closure "

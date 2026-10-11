@@ -931,6 +931,34 @@
       "artifact": "com.github.zhkl0228:unidbg-android:0.9.8",
       "status": "pending-embedded-native-provenance",
       "reason": "34 packaged Android guest SDK/hook native libraries are indexed and the unidbg release archive is retained; not all Android SDK/third-party origins, exact upstream commits, license texts and corresponding source are established. Java parent Apache license does not automatically license these binaries.",
+      "license_facts": {
+        "summary": "The LICENSE governing each guest file IS established from the strings observed in the retained binaries, even though the exact AOSP tag/module is not. All 26 SDK libs plus xHook/whale/Dobby are PERMISSIVE (notice-only, no source obligation). The GPL-2.0 corresponding-source obligation belongs solely to the Unicorn engine (unidbg-unicorn2), NOT to these guest libs. libhookzz.so is the one guest file whose license is genuinely unknown.",
+        "class_permissive_notice_only": [
+          "bionic libc.so/libdl.so/libm.so/liblog.so -> BSD-family (notice-only; bionic BSD does NOT require full source)",
+          "bionic libc++ libstdcpp.so/libcpp.so -> MIT / Illinois-BSD dual (notice-only)",
+          "libz.so -> zlib (notice-only)",
+          "sdk19 libcrypto.so/libssl.so -> OpenSSL 1.0.1e dual OpenSSL+SSLeay (strings 'external/openssl/...', 'OpenSSL 1.0.1e 11 Feb 2013'); NOT BoringSSL",
+          "sdk23 libcrypto.so/libssl.so -> BoringSSL (strings 'external/boringssl/...', 'BoringSSL')",
+          "libxhook.so -> MIT + BSD-2 (tree.h) + BSD-3 (queue.h), docs CC-BY-4.0 (notice-only)",
+          "libwhale.so -> Apache-2.0 (notice-only)",
+          "libdobby.so -> Apache-2.0 (notice-only)"
+        ],
+        "class_gpl_corresponding_source": [
+          "Unicorn engine statically linked into unidbg-unicorn2 natives/{libunicorn.so,libunicorn.dylib,unicorn.dll} -> GPL-2.0; requires engine corresponding source (see REPORT.md). This is the ONLY full-source obligation in this dependency."
+        ],
+        "license_unknown_rebuild_or_drop": [
+          "libhookzz.so -> HookZz license/revision unresolved (Dobby is not its license or ABI)"
+        ],
+        "licenses_not_yet_physically_retained": [
+          "bionic BSD NOTICE (libc/libdl/libm/liblog)",
+          "bionic libc++ LICENSE.TXT (libstdcpp/libcpp)",
+          "zlib license",
+          "OpenSSL 1.0.1e dual OpenSSL+SSLeay LICENSE text",
+          "BoringSSL LICENSE text",
+          "HookZz license (unknown)"
+        ],
+        "document": "../dependency-notices/unidbg-android-0.9.8/GUEST-NATIVE-LICENSE-FACTS.md"
+      },
       "native_binary_match_count": 34,
       "corresponding_source_complete": false,
       "sdk_groups": {

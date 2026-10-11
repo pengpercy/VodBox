@@ -29,7 +29,7 @@ from nativeverify import verify_linux_closure, verify_windows_dll, pe_imports, v
 from native_coverage import backend_supports, describe, verify_deps, NativeCoverageError
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = json.loads((ROOT / "build" / "native-assets.json").read_text())
+ASSETS = json.loads((ROOT / "build" / "native-assets.json").read_text(encoding="utf-8"))
 
 
 def download(rid: str) -> Path:
@@ -235,7 +235,7 @@ def bundle_linux(archive: Path, output: Path, rid: str):
                 shutil.copy2(path, target)
     copied = set()
     receipt = output / "media-dependencies.json"
-    previous = json.loads(receipt.read_text()) if receipt.exists() else {}
+    previous = json.loads(receipt.read_text(encoding="utf-8")) if receipt.exists() else {}
     previous = previous.get("libraries", previous)
     owners = {name: {key: row[key] for key in ("package", "version") if key in row}
               for name, row in previous.items() if isinstance(row, dict) and "package" in row}
@@ -374,7 +374,7 @@ def bundle_java_host(rid: str, output: Path, host_jar=None):
     stage = ROOT / "build" / "fetch-dex-deps.py"
     run(sys.executable, stage, "jre", "--rid", rid, "--extract", host / "jre")
     architecture = verify_jre(host / "jre", rid)
-    lock = json.loads((ROOT / "build" / "dex-deps.json").read_text())
+    lock = json.loads((ROOT / "build" / "dex-deps.json").read_text(encoding="utf-8"))
     # Record whether the RID can actually run the upstream native ARM64 backend. The JRE is only a
     # Java runtime: a matching JRE proves nothing about the plugin's native libraries, so the bundle
     # carries an explicit verdict instead of leaving "has a JRE" to be read as "native backend works".

@@ -64,6 +64,7 @@
       "replaces": "libwhale.so"
     }
   },
+  "license_facts": "Per the retained binaries + upstream texts (see ../../dependency-notices/unidbg-android-0.9.8/GUEST-NATIVE-LICENSE-FACTS.md): libxhook.so = MIT + BSD-2 (tree.h) + BSD-3 (queue.h) + CC-BY-4.0 docs, notice-only; libwhale.so = Apache-2.0 (Apache also carries a NOTICE), notice-only; libdobby.so = Apache-2.0, notice-only; libhookzz.so = LICENSE UNKNOWN (HookZz is Dobby's predecessor, no HookZz license text retained, historical revision unresolved) -> cannot be satisfied by notice -> rebuild-or-drop. All hook licenses are permissive/notice-based; none is GPL. The historical revision of each (vs the pinned reference) is NOT proven, so the retained reference commit is a reference, not a proof of the shipped binary's source.",
   "not_claimed": [
     "That these builds byte-match the packaged hook libs in unidbg-android:0.9.8.",
     "That the historical HookZz revision or license is established.",

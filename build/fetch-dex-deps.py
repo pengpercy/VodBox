@@ -35,7 +35,7 @@ from pathlib import Path
 from nativeverify import verify_jre
 
 ROOT = Path(__file__).resolve().parent.parent
-LOCK = json.loads((ROOT / "build" / "dex-deps.json").read_text())
+LOCK = json.loads((ROOT / "build" / "dex-deps.json").read_text(encoding="utf-8"))
 CACHE = ROOT / LOCK.get("cacheRoot", ".cache/dex-deps")
 USER_AGENT = "vodbox-dexdeps/1.0"
 
