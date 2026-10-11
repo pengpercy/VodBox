@@ -43,8 +43,21 @@ def package_macos(rid, source: Path, output: Path, version: str):
     # `.gitkeep` files behind. They are never runtime content and they break codesign, which walks
     # sibling code directories such as lib/ and requires every entry there to be signed code.
     for detritus in sorted(contents.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if "corresponding-source" in detritus.relative_to(contents).parts:
+            continue
         if detritus.name.startswith("."):
             shutil.rmtree(detritus, ignore_errors=True) if detritus.is_dir() else detritus.unlink(missing_ok=True)
+    # Remove the upstream resource seal only in the copied runtime. Keep Info.plist so
+    # codesign recognizes the JRE as a nested bundle and builds a fresh resource seal.
+    runtime = contents / "MacOS/JavaHost/jre"
+    runtime_bundles = []
+    if (runtime / "Contents/Info.plist").is_file():
+        runtime_bundles.append(runtime)
+        old_signature = runtime / "Contents/_CodeSignature"
+        if old_signature.is_symlink():
+            old_signature.unlink()
+        elif old_signature.is_dir():
+            shutil.rmtree(old_signature)
     # Keep libmpv and lib/ together: native dependencies use @loader_path/lib.
     shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/vodbox.icns", resources / "vodbox.icns")
     with (contents / "Info.plist").open("wb") as file:
@@ -57,16 +70,24 @@ def package_macos(rid, source: Path, output: Path, version: str):
         }, file)
     # libmpv.dylib 也在 MacOS 下（MpvNative 候选路径包含 ../Resources）
     identity = os.environ.get("CODESIGN_IDENTITY") or "-"
-    macho = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca")
-    for file in sorted(contents.rglob("*"), key=lambda x: len(x.parts), reverse=True):
+    macho = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",
+             b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca", b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca")
+    targets = list(runtime_bundles)
+    for file in contents.rglob("*"):
+        relative = file.relative_to(contents)
+        if "corresponding-source" in relative.parts or relative.parts[0] != "MacOS":
+            continue
         if file.is_file() and not file.is_symlink():
             with file.open("rb") as content:
                 if content.read(4) in macho:
-                    command = ["codesign", "--force", "--sign", identity]
-                    if identity != "-":
-                        command += ["--options", "runtime", "--timestamp"]
-                    run(*command, file)
-    run("codesign", "--force", "--sign", identity, app)
+                    targets.append(file)
+    # The runtime's Mach-O files precede its bundle, which in turn precedes the
+    # desktop executable and outer app. Never sign source/license resources as code.
+    for target in sorted(targets, key=lambda item: len(item.parts), reverse=True) + [app]:
+        command = ["codesign", "--force", "--sign", identity]
+        if identity != "-":
+            command += ["--options", "runtime", "--timestamp"]
+        run(*command, target)
     run("codesign", "--verify", "--deep", "--strict", app)
     run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, output / (stem + ".zip"))
     with tempfile.TemporaryDirectory(prefix="vodbox-dmg-",dir=output) as directory:

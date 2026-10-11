@@ -6,6 +6,7 @@ metadata artifacts were present. Each of those is asserted here as a refusal, ag
 bytes.
 """
 import contextlib
+import gzip
 import hashlib
 import io
 import json
@@ -56,7 +57,8 @@ def host_members(backend: str = "unidbg-unicorn2-0.9.8.jar", receipt: bool = Tru
 
 
 def write_zip(path: pathlib.Path, members: list[str], prefix: str = "") -> pathlib.Path:
-    rid = next((rid for rid in evidence.RIDS if f".{rid}." in path.name), "osx-arm64")
+    rid = next((rid for rid in evidence.RIDS
+                if any(marker in path.name for marker in (f".{rid}.", f"_{rid}."))), "osx-arm64")
     contents = {member: b"payload:" + member.encode() for member in members}
     for member in members:
         if member.endswith(".jar"):
@@ -93,7 +95,10 @@ def write_zip(path: pathlib.Path, members: list[str], prefix: str = "") -> pathl
             contents[vendor + notice.relative_to(evidence.rebuild.SOURCE).as_posix()] = notice.read_bytes()
     with zipfile.ZipFile(path, "w") as archive:
         for member, data in contents.items():
-            archive.writestr(prefix + member, data)
+            location = prefix + member
+            if prefix.endswith("Contents/MacOS/") and member.startswith("licenses/"):
+                location = prefix.removesuffix("MacOS/") + "Resources/" + member
+            archive.writestr(location, data)
     return path
 
 
@@ -494,7 +499,231 @@ class SixRidClosureTests(unittest.TestCase):
         self.assertEqual(result["verdicts"]["osx-arm64"]["receiptArtifact"]["excluded"], False)
 
 
+class PackageReceiptTests(RidVerdictTests):
+    def test_only_checked_subset_bytes_are_retained(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+            rewrite_zip(archive, {"VodBox.Desktop": b"application" * 1024,
+                                  "JavaHost/jre/bin/java": b"runtime" * 1024})
+            path = evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
+            data = evidence._read_package_receipt(path)
+            self.assertEqual(data["schema"], 2)
+            self.assertEqual(data["files"]["VodBox.Desktop"], {
+                "size": len(b"application" * 1024),
+                "sha256": hashlib.sha256(b"application" * 1024).hexdigest()})
+            names = set(data["subset"])
+            self.assertEqual(path.read_bytes()[:2], b"\x1f\x8b")
+            self.assertNotIn("VodBox.Desktop", names)
+            self.assertNotIn("JavaHost/jre/bin/java", names)
+            self.assertIn("JavaHost/jre/legal/java.base/LICENSE", names)
+            self.assertIn("JavaHost/deps/unidbg-unicorn2-0.9.8.jar", names)
+            self.assertIn("JavaHost/corresponding-source/" + SOURCE_PREFIX +
+                          "dependency-sources/archives/engine.tar", names)
+            self.assertEqual(names, {name for name in data["files"] if evidence._retain_member(name)})
+            evidence.verify_package_receipt("osx-arm64", archive, path.parent)
+
+    def test_subset_and_receipt_limits_fail_without_truncating_checks(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+            receipts = root / "receipts"
+            with unittest.mock.patch.object(evidence, "MAX_SUBSET_BYTES", 1):
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "subset exceeds"):
+                    evidence.write_package_receipt("osx-arm64", archive, receipts)
+            self.assertEqual(list(receipts.iterdir()), [])
+            path = evidence.write_package_receipt("osx-arm64", archive, receipts)
+            with unittest.mock.patch.object(evidence, "MAX_SUBSET_BYTES", 1):
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "subset exceeds"):
+                    evidence.verify_package_receipt("osx-arm64", archive, receipts)
+            with unittest.mock.patch.object(evidence, "MAX_RECEIPT_BYTES", 1):
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "receipt exceeds"):
+                    evidence.verify_package_receipt("osx-arm64", archive, receipts)
+            self.assertTrue(path.is_file())
+
+    def test_subset_tampering_and_missing_bytes_are_refused(self):
+        for mode in ("hash", "missing", "traversal", "source", "encoding", "extra"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+                path = evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
+                data = evidence._read_package_receipt(path)
+                member = "JavaHost/corresponding-source/" + BRIDGE_PATH + "/unicorn.c"
+                if mode == "missing":
+                    data["subset"].pop(member)
+                elif mode in ("hash", "source"):
+                    changed = b"changed source"
+                    data["subset"][member] = evidence.base64.b64encode(changed).decode("ascii")
+                    if mode == "source":
+                        data["files"][member] = {
+                            "size": len(changed), "sha256": hashlib.sha256(changed).hexdigest()}
+                elif mode == "encoding":
+                    data["subset"][member] = "!" * len(data["subset"][member])
+                else:
+                    data["subset"]["../outside" if mode == "traversal" else "VodBox.Desktop"] = ""
+                with gzip.open(path, "wt", encoding="utf-8") as stream:
+                    json.dump(data, stream)
+                with self.assertRaises(evidence.ReleaseEvidenceError):
+                    evidence.verify_package_receipt("osx-arm64", archive, path.parent)
+
+    def test_replay_checks_content_even_with_updated_manifest_hashes(self):
+        source = "JavaHost/corresponding-source/"
+        cases = {
+            source + SOURCE_PREFIX + "dependency-sources/archives/engine.tar": b"changed source",
+            source + SOURCE_PREFIX + "dependency-sources/archives/unicorn.tar": b"changed source",
+            "JavaHost/jre/legal/java.base/LICENSE": b"",
+            "JavaHost/deps/unidbg-unicorn2-0.9.8.jar": jar_bytes({
+                "Backend.class": b"class", native_entry_for("osx-arm64"): b"changed native"}),
+        }
+        for member, changed in cases.items():
+            with self.subTest(member=member), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+                path = evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
+                data = evidence._read_package_receipt(path)
+                data["subset"][member] = evidence.base64.b64encode(changed).decode("ascii")
+                data["files"][member] = {"size": len(changed), "sha256": hashlib.sha256(changed).hexdigest()}
+                with gzip.open(path, "wt", encoding="utf-8") as stream:
+                    json.dump(data, stream)
+                with unittest.mock.patch.object(evidence, "extracted_package", side_effect=AssertionError("must fail during replay")):
+                    with self.assertRaises(evidence.ReleaseEvidenceError):
+                        evidence.verify_package_receipt("osx-arm64", archive, path.parent)
+
+    def test_duplicate_json_keys_and_decompression_overflow_are_refused(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            path = pathlib.Path(directory) / "receipt.json"
+            with gzip.open(path, "wt", encoding="utf-8") as stream:
+                stream.write('{"rid":"osx-arm64","rid":"linux-x64"}')
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "duplicate"):
+                evidence._read_package_receipt(path)
+            with gzip.open(path, "wb") as stream:
+                stream.write(b" " * 64)
+            with unittest.mock.patch.object(evidence, "MAX_SUBSET_BYTES", 0), \
+                    unittest.mock.patch.object(evidence, "MAX_RECEIPT_BYTES", 1), \
+                    unittest.mock.patch.object(evidence, "MAX_MANIFEST_FILES", 0):
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "decompressed byte limit"):
+                    evidence._read_package_receipt(path)
+
+    def test_unretained_payload_manifest_cannot_be_forged(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+            path = evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
+            data = evidence._read_package_receipt(path)
+            data["files"]["VodBox.Desktop"]["sha256"] = "0" * 64
+            with gzip.open(path, "wt", encoding="utf-8") as stream:
+                json.dump(data, stream)
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "manifest differs from actual asset"):
+                evidence.verify_package_receipt("osx-arm64", archive, path.parent)
+
+    def test_dmg_producer_cannot_claim_a_non_native_runner(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            archive = root / "VodBox.1.osx-arm64.dmg"
+            archive.write_bytes(b"not mounted")
+            with unittest.mock.patch.object(evidence.sys, "platform", "linux"), \
+                    unittest.mock.patch.object(evidence, "extracted_package") as extract:
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "macOS runner"):
+                    evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
+                extract.assert_not_called()
+
+    def test_linux_installer_names_and_every_asset_are_discovered(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            for name in ("vodbox_1.0_linux-x64.deb", "vodbox_1.0_linux-x64.rpm",
+                         "VodBox_1.0.linux-x64.zip"):
+                (root / name).write_bytes(b"installer")
+            self.assertEqual(len(evidence.find_archives("linux-x64", root)), 3)
+
+    def test_receipt_round_trip_and_real_zip_reverification(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+            receipts = root / "receipts"
+            evidence.write_package_receipt("osx-arm64", archive, receipts)
+            result = evidence.verify_release(["osx-arm64"], root, package_receipts_dir=receipts)
+            self.assertEqual(len(result["verdicts"]["osx-arm64"]["assets"]), 1)
+            with unittest.mock.patch.object(evidence, "verify_rid", side_effect=evidence.ReleaseEvidenceError("rechecked")):
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "rechecked"):
+                    evidence.verify_release(["osx-arm64"], root, package_receipts_dir=receipts)
+
+    def test_receipt_mismatch_summary_and_source_tampering_fail(self):
+        for mode in ("hash", "size", "summary", "source", "checks"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+                path = evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
+                data = evidence._read_package_receipt(path)
+                if mode == "hash":
+                    archive.write_bytes(archive.read_bytes() + b"changed")
+                elif mode == "size":
+                    data["size"] += 1
+                elif mode == "summary":
+                    data.pop("files")
+                    data["verified"] = True
+                elif mode == "checks":
+                    data["checks"]["sourceEvidence"]["bridgeDigest"] = "fake"
+                else:
+                    member = "JavaHost/corresponding-source/" + BRIDGE_PATH + "/unicorn.c"
+                    data["files"][member]["sha256"] = hashlib.sha256(b"changed source").hexdigest()
+                with gzip.open(path, "wt", encoding="utf-8") as stream:
+                    json.dump(data, stream)
+                with self.assertRaises(evidence.ReleaseEvidenceError):
+                    evidence.verify_package_receipt("osx-arm64", archive, path.parent)
+
+    def test_deb_and_rpm_receipts_do_not_skip_actual_asset_reverification(self):
+        for suffix in ("deb", "rpm"):
+            with self.subTest(format=suffix), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                fixture = write_zip(root / "VodBox.1.linux-x64.zip", host_members(), prefix="opt/vodbox/")
+                asset = root / f"vodbox_1_linux-x64.{suffix}"
+                asset.write_bytes(b"installer fixture")
+                with evidence.extracted_package(fixture) as payload:
+                    with unittest.mock.patch.object(evidence, "extracted_package", return_value=contextlib.nullcontext(payload)):
+                        evidence.write_package_receipt("linux-x64", asset, root / "receipts")
+                        fixture.unlink()
+                        with unittest.mock.patch.object(evidence, "verify_rid", side_effect=evidence.ReleaseEvidenceError("actual installer rechecked")) as verify:
+                            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "actual installer rechecked"):
+                                evidence.verify_release(["linux-x64"], root, package_receipts_dir=root / "receipts")
+                            verify.assert_called_once_with("linux-x64", asset, None, None)
+
+    def test_valid_zip_does_not_hide_unverified_dmg(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
+            (root / "VodBox.1.osx-arm64.dmg").write_bytes(b"real DMG needed")
+            with unittest.mock.patch.object(evidence.sys, "platform", "linux"):
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "dmg"):
+                    evidence.verify_release(["osx-arm64"], root)
+
+    def test_dmg_uses_mac_extraction_receipt_and_never_hdiutil_on_linux(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            fixture = write_zip(root / "VodBox.1.osx-arm64.zip", host_members(),
+                                prefix="VodBox.app/Contents/MacOS/")
+            dmg = root / "VodBox.1.osx-arm64.dmg"
+            dmg.write_bytes(b"DMG fixture bytes")
+            # Model files exposed by an attached DMG, not a ZIP disguised as a DMG.
+            with evidence.extracted_package(fixture) as payload:
+                with unittest.mock.patch.object(evidence.sys, "platform", "darwin"), \
+                        unittest.mock.patch.object(evidence, "extracted_package", return_value=contextlib.nullcontext(payload)):
+                    evidence.write_package_receipt("osx-arm64", dmg, root / "receipts")
+            evidence.write_package_receipt("osx-arm64", fixture, root / "receipts")
+            with unittest.mock.patch.object(evidence.sys, "platform", "linux"), \
+                    unittest.mock.patch.object(evidence, "_command", side_effect=AssertionError("hdiutil on Linux")):
+                result = evidence.verify_release(["osx-arm64"], root, package_receipts_dir=root / "receipts")
+                self.assertEqual(len(result["verdicts"]["osx-arm64"]["assets"]), 2)
+                path = evidence.package_receipt_path(root / "receipts", dmg)
+                data = evidence._read_package_receipt(path)
+                data["platform"] = "linux"
+                with gzip.open(path, "wt", encoding="utf-8") as stream:
+                    json.dump(data, stream)
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "macOS runner"):
+                    evidence.verify_package_receipt("osx-arm64", dmg, path.parent)
+
+
 class CommandLineTests(unittest.TestCase):
+
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
         pin = unittest.mock.patch.object(evidence.rebuild, "_engines",

@@ -24,8 +24,11 @@ Nothing here mutates repository state and nothing here trusts a summary flag.
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
+import gzip
 import hashlib
+import io
 import json
 import shutil
 import stat
@@ -68,6 +71,13 @@ JRE_NOTICES = ("LICENSE", "legal/java.base/LICENSE")
 ARCHIVE_SUFFIXES = (".zip", ".tar", ".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".dmg", ".deb", ".rpm")
 
 
+# Evidence limits apply to uncompressed bytes; exceeding them fails without dropping checks.
+MAX_SUBSET_BYTES = 512 * 1024 * 1024
+MAX_RECEIPT_BYTES = 32 * 1024 * 1024
+MAX_MANIFEST_FILES = 100_000
+COPY_CHUNK = 1024 * 1024
+
+
 class ReleaseEvidenceError(RuntimeError):
     """A published package does not prove what the release claims; publishing must stop."""
 
@@ -100,6 +110,15 @@ def _command(command: list[str]) -> bytes:
     return result.stdout
 
 
+def _command_to_file(command: list[str], target: Path) -> None:
+    with target.open("wb") as output, tempfile.TemporaryFile() as errors:
+        result = subprocess.run(command, stdout=output, stderr=errors)
+        if result.returncode:
+            errors.seek(0)
+            detail = errors.read(4096).decode(errors="replace")
+            raise ReleaseEvidenceError(f"cannot read package: {' '.join(command)}: {detail}")
+
+
 def _extract_package(archive: Path, root: Path) -> None:
     """Materialize real file bytes; never extract links or trust a filename-only listing."""
     suffix = next((s for s in ARCHIVE_SUFFIXES if archive.name.lower().endswith(s)), None)
@@ -107,22 +126,24 @@ def _extract_package(archive: Path, root: Path) -> None:
         raise ReleaseEvidenceError(f"{archive.name}: unsupported package format")
     seen: set[Path] = set()
 
-    def write(name: str, data: bytes) -> None:
+    def write(name: str, stream) -> None:
         target = _member_path(root, name)
         if target in seen:
             raise ReleaseEvidenceError(f"duplicate package member {name!r}")
         seen.add(target)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
+        with target.open("wb") as output:
+            shutil.copyfileobj(stream, output, COPY_CHUNK)
 
-    if suffix == ".zip" or (suffix == ".dmg" and zipfile.is_zipfile(archive)):
+    if suffix == ".zip":
         with zipfile.ZipFile(archive) as reader:
             for info in reader.infolist():
                 _member_path(root, info.filename)
                 if stat.S_ISLNK(info.external_attr >> 16):
                     raise ReleaseEvidenceError(f"{archive.name}: linked member {info.filename}")
                 if not info.is_dir():
-                    write(info.filename, reader.read(info))
+                    with reader.open(info) as stream:
+                        write(info.filename, stream)
         return
     payload = archive
     if suffix == ".deb":
@@ -131,7 +152,7 @@ def _extract_package(archive: Path, root: Path) -> None:
         if len(data) != 1:
             raise ReleaseEvidenceError(f"{archive.name}: expected exactly one data.tar payload")
         payload = root.parent / data[0]
-        payload.write_bytes(_command(["ar", "p", str(archive), data[0]]))
+        _command_to_file(["ar", "p", str(archive), data[0]], payload)
     if suffix.startswith(".tar") or suffix == ".deb":
         try:
             with tarfile.open(payload) as reader:
@@ -139,7 +160,7 @@ def _extract_package(archive: Path, root: Path) -> None:
                     _member_path(root, info.name)
                     if info.isfile():
                         with reader.extractfile(info) as stream:
-                            write(info.name, stream.read())
+                            write(info.name, stream)
                     elif not info.isdir():
                         raise ReleaseEvidenceError(f"{archive.name}: non-file member {info.name}")
             return
@@ -147,6 +168,8 @@ def _extract_package(archive: Path, root: Path) -> None:
             # libarchive can read compression formats unavailable to this Python runtime.
             pass
     if suffix == ".dmg":
+        if sys.platform != "darwin":
+            raise ReleaseEvidenceError(f"{archive.name}: DMG requires a macOS package evidence receipt")
         mount = root.parent / "mount"
         mount.mkdir()
         _command(["hdiutil", "attach", str(archive), "-readonly", "-nobrowse",
@@ -157,7 +180,8 @@ def _extract_package(archive: Path, root: Path) -> None:
                     # macOS DMGs commonly carry an Applications shortcut, not runtime evidence.
                     continue
                 if path.is_file():
-                    write(path.relative_to(mount).as_posix(), path.read_bytes())
+                    with path.open("rb") as stream:
+                        write(path.relative_to(mount).as_posix(), stream)
         finally:
             _command(["hdiutil", "detach", str(mount)])
         return
@@ -168,7 +192,12 @@ def _extract_package(archive: Path, root: Path) -> None:
     for name in _command([reader, "-tf", str(payload)]).decode().splitlines():
         _member_path(root, name)
         if not name.endswith("/"):
-            write(name, _command([reader, "-xOf", str(payload), "--", name]))
+            target = _member_path(root, name)
+            if target in seen:
+                raise ReleaseEvidenceError(f"duplicate package member {name!r}")
+            seen.add(target)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            _command_to_file([reader, "-xOf", str(payload), "--", name], target)
 
 
 @contextlib.contextmanager
@@ -353,10 +382,12 @@ def verify_packaged_evidence(rid: str, host: Path) -> dict:
         raise ReleaseEvidenceError(f"{rid}: receipt records no rewritten backend jar hash")
     if not backend.get("excluded"):
         with zipfile.ZipFile(backend_jar) as reader:
-            native = reader.read(integration["native_entry"])
+            info = reader.getinfo(integration["native_entry"])
+            with reader.open(info) as stream:
+                native_hash = hashlib.file_digest(stream, "sha256").hexdigest()
         output = backend["output_library"]
-        if not native or hashlib.sha256(native).hexdigest() != output.get("sha256") or \
-                len(native) != output.get("size"):
+        if not info.file_size or native_hash != output.get("sha256") or \
+                info.file_size != output.get("size"):
             raise ReleaseEvidenceError(f"{rid}: output native bytes hash/size does not match receipt")
     u1 = rebuild._maven_jar(deps, rebuild.UNICORN1_JAR_GLOB, rebuild.UNICORN1_COORDINATE)
     if not unicorn1.get("post_quarantine_jar_sha256") or \
@@ -437,38 +468,220 @@ def verify_packaged_evidence(rid: str, host: Path) -> dict:
             "sourceEvidence": {"bridgeDigest": combined.hexdigest(), "retainedLicenses": len(notices)}}
 
 
+def verify_payload(rid: str, archive: Path, root: Path, meta: Path | None = None,
+                   receipts_dir: Path | None = None, members: list[str] | None = None) -> dict:
+    """Check actual extracted evidence bytes, including the source rebuild receipt."""
+    if members is None:
+        members = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
+    if not members:
+        raise ReleaseEvidenceError(f"{rid}: {archive.name} contains no files")
+    verdict = {"rid": rid, **verify_java_host(rid, archive, members)}
+    verdict.update(verify_licenses(rid, archive, members))
+    host = root / verdict["hostPrefix"]
+    packaged = verify_packaged_evidence(rid, host)
+    receipt = packaged.pop("packagedReceipt")
+    verdict.update(packaged)
+    for member in members:
+        if Path(member).name.lower().startswith(("license", "copying", "notice", "copyright")):
+            if not (root / member).read_bytes().strip():
+                raise ReleaseEvidenceError(f"{rid}: retained license/notice is empty: {member}")
+    app = host.parent
+    if app.name == "MacOS" and app.parent.name == "Contents":
+        app = app.parent / "Resources"
+    for name in MEDIA_NOTICES:
+        _read_object(app / name)
+    verdict["meta"] = verify_meta(rid, meta) if meta is not None else None
+    verdict["receiptArtifact"] = None
+    if receipts_dir is not None:
+        verdict["receiptArtifact"] = verify_receipt_artifact(rid, receipts_dir)
+        sidecar = Path(receipts_dir) / f"native-backend-receipt.{rid}.json"
+        if _read_object(sidecar) != receipt:
+            raise ReleaseEvidenceError(f"{rid}: sidecar receipt differs from the packaged receipt")
+    return verdict
+
+
 def verify_rid(rid: str, archive: Path, meta: Path | None = None,
                receipts_dir: Path | None = None) -> dict:
-    """One RID's full verdict, from the package's own receipt, binaries, sources and licenses."""
-    if not archive.is_file():
-        raise ReleaseEvidenceError(f"{rid}: no package artifact matches {archive.name}")
-    if archive.stat().st_size == 0:
-        raise ReleaseEvidenceError(f"{rid}: {archive.name} is empty")
+    """One asset's full verdict from its actual installed payload."""
+    if not archive.is_file() or archive.stat().st_size == 0:
+        raise ReleaseEvidenceError(f"{rid}: package artifact {archive.name} is missing or empty")
     with extracted_package(archive) as root:
-        members = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
-        if not members:
-            raise ReleaseEvidenceError(f"{rid}: {archive.name} contains no files")
-        verdict = {"rid": rid, **verify_java_host(rid, archive, members)}
-        verdict.update(verify_licenses(rid, archive, members))
-        host = root / verdict["hostPrefix"]
-        packaged = verify_packaged_evidence(rid, host)
-        receipt = packaged.pop("packagedReceipt")
-        verdict.update(packaged)
-        for member in members:
-            if Path(member).name.lower().startswith(("license", "copying", "notice", "copyright")):
-                if not (root / member).read_bytes().strip():
-                    raise ReleaseEvidenceError(f"{rid}: retained license/notice is empty: {member}")
-        app = host.parent
-        for name in MEDIA_NOTICES:
-            _read_object(app / name)
-        verdict["meta"] = verify_meta(rid, meta) if meta is not None else None
-        verdict["receiptArtifact"] = None
-        if receipts_dir is not None:
-            verdict["receiptArtifact"] = verify_receipt_artifact(rid, receipts_dir)
-            sidecar = Path(receipts_dir) / f"native-backend-receipt.{rid}.json"
-            if _read_object(sidecar) != receipt:
-                raise ReleaseEvidenceError(f"{rid}: sidecar receipt differs from the packaged receipt")
+        return verify_payload(rid, archive, root, meta, receipts_dir)
+
+
+def package_receipt_path(directory: Path, archive: Path) -> Path:
+    return Path(directory) / f"{archive.name}.package-evidence.json"
+
+
+def _retain_member(name: str) -> bool:
+    """Keep every byte used by source/native/license checks, excluding runtime binaries."""
+    parts = PurePosixPath(name).parts
+    if JAVA_HOST_DIRECTORY in parts:
+        relative = parts[parts.index(JAVA_HOST_DIRECTORY) + 1:]
+        if relative and relative[0] != "jre":
+            return True
+    return ("licenses" in parts or
+            Path(name).name.lower().startswith(("license", "copying", "notice", "copyright")) or
+            any(name.endswith(str(notice)) for notice in MEDIA_NOTICES))
+
+
+def _payload_manifest(root: Path) -> dict:
+    files = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            if len(files) >= MAX_MANIFEST_FILES:
+                raise ReleaseEvidenceError("package manifest exceeds file limit")
+            files[path.relative_to(root).as_posix()] = {
+                "size": path.stat().st_size, "sha256": sha256_file(path)}
+    return files
+
+
+def _unique_object(pairs) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ReleaseEvidenceError(f"duplicate evidence JSON key {key!r}")
+        result[key] = value
+    return result
+
+
+def _read_package_receipt(path: Path) -> dict:
+    # Bound decompression before json.load; text decoding avoids a second complete read_text copy.
+    limit = 2 * MAX_RECEIPT_BYTES + 4 * ((MAX_SUBSET_BYTES + 2) // 3) + 4 * MAX_MANIFEST_FILES
+    with gzip.open(path, "rb") as stream, tempfile.TemporaryFile() as expanded:
+        total = 0
+        while chunk := stream.read(COPY_CHUNK):
+            total += len(chunk)
+            if total > limit:
+                raise ReleaseEvidenceError("evidence receipt exceeds decompressed byte limit")
+            expanded.write(chunk)
+        expanded.seek(0)
+        with io.TextIOWrapper(expanded, encoding="utf-8") as text:
+            data = json.load(text, object_pairs_hook=_unique_object)
+    if not isinstance(data, dict):
+        raise ReleaseEvidenceError(f"{path.name}: expected a JSON object")
+    return data
+
+
+def write_package_receipt(rid: str, archive: Path, directory: Path,
+                          receipts_dir: Path | None = None) -> Path:
+    """Fully verify extraction, then stream a bounded subset into a gzip JSON receipt."""
+    if rid not in RIDS:
+        raise ReleaseEvidenceError(f"unknown runtime identifier: {rid}")
+    if archive.name.lower().endswith(".dmg") and (sys.platform != "darwin" or not rid.startswith("osx-")):
+        raise ReleaseEvidenceError(f"{rid}: DMG receipt must come from a macOS runner")
+    path = package_receipt_path(directory, archive)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with extracted_package(archive) as root:
+        verdict = verify_payload(rid, archive, root, receipts_dir=receipts_dir)
+        files = _payload_manifest(root)
+        subset = [name for name in files if _retain_member(name)]
+        if sum(files[name]["size"] for name in subset) > MAX_SUBSET_BYTES:
+            raise ReleaseEvidenceError(f"{rid}: evidence subset exceeds byte limit")
+        receipt = {"schema": 2, "rid": rid, "archive": archive.name,
+                   "archiveSHA": sha256_file(archive), "size": archive.stat().st_size,
+                   "format": next(s for s in ARCHIVE_SUFFIXES if archive.name.lower().endswith(s)),
+                   "platform": sys.platform, "files": files, "checks": verdict}
+        # Only metadata is serialized in memory; retained bytes are encoded in aligned chunks.
+        header = json.dumps(receipt, sort_keys=True).encode("utf-8")
+        if len(header) > MAX_RECEIPT_BYTES:
+            raise ReleaseEvidenceError(f"{rid}: evidence receipt exceeds metadata byte limit")
+        with tempfile.TemporaryDirectory(dir=path.parent) as temporary:
+            staged = Path(temporary) / path.name
+            with gzip.open(staged, "wb") as output:
+                output.write(header[:-1] + b', "subset": {')
+                for index, name in enumerate(subset):
+                    if index:
+                        output.write(b",")
+                    output.write(json.dumps(name).encode("utf-8") + b':"')
+                    with (root / name).open("rb") as stream:
+                        while chunk := stream.read(3 * (COPY_CHUNK // 3)):
+                            output.write(base64.b64encode(chunk))
+                    output.write(b'"')
+                output.write(b"}}\n")
+            staged.replace(path)
+    return path
+
+
+def verify_package_receipt(rid: str, archive: Path, directory: Path,
+                           receipts_dir: Path | None = None) -> dict:
+    """Bind the asset and manifest, then replay all checks from bounded evidence bytes.
+
+    Receipts are trusted runner artifacts, not signatures. Workflow provenance must enforce
+    the native producer's identity; a self-reported platform cannot authenticate that runner.
+    Readable formats additionally compare every extracted file against the producer manifest.
+    """
+    path = package_receipt_path(directory, archive)
+    try:
+        data = _read_package_receipt(path)
+        metadata = {key: value for key, value in data.items() if key != "subset"}
+        if len(json.dumps(metadata, sort_keys=True).encode("utf-8")) > MAX_RECEIPT_BYTES:
+            raise ReleaseEvidenceError(f"{rid}: evidence receipt exceeds metadata byte limit")
+        suffix = next(s for s in ARCHIVE_SUFFIXES if archive.name.lower().endswith(s))
+        if data.get("schema") != 2 or data.get("rid") != rid or \
+                data.get("archive") != archive.name or data.get("format") != suffix or \
+                data.get("archiveSHA") != sha256_file(archive) or \
+                type(data.get("size")) is not int or data["size"] != archive.stat().st_size:
+            raise ReleaseEvidenceError(f"{rid}: {path.name}: archive SHA/size or identity mismatch")
+        if suffix == ".dmg" and (not rid.startswith("osx-") or data.get("platform") != "darwin"):
+            raise ReleaseEvidenceError(f"{rid}: DMG receipt must come from a macOS runner")
+        files = data.get("files")
+        if not isinstance(files, dict) or not files or len(files) > MAX_MANIFEST_FILES:
+            raise ReleaseEvidenceError(f"{rid}: receipt has no bounded extracted manifest")
+        normalized = set()
+        for name, entry in files.items():
+            target = _member_path(Path("payload"), name)
+            if target in normalized or name != target.relative_to("payload").as_posix():
+                raise ReleaseEvidenceError(f"{rid}: duplicate or noncanonical manifest member {name!r}")
+            normalized.add(target)
+            if not isinstance(entry, dict) or set(entry) != {"size", "sha256"} or \
+                    type(entry["size"]) is not int or entry["size"] < 0 or \
+                    not isinstance(entry["sha256"], str) or len(entry["sha256"]) != 64 or \
+                    any(c not in "0123456789abcdef" for c in entry["sha256"]):
+                raise ReleaseEvidenceError(f"{rid}: invalid manifest entry {name!r}")
+        subset = {name for name in files if _retain_member(name)}
+        if sum(files[name]["size"] for name in subset) > MAX_SUBSET_BYTES:
+            raise ReleaseEvidenceError(f"{rid}: evidence subset exceeds byte limit")
+        retained = data.get("subset")
+        if not isinstance(retained, dict) or set(retained) != subset:
+            raise ReleaseEvidenceError(f"{rid}: missing or unexpected extracted evidence bytes")
+        with tempfile.TemporaryDirectory(prefix=".package-receipt-", dir=archive.parent) as temporary:
+            root = Path(temporary) / "payload"
+            root.mkdir()
+            for name, encoded in retained.items():
+                if not isinstance(encoded, str) or len(encoded) != 4 * ((files[name]["size"] + 2) // 3):
+                    raise ReleaseEvidenceError(f"{rid}: invalid evidence member size: {name}")
+                target = _member_path(root, name)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("wb") as output:
+                    for offset in range(0, len(encoded), COPY_CHUNK):
+                        output.write(base64.b64decode(encoded[offset:offset + COPY_CHUNK], validate=True))
+                if target.stat().st_size != files[name]["size"] or sha256_file(target) != files[name]["sha256"]:
+                    raise ReleaseEvidenceError(f"{rid}: evidence member hash/size mismatch: {name}")
+            verdict = verify_payload(rid, archive, root, receipts_dir=receipts_dir, members=sorted(files))
+        if suffix != ".dmg" or sys.platform == "darwin":
+            with extracted_package(archive) as actual:
+                if _payload_manifest(actual) != files:
+                    raise ReleaseEvidenceError(f"{rid}: receipt manifest differs from actual asset")
+        recorded = dict(verdict)
+        checks = data.get("checks")
+        if not isinstance(checks, dict):
+            raise ReleaseEvidenceError(f"{rid}: receipt has no detailed checks")
+        # Sidecar paths can change across runners; its bytes and identity must still agree.
+        producer_sidecar = checks.get("receiptArtifact")
+        consumer_sidecar = recorded.get("receiptArtifact")
+        if consumer_sidecar is not None:
+            if not isinstance(producer_sidecar, dict) or \
+                    {k: v for k, v in producer_sidecar.items() if k != "path"} != \
+                    {k: v for k, v in consumer_sidecar.items() if k != "path"}:
+                raise ReleaseEvidenceError(f"{rid}: package receipt source sidecar mismatch")
+        recorded["receiptArtifact"] = producer_sidecar
+        if recorded != checks:
+            raise ReleaseEvidenceError(f"{rid}: receipt checks differ from actual payload evidence")
         return verdict
+    except (OSError, EOFError, ValueError, TypeError, AttributeError, KeyError, StopIteration,
+            native_coverage.NativeCoverageError, rebuild.RebuildError, tarfile.TarError) as error:
+        raise ReleaseEvidenceError(f"{rid}: invalid package evidence receipt {path.name}: {error}") from error
 
 
 def verify_meta(rid: str, meta: Path) -> dict:
@@ -485,25 +698,29 @@ def verify_meta(rid: str, meta: Path) -> dict:
             "version": data.get("version"), "sourceSha": data.get("sourceSha")}
 
 
-def find_archive(rid: str, archives_dir: Path) -> Path:
-    """The single package artifact for `rid` inside the downloaded artifact directory."""
+def find_archives(rid: str, archives_dir: Path) -> list[Path]:
+    """Every published asset, including underscore-named Linux installers."""
     matches = [path for path in sorted(Path(archives_dir).iterdir())
                if path.is_file() and any(path.name.lower().endswith(s) for s in ARCHIVE_SUFFIXES)
-               and f".{rid}." in path.name]
+               and any(marker in path.name for marker in (f".{rid}.", f"_{rid}."))]
     if not matches:
-        raise ReleaseEvidenceError(
-            f"{rid}: no downloaded package artifact in {archives_dir} (expected a "
-            f"{'/'.join(ARCHIVE_SUFFIXES)} carrying '.{rid}.')")
-    if len(matches) > 1:
-        names = ", ".join(path.name for path in matches)
-        raise ReleaseEvidenceError(f"{rid}: multiple package artifacts match: {names}")
+        raise ReleaseEvidenceError(f"{rid}: no downloaded package artifact in {archives_dir}")
+    return matches
+
+
+def find_archive(rid: str, archives_dir: Path) -> Path:
+    """Compatibility helper for callers requiring exactly one asset."""
+    matches = find_archives(rid, archives_dir)
+    if len(matches) != 1:
+        raise ReleaseEvidenceError(f"{rid}: multiple package artifacts match; use find_archives")
     return matches[0]
 
 
 def verify_release(rids=None, archives_dir: Path = ARCHIVES_DIR, meta_dir: Path | None = None,
                    expected_sha: str = "", version: str = "",
-                   receipts_dir: Path | None = None) -> dict:
-    """Verify every published RID; refuse the release unless all six are present and provable."""
+                   receipts_dir: Path | None = None,
+                   package_receipts_dir: Path | None = None) -> dict:
+    """Verify every published asset; a valid sibling cannot hide a broken installer."""
     targets = list(rids or RIDS)
     unknown = [rid for rid in targets if rid not in RIDS]
     if unknown:
@@ -512,19 +729,36 @@ def verify_release(rids=None, archives_dir: Path = ARCHIVES_DIR, meta_dir: Path 
     problems: list[str] = []
     for rid in targets:
         try:
-            archive = find_archive(rid, archives_dir)
-            meta = None
-            if meta_dir is not None:
-                candidate = Path(meta_dir) / f"{rid}.json"
-                meta = candidate if candidate.is_file() else None
-            verdicts[rid] = verify_rid(rid, archive, meta, receipts_dir)
-            if expected_sha and version:
-                recorded = (verdicts[rid].get("meta") or {})
-                if recorded and recorded.get("version") != version:
-                    problems.append(f"{rid}: package metadata version {recorded.get('version')!r} != {version}")
-                if recorded and recorded.get("sourceSha") != expected_sha:
-                    problems.append(
-                        f"{rid}: package metadata sourceSha {recorded.get('sourceSha')!r} != {expected_sha}")
+            archives = find_archives(rid, archives_dir)
+            meta = Path(meta_dir) / f"{rid}.json" if meta_dir is not None else None
+            assets = []
+            for archive in archives:
+                try:
+                    attested = None
+                    if package_receipts_dir is not None:
+                        attested = verify_package_receipt(rid, archive, package_receipts_dir, receipts_dir)
+                    if archive.suffix.lower() == ".dmg" and sys.platform != "darwin":
+                        if attested is None:
+                            raise ReleaseEvidenceError(f"{rid}: {archive.name}: missing macOS package receipt")
+                        verdict = attested
+                        verdict["meta"] = verify_meta(rid, meta) if meta is not None else None
+                    else:
+                        verdict = verify_rid(rid, archive, meta, receipts_dir)
+                        if attested is not None:
+                            comparable = dict(verdict)
+                            comparable["meta"] = None
+                            if comparable != attested:
+                                raise ReleaseEvidenceError(f"{rid}: {archive.name}: receipt differs from actual asset")
+                    recorded = verdict.get("meta") or {}
+                    if version and recorded.get("version") != version:
+                        raise ReleaseEvidenceError(f"{rid}: package metadata version {recorded.get('version')!r} != {version}")
+                    if expected_sha and recorded.get("sourceSha") != expected_sha:
+                        raise ReleaseEvidenceError(f"{rid}: package metadata sourceSha {recorded.get('sourceSha')!r} != {expected_sha}")
+                    assets.append(verdict)
+                except ReleaseEvidenceError as error:
+                    problems.append(f"{archive.name}: {error}")
+            if len(assets) == len(archives):
+                verdicts[rid] = {**assets[0], "assets": assets}
         except ReleaseEvidenceError as error:
             problems.append(str(error))
     missing = [rid for rid in targets if rid not in verdicts]
@@ -546,24 +780,36 @@ def main() -> int:
     parser.add_argument("--receipts", type=Path, default=None,
                         help="Directory of per-RID `native-backend-receipt.<rid>.json` artifacts; "
                              "when given, every RID must carry its own real receipt.")
+    parser.add_argument("--package-receipts", type=Path, default=None,
+                        help="Per-asset runner receipts; required for DMGs on non-macOS runners")
+    parser.add_argument("--write-package-receipts", type=Path, default=None,
+                        help="Extract/check every selected asset and write runner receipts here")
     parser.add_argument("--rid", default="", help="Verify a single RID (default: all six)")
     parser.add_argument("--expected-sha", default="", help="Source commit the release is bound to.")
     parser.add_argument("--version", default="", help="Version the release is bound to.")
     args = parser.parse_args()
     targets = [rid.strip() for rid in args.rid.split(",") if rid.strip()] or None
     try:
+        if args.write_package_receipts is not None:
+            for rid in targets or RIDS:
+                if rid not in RIDS:
+                    raise ReleaseEvidenceError(f"unknown runtime identifier: {rid}")
+                for archive in find_archives(rid, args.archives):
+                    path = write_package_receipt(rid, archive, args.write_package_receipts, args.receipts)
+                    print(f"Wrote package evidence: {path.name}")
         result = verify_release(targets, args.archives, args.meta, args.expected_sha, args.version,
-                                args.receipts)
+                                args.receipts, args.package_receipts)
     except ReleaseEvidenceError as error:
         print(f"Release evidence verification failed: {error}", file=sys.stderr)
         print("Refusing to publish: every one of the six RIDs must carry its own artifact, hash, "
               "staged deps, source-rebuild receipt and retained licenses. A manifest summary or a "
               "synthetic receipt is not evidence about the bytes in the archive.", file=sys.stderr)
         return 1
-    for rid, verdict in result["verdicts"].items():
-        print(f"OK {rid}: {verdict['archive']} sha256={verdict['sha256'][:16]}… "
-              f"host={verdict['hostPrefix']} deps={verdict['depsJars']} "
-              f"backend={verdict['backendJar']} receipt={verdict['receipt']}")
+    for rid, summary in result["verdicts"].items():
+        for verdict in summary["assets"]:
+            print(f"OK {rid}: {verdict['archive']} sha256={verdict['sha256'][:16]}… "
+                  f"host={verdict['hostPrefix']} deps={verdict['depsJars']} "
+                  f"backend={verdict['backendJar']} receipt={verdict['receipt']}")
     print(f"Verified {len(result['verdicts'])} RIDs from their real package artifacts")
     return 0
 

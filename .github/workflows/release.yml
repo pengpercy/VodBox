@@ -91,6 +91,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.sha }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install package evidence readers
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm libarchive-tools
+          python3 -m pip install rpmfile
       # Fail fast on a token that cannot publish, and re-derive the closure verdicts from the
       # repository's own trees. This is a declaration check, not the evidence check: the packages
       # do not exist yet at this point, and a gate that demanded packaging output here would be
@@ -140,6 +149,13 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.package_run || github.run_id }}
+          pattern: package-evidence.*
+          merge-multiple: true
+          path: artifacts/package-evidence
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.package_run || github.run_id }}
           pattern: package.*
           merge-multiple: true
           path: artifacts/release
@@ -173,6 +189,7 @@ jobs:
             --archives artifacts/release \
             --meta artifacts/meta \
             --receipts artifacts/receipts \
+            --package-receipts artifacts/package-evidence \
             --expected-sha "${{ needs.version.outputs.sha }}" \
             --version "${{ needs.version.outputs.value }}"
       - name: Publish release

@@ -31,6 +31,16 @@ jobs:
         with:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install package evidence readers
+        if: startsWith(matrix.rid, 'linux')
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm libarchive-tools
+          python3 -m pip install rpmfile
       - name: Test packaging reuse guards
         shell: bash
         run: python3 build/test_package_reuse.py
@@ -59,6 +69,7 @@ jobs:
         run: |
           gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n package.${{ matrix.rid }} -D artifacts/packages
           gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n native-backend-receipt.${{ matrix.rid }} -D artifacts/receipts
+          gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n package-evidence.${{ matrix.rid }} -D artifacts/package-evidence
       - name: Fetch verified build artifact
         if: steps.source.outputs.reuse_package != 'true'
         shell: bash
@@ -115,6 +126,28 @@ jobs:
           test -n "$receipt"
           mkdir -p artifacts/receipts
           cp "$receipt" artifacts/receipts/native-backend-receipt.${{ matrix.rid }}.json
+      - name: Record real package format evidence
+        if: steps.source.outputs.reuse_package != 'true'
+        shell: bash
+        run: |
+          python3 build/release_evidence.py --rid ${{ matrix.rid }} \
+            --archives artifacts/packages --receipts artifacts/receipts \
+            --meta artifacts/meta --expected-sha "${{ inputs.source_sha }}" --version "${{ inputs.version }}" \
+            --write-package-receipts artifacts/package-evidence
+      - name: Verify reused package evidence
+        if: steps.source.outputs.reuse_package == 'true'
+        shell: bash
+        run: |
+          python3 build/release_evidence.py --rid ${{ matrix.rid }} \
+            --archives artifacts/packages --receipts artifacts/receipts \
+            --meta artifacts/meta --expected-sha "${{ inputs.source_sha }}" --version "${{ inputs.version }}" \
+            --package-receipts artifacts/package-evidence
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-evidence.${{ matrix.rid }}
+          path: artifacts/package-evidence/*.package-evidence.json
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: native-backend-receipt.${{ matrix.rid }}
