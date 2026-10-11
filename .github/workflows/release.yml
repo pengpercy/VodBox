@@ -175,6 +175,12 @@ jobs:
           pattern: native-backend-receipt.*
           merge-multiple: true
           path: artifacts/receipts
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.package_run || github.run_id }}
+          name: matching-source-assets
+          path: artifacts/sources
       # The evidence check. Every one of the six RIDs must carry its own downloaded archive with a
       # real hash, a staged JavaHost with the RID's actual deps and its packaged
       # native-backend-receipt.json, and the retained license/notice material. A manifest summary, a
@@ -186,7 +192,7 @@ jobs:
             test -f "artifacts/meta/$rid.json"
           done
           python3 build/release_evidence.py \
-            --archives artifacts/release \
+            --archives artifacts/release --sources artifacts/sources \
             --meta artifacts/meta \
             --receipts artifacts/receipts \
             --package-receipts artifacts/package-evidence \

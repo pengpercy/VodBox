@@ -83,6 +83,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          architecture: ${{ endsWith(matrix.rid, '-arm64') && 'aarch64' || 'x64' }}
       - name: Build upstream Java plugin component
         if: steps.reuse.outputs.skip != 'true'
         shell: bash

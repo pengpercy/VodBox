@@ -6,9 +6,9 @@ Windows: 静态媒体库 libmpv-2.dll + Vulkan loader，一起随包分发。
 Linux: 固定 libmpv/FFmpeg 构建 + 完整非 glibc 动态依赖闭包，随包分发。
 
 另把 JVM 插件宿主打进 `<output>/JavaHost/`：`host.jar`（架构无关的 Java 字节码，本机 JDK 编译即可）
-+ `dex-tools/`、`sqlite-jdbc/`、`runtime/`（固定版本 + sha256） + **该 RID 自己的** Temurin JRE。
-JRE 绝不取构建机自带的 `java`：跨编译时那是构建机的架构，装到目标上跑不起来（`bundle_java_host`
-用 verify_jre 按 RID 校验 PE/ELF/Mach-O 机器类型）。`--skip-java-host` 只打媒体内核。
++ `deps/`（固定上游 Maven 依赖闭包） + **该 RID 自己的** jlink Java 21 runtime。
+JRE 由目标 native runner 上经过版本与机器类型校验的 JDK 21 裁剪生成，跨架构立即失败。
+`verify_jre` 按 RID 校验 PE/ELF/Mach-O 机器类型。`--skip-java-host` 只打媒体内核。
 """
 import argparse
 import hashlib
@@ -26,6 +26,7 @@ import zipfile
 from pathlib import Path
 
 from nativeverify import verify_linux_closure, verify_windows_dll, pe_imports, verify_jre, NativeVerifyError, LINUX_BASE
+from jlink_runtime import METADATA as JLINK_METADATA
 from native_coverage import backend_supports, describe, verify_deps, NativeCoverageError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -371,9 +372,9 @@ def build_host_jar(destination: Path, rid: str) -> Path:
 def bundle_java_host(rid: str, output: Path, host_jar=None):
     """Stage the JVM plugin host next to the published app: host.jar + deps + the RID's JRE.
 
-    The JRE is deliberately the RID's pinned Temurin asset, never the runner's own `java`: on a
-    cross-compile leg that would be the build host's architecture, which installs fine and then
-    fails to exec on the target. `verify_jre` proves the launcher matches the RID before we accept it.
+    The runtime is linked using the native target runner's verified JDK 21 and upstream module
+    baseline. Cross-architecture runners and incomplete JDKs fail without a full-JRE fallback.
+    `verify_jre` proves the resulting launcher matches the target RID.
     """
     host = output / JAVA_HOST_DIRECTORY
     host.mkdir(parents=True, exist_ok=True)
@@ -388,7 +389,9 @@ def bundle_java_host(rid: str, output: Path, host_jar=None):
     stage = ROOT / "build" / "fetch-dex-deps.py"
     run(sys.executable, stage, "jre", "--rid", rid, "--extract", host / "jre")
     architecture = verify_jre(host / "jre", rid)
-    lock = json.loads((ROOT / "build" / "dex-deps.json").read_text(encoding="utf-8"))
+    runtime = json.loads((host / "jre" / JLINK_METADATA).read_text(encoding="utf-8"))
+    if runtime.get("rid") != rid or runtime.get("kind") != "jlink" or runtime.get("architecture") != architecture:
+        raise ValueError(f"{rid}: linked runtime metadata does not match the bundled JRE")
     # The full upstream host is staged first (host.jar + original Maven deps + corresponding source);
     # the per-RID source rebuild then rewrites the backend jar inside that staged host, and this is
     # where the *result* is verified. After a source rebuild the backend jar deliberately carries
@@ -427,7 +430,7 @@ def bundle_java_host(rid: str, output: Path, host_jar=None):
         "hostJar": {"name": jar.name, "sha256": digest},
         "backend": "tvbox-silicon",
         "dependencies": ["deps"],
-        "jre": {"release": lock["jre"]["release"], "rid": rid, "architecture": architecture},
+        "jre": runtime,
         "nativeBackend": native,
     }, indent=2) + "\n")
     if not native["supported"]:

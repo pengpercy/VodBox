@@ -34,6 +34,7 @@ class BundleTests(unittest.TestCase):
             (output / 'corresponding-source').mkdir(); (output / 'corresponding-source/pom.xml').write_text('<project/>')
             (output / 'upstream-runtime.json').write_text('{}')
             (output / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
+            self._write_runtime(output, 'osx-arm64', 'AArch64')
             calls = []
             with patch.object(bundle, 'run', side_effect=lambda *args: calls.append([str(x) for x in args])), \
                  patch.object(bundle, 'verify_jre', return_value='AArch64') as verify:
@@ -51,6 +52,9 @@ class BundleTests(unittest.TestCase):
             verify.assert_called_once_with(host / 'jre', 'osx-arm64')
             notice = bundle.json.loads((host / 'java-host.json').read_text())
             self.assertEqual(notice['jre']['architecture'], 'AArch64')
+            self.assertEqual(notice['jre']['kind'], 'jlink')
+            self.assertEqual(notice['jre']['release'], '21.0.11')
+            self.assertIn('java.compiler', notice['jre']['modules'])
             self.assertEqual(notice['dependencies'], ['deps'])
 
     def test_environment_prebuilt_preserves_the_complete_component(self):
@@ -102,6 +106,7 @@ class BundleTests(unittest.TestCase):
                 (backend / 'corresponding-source').mkdir(); (backend / 'corresponding-source/pom.xml').write_text('<project/>')
                 (backend / 'upstream-runtime.json').write_text('{}')
                 (backend / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
+                self._write_runtime(output, rid, 'AArch64')
                 with patch.object(bundle, 'run'), patch.object(bundle, 'verify_jre', return_value='AArch64'):
                     bundle.bundle_java_host(rid, output, backend / 'host.jar')
                 notice = bundle.json.loads((output / 'JavaHost' / 'java-host.json').read_text())
@@ -121,13 +126,22 @@ class BundleTests(unittest.TestCase):
             (component / 'deps').mkdir()
             # Only macOS natives: the staged jar cannot serve the linux-x64 bundle being built.
             self._write_backend_jar(component / 'deps', 'osx-arm64')
-            self._write_receipt(component, 'osx-arm64', 'natives/osx_arm64/libunicorn.so')
+            self._write_receipt(component, 'osx-arm64', 'natives/osx_arm64/libunicorn.dylib')
             (component / 'corresponding-source').mkdir(); (component / 'corresponding-source/pom.xml').write_text('<project/>')
             (component / 'upstream-runtime.json').write_text('{}')
             (component / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
+            self._write_runtime(output, 'linux-x64', 'x86-64')
             with patch.object(bundle, 'run'), patch.object(bundle, 'verify_jre', return_value='x86-64'):
                 with self.assertRaisesRegex(ValueError, 'native coverage'):
                     bundle.bundle_java_host('linux-x64', output, component / 'host.jar')
+
+    def _write_runtime(self, output, rid, architecture):
+        runtime = output / 'JavaHost/jre'
+        runtime.mkdir(parents=True)
+        (runtime / bundle.JLINK_METADATA).write_text(bundle.json.dumps({
+            'kind': 'jlink', 'release': '21.0.11', 'rid': rid,
+            'architecture': architecture, 'modules': ['java.base', 'java.compiler'],
+        }))
 
     def _write_backend_jar(self, deps, rid=None):
         import zipfile
@@ -139,7 +153,9 @@ class BundleTests(unittest.TestCase):
             selected = directories[rid] if rid else [d for key, values in directories.items()
                                                      if key != "win-arm64" for d in values]
             for directory in selected:
-                archive.writestr(f'natives/{directory}/libunicorn.so', b'\x7fELF')
+                filename = ('libunicorn.dylib' if directory.startswith('osx') else
+                            'unicorn.dll' if directory.startswith('windows') else 'libunicorn.so')
+                archive.writestr(f'natives/{directory}/{filename}', b'\x7fELF')
 
     def _write_receipt(self, component, rid, native_entry):
         """A source-rebuild receipt shaped like `rebuild_native_backend.py` writes (classes-only

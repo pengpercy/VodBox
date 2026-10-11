@@ -21,6 +21,8 @@ import zipfile
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import native_coverage
 import release_evidence as evidence
+import source_assets
+from test_source_assets import fixture_git_context, split_fixture
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ALMA = ROOT / ".alma"
@@ -56,7 +58,8 @@ def host_members(backend: str = "unidbg-unicorn2-0.9.8.jar", receipt: bool = Tru
     return members
 
 
-def write_zip(path: pathlib.Path, members: list[str], prefix: str = "") -> pathlib.Path:
+def write_zip(path: pathlib.Path, members: list[str], prefix: str = "",
+              source_sha: str = "abc", producer_sha: str = "") -> pathlib.Path:
     rid = next((rid for rid in evidence.RIDS
                 if any(marker in path.name for marker in (f".{rid}.", f"_{rid}."))), "osx-arm64")
     contents = {member: b"payload:" + member.encode() for member in members}
@@ -93,6 +96,27 @@ def write_zip(path: pathlib.Path, members: list[str], prefix: str = "") -> pathl
                        if p.is_file() and p.name.lower().startswith(("license", "copying", "notice")))
         for notice in notices:
             contents[vendor + notice.relative_to(evidence.rebuild.SOURCE).as_posix()] = notice.read_bytes()
+    # Exercise the producer protocol before packaging, so runtime fixtures carry only
+    # the binding and retained notices, while source bytes live in an independent asset.
+    if "JavaHost/corresponding-source/LICENSE" in contents:
+        with tempfile.TemporaryDirectory(prefix="vodbox-host-fixture-") as directory:
+            host = pathlib.Path(directory) / "JavaHost"
+            for member, data in contents.items():
+                if member.startswith("JavaHost/"):
+                    target = pathlib.Path(directory) / member
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(data)
+            receipt_path = host / "native-backend-receipt.json"
+            missing_receipt = not receipt_path.exists()
+            if missing_receipt:
+                receipt_path.write_bytes(json.dumps(receipt_for(rid)).encode())
+            split_fixture(host, source_assets.ASSETS, source_sha=source_sha, producer_sha=producer_sha)
+            if missing_receipt:
+                receipt_path.unlink()
+            contents = {name: data for name, data in contents.items()
+                        if not name.startswith("JavaHost/")}
+            contents.update({"JavaHost/" + item.relative_to(host).as_posix(): item.read_bytes()
+                             for item in host.rglob("*") if item.is_file()})
     with zipfile.ZipFile(path, "w") as archive:
         for member, data in contents.items():
             location = prefix + member
@@ -184,6 +208,17 @@ def rewrite_zip(path: pathlib.Path, changes: dict[str, bytes | None]) -> None:
             contents.pop(name, None)
         else:
             contents[name] = data
+        if name.endswith("/native-backend-receipt.json") and data is not None:
+            prefix = name.removesuffix("native-backend-receipt.json")
+            offer_name = prefix + "source-offer.json"
+            if offer_name in contents:
+                offer = json.loads(contents[offer_name])
+                previous = offer["backendReceiptSHA256"]
+                offer["backendReceiptSHA256"] = hashlib.sha256(data).hexdigest()
+                contents[offer_name] = source_assets.encoded(offer)
+                instructions = prefix + "SOURCE-OFFER.txt"
+                contents[instructions] = contents[instructions].replace(
+                    previous.encode(), offer["backendReceiptSHA256"].encode())
     with zipfile.ZipFile(path, "w") as archive:
         for name, data in contents.items():
             archive.writestr(name, data)
@@ -218,9 +253,47 @@ def write_linked_package(path: pathlib.Path, fixture: pathlib.Path,
     return path
 
 
+def source_context(test):
+    fixture_git_context(test)
+    temporary = tempfile.TemporaryDirectory(prefix="vodbox-source-fixture-")
+    test.addCleanup(temporary.cleanup)
+    for name, value in (("ASSETS", pathlib.Path(temporary.name)),
+                        ("EXPECTED_VERSION", "1.0.0"), ("EXPECTED_SHA", "abc")):
+        context = unittest.mock.patch.object(source_assets, name, value)
+        context.start()
+        test.addCleanup(context.stop)
+
+
+@contextlib.contextmanager
+def tamper_source(archive, member, data):
+    """Alter independent source bytes while preserving the runtime binding."""
+    with zipfile.ZipFile(archive) as runtime:
+        offer_name = next(name for name in runtime.namelist() if name.endswith("/source-offer.json"))
+        offer = json.loads(runtime.read(offer_name))
+    path = pathlib.Path(source_assets.ASSETS) / offer["asset"]
+    original = path.read_bytes()
+    with tarfile.open(path, "r:gz") as reader:
+        files = {item.name: reader.extractfile(item).read() for item in reader}
+    member = member.removeprefix("JavaHost/corresponding-source/")
+    if data is None:
+        files.pop(member)
+    else:
+        files[member] = data
+    with tarfile.open(path, "w:gz") as writer:
+        for name, payload in files.items():
+            item = tarfile.TarInfo(name)
+            item.size = len(payload)
+            writer.addfile(item, io.BytesIO(payload))
+    try:
+        yield
+    finally:
+        path.write_bytes(original)
+
+
 class MemberInspectionTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        source_context(self)
         pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
                                          return_value={"archive_sha256": SOURCE_HASH})
         pin.start()
@@ -256,6 +329,7 @@ class MemberInspectionTests(unittest.TestCase):
 class RidVerdictTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        source_context(self)
         pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
                                          return_value={"archive_sha256": SOURCE_HASH})
         pin.start()
@@ -357,9 +431,9 @@ class RidVerdictTests(unittest.TestCase):
                     source_member = "JavaHost/corresponding-source/" + receipt[section][detail][name].replace("\\", "/")
                     if name == "source_tree":
                         source_member += "/unicorn.c"
-                    rewrite_zip(path, {source_member: b"changed source"})
-                    with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "source.*(hash|digest)"):
-                        evidence.verify_rid(rid, path)
+                    with tamper_source(path, source_member, b"changed source"):
+                        with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "source.*(hash|digest)"):
+                            evidence.verify_rid(rid, path)
 
     def test_windows_receipt_normalization_still_refuses_absolute_and_escaping_paths(self):
         fields = (("backend", "engine", "source_archive"),
@@ -431,9 +505,14 @@ class RidVerdictTests(unittest.TestCase):
         for name, data in cases.items():
             with self.subTest(member=name), tempfile.TemporaryDirectory(dir=ALMA) as directory:
                 path = write_zip(pathlib.Path(directory) / "VodBox.1.osx-arm64.zip", host_members())
-                rewrite_zip(path, {name: data})
-                with self.assertRaises(evidence.ReleaseEvidenceError):
-                    evidence.verify_rid("osx-arm64", path)
+                if name.startswith(source):
+                    with tamper_source(path, name, data):
+                        with self.assertRaises(evidence.ReleaseEvidenceError):
+                            evidence.verify_rid("osx-arm64", path)
+                else:
+                    rewrite_zip(path, {name: data})
+                    with self.assertRaises(evidence.ReleaseEvidenceError):
+                        evidence.verify_rid("osx-arm64", path)
                 self.assertEqual(sorted(p.name for p in path.parent.iterdir()), [path.name])
 
     def test_sidecar_cannot_replace_or_disagree_with_packaged_receipt(self):
@@ -528,9 +607,9 @@ class RidVerdictTests(unittest.TestCase):
                                      sorted([fixture.name, asset.name]))
 
     def test_linked_source_native_and_license_bytes_are_still_verified(self):
-        source = "JavaHost/corresponding-source/" + SOURCE_PREFIX
+        source = "JavaHost/SOURCE-MANIFEST.json"
         members = {
-            source + "dependency-sources/archives/engine.tar": b"changed source",
+            source: b"changed source binding",
             "JavaHost/deps/unidbg-unicorn2-0.9.8.jar": jar_bytes({
                 "Backend.class": b"class", native_entry_for("linux-x64"): b"changed native"}),
             "JavaHost/jre/legal/java.base/LICENSE": b"",
@@ -653,6 +732,7 @@ class RpmFallbackTests(unittest.TestCase):
 class SixRidClosureTests(unittest.TestCase):
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        source_context(self)
         pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
                                          return_value={"archive_sha256": SOURCE_HASH})
         pin.start()
@@ -717,7 +797,7 @@ class SixRidClosureTests(unittest.TestCase):
             self.assertEqual(len(result["verdicts"]), 6)
             (meta / "osx-arm64.json").write_text(json.dumps(
                 {"rid": "osx-arm64", "version": "1.0.0", "sourceSha": "other"}))
-            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "sourceSha"):
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "sourceSha|source binding"):
                 evidence.verify_release(archives_dir=archives, meta_dir=meta,
                                         expected_sha="abc", version="1.0.0")
 
@@ -726,7 +806,11 @@ class SixRidClosureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ALMA) as directory:
             root = pathlib.Path(directory)
             rid = "osx-arm64"
-            archives = self._release(root, [rid])
+            archives = root / "release"
+            archives.mkdir()
+            write_zip(archives / f"VodBox_1.0.0.{rid}.zip", host_members(),
+                      source_sha="target", producer_sha="original")
+            source_assets.EXPECTED_SHA = "target"
             meta = root / "meta"
             meta.mkdir()
             data = {"rid": rid, "version": "1.0.0", "sourceSha": "original",
@@ -743,8 +827,9 @@ class SixRidClosureTests(unittest.TestCase):
                 self.assertEqual(result["verdicts"][rid]["meta"]["packageSourceSha"], "target")
                 ensure.assert_has_calls([unittest.mock.call("original"), unittest.mock.call("target")])
                 native.assert_has_calls([unittest.mock.call("original"), unittest.mock.call("target")])
-                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "packageSourceSha"):
-                    evidence.verify_release([rid], archives, meta, "original", "1.0.0")
+                path.write_text(json.dumps({**data, "packageSourceSha": "original"}))
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "source binding|packageSourceSha|targetPackageInput"):
+                    evidence.verify_release([rid], archives, meta, "target", "1.0.0")
                 for field in ("fingerprint", "originalFingerprint", "nativeBuildHash", "targetPackageInput"):
                     with self.subTest(field=field):
                         path.write_text(json.dumps({**data, field: "forged"}))
@@ -833,8 +918,10 @@ class PackageReceiptTests(RidVerdictTests):
             self.assertNotIn("JavaHost/jre/bin/java", names)
             self.assertIn("JavaHost/jre/legal/java.base/LICENSE", names)
             self.assertIn("JavaHost/deps/unidbg-unicorn2-0.9.8.jar", names)
-            self.assertIn("JavaHost/corresponding-source/" + SOURCE_PREFIX +
-                          "dependency-sources/archives/engine.tar", names)
+            self.assertIn("JavaHost/SOURCE-MANIFEST.json", names)
+            self.assertIn("JavaHost/source-offer.json", names)
+            self.assertIn("JavaHost/SOURCE-OFFER.txt", names)
+            self.assertFalse(any("corresponding-source/" in name for name in names))
             self.assertEqual(names, {name for name in data["files"] if evidence._retain_member(name)})
             evidence.verify_package_receipt("osx-arm64", archive, path.parent)
 
@@ -863,7 +950,7 @@ class PackageReceiptTests(RidVerdictTests):
                 archive = write_zip(root / "VodBox.1.osx-arm64.zip", host_members())
                 path = evidence.write_package_receipt("osx-arm64", archive, root / "receipts")
                 data = evidence._read_package_receipt(path)
-                member = "JavaHost/corresponding-source/" + BRIDGE_PATH + "/unicorn.c"
+                member = "JavaHost/SOURCE-MANIFEST.json"
                 if mode == "missing":
                     data["subset"].pop(member)
                 elif mode in ("hash", "source"):
@@ -882,10 +969,9 @@ class PackageReceiptTests(RidVerdictTests):
                     evidence.verify_package_receipt("osx-arm64", archive, path.parent)
 
     def test_replay_checks_content_even_with_updated_manifest_hashes(self):
-        source = "JavaHost/corresponding-source/"
         cases = {
-            source + SOURCE_PREFIX + "dependency-sources/archives/engine.tar": b"changed source",
-            source + SOURCE_PREFIX + "dependency-sources/archives/unicorn.tar": b"changed source",
+            "JavaHost/SOURCE-MANIFEST.json": b"changed source manifest",
+            "JavaHost/source-offer.json": b"{}",
             "JavaHost/jre/legal/java.base/LICENSE": b"",
             "JavaHost/deps/unidbg-unicorn2-0.9.8.jar": jar_bytes({
                 "Backend.class": b"class", native_entry_for("osx-arm64"): b"changed native"}),
@@ -979,7 +1065,7 @@ class PackageReceiptTests(RidVerdictTests):
                 elif mode == "checks":
                     data["checks"]["sourceEvidence"]["bridgeDigest"] = "fake"
                 else:
-                    member = "JavaHost/corresponding-source/" + BRIDGE_PATH + "/unicorn.c"
+                    member = "JavaHost/SOURCE-MANIFEST.json"
                     data["files"][member]["sha256"] = hashlib.sha256(b"changed source").hexdigest()
                 with gzip.open(path, "wt", encoding="utf-8") as stream:
                     json.dump(data, stream)
@@ -1041,6 +1127,7 @@ class CommandLineTests(unittest.TestCase):
 
     def setUp(self):
         ALMA.mkdir(exist_ok=True)
+        source_context(self)
         pin = unittest.mock.patch.object(evidence.rebuild, "_engines",
                                          return_value={"archive_sha256": SOURCE_HASH})
         pin.start()
@@ -1048,7 +1135,8 @@ class CommandLineTests(unittest.TestCase):
 
     def _run(self, *argv):
         out, err = io.StringIO(), io.StringIO()
-        with unittest.mock.patch.object(sys, "argv", ["release_evidence.py", *argv]):
+        with unittest.mock.patch.object(sys, "argv", ["release_evidence.py", "--sources",
+                                                      str(source_assets.ASSETS), *argv]):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 status = evidence.main()
         return status, out.getvalue() + err.getvalue()

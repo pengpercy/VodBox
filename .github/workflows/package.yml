@@ -13,7 +13,48 @@ on:
         type: string
         default: ''
 jobs:
+  sources:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Collect distinct matching source closures from actual build artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORIGIN_RUN: ${{ inputs.source_run || github.run_id }}
+        run: |
+          mkdir -p artifacts/sources artifacts/source-meta
+          for rid in win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64; do
+            gh run download "$ORIGIN_RUN" --repo "$GITHUB_REPOSITORY" -n "vodbox-meta.$rid" -D artifacts/source-meta
+            python3 build/package_reuse.py --rid "$rid" --version "${{ inputs.version }}" \
+              --source-sha "${{ inputs.source_sha }}" --repo "$GITHUB_REPOSITORY" \
+              --source-run "$ORIGIN_RUN" --meta "artifacts/source-meta/$rid.json" \
+              --jobs "artifacts/source-meta/jobs.$rid.json"
+            producer_sha=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourceSha"])' "artifacts/source-meta/$rid.json")
+            run_id=$(python3 build/ci_reuse.py artifact-run --meta "artifacts/source-meta/$rid.json" --current-run "$ORIGIN_RUN")
+            mkdir -p "artifacts/source-input/$rid" "artifacts/source-host/$rid"
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" -n "vodbox.$rid" -D "artifacts/source-input/$rid"
+            tar -xzf "artifacts/source-input/$rid/VodBox.$rid.tar.gz" -C "artifacts/source-host/$rid" \
+              JavaHost/corresponding-source JavaHost/native-backend-receipt.json
+            python3 build/source_assets.py --host "artifacts/source-host/$rid/JavaHost" \
+              --output artifacts/sources --version "${{ inputs.version }}" --source-sha "${{ inputs.source_sha }}" \
+              --producer-sha "$producer_sha"
+            rm -rf "artifacts/source-input/$rid" "artifacts/source-host/$rid"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: matching-source-assets
+          path: artifacts/sources/*
+          if-no-files-found: error
+          retention-days: 14
   package:
+    needs: sources
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -34,6 +75,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: matching-source-assets
+          path: artifacts/sources
       - name: Install package evidence readers
         if: startsWith(matrix.rid, 'linux')
         shell: bash
@@ -88,6 +133,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ruby-dev build-essential rpm
           sudo gem install fpm --version 1.16.0 --no-document
+      - name: Separate matching source from the runtime payload
+        if: steps.source.outputs.reuse_package != 'true'
+        shell: bash
+        run: |
+          producer_sha=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourceSha"])' "artifacts/meta/${{ matrix.rid }}.json")
+          python3 build/source_assets.py --host artifacts/publish/${{ matrix.rid }}/JavaHost \
+            --existing --output artifacts/sources --version "${{ inputs.version }}" --source-sha "${{ inputs.source_sha }}" \
+            --producer-sha "$producer_sha"
       - name: Package
         if: steps.source.outputs.reuse_package != 'true'
         shell: bash
@@ -131,7 +184,7 @@ jobs:
         shell: bash
         run: |
           python3 build/release_evidence.py --rid ${{ matrix.rid }} \
-            --archives artifacts/packages --receipts artifacts/receipts \
+            --archives artifacts/packages --receipts artifacts/receipts --sources artifacts/sources \
             --meta artifacts/meta --expected-sha "${{ inputs.source_sha }}" --version "${{ inputs.version }}" \
             --write-package-receipts artifacts/package-evidence
       - name: Verify reused package evidence
@@ -139,7 +192,7 @@ jobs:
         shell: bash
         run: |
           python3 build/release_evidence.py --rid ${{ matrix.rid }} \
-            --archives artifacts/packages --receipts artifacts/receipts \
+            --archives artifacts/packages --receipts artifacts/receipts --sources artifacts/sources \
             --meta artifacts/meta --expected-sha "${{ inputs.source_sha }}" --version "${{ inputs.version }}" \
             --package-receipts artifacts/package-evidence
       - uses: actions/upload-artifact@v7

@@ -41,6 +41,7 @@ from collections import deque
 from pathlib import Path, PurePosixPath
 
 import native_coverage
+import source_assets
 from ci_reuse import ensure_commit, native_build_hash, source_hash
 import rebuild_native_backend as rebuild
 
@@ -443,6 +444,14 @@ def _read_object(path: Path) -> dict:
 
 
 def verify_packaged_evidence(rid: str, host: Path) -> dict:
+    try:
+        with source_assets.matching_source(host) as source:
+            return _verify_packaged_evidence(rid, host, source)
+    except (OSError, ValueError, KeyError, tarfile.TarError, subprocess.CalledProcessError) as error:
+        raise ReleaseEvidenceError(f"{rid}: independent source verification failed: {error}") from error
+
+
+def _verify_packaged_evidence(rid: str, host: Path, source: Path) -> dict:
     """Bind the packaged receipt to native bytes and the source/notices actually distributed."""
     receipt = _read_object(host / RECEIPT_NAME)
     if receipt.get("rid") != rid:
@@ -485,8 +494,11 @@ def verify_packaged_evidence(rid: str, host: Path) -> dict:
         if not any(name.endswith(".class") for name in reader.namelist()):
             raise ReleaseEvidenceError(f"{rid}: unicorn parent classes are missing")
 
-    source = host / "corresponding-source"
     retained = source / "third_party/tvbox-silicon"
+    recipe = source / "build/rebuild_native_backend.py"
+    if source_assets.canonical_text(recipe.read_bytes()) != \
+            source_assets.canonical_text(Path(rebuild.__file__).read_bytes()):
+        raise ReleaseEvidenceError(f"{rid}: independent backend producer recipe differs from source commit")
     manifest = _read_object(retained / "dependency-sources/native-source-manifest.json")
     entries = native_coverage._manifest_artifacts(manifest)
     for coordinate in native_coverage.DISTRIBUTED_SOURCE_ARTIFACTS:
@@ -543,9 +555,17 @@ def verify_packaged_evidence(rid: str, host: Path) -> dict:
                    if path.is_file() and path.name.lower().startswith(("license", "copying", "notice")))
     if not notices:
         raise ReleaseEvidenceError(f"{rid}: no retained dependency licenses")
+    def require_license(path: Path, reference: Path, label: str) -> None:
+        if not path.is_file() or not path.read_bytes().strip() or \
+                source_assets.canonical_text(path.read_bytes()) != \
+                source_assets.canonical_text(reference.read_bytes()):
+            raise ReleaseEvidenceError(f"{rid}: packaged {label} differs from retained license text")
+
     for reference in sorted(notices):
-        require_hash(retained / reference.relative_to(rebuild.SOURCE),
-                     sha256_file(reference), f"license {reference.name}")
+        require_license(retained / reference.relative_to(rebuild.SOURCE),
+                        reference, f"source license {reference.name}")
+        require_license(host / "dependency-notices" / reference.relative_to(native_coverage.DEPENDENCY_NOTICES),
+                        reference, f"runtime license {reference.name}")
     for path in (host / "LICENSE-tvbox-silicon", source / "LICENSE"):
         if not path.is_file() or not path.read_bytes().strip():
             raise ReleaseEvidenceError(f"{rid}: retained license is missing or empty: {path.name}")
@@ -553,7 +573,8 @@ def verify_packaged_evidence(rid: str, host: Path) -> dict:
                for name in JRE_NOTICES):
         raise ReleaseEvidenceError(f"{rid}: bundled runtime license is missing or empty")
     return {"packagedReceipt": receipt, "nativeCoverage": coverage,
-            "sourceEvidence": {"bridgeDigest": combined.hexdigest(), "retainedLicenses": len(notices)}}
+            "sourceEvidence": {"bridgeDigest": combined.hexdigest(), "retainedLicenses": len(notices),
+                               "matchingSource": _read_object(host / "source-offer.json")}}
 
 
 def verify_payload(rid: str, archive: Path, root: Path, meta: Path | None = None,
@@ -579,6 +600,11 @@ def verify_payload(rid: str, archive: Path, root: Path, meta: Path | None = None
     for name in MEDIA_NOTICES:
         _read_object(app / name)
     verdict["meta"] = verify_meta(rid, meta) if meta is not None else None
+    if meta is not None:
+        offer = _read_object(host / "source-offer.json")
+        if offer.get("backendSourceSha") != verdict["meta"]["sourceSha"] or \
+                offer.get("sourceSha") != verdict["meta"]["packageSourceSha"]:
+            raise ReleaseEvidenceError(f"{rid}: source binding differs from actual producer/target metadata")
     verdict["receiptArtifact"] = None
     if receipts_dir is not None:
         verdict["receiptArtifact"] = verify_receipt_artifact(rid, receipts_dir)
@@ -842,6 +868,23 @@ def verify_release(rids=None, archives_dir: Path = ARCHIVES_DIR, meta_dir: Path 
     unknown = [rid for rid in targets if rid not in RIDS]
     if unknown:
         raise ReleaseEvidenceError(f"unknown runtime identifier(s): {', '.join(unknown)}")
+    if source_assets.ASSETS is None:
+        raise ReleaseEvidenceError("independent source artifacts directory is required")
+    sources = Path(source_assets.ASSETS)
+    indexed = set()
+    try:
+        indexes = sorted(sources.glob("VodBox-*-source-*.json"))
+        if not indexes:
+            raise ValueError("no independent source indexes")
+        for path in indexes:
+            index = source_assets.validate_index(path, version, expected_sha)
+            with source_assets.extracted(index, sources):
+                pass
+            indexed.update((path, sources / index["asset"]))
+        if indexed != {path for path in sources.iterdir() if path.is_file()}:
+            raise ValueError("unindexed independent source release asset")
+    except (OSError, ValueError, KeyError, tarfile.TarError) as error:
+        raise ReleaseEvidenceError(f"independent source release assets failed verification: {error}") from error
     verdicts: dict[str, dict] = {}
     problems: list[str] = []
     for rid in targets:
@@ -867,6 +910,10 @@ def verify_release(rids=None, archives_dir: Path = ARCHIVES_DIR, meta_dir: Path 
                             if comparable != attested:
                                 raise ReleaseEvidenceError(f"{rid}: {archive.name}: receipt differs from actual asset")
                     recorded = verdict.get("meta") or {}
+                    offer = verdict["sourceEvidence"]["matchingSource"]
+                    if meta is not None and (offer.get("backendSourceSha") != recorded.get("sourceSha") or
+                                             offer.get("sourceSha") != recorded.get("packageSourceSha")):
+                        raise ReleaseEvidenceError(f"{rid}: source offer producer/target does not match metadata")
                     if version and recorded.get("version") != version:
                         raise ReleaseEvidenceError(f"{rid}: package metadata version {recorded.get('version')!r} != {version}")
                     if expected_sha and recorded.get("packageSourceSha") != expected_sha:
@@ -890,6 +937,8 @@ def verify_release(rids=None, archives_dir: Path = ARCHIVES_DIR, meta_dir: Path 
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Verify the downloaded per-RID packages before publishing")
+    parser.add_argument("--sources", type=Path, required=True,
+                        help="Downloaded independent source archives and indexes")
     parser.add_argument("--archives", type=Path, default=ARCHIVES_DIR,
                         help="Directory of downloaded package artifacts (pattern: package.*)")
     parser.add_argument("--meta", type=Path, default=None,
@@ -905,6 +954,9 @@ def main() -> int:
     parser.add_argument("--expected-sha", default="", help="Source commit the release is bound to.")
     parser.add_argument("--version", default="", help="Version the release is bound to.")
     args = parser.parse_args()
+    source_assets.ASSETS = args.sources
+    source_assets.EXPECTED_VERSION = args.version
+    source_assets.EXPECTED_SHA = args.expected_sha
     targets = [rid.strip() for rid in args.rid.split(",") if rid.strip()] or None
     try:
         if args.write_package_receipts is not None:

@@ -37,7 +37,7 @@ NATIVE_BUILD_PATHS = (
     "build/native_coverage.py", "build/verify_java_host.py", "build/verify_mpv_bundle.py",
     "build/archive.py", "build/licenses", "build/publish-aot.sh", "build/dev-natives.sh",
     "build/smoke.py", "build/dex-acceptance.sh", "build/dex_fixture.py",
-    "build/dex-deps.json", "build/fetch-dex-deps.py", "build/test-desktop-smoke.sh",
+    "build/dex-deps.json", "build/fetch-dex-deps.py", "build/jlink_runtime.py", "build/test_jlink_runtime.py", "build/test-desktop-smoke.sh",
     "build/media-fixtures", "build/generate-icons.py",
     "build/test_bundle.py", "build/test_nativeverify.py", "build/test_native_coverage.py",
     "build/test_rebuild_native_backend.py", "build/test_archive.py",

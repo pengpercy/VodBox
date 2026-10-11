@@ -20,6 +20,9 @@ import subprocess
 import sys
 from urllib.parse import quote
 
+import source_assets
+from release_evidence import RIDS, ReleaseEvidenceError, find_archives
+
 
 class PublicationError(Exception):
     """A release could not be published; the caller reports it without leaking secrets."""
@@ -38,7 +41,8 @@ def api(path: str, *extra: str) -> str:
 
 
 def digest_of(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    with path.open("rb") as stream:
+        return "sha256:" + hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def validate_assets(files: list[Path], existing: list[dict]) -> list[Path]:
@@ -118,9 +122,24 @@ def upload_pending(repo: str, release_id: int, pending: list[Path]) -> None:
 
 def publish(repo: str, version: str, sha: str) -> int:
     tag = "v" + version
-    files = sorted(path for path in Path("artifacts/release").iterdir() if path.is_file())
-    if not files:
-        raise ValueError("No packages to publish")
+    runtime = Path("artifacts/release")
+    files = sorted({path for rid in RIDS for path in find_archives(rid, runtime)})
+    if set(files) != {path for path in runtime.iterdir() if path.is_file()}:
+        raise ValueError("Unexpected file in the runtime installer assets")
+    sources = Path("artifacts/sources")
+    indexes = sorted(sources.glob("VodBox-*-source-*.json"))
+    if not indexes:
+        raise ValueError("No independent matching source assets to publish")
+    source_files = set()
+    for path in indexes:
+        index = source_assets.validate_index(path, version, sha)
+        # Source assets have their own namespace; never classify them as RID installers.
+        with source_assets.extracted(index, sources):
+            pass
+        source_files.update((path, sources / index["asset"]))
+    if source_files != {path for path in sources.iterdir() if path.is_file()}:
+        raise ValueError("Unindexed file in the independent source assets")
+    files += sorted(source_files)
     ensure_tag(repo, tag, sha)
     release_id = resolve_release(repo, tag, version)
     release = json.loads(api(f"repos/{repo}/releases/{release_id}"))
@@ -145,7 +164,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (PublicationError, ValueError, KeyError) as error:
+    except (PublicationError, ReleaseEvidenceError, ValueError, KeyError) as error:
         print(f"Publication failed: {error}", file=sys.stderr)
         print("Check contents:write and repository rules. If GitHub still returns 403, fix the workflow "
               "permissions; do not publish from a local machine or broaden repository defaults.", file=sys.stderr)

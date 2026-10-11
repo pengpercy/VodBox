@@ -1,7 +1,7 @@
 """下载并校验 JVM 侧宿主依赖（见 build/dex-deps.json）。
 
-只做三件事：**下载 → 校验 sha256 → 按宿主约定布局文件**。绝不编译、绝不运行测试，
-也绝不写 /tmp（一切落在工作区 .cache/dex-deps/ 或你显式指定的目录里）。
+只下载、校验并布局宿主依赖；jre 子命令使用目标 native runner 的 JDK 21 做 jlink 裁剪。
+绝不编译宿主、绝不运行测试，也绝不写 /tmp（缓存和中间件留在工作区）。
 
 用法：
   python3 build/fetch-dex-deps.py list
@@ -15,9 +15,9 @@
       unidbg→DIR/unidbg/（都是宿主运行时发现的约定目录）。DIR 通常是发布输出里的 JavaHost/。
       --host-jar 一并把 host.jar 放到 DIR/host.jar。
       默认 stage 可分发组（dex,sqlite,runtime）；unidbg 组需显式 --groups unidbg 并加 --allow-non-distributable。
-  python3 build/fetch-dex-deps.py jre --rid osx-arm64 [--extract DIR]
-      下载锁定版 Temurin 21 JRE 到缓存并校验；--extract 摊平顶层目录解到 DIR，并按 RID 校验
-      DIR/bin/java 的 PE/ELF/Mach-O 架构（跨编译时绝不放进构建机自带 java 的架构）。
+  python3 build/fetch-dex-deps.py jre --rid osx-arm64 --extract DIR [--jdk-home JDK]
+      验证 JAVA_HOME（或 --jdk-home）的 JDK 21 及目标机器类型，用 jlink 生成 DIR/bin/java。
+      包含固定上游动态依赖模块与真实 legal 许可文件；跨架构或缺少 JDK 资源立即失败。
 
 说明：unidbg 组编译期传递依赖含 GPL-2.0-only（unicorn/keystone/demumble）。本脚本只陈述该许可事实；
 是否随包分发是本仓库的分发策略（默认**不随包分发**该组），stage 该组需显式同意。
@@ -27,12 +27,11 @@ import hashlib
 import json
 import shutil
 import sys
-import tarfile
 import urllib.request
-import zipfile
 from pathlib import Path
 
-from nativeverify import verify_jre
+from nativeverify import NativeVerifyError
+from jlink_runtime import link_runtime
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = json.loads((ROOT / "build" / "dex-deps.json").read_text(encoding="utf-8"))
@@ -55,21 +54,6 @@ def url_for(entry: dict) -> str:
 def cache_path(entry: dict) -> Path:
     _, artifact, version = coordinates(entry)
     return CACHE / f"{artifact}-{version}.jar"
-
-
-def flatten(destination: Path) -> None:
-    """Lift the single top-level directory an upstream archive ships (`jdk-<ver>-jre/`) up one level.
-
-    Temurin (and most JDK distributions) wrap everything in a versioned root, but the host locator
-    expects `<jre>/bin/java`, so the archive root must not stay nested.
-    """
-    children = list(destination.iterdir())
-    if len(children) != 1 or not children[0].is_dir():
-        return
-    inner = children[0]
-    for item in inner.iterdir():
-        shutil.move(str(item), destination / item.name)
-    inner.rmdir()
 
 
 def sha256_of(path: Path) -> str:
@@ -135,8 +119,8 @@ def command_list(_args: argparse.Namespace) -> int:
     for rid, reason in platform_info["missing"].items():
         print(f"    缺资产 {rid:<12} {reason}")
     jre = LOCK["jre"]
-    print(f"\n[JRE] {jre['release']}（{jre['distribution']}） 覆盖 {len(jre['assets'])} 个 RID")
-    print(f"      {jre['discovery']}")
+    print(f"\n[JRE] jlink Java 21，覆盖 {len(jre['assets'])} 个 RID；要求各 native runner 的目标 JDK 21")
+    print("      校验 JAVA_HOME 的 major、工具和 jmods 机器类型；保留上游动态模块与真实 legal 许可。")
     return 0
 
 
@@ -189,37 +173,13 @@ def command_stage(args: argparse.Namespace) -> int:
 
 
 def command_jre(args: argparse.Namespace) -> int:
-    jre = LOCK["jre"]
-    asset = jre["assets"].get(args.rid)
-    if asset is None:
-        raise SystemExit(f"JRE 锁定表没有 RID {args.rid}（可用：{','.join(sorted(jre['assets']))}）")
-    name = asset["url"].rsplit("/", 1)[1]
-    path = CACHE / "jre" / name
-    if not path.exists():
-        print(f"  下载 {jre['release']} {args.rid}")
-        download(asset["url"], path)
-    actual = sha256_of(path)
-    if actual != asset["sha256"]:
-        raise SystemExit(f"JRE sha256 不符：{path.name}\n  期望 {asset['sha256']}\n  实际 {actual}")
-    print(f"  OK {path}  {path.stat().st_size} B")
-    if args.extract:
-        destination = Path(args.extract).resolve()
-        destination.mkdir(parents=True, exist_ok=True)
-        if path.suffix == ".zip":
-            with zipfile.ZipFile(path) as archive:
-                archive.extractall(destination)
-        else:
-            with tarfile.open(path) as archive:
-                archive.extractall(destination)
-        flatten(destination)
-        # Cross-compile guard: prove the launcher really is the RID's architecture instead of the
-        # build host's. Shipping the runner's own `java` into an arm64 package looks fine until
-        # the target tries to exec an x86-64 binary.
-        arch = verify_jre(destination, args.rid)
-        java = destination / "bin" / ("java.exe" if args.rid.startswith("win") else "java")
-        if not java.is_file() and args.rid.startswith("osx"):
-            java = destination / "Contents" / "Home" / "bin" / "java"
-        print(f"  解到 {destination}；java = {java}（{arch}）")
+    if not args.extract:
+        raise SystemExit("jre requires --extract DIR; provide the native target JDK 21 via JAVA_HOME or --jdk-home")
+    try:
+        metadata = link_runtime(args.rid, Path(args.extract), args.jdk_home)
+    except (ValueError, NativeVerifyError) as error:
+        raise SystemExit(str(error)) from error
+    print(f"  {args.rid}: jlink Java {metadata['release']} -> {args.extract} ({metadata['architecture']})")
     return 0
 
 
@@ -244,9 +204,10 @@ def main() -> int:
     stage.add_argument("--allow-non-distributable", action="store_true", help="允许 stage 不随包分发的分组")
     stage.set_defaults(func=command_stage)
 
-    jre = subparsers.add_parser("jre", help="下载锁定版 JRE")
+    jre = subparsers.add_parser("jre", help="使用目标 JDK 21 jlink 裁剪 JRE")
     jre.add_argument("--rid", required=True, help="osx-x64/osx-arm64/linux-x64/linux-arm64/win-x64/win-arm64")
-    jre.add_argument("--extract", help="解包目录（可选；摊平顶层并校验该 RID 的架构）")
+    jre.add_argument("--extract", required=True, help="jlink 输出目录（必须为空或不存在）")
+    jre.add_argument("--jdk-home", help="目标 native JDK 21 路径（默认 JAVA_HOME，不能是 JRE）")
     jre.set_defaults(func=command_jre)
 
     args = parser.parse_args()
