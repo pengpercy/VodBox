@@ -18,9 +18,9 @@ public sealed class JarPluginHostLocatorTests
     {
         var root = Path.Combine(Path.GetTempPath(), "vodbox-locator-" + Guid.NewGuid().ToString("N"));
         var baseDirectory = Path.Combine(root, "Contents", "MacOS");
-        var hostDirectory = Path.GetFullPath(Path.Combine(baseDirectory, hostRelativePath));
+        var hostDirectory = Path.GetFullPath(Path.Combine(baseDirectory, hostRelativePath.Replace('/', Path.DirectorySeparatorChar)));
         var host = Path.Combine(hostDirectory, "host.jar");
-        var java = Path.Combine(hostDirectory, "jre", javaRelativePath,
+        var java = Path.Combine(hostDirectory, "jre", javaRelativePath.Replace('/', Path.DirectorySeparatorChar),
             OperatingSystem.IsWindows() ? "java.exe" : "java");
         var oldHost = Environment.GetEnvironmentVariable(JarPluginHostLocator.HostJarEnvironmentVariable);
         var oldJava = Environment.GetEnvironmentVariable(JarPluginHostLocator.JavaEnvironmentVariable);
