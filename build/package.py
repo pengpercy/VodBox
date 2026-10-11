@@ -53,6 +53,25 @@ def package_macos(rid, source: Path, output: Path, version: str):
     # Remove the upstream resource seal only in the copied runtime. Keep Info.plist so
     # codesign recognizes the JRE as a nested bundle and builds a fresh resource seal.
     runtime = resources / "JavaHost/jre"
+    # jlink shares license text via relative links. Materialize only the copied
+    # runtime's legal files, after validating each target within that runtime.
+    legal = runtime / "legal"
+    if legal.is_dir():
+        runtime_root = runtime.resolve(strict=True)
+        for license_file in sorted(legal.rglob("*")):
+            if not license_file.is_symlink():
+                continue
+            try:
+                target = license_file.resolve(strict=True)
+            except (OSError, RuntimeError) as error:
+                raise ValueError(f"Invalid JRE license link: {license_file}") from error
+            if not target.is_relative_to(runtime_root) or not target.is_file():
+                raise ValueError(f"JRE license target must be a regular file within the JRE: {license_file}")
+            content = target.read_bytes()
+            if not content.strip():
+                raise ValueError(f"Empty JRE license: {license_file}")
+            license_file.unlink()
+            license_file.write_bytes(content)
     runtime_bundles = []
     if (runtime / "Contents/Info.plist").is_file():
         runtime_bundles.append(runtime)
