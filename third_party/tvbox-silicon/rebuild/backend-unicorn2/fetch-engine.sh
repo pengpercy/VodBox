@@ -74,6 +74,7 @@ REQUIRED_HDR_SYMBOLS=(
 )
 
 CACHE="${VODBOX_REBUILD_CACHE:-$HERE/.cache}"
+if command -v cygpath >/dev/null 2>&1; then CACHE="$(cygpath -u "$CACHE")"; fi
 mkdir -p "$CACHE"
 ARCHIVE="$CACHE/unicorn-${ENGINE_COMMIT}.tar.gz"
 SRC="$CACHE/unicorn-${ENGINE_COMMIT}"
@@ -102,7 +103,7 @@ fi
 echo "OK engine archive verified: $actual"
 
 if [[ ! -d "$SRC" ]]; then
-  tar -xzf "$ARCHIVE" -C "$CACHE"
+  tar -xz -C "$CACHE" < "$ARCHIVE"
 fi
 [[ -d "$SRC" ]] || { echo "FATAL: expected extracted source at $SRC" >&2; exit 1; }
 echo "Engine source at: $SRC"

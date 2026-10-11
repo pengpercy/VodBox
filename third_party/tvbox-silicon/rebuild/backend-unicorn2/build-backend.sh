@@ -31,8 +31,13 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NATIVE="$HERE/../../dependency-sources/upstream-evidence/native-provenance/release-inputs/backend/unicorn2/src/main/native"
 CACHE="${VODBOX_REBUILD_CACHE:-$HERE/.cache}"
+if command -v cygpath >/dev/null 2>&1; then CACHE="$(cygpath -u "$CACHE")"; fi
 ENGINE="$CACHE/unicorn-548eda466eb9a2c69723a0f74888aa7b889b4ed9"
 OUT="${VODBOX_REBUILD_OUT:-$HERE/out}"
+if command -v cygpath >/dev/null 2>&1; then
+  OUT="$(cygpath -u "$OUT")"
+  JAVA_HOME="$(cygpath -u "${JAVA_HOME:?set JAVA_HOME}")"
+fi
 # Compilation changes directory to the retained sources; resolve caller-relative output first.
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
