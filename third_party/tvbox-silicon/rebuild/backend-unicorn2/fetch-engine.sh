@@ -37,7 +37,31 @@ ENGINE_URL="https://codeload.github.com/zhkl0228/unicorn/tar.gz/${ENGINE_COMMIT}
 # deployment target: the static engine is linked into the bridge library, so its own CMake build
 # must share the bridge's -mmacosx-version-min (11.6) or the shipped library's minimum OS is the
 # engine's default (the runner SDK) instead of the bundle's 11.6 floor.
-ENGINE_BUILD_CMD="cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DUNICORN_ARCH=\"arm;aarch64\" ${VODBOX_ENGINE_CMAKE_FLAGS:-} . && cmake --build build -j"
+ENGINE_CMAKE="${VODBOX_ENGINE_CMAKE:-cmake}"
+ENGINE_CMAKE="${ENGINE_CMAKE//\\//}"
+ENGINE_CONFIGURE=("$ENGINE_CMAKE" -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+  -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF '-DUNICORN_ARCH=arm;aarch64')
+if [[ "${RID:-}" == "win-x64" ]]; then
+  CC="${VODBOX_NATIVE_CC:-${CROSS_CC:-}}"
+  if [[ -z "$CC" ]]; then
+    CC="$(command -v x86_64-w64-mingw32-gcc || command -v gcc)"
+  fi
+  CC="${CC//\\//}"
+  [[ "$("$CC" -dumpmachine)" == "x86_64-w64-mingw32" ]] || {
+    echo "FATAL: $CC is not an x86_64 MinGW compiler" >&2; exit 1; }
+  GENERATOR="${VODBOX_ENGINE_GENERATOR:-MinGW Makefiles}"
+  MAKE="${VODBOX_ENGINE_MAKE:-}"
+  if [[ -z "$MAKE" ]]; then
+    if [[ "$GENERATOR" == "Ninja" ]]; then MAKE="$(command -v ninja)"
+    else MAKE="$(command -v mingw32-make)"; fi
+  fi
+  MAKE="${MAKE//\\//}"
+  ENGINE_CONFIGURE+=(-G "$GENERATOR" "-DCMAKE_C_COMPILER=$CC" "-DCMAKE_MAKE_PROGRAM=$MAKE")
+fi
+# Existing per-host flags are a whitespace-separated list of CMake options.
+ENGINE_EXTRA_FLAGS=()
+read -r -a ENGINE_EXTRA_FLAGS <<< "${VODBOX_ENGINE_CMAKE_FLAGS:-}"
+ENGINE_CONFIGURE+=("${ENGINE_EXTRA_FLAGS[@]}" .)
 
 # Symbols the bridge C source REQUIRES from the engine. If the pinned tree stops providing
 # any of these, the pin is wrong (regressed back to Unicorn1) and we fail closed.
@@ -97,8 +121,8 @@ done
 echo "OK engine tree provides all bridge-required Unicorn2 Control-API symbols"
 
 if [[ "${VODBOX_BUILD_ENGINE:-0}" == "1" ]]; then
-  echo "Building static engine: $ENGINE_BUILD_CMD"
-  ( cd "$SRC" && eval "$ENGINE_BUILD_CMD" )
+  echo "Building static engine: ${ENGINE_CONFIGURE[*]}"
+  ( cd "$SRC" && "${ENGINE_CONFIGURE[@]}" && "$ENGINE_CMAKE" --build build -j )
   # CMake: static archive lives in the build/ dir; MinGW names it without the lib prefix.
   if [[ -f "$SRC/build/libunicorn.a" ]]; then
     echo "Static engine: $SRC/build/libunicorn.a"
@@ -110,6 +134,6 @@ if [[ "${VODBOX_BUILD_ENGINE:-0}" == "1" ]]; then
   fi
 else
   echo "Engine fetch only. To build the static engine, re-run with VODBOX_BUILD_ENGINE=1,"
-  echo "or run manually:  ( cd '$SRC' && $ENGINE_BUILD_CMD )"
+  echo "or run manually: ( cd '$SRC' && ${ENGINE_CONFIGURE[*]} && '$ENGINE_CMAKE' --build build -j )"
 fi
 echo "Next: rebuild/backend-unicorn2/build-backend.sh (see README.md)."

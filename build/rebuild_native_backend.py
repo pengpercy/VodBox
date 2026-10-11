@@ -229,12 +229,28 @@ def toolchain_probe(rid: str) -> dict:
         probe["command"] = [compiler]
         probe["version"] = _tool_version([compiler, "--version"])
     elif rid == "win-x64":
-        # Real selection: prefer the runner's native MinGW target compiler, fall back to a `gcc`
-        # that actually targets x86_64-w64-mingw32. The JNI headers come from JAVA_HOME, not the JDK
-        # installed by the runner for the rest of the job (the shipped package must not borrow it).
-        compiler = shutil.which("x86_64-w64-mingw32-gcc") or shutil.which("gcc") or ""
-        probe["command"] = [compiler] if compiler else []
-        probe["version"] = _tool_version([compiler, "--version"]) if compiler else "missing"
+        # MSYS2 commonly supplies gcc.exe without a target-prefixed executable name.
+        requested = os.environ.get("VODBOX_NATIVE_CC") or os.environ.get("CROSS_CC")
+        compiler = shutil.which(requested) if requested else (
+            shutil.which("x86_64-w64-mingw32-gcc") or shutil.which("gcc"))
+        if not compiler:
+            raise RebuildError(f"win-x64: MinGW compiler not found: {requested or 'gcc'}")
+        target = _tool_version([compiler, "-dumpmachine"])
+        if target != "x86_64-w64-mingw32":
+            raise RebuildError(f"win-x64: {compiler} targets {target}, expected x86_64-w64-mingw32")
+        probe["command"] = [compiler]
+        probe["version"] = _tool_version([compiler, "--version"])
+        probe["target"] = target
+        probe["engine_generator"] = os.environ.get("VODBOX_ENGINE_GENERATOR", "MinGW Makefiles")
+        for key, variable, default in (
+            ("engine_cmake", "VODBOX_ENGINE_CMAKE", "cmake"),
+            ("engine_make", "VODBOX_ENGINE_MAKE",
+             "ninja" if probe["engine_generator"] == "Ninja" else "mingw32-make"),
+        ):
+            tool = shutil.which(os.environ.get(variable) or default)
+            if not tool:
+                raise RebuildError(f"win-x64: missing {variable} tool ({default})")
+            probe[key] = tool
         probe["static"] = True
     else:
         raise RebuildError(f"{rid}: no toolchain is defined; {rid} is not built from source")
@@ -454,6 +470,13 @@ def build(rid: str, deps: Path, *, engine_cache: Path, out_root: Path) -> dict:
         "VODBOX_REBUILD_OUT": str(Path(out_root).resolve()),
         "VODBOX_ENGINE_CMAKE_FLAGS": toolchain.get("engine_cmake_flags", ""),
     }
+    if rid == "win-x64":
+        env.update({
+            "VODBOX_NATIVE_CC": toolchain["command"][0],
+            "VODBOX_ENGINE_CMAKE": toolchain["engine_cmake"],
+            "VODBOX_ENGINE_GENERATOR": toolchain["engine_generator"],
+            "VODBOX_ENGINE_MAKE": toolchain["engine_make"],
+        })
     _run(["bash", str(REBUILD / "fetch-engine.sh")], env=env)
     _run(["bash", str(REBUILD / "build-backend.sh")], env=env)
     library = built_library(rid, out_root)

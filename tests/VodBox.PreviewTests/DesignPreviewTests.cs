@@ -12,6 +12,10 @@ using Xunit;
 
 // 指定无头会话使用的应用基座（Fluent 深色主题 + Inter 字体），保证截图与真实 App 同视觉基座。
 [assembly: AvaloniaTestApplication(typeof(VodBox.PreviewTests.PreviewApp))]
+// 设计数据与渲染服务跨测试共享；应用和 Dispatcher 必须保持在同一个 Headless 会话线程上。
+[assembly: AvaloniaTestIsolation(AvaloniaTestIsolationLevel.PerAssembly)]
+// 一个串行 collection，避免异步测试交错访问共享应用、设计数据与渲染状态。
+[assembly: CollectionBehavior(CollectionBehavior.CollectionPerAssembly, DisableTestParallelization = true)]
 
 namespace VodBox.PreviewTests;
 

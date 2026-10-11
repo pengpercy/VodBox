@@ -87,23 +87,23 @@ jobs:
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/tvbox-host.py
-      # MSYS2/MinGW for the win-x64 source rebuild: the MinGW target compiler is what
-      # build-backend.sh calls, and it must be a real, present toolchain — not an assumption.
-      - name: Windows MinGW toolchain
+      - name: Install Windows MinGW toolchain
         if: steps.reuse.outputs.skip != 'true' && matrix.rid == 'win-x64'
-        shell: pwsh
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
+      - name: Resolve Windows MinGW tools
+        if: steps.reuse.outputs.skip != 'true' && matrix.rid == 'win-x64'
+        shell: msys2 {0}
         run: |
-          if (-not (Get-Command x86_64-w64-mingw32-gcc -ErrorAction SilentlyContinue)) {
-            if (Get-Command winget -ErrorAction SilentlyContinue) {
-              winget install --id MSYS2.MSYS2 -e --accept-source-agreements --accept-package-agreements --disable-interactivity
-            }
-            $mingw = 'C:\msys64\mingw64\bin'
-            if (-not (Test-Path "$mingw\x86_64-w64-mingw32-gcc.exe")) {
-              C:\msys64\usr\bin\bash.exe -lc 'pacman -Sy --noconfirm mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake make'
-            }
-            "$mingw" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          }
-          & 'C:\msys64\mingw64\bin\x86_64-w64-mingw32-gcc.exe' --version
+          set -euo pipefail
+          gcc --version
+          test "$(gcc -dumpmachine)" = x86_64-w64-mingw32
+          echo "VODBOX_NATIVE_CC=$(cygpath -m "$(command -v gcc)")" >> "$GITHUB_ENV"
+          echo "VODBOX_ENGINE_CMAKE=$(cygpath -m "$(command -v cmake)")" >> "$GITHUB_ENV"
+          echo "VODBOX_ENGINE_MAKE=$(cygpath -m "$(command -v ninja)")" >> "$GITHUB_ENV"
+          echo "VODBOX_ENGINE_GENERATOR=Ninja" >> "$GITHUB_ENV"
       - name: Linux native dependencies
         if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
         run: |

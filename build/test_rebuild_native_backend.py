@@ -12,9 +12,50 @@ import zipfile
 import rebuild_native_backend as rebuild
 
 
+class WindowsToolchainTests(unittest.TestCase):
+    def probe(self, tools, env=None, target="x86_64-w64-mingw32"):
+        with patch.dict(os.environ, dict(JAVA_HOME="fixture-jdk", **(env or {})), clear=True), \
+             patch.object(rebuild.shutil, "which", side_effect=tools.get), \
+             patch.object(rebuild, "_tool_version", side_effect=lambda command:
+                          target if command[-1] == "-dumpmachine" else "fixture GCC"):
+            return rebuild.toolchain_probe("win-x64")
+
+    def test_unprefixed_msys2_gcc_is_supported(self):
+        probe = self.probe({"gcc": "C:/msys64/mingw64/bin/gcc.exe",
+                            "cmake": "C:/msys64/mingw64/bin/cmake.exe",
+                            "mingw32-make": "C:/msys64/mingw64/bin/mingw32-make.exe"})
+        self.assertEqual(probe["command"], ["C:/msys64/mingw64/bin/gcc.exe"])
+        self.assertEqual(probe["engine_generator"], "MinGW Makefiles")
+        self.assertEqual(probe["target"], "x86_64-w64-mingw32")
+
+    def test_explicit_tools_override_path_discovery(self):
+        cc = "C:/tool chain/gcc.exe"
+        cmake = "C:/tool chain/cmake.exe"
+        make = "C:/tool chain/ninja.exe"
+        probe = self.probe({cc: cc, cmake: cmake, make: make, "gcc": "wrong-gcc"},
+                           {"VODBOX_NATIVE_CC": cc, "VODBOX_ENGINE_CMAKE": cmake,
+                            "VODBOX_ENGINE_MAKE": make, "VODBOX_ENGINE_GENERATOR": "Ninja"})
+        self.assertEqual(probe["command"], [cc])
+        self.assertEqual(probe["engine_cmake"], cmake)
+        self.assertEqual(probe["engine_make"], make)
+        self.assertEqual(probe["engine_generator"], "Ninja")
+
+    def test_missing_explicit_compiler_does_not_fall_back(self):
+        with self.assertRaisesRegex(rebuild.RebuildError, "compiler not found"):
+            self.probe({"gcc": "other-gcc"}, {"VODBOX_NATIVE_CC": "missing-gcc"})
+
+    def test_wrong_target_is_rejected(self):
+        with self.assertRaisesRegex(rebuild.RebuildError, "expected x86_64-w64-mingw32"):
+            self.probe({"gcc": "gcc"}, target="x86_64-pc-msys")
+
+    def test_missing_make_is_rejected(self):
+        with self.assertRaisesRegex(rebuild.RebuildError, "VODBOX_ENGINE_MAKE"):
+            self.probe({"gcc": "gcc", "cmake": "cmake"})
+
+
 class RebuildEnvironmentTests(unittest.TestCase):
     def test_build_passes_output_and_engine_flags_to_both_recipes(self):
-        for rid in ("osx-x64", "osx-arm64"):
+        for rid in ("osx-x64", "osx-arm64", "win-x64"):
             with self.subTest(rid=rid), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 deps = root / "deps"
@@ -38,10 +79,16 @@ class RebuildEnvironmentTests(unittest.TestCase):
                         library.parent.mkdir(parents=True)
                         library.write_bytes(b"rebuilt fixture")
 
-                with patch.dict(os.environ, {"JAVA_HOME": str(root / "jdk")}), \
+                with patch.dict(os.environ, {"JAVA_HOME": str(root / "jdk"),
+                                             "VODBOX_NATIVE_CC": "C:/tool chain/gcc.exe",
+                                             "VODBOX_ENGINE_CMAKE": "C:/tool chain/cmake.exe",
+                                             "VODBOX_ENGINE_MAKE": "C:/tool chain/ninja.exe",
+                                             "VODBOX_ENGINE_GENERATOR": "Ninja"}), \
+                     patch.object(rebuild.shutil, "which", side_effect=lambda name: name), \
                      patch.object(rebuild, "_engines", return_value=engine), \
                      patch.object(rebuild, "engine_archive", return_value=archive), \
-                     patch.object(rebuild, "_tool_version", return_value="fixture compiler"), \
+                     patch.object(rebuild, "_tool_version", side_effect=lambda command:
+                                  "x86_64-w64-mingw32" if command[-1] == "-dumpmachine" else "fixture compiler"), \
                      patch.object(rebuild, "unicorn1_source_evidence", return_value={"archive_sha256": "fixture"}), \
                      patch.object(rebuild, "_run", side_effect=run):
                     receipt = rebuild.build(rid, deps, engine_cache=cache, out_root=out)
@@ -49,8 +96,15 @@ class RebuildEnvironmentTests(unittest.TestCase):
                 for _, env in calls:
                     self.assertEqual(env["VODBOX_REBUILD_OUT"], str(out.resolve()))
                     self.assertEqual(env["VODBOX_REBUILD_CACHE"], str(cache.resolve()))
-                    self.assertEqual(env["VODBOX_ENGINE_CMAKE_FLAGS"], "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.6")
-                self.assertIn("-mmacosx-version-min=11.6", receipt["backend"]["flags"].split())
+                    if rid == "win-x64":
+                        self.assertEqual(env["VODBOX_NATIVE_CC"], "C:/tool chain/gcc.exe")
+                        self.assertEqual(env["VODBOX_ENGINE_CMAKE"], "C:/tool chain/cmake.exe")
+                        self.assertEqual(env["VODBOX_ENGINE_MAKE"], "C:/tool chain/ninja.exe")
+                        self.assertEqual(env["VODBOX_ENGINE_GENERATOR"], "Ninja")
+                    else:
+                        self.assertEqual(env["VODBOX_ENGINE_CMAKE_FLAGS"], "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.6")
+                if rid.startswith("osx"):
+                    self.assertIn("-mmacosx-version-min=11.6", receipt["backend"]["flags"].split())
                 self.assertEqual(receipt["backend"]["output_library"]["sha256"],
                                  hashlib.sha256(b"rebuilt fixture").hexdigest())
                 with zipfile.ZipFile(deps / "unidbg-unicorn2-0.9.8.jar") as jar:

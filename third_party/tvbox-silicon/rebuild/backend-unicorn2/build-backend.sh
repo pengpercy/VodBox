@@ -112,7 +112,14 @@ case "$RID" in
     ;;
   win-x64)
     # retained: windows_build.sh -> MinGW gcc, links the engine static archive by its MinGW name.
-    x86_64-w64-mingw32-gcc -m64 -o unicorn.dll -shared -O3 -static -DNDEBUG \
+    CC="${VODBOX_NATIVE_CC:-${CROSS_CC:-}}"
+    if [[ -z "$CC" ]]; then
+      CC="$(command -v x86_64-w64-mingw32-gcc || command -v gcc)"
+    fi
+    CC="${CC//\\//}"
+    [[ "$("$CC" -dumpmachine)" == "x86_64-w64-mingw32" ]] || {
+      echo "FATAL: $CC is not an x86_64 MinGW compiler" >&2; exit 1; }
+    "$CC" -m64 -o unicorn.dll -shared -O3 -static -DNDEBUG \
       -I "$ENGINE/include" "${BRIDGE_SRCS[@]}" \
       -I "$JAVA_INC" -I "$JAVA_PLATFORM_INC" -fPIC \
       "$ENGINE_A"
