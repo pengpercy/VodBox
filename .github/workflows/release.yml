@@ -138,7 +138,7 @@ jobs:
           jobs = json.loads(Path('artifacts/jobs.json').read_text())['jobs']
           for rid in rids:
               meta = json.loads((Path('artifacts/meta') / (rid + '.json')).read_text())
-              if meta.get('version') != os.environ['VERSION'] or meta.get('sourceSha') != os.environ['SOURCE_SHA']:
+              if meta.get('version') != os.environ['VERSION'] or meta.get('packageSourceSha', meta.get('sourceSha')) != os.environ['SOURCE_SHA']:
                   raise SystemExit('Package source/version mismatch: ' + rid)
               if not any(j['conclusion']=='success' and j['name'].startswith('package / ') and j['name'].endswith(', ' + rid + ')') for j in jobs):
                   raise SystemExit('Package job did not succeed: ' + rid)

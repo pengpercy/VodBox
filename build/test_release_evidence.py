@@ -722,6 +722,59 @@ class SixRidClosureTests(unittest.TestCase):
                                         expected_sha="abc", version="1.0.0")
 
 
+    def test_reused_binary_is_bound_to_package_target_and_original_inputs(self):
+        with tempfile.TemporaryDirectory(dir=ALMA) as directory:
+            root = pathlib.Path(directory)
+            rid = "osx-arm64"
+            archives = self._release(root, [rid])
+            meta = root / "meta"
+            meta.mkdir()
+            data = {"rid": rid, "version": "1.0.0", "sourceSha": "original",
+                    "packageSourceSha": "target", "fingerprint": "original-input",
+                    "originalFingerprint": "original-input", "nativeBuildHash": "native-input",
+                    "targetPackageInput": "target-input", "reused": True}
+            path = meta / f"{rid}.json"
+            path.write_text(json.dumps(data))
+            with unittest.mock.patch.object(evidence, "ensure_commit", return_value=True) as ensure, \
+                    unittest.mock.patch.object(evidence, "source_hash", side_effect=lambda sha: sha + "-input"), \
+                    unittest.mock.patch.object(evidence, "native_build_hash", return_value="native-input") as native:
+                result = evidence.verify_release([rid], archives, meta, "target", "1.0.0")
+                self.assertEqual(result["verdicts"][rid]["meta"]["sourceSha"], "original")
+                self.assertEqual(result["verdicts"][rid]["meta"]["packageSourceSha"], "target")
+                ensure.assert_has_calls([unittest.mock.call("original"), unittest.mock.call("target")])
+                native.assert_has_calls([unittest.mock.call("original"), unittest.mock.call("target")])
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "packageSourceSha"):
+                    evidence.verify_release([rid], archives, meta, "original", "1.0.0")
+                for field in ("fingerprint", "originalFingerprint", "nativeBuildHash", "targetPackageInput"):
+                    with self.subTest(field=field):
+                        path.write_text(json.dumps({**data, field: "forged"}))
+                        with self.assertRaisesRegex(evidence.ReleaseEvidenceError, field):
+                            evidence.verify_release([rid], archives, meta, "target", "1.0.0")
+                for field in ("fingerprint", "originalFingerprint", "nativeBuildHash"):
+                    with self.subTest(missing=field):
+                        path.write_text(json.dumps({key: value for key, value in data.items() if key != field}))
+                        with self.assertRaisesRegex(evidence.ReleaseEvidenceError, field):
+                            evidence.verify_release([rid], archives, meta, "target", "1.0.0")
+                path.write_text(json.dumps(data))
+                native.side_effect = lambda sha: sha + "-native"
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "native build inputs differ"):
+                    evidence.verify_release([rid], archives, meta, "target", "1.0.0")
+
+    def test_reused_metadata_refuses_unavailable_commits_and_git_errors(self):
+        data = {"sourceSha": "original", "packageSourceSha": "target",
+                "fingerprint": "input", "originalFingerprint": "input", "nativeBuildHash": "native"}
+        for unavailable in ("original", "target"):
+            with self.subTest(unavailable=unavailable), \
+                    unittest.mock.patch.object(evidence, "ensure_commit", side_effect=lambda sha: sha != unavailable), \
+                    unittest.mock.patch.object(evidence, "source_hash") as source:
+                with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "commit unavailable"):
+                    evidence.verify_metadata_source("osx-arm64", data)
+                source.assert_not_called()
+        with unittest.mock.patch.object(evidence, "ensure_commit", return_value=True), \
+                unittest.mock.patch.object(evidence, "source_hash", side_effect=OSError("git failed")):
+            with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "cannot verify package source inputs"):
+                evidence.verify_metadata_source("osx-arm64", data)
+
     def test_a_receipt_artifact_for_another_rid_is_refused(self):
         with tempfile.TemporaryDirectory(dir=ALMA) as directory:
             root = pathlib.Path(directory)

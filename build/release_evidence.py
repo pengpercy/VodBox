@@ -41,6 +41,7 @@ from collections import deque
 from pathlib import Path, PurePosixPath
 
 import native_coverage
+from ci_reuse import ensure_commit, native_build_hash, source_hash
 import rebuild_native_backend as rebuild
 
 # The six RIDs a release publishes, in the order the packaging matrix declares them. A release with
@@ -771,6 +772,33 @@ def verify_package_receipt(rid: str, archive: Path, directory: Path,
         raise ReleaseEvidenceError(f"{rid}: invalid package evidence receipt {path.name}: {error}") from error
 
 
+def verify_metadata_source(rid: str, data: dict) -> None:
+    """Recompute reuse provenance from the original and packaged Git input trees."""
+    actual = data.get("sourceSha")
+    target = data.get("packageSourceSha", actual)
+    cross_commit = target != actual
+    fields = ("fingerprint", "originalFingerprint", "nativeBuildHash", "targetPackageInput")
+    if not cross_commit and not any(field in data for field in fields):
+        return  # Legacy metadata for a package built from the same commit.
+    try:
+        for sha in dict.fromkeys((actual, target)):
+            if not isinstance(sha, str) or not sha or not ensure_commit(sha):
+                raise ReleaseEvidenceError(f"{rid}: build input commit unavailable: {sha!r}")
+        original = source_hash(actual)
+        for field in ("fingerprint", "originalFingerprint"):
+            if (cross_commit or field in data) and data.get(field) != original:
+                raise ReleaseEvidenceError(f"{rid}: {field} mismatch for original sourceSha")
+        native = native_build_hash(actual)
+        if native_build_hash(target) != native:
+            raise ReleaseEvidenceError(f"{rid}: native build inputs differ between sourceSha and packageSourceSha")
+        if (cross_commit or "nativeBuildHash" in data) and data.get("nativeBuildHash") != native:
+            raise ReleaseEvidenceError(f"{rid}: recorded nativeBuildHash mismatch")
+        if "targetPackageInput" in data and data["targetPackageInput"] != source_hash(target):
+            raise ReleaseEvidenceError(f"{rid}: targetPackageInput mismatch")
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ReleaseEvidenceError(f"{rid}: cannot verify package source inputs: {error}") from error
+
+
 def verify_meta(rid: str, meta: Path) -> dict:
     """The packaging job's own per-RID metadata, verified as a real file rather than a job token."""
     if not meta.is_file() or meta.stat().st_size == 0:
@@ -781,8 +809,10 @@ def verify_meta(rid: str, meta: Path) -> dict:
         raise ReleaseEvidenceError(f"{rid}: package metadata {meta} is not valid JSON: {error}") from error
     if data.get("rid") not in (None, rid):
         raise ReleaseEvidenceError(f"{rid}: {meta} is metadata for {data.get('rid')!r}")
+    verify_metadata_source(rid, data)
     return {"path": str(meta), "sha256": sha256_file(meta), "rid": data.get("rid"),
-            "version": data.get("version"), "sourceSha": data.get("sourceSha")}
+            "version": data.get("version"), "sourceSha": data.get("sourceSha"),
+            "packageSourceSha": data.get("packageSourceSha", data.get("sourceSha"))}
 
 
 def find_archives(rid: str, archives_dir: Path) -> list[Path]:
@@ -839,8 +869,8 @@ def verify_release(rids=None, archives_dir: Path = ARCHIVES_DIR, meta_dir: Path 
                     recorded = verdict.get("meta") or {}
                     if version and recorded.get("version") != version:
                         raise ReleaseEvidenceError(f"{rid}: package metadata version {recorded.get('version')!r} != {version}")
-                    if expected_sha and recorded.get("sourceSha") != expected_sha:
-                        raise ReleaseEvidenceError(f"{rid}: package metadata sourceSha {recorded.get('sourceSha')!r} != {expected_sha}")
+                    if expected_sha and recorded.get("packageSourceSha") != expected_sha:
+                        raise ReleaseEvidenceError(f"{rid}: package metadata packageSourceSha (legacy sourceSha) {recorded.get('packageSourceSha')!r} != {expected_sha}")
                     assets.append(verdict)
                 except ReleaseEvidenceError as error:
                     problems.append(f"{archive.name}: {error}")
