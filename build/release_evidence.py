@@ -66,7 +66,7 @@ JAVA_HOST_NOTICE_FILES = ("LICENSE-tvbox-silicon",)
 # The notice tree the bundle copies onto itself for the media kernel (bundle.copy_media_notices).
 MEDIA_NOTICES = (Path("licenses") / "media" / "asset.json",)
 # The JDK/Temurin license a bundled runtime must carry.
-JRE_NOTICES = ("LICENSE", "legal/java.base/LICENSE")
+JRE_NOTICES = ("LICENSE", "legal/java.base/LICENSE", "Contents/Home/LICENSE", "Contents/Home/legal/java.base/LICENSE")
 
 # Package extensions the packaging matrix produces (package.py / package.yml).
 ARCHIVE_SUFFIXES = (".zip", ".tar", ".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".dmg", ".deb", ".rpm")
@@ -273,19 +273,14 @@ def _extract_package(archive: Path, root: Path) -> None:
         finally:
             _command(["hdiutil", "detach", str(mount)])
         return
-    # Read each payload member through the available archive reader rather than extracting links.
+    # RPM is the remaining format. Convert once, preserving links for the TAR resolver above.
+    # bsdtar(1) documents @archive in create mode for conversion and --format=pax.
     reader = shutil.which("bsdtar")
     if reader is None:
         raise ReleaseEvidenceError(f"{archive.name}: no archive reader for {suffix}")
-    for name in _command([reader, "-tf", str(payload)]).decode().splitlines():
-        _member_path(root, name)
-        if not name.endswith("/"):
-            target = _member_path(root, name)
-            if target in seen:
-                raise ReleaseEvidenceError(f"duplicate package member {name!r}")
-            seen.add(target)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            _command_to_file([reader, "-xOf", str(payload), "--", name], target)
+    converted = root.parent / "rpm-payload.tar"
+    _command([reader, "--format=pax", "-cf", str(converted), "@" + str(payload)])
+    _extract_package(converted, root)
 
 
 @contextlib.contextmanager
@@ -394,7 +389,9 @@ def verify_licenses(rid: str, archive: Path, members: list[str]) -> dict:
     if missing:
         raise ReleaseEvidenceError(
             f"{rid}: {archive.name} does not retain the media notices {', '.join(sorted(missing))}")
-    jre_notice = next((m for m in members for name in JRE_NOTICES if m.endswith(name)), None)
+    prefix = package_java_host(members)
+    jre_notice = next((prefix + "jre/" + name for name in JRE_NOTICES
+                       if prefix and prefix + "jre/" + name in members), None)
     if jre_notice is None:
         raise ReleaseEvidenceError(
             f"{rid}: {archive.name} does not retain the bundled runtime's license "
@@ -509,14 +506,14 @@ def verify_packaged_evidence(rid: str, host: Path) -> dict:
     if pin.get("archive_sha256") != pinned["archive_sha256"] or \
             engine.get("source_archive_sha256") != pinned["archive_sha256"]:
         raise ReleaseEvidenceError(f"{rid}: packaged engine source does not match the pinned archive")
-    require_hash(_member_path(source, engine.get("source_archive", "")),
+    require_hash(_member_path(source, engine.get("source_archive", "").replace("\\", "/")),
                  engine.get("source_archive_sha256"), "engine source archive")
     u1_source = unicorn1["source_evidence"]
-    require_hash(_member_path(source, u1_source.get("archive", "")),
+    require_hash(_member_path(source, u1_source.get("archive", "").replace("\\", "/")),
                  u1_source.get("archive_sha256"), "unicorn source archive")
     bridge = backend["bridge"]
     bridge_path = rebuild.NATIVE_INPUTS.relative_to(rebuild.ROOT).as_posix()
-    if bridge.get("source_tree") != bridge_path:
+    if bridge.get("source_tree", "").replace("\\", "/") != bridge_path:
         raise ReleaseEvidenceError(f"{rid}: packaged bridge source tree does not match receipt")
     combined = hashlib.sha256()
     files = {}

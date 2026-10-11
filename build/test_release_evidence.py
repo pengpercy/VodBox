@@ -307,6 +307,78 @@ class RidVerdictTests(unittest.TestCase):
             verdict = evidence.verify_rid("osx-x64", archive)
         self.assertEqual(verdict["hostPrefix"], "VodBox.app/Contents/MacOS/JavaHost/")
 
+    def test_real_macos_resources_host_and_contents_home_jre_are_verified(self):
+        prefix = "VodBox.app/Contents/Resources/"
+        license_member = prefix + "JavaHost/jre/Contents/Home/legal/java.base/LICENSE"
+        for rid in ("osx-x64", "osx-arm64"):
+            with self.subTest(rid=rid), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                root = pathlib.Path(directory)
+                path = write_zip(root / f"VodBox.1.{rid}.zip", host_members(), prefix=prefix)
+                rewrite_zip(path, {
+                    prefix + "JavaHost/jre/bin/java": None,
+                    prefix + "JavaHost/jre/legal/java.base/LICENSE": None,
+                    prefix + "JavaHost/jre/Contents/Home/bin/java": b"runtime executable",
+                    license_member: b"runtime.*license",
+                })
+                verdict = evidence.verify_rid(rid, path)
+                self.assertEqual(verdict["hostPrefix"], prefix + "JavaHost/")
+                self.assertEqual(verdict["jreNotice"], license_member)
+                receipts = root / "receipts"
+                receipt_path = evidence.write_package_receipt(rid, path, receipts)
+                retained = evidence._read_package_receipt(receipt_path)["subset"]
+                self.assertIn(license_member, retained)
+                self.assertNotIn(prefix + "JavaHost/jre/Contents/Home/bin/java", retained)
+                self.assertEqual(evidence.verify_package_receipt(rid, path, receipts)["hostPrefix"],
+                                 prefix + "JavaHost/")
+                for data in (None, b"", b" \n"):
+                    with self.subTest(license_bytes=data):
+                        rewrite_zip(path, {license_member: data})
+                        with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "runtime.*license"):
+                            evidence.verify_rid(rid, path)
+
+    def test_windows_receipt_backslashes_bind_to_real_posix_source_members(self):
+        fields = (("backend", "engine", "source_archive"),
+                  ("unicorn1", "source_evidence", "archive"),
+                  ("backend", "bridge", "source_tree"))
+        for rid in ("win-x64", "win-arm64"):
+            for selected in (*[(field,) for field in fields], fields):
+                with self.subTest(rid=rid, fields=selected), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                    root = pathlib.Path(directory)
+                    path = write_zip(root / f"VodBox.1.{rid}.zip", host_members())
+                    receipt = receipt_for(rid)
+                    for section, detail, name in selected:
+                        receipt[section][detail][name] = receipt[section][detail][name].replace("/", "\\")
+                    rewrite_zip(path, {"JavaHost/native-backend-receipt.json": json.dumps(receipt).encode()})
+                    self.assertEqual(evidence.verify_rid(rid, path)["rid"], rid)
+                    receipts = root / "receipts"
+                    evidence.write_package_receipt(rid, path, receipts)
+                    self.assertEqual(evidence.verify_package_receipt(rid, path, receipts)["rid"], rid)
+                    section, detail, name = selected[0]
+                    source_member = "JavaHost/corresponding-source/" + receipt[section][detail][name].replace("\\", "/")
+                    if name == "source_tree":
+                        source_member += "/unicorn.c"
+                    rewrite_zip(path, {source_member: b"changed source"})
+                    with self.assertRaisesRegex(evidence.ReleaseEvidenceError, "source.*(hash|digest)"):
+                        evidence.verify_rid(rid, path)
+
+    def test_windows_receipt_normalization_still_refuses_absolute_and_escaping_paths(self):
+        fields = (("backend", "engine", "source_archive"),
+                  ("unicorn1", "source_evidence", "archive"),
+                  ("backend", "bridge", "source_tree"))
+        for rid in ("win-x64", "win-arm64"):
+            for section, detail, name in fields:
+                for spelling in ("/outside", "\\outside", "C:\\outside", "C:/outside",
+                                 "\\\\server\\share\\outside", "../outside", "..\\outside",
+                                 "safe/../../outside", "safe\\..\\..\\outside"):
+                    with self.subTest(rid=rid, field=name, path=spelling), tempfile.TemporaryDirectory(dir=ALMA) as directory:
+                        path = write_zip(pathlib.Path(directory) / f"VodBox.1.{rid}.zip", host_members())
+                        receipt = receipt_for(rid)
+                        receipt[section][detail][name] = spelling
+                        rewrite_zip(path, {"JavaHost/native-backend-receipt.json": json.dumps(receipt).encode()})
+                        expected = "source tree does not match" if name == "source_tree" else "unsafe package member"
+                        with self.assertRaisesRegex(evidence.ReleaseEvidenceError, expected):
+                            evidence.verify_rid(rid, path)
+
     def test_meta_is_verified_as_a_real_file(self):
         with tempfile.TemporaryDirectory(dir=ALMA) as directory:
             root = pathlib.Path(directory)
@@ -416,7 +488,7 @@ class RidVerdictTests(unittest.TestCase):
                 }
                 asset = write_linked_package(root / f"vodbox_1_linux-x64.{suffix}", fixture, links,
                                              {"opt/vodbox/lib/libmpv.so.2.0": b"real mpv bytes",
-                                              "opt/vodbox/JavaHost/jre/LICENSE": b"runtime license"})
+                                              "opt/vodbox/JavaHost/jre/LICENSE": b"runtime.*license"})
                 with evidence.extracted_package(asset) as payload:
                     for name in ("libmpv.so", "libmpv.so.2", "libmpv-hard.so"):
                         path = payload / "opt/vodbox" / name
@@ -500,6 +572,82 @@ class RidVerdictTests(unittest.TestCase):
                     archive.writestr(name, b"invalid")
                 with self.assertRaises(evidence.ReleaseEvidenceError):
                     evidence.verify_rid("osx-arm64", path)
+
+
+class RpmFallbackTests(unittest.TestCase):
+    """Model the documented bsdtar conversion; use real TAR bytes and the real resolver."""
+
+    def test_rpm_is_read_once_and_all_file_and_link_bytes_are_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            asset = root / "package.rpm"
+            asset.write_bytes(b"RPM fixture: conversion is mocked")
+            data = bytes(range(256)) * (evidence.COPY_CHUNK // 256 + 1) + b"\x00tail\xff"
+            files = {f"files/{index}": f"payload {index}".encode() for index in range(64)}
+            files["files/actual\nname"] = data
+            links = {
+                "alias": (tarfile.SYMTYPE, "files/actual\nname"),
+                "chain": (tarfile.SYMTYPE, "alias"),
+                "hard": (tarfile.LNKTYPE, "files/actual\nname"),
+            }
+
+            def convert(command, **kwargs):
+                converted = pathlib.Path(command[3])
+                self.assertEqual(converted.name, "rpm-payload.tar")
+                self.assertEqual(command, ["bsdtar", "--format=pax", "-cf",
+                                           str(converted), "@" + str(asset)])
+                with tarfile.open(command[3], "w", format=tarfile.PAX_FORMAT) as output:
+                    for name, (kind, target) in links.items():
+                        info = tarfile.TarInfo(name)
+                        info.type, info.linkname = kind, target
+                        output.addfile(info)
+                    for name, content in files.items():
+                        info = tarfile.TarInfo(name)
+                        info.size = len(content)
+                        output.addfile(info, io.BytesIO(content))
+                return evidence.subprocess.CompletedProcess(command, 0, b"", b"")
+
+            with unittest.mock.patch.object(evidence.shutil, "which", return_value="bsdtar"), \
+                    unittest.mock.patch.object(evidence.subprocess, "run", side_effect=convert) as run:
+                with evidence.extracted_package(asset) as payload:
+                    actual = {path.relative_to(payload).as_posix(): path.read_bytes()
+                              for path in payload.rglob("*") if path.is_file()}
+                    self.assertEqual(actual, {**files, **{name: data for name in links}})
+                    self.assertFalse(any(path.is_symlink() for path in payload.rglob("*")))
+                run.assert_called_once()
+                self.assertEqual(run.call_args.args[0][-1], "@" + str(asset))
+            self.assertEqual(list(root.iterdir()), [asset])
+
+    def test_rpm_conversion_still_refuses_unsafe_members_and_links(self):
+        cases = [
+            ("../outside", tarfile.REGTYPE, ""),
+            ("/outside", tarfile.REGTYPE, ""),
+            ("alias", tarfile.SYMTYPE, "/outside"),
+            ("alias", tarfile.SYMTYPE, "../outside"),
+            ("alias", tarfile.SYMTYPE, "missing"),
+            ("alias", tarfile.SYMTYPE, "alias"),
+            ("alias", tarfile.LNKTYPE, "../outside"),
+        ]
+        for name, kind, target in cases:
+            with self.subTest(member=name, target=target), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                asset = root / "package.rpm"
+                asset.write_bytes(b"RPM fixture: conversion is mocked")
+
+                def convert(command, **kwargs):
+                    with tarfile.open(command[3], "w", format=tarfile.PAX_FORMAT) as output:
+                        info = tarfile.TarInfo(name)
+                        info.type, info.linkname = kind, target
+                        output.addfile(info)
+                    return evidence.subprocess.CompletedProcess(command, 0, b"", b"")
+
+                with unittest.mock.patch.object(evidence.shutil, "which", return_value="bsdtar"), \
+                        unittest.mock.patch.object(evidence.subprocess, "run", side_effect=convert) as run:
+                    with self.assertRaises(evidence.ReleaseEvidenceError):
+                        with evidence.extracted_package(asset):
+                            self.fail("unsafe RPM payload was accepted")
+                    run.assert_called_once()
+                self.assertEqual(list(root.iterdir()), [asset])
 
 
 class SixRidClosureTests(unittest.TestCase):
