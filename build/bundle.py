@@ -190,10 +190,10 @@ def build_windows_vulkan(rid: str) -> Path:
     loader = next((directory / "loader").iterdir())
     arch = "ARM64" if rid == "win-arm64" else "x64"
     headers_install = directory / "headers-install"
-    run("cmake", "-S", headers, "-B", directory / "headers-build", "-A", arch,
+    run("cmake", "-S", headers, "-B", directory / "headers-build", "-G", "Visual Studio 17 2022", "-A", arch,
         f"-DCMAKE_INSTALL_PREFIX={headers_install}")
     run("cmake", "--install", directory / "headers-build", "--config", "Release")
-    run("cmake", "-S", loader, "-B", directory / "loader-build", "-A", arch,
+    run("cmake", "-S", loader, "-B", directory / "loader-build", "-G", "Visual Studio 17 2022", "-A", arch,
         f"-DCMAKE_PREFIX_PATH={headers_install}", f"-DCMAKE_INSTALL_PREFIX={installed}",
         "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded", "-DBUILD_TESTS=OFF", "-DLOADER_CODEGEN=OFF")
     run("cmake", "--build", directory / "loader-build", "--config", "Release", "--parallel", "2")

@@ -186,6 +186,11 @@ def _run(command: list[str], *, cwd: Path | None = None, env: dict | None = None
     merged = dict(os.environ)
     if env:
         merged.update(env)
+    if merged.get("VODBOX_NATIVE_CC"):
+        tools = [str(Path(merged["VODBOX_NATIVE_CC"]).parent)]
+        if merged.get("VODBOX_NATIVE_BASH"):
+            tools.append(str(Path(merged["VODBOX_NATIVE_BASH"]).parent))
+        merged["PATH"] = os.pathsep.join(tools + [merged.get("PATH", "")])
     print("+ " + " ".join(command), flush=True)
     subprocess.run(command, cwd=str(cwd) if cwd else None, env=merged, check=True)
 

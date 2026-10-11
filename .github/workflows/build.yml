@@ -105,8 +105,6 @@ jobs:
           echo "VODBOX_ENGINE_MAKE=$(cygpath -m "$(command -v ninja)")" >> "$GITHUB_ENV"
           echo "VODBOX_ENGINE_GENERATOR=Ninja" >> "$GITHUB_ENV"
           echo "VODBOX_NATIVE_BASH=$(cygpath -m /usr/bin/bash.exe)" >> "$GITHUB_ENV"
-          cygpath -m /mingw64/bin >> "$GITHUB_PATH"
-          cygpath -m /usr/bin >> "$GITHUB_PATH"
           printf 'int main(void){return 0;}\n' > "$RUNNER_TEMP/native-probe.c"
           gcc "$RUNNER_TEMP/native-probe.c" -o "$RUNNER_TEMP/native-probe.exe"
           "$RUNNER_TEMP/native-probe.exe"
