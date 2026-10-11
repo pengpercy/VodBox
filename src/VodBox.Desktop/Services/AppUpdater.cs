@@ -8,7 +8,8 @@ using System.Text.RegularExpressions;
 
 namespace VodBox.Desktop.Services;
 
-public sealed record UpdateOffer(string Version, string Name, Uri Url, string Sha256, string ReleaseUrl);
+public sealed record UpdateOffer(string Version, string Name, Uri Url, string Sha256, string ReleaseUrl, string ReleaseNotes = "", long SizeBytes = 0);
+public sealed record UpdateDownloadProgress(long BytesReceived, long? TotalBytes, bool IsVerifying = false);
 
 /// <summary>Release discovery, verified staging and detached replacement. No replacement occurs before explicit UI consent.</summary>
 public static class AppUpdater
@@ -68,9 +69,10 @@ public static class AppUpdater
         var linux = rid.StartsWith("linux-", StringComparison.Ordinal);
         var name = linux ? $"vodbox_{tag}_{rid}.{linuxPackage}" : $"VodBox_{tag}.{rid}.zip";
         var releaseUrl = release.GetProperty("html_url").GetString() ?? "";
+        var notes = release.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String ? body.GetString() ?? "" : "";
         if (!ValidGithubUrl(releaseUrl, $"/pengpercy/VodBox/releases/tag/{releaseTag}")) return null;
         if (linux && linuxPackage is not ("deb" or "rpm"))
-            return new UpdateOffer(tag!, "", new Uri(releaseUrl), "", releaseUrl);
+            return new UpdateOffer(tag!, "", new Uri(releaseUrl), "", releaseUrl, notes);
         foreach (var asset in release.GetProperty("assets").EnumerateArray())
         {
             if (asset.GetProperty("name").GetString() != name) continue;
@@ -78,9 +80,10 @@ public static class AppUpdater
             var address = asset.GetProperty("browser_download_url").GetString();
             if (digest is null || !Regex.IsMatch(digest, "^sha256:[a-fA-F0-9]{64}$") ||
                 !ValidGithubUrl(address, $"/pengpercy/VodBox/releases/download/{releaseTag}/{name}")) return null;
-            return new UpdateOffer(tag!, name, new Uri(address!), digest[7..].ToLowerInvariant(), releaseUrl);
+            var size = asset.TryGetProperty("size", out var sizeValue) && sizeValue.ValueKind == JsonValueKind.Number && sizeValue.TryGetInt64(out var bytes) && bytes > 0 ? bytes : 0;
+            return new UpdateOffer(tag!, name, new Uri(address!), digest[7..].ToLowerInvariant(), releaseUrl, notes, size);
         }
-        return linux ? new UpdateOffer(tag!, "", new Uri(releaseUrl), "", releaseUrl) : null;
+        return linux ? new UpdateOffer(tag!, "", new Uri(releaseUrl), "", releaseUrl, notes) : null;
     }
 
     private static bool ValidGithubUrl(string? address, string expectedPath) =>
@@ -100,13 +103,15 @@ public static class AppUpdater
         return Select(document.RootElement, currentVersion, Rid, OperatingSystem.IsLinux() ? InstalledLinuxPackage() : null);
     }
 
-    public static async Task<string> DownloadAsync(UpdateOffer offer, string cache, CancellationToken cancellationToken, IProgress<long>? progress = null)
+    public static async Task<string> DownloadAsync(UpdateOffer offer, string cache, CancellationToken cancellationToken, IProgress<UpdateDownloadProgress>? progress = null)
     {
         Directory.CreateDirectory(cache);
         // A fixed, internal filename prevents asset names from controlling filesystem paths.
         var path = Path.Combine(cache, "update.zip");
         if (File.Exists(path))
         {
+            var cachedBytes = new FileInfo(path).Length;
+            progress?.Report(new UpdateDownloadProgress(cachedBytes, cachedBytes, true));
             if (await MatchesAsync(path, offer.Sha256, cancellationToken)) return path;
             File.Delete(path);
         }
@@ -116,18 +121,23 @@ public static class AppUpdater
             using var response = await Client.GetAsync(offer.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
             if (response.Content.Headers.ContentLength > MaxArchiveBytes) throw new InvalidDataException("更新包过大。");
+            var expectedBytes = response.Content.Headers.ContentLength is > 0 ? response.Content.Headers.ContentLength
+                : offer.SizeBytes > 0 ? offer.SizeBytes : (long?)null;
+            progress?.Report(new UpdateDownloadProgress(0, expectedBytes));
+            long total = 0;
             await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
             await using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                var buffer = new byte[81920]; long total = 0; int read;
+                var buffer = new byte[81920]; int read;
                 while ((read = await input.ReadAsync(buffer, cancellationToken)) != 0)
                 {
                     total += read;
                     if (total > MaxArchiveBytes) throw new InvalidDataException("更新包过大。");
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    progress?.Report(total);
+                    progress?.Report(new UpdateDownloadProgress(total, expectedBytes));
                 }
             }
+            progress?.Report(new UpdateDownloadProgress(total, expectedBytes, true));
             if (!await MatchesAsync(partial, offer.Sha256, cancellationToken)) throw new InvalidDataException("更新包 SHA256 校验失败。");
             File.Move(partial, path, true);
             return path;

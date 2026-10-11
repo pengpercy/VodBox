@@ -12,4 +12,12 @@
     <!-- drpy 依赖库随包分发（模块加载器按 assets://js/... 解析） -->
     <Content Include="Assets/js/**/*.js" CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="JavaHost/host.jar;JavaHost/upstream-runtime.json;JavaHost/deps/*.jar;JavaHost/LICENSE-tvbox-silicon" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <Content Include="JavaHost/corresponding-source/**/*" CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- JAR 宿主适配器的构造与内部协议类型对测试可见（离线驱动假通道，不启动 JVM）。 -->
+    <InternalsVisibleTo Include="VodBox.Tests" />
+  </ItemGroup>
 </Project>

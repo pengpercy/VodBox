@@ -554,6 +554,22 @@ public partial class PlayerOverlay : UserControl
             parsers.ItemsSource = options;
             menu.Items.Add(parsers);
         }
+        if (vm.AddressChoices.Count > 1)
+        {
+            var addresses = new MenuItem { Header = "线路地址" };
+            var options = new List<MenuItem>();
+            var session = vm.CurrentSessionId;
+            for (var index = 0; index < vm.AddressChoices.Count; index++)
+            {
+                var target = index;
+                var choice = vm.AddressChoices[index];
+                var option = new MenuItem { Header = (vm.AddressChoiceIndex == target ? "当前 · " : "") + choice.Name };
+                option.Click += async (_, _) => { if (session == vm.CurrentSessionId) await vm.SelectAddressAsync(target); };
+                options.Add(option);
+            }
+            addresses.ItemsSource = options;
+            menu.Items.Add(addresses);
+        }
         foreach (var opening in new[] { true, false })
         {
             var group = new MenuItem { Header = opening ? "跳过片头" : "跳过片尾" };

@@ -1,0 +1,38 @@
+[
+  {
+    "archive": "unidbg-c4ced05858a7878f3c68f6df465ae02fa59f6759.tar.gz",
+    "sha256": "35c6a5a45870175fcfee7361f533a2ae321f9371ef556e6e9077383f513754e7",
+    "parts": [
+      {
+        "file": "unidbg-c4ced05858a7878f3c68f6df465ae02fa59f6759.tar.gz.part000",
+        "sha256": "7b9a205dbc668f1df138c6dfee62528c243136dc1f4e2ad4e4f33eceb0a439a2"
+      },
+      {
+        "file": "unidbg-c4ced05858a7878f3c68f6df465ae02fa59f6759.tar.gz.part001",
+        "sha256": "067ceae4b6aba4a20d5370f1b3a7f622518664d0cc91035e2e2da02dad335b33"
+      },
+      {
+        "file": "unidbg-c4ced05858a7878f3c68f6df465ae02fa59f6759.tar.gz.part002",
+        "sha256": "ac4f9129108db24e950248ff5d3614eb8ac3cbef4fb3dfc3fd8c9348b5644587"
+      }
+    ]
+  },
+  {
+    "archive": "jna-8230fd9c023246e331601690a2afb82f37e6d4b6.tar.gz",
+    "sha256": "e24711d22163b7f49f79065ee49c2db75d59a734dde98a01bed9106f603017a6",
+    "parts": [
+      {
+        "file": "jna-8230fd9c023246e331601690a2afb82f37e6d4b6.tar.gz.part000",
+        "sha256": "a92c033fd688c552f1613bf3ab25092d0b082cf40821ffd0c0eff8dcb2a131c3"
+      },
+      {
+        "file": "jna-8230fd9c023246e331601690a2afb82f37e6d4b6.tar.gz.part001",
+        "sha256": "094da403acdc06de05404996a172b6014749e954e23229836734758e028294a6"
+      },
+      {
+        "file": "jna-8230fd9c023246e331601690a2afb82f37e6d4b6.tar.gz.part002",
+        "sha256": "a491d24d0b767003a8209df62fbcedfdff4125288d89283aaea4b02d0c967b5f"
+      }
+    ]
+  }
+]

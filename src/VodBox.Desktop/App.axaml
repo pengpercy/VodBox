@@ -11,6 +11,8 @@
       </ResourceDictionary.MergedDictionaries>
       <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
       <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
+      <!-- 海报角标（时长/备注）文字：中性灰，压在半透明黑底上必须保持亮色，因此不跟随亮/暗主题翻转。 -->
+      <SolidColorBrush x:Key="PosterBadgeTextBrush" Color="#D0D0D0" />
       <SolidColorBrush x:Key="AccentStrongBrush" Color="#0078D4" />
       <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
       <SolidColorBrush x:Key="WarnBrush" Color="#FFB900" />

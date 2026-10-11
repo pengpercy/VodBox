@@ -7,9 +7,7 @@
         x:Class="VodBox.Desktop.Views.SettingsWindow" x:DataType="vm:SettingsWindowViewModel"
         Title="设置 — VodBox" Icon="/Assets/Icons/linux/256/vodbox.png"
         Width="940" Height="680" MinWidth="760" MaxWidth="1000" MinHeight="560" MaxHeight="1000"
-        TransparencyLevelHint="Mica,AcrylicBlur,Blur"
-        TransparencyBackgroundFallback="{DynamicResource PageBackgroundBrush}"
-        Background="Transparent"
+        Background="{DynamicResource PageBackgroundBrush}"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="44"
         WindowDecorations="Full"
@@ -38,13 +36,7 @@
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
-    <Style Selector="TextBlock.rowSubtitle">
-      <Setter Property="FontSize" Value="11.5" />
-      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="MaxWidth" Value="420" />
-      <Setter Property="Margin" Value="0,3,0,0" />
-    </Style>
+    <!-- 副标题统一使用 Resources/SettingsCardStyles.axaml 的 rowSubtitle 样式。 -->
     <!-- 行间分隔线：1px StrokeBrush，左缩进 46（16 padding + 18 图标 + 12 gap） -->
     <Style Selector="Border.rowSep">
       <Setter Property="Height" Value="1" />
@@ -106,8 +98,9 @@
   </Window.Styles>
 
   <Panel>
-    <!-- 左栏半透明着色，让窗口材质透出（对齐 MainWindow.SidebarBackdrop） -->
-    <Rectangle Fill="{DynamicResource PageBackgroundBrush}" Opacity="0.40"
+    <!-- 左栏（侧边菜单）用主题底色不透明铺满：设置窗口不使用 Mica/Acrylic 毛玻璃，
+         否则导航区的文字对比度会随桌面壁纸变化。右栏同样是不透明底，两栏只靠分隔线区分。 -->
+    <Rectangle Fill="{DynamicResource PageBackgroundBrush}"
                Width="216" HorizontalAlignment="Left" VerticalAlignment="Stretch" IsHitTestVisible="False" />
 
     <Grid RowDefinitions="44,*" ColumnDefinitions="216,*"
@@ -247,7 +240,7 @@
                     <DataTemplate>
                       <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,8" Background="#0AFFFFFF">
                         <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"
-                                   MaxWidth="300" VerticalAlignment="Center" />
+                                   MaxWidth="300" HorizontalAlignment="Left" VerticalAlignment="Center" />
                         <Border Grid.Column="1" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
                                 Padding="7,1" VerticalAlignment="Center" Margin="0,0,8,0"
                                 IsVisible="{Binding Current}">

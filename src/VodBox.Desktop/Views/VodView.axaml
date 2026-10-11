@@ -8,49 +8,67 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
-  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" DataContext="{Binding Vod}" Margin="28,12,28,20">
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" DataContext="{Binding Vod}" Margin="28,12,0,20">
 
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,14">
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,28,14">
       <TextBlock Text="点播" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
       <!-- 当前站点（下拉换源）+ 可用站点计数，对齐设计稿 p-vod -->
-      <Button CornerRadius="{DynamicResource AppControlCornerRadius}" Background="#264CC2FF" Foreground="#4CC2FF"
+      <Button x:Name="SourceSelector" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="#264CC2FF" Foreground="#4CC2FF"
               BorderBrush="#4CC2FF" BorderThickness="1" Padding="14,5" Click="OnSwitchSource" Cursor="Hand">
+        <!-- 站点弹层固定在控件下方展开（不放鼠标点位）；长站名固定宽度省略号 + 中性色，不跟随按钮的主题蓝。 -->
+        <Button.ContextMenu>
+          <ContextMenu x:Name="SourceMenu" Placement="BottomEdgeAlignedLeft">
+            <ContextMenu.Styles>
+              <Style Selector="MenuItem">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+              </Style>
+              <Style Selector="MenuItem TextBlock">
+                <Setter Property="Width" Value="180" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+              </Style>
+            </ContextMenu.Styles>
+          </ContextMenu>
+        </Button.ContextMenu>
         <StackPanel Orientation="Horizontal" Spacing="6">
           <PathIcon Data="{StaticResource Icon.Broadcast}" Width="18" Height="18" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding SourceName}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding SourceName}" Width="150" TextTrimming="CharacterEllipsis"
+                     Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
           <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
       <TextBlock Text="{Binding SourceCountLabel}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Opacity="0.75" />
-      <Panel HorizontalAlignment="Right" />
-      <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
-        <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="#264CC2FF" Padding="10,4">
-          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#4CC2FF">
-            <PathIcon Data="{StaticResource Icon.ViewGrid}" Width="18" Height="18" VerticalAlignment="Center" />
-            <TextBlock Text="网格" FontSize="11.5" VerticalAlignment="Center" />
-          </StackPanel>
-        </Border>
-        <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardHoverBrush}" Padding="10,4">
-          <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextTertiaryBrush}">
-            <PathIcon Data="{StaticResource Icon.ViewList}" Width="18" Height="18" VerticalAlignment="Center" />
-            <TextBlock Text="列表" FontSize="11.5" VerticalAlignment="Center" />
-          </StackPanel>
-        </Border>
-      </StackPanel>
+
+      <!-- 跨站点搜索：聚合「启用搜索 + 实际注册」的全部站点；清空关键词即回到当前站点浏览 -->
+      <Grid Width="250" Height="32" VerticalAlignment="Center">
+        <TextBox x:Name="VodSearchBox" Text="{Binding Keyword}" PlaceholderText="搜索全部站点…" Height="32"
+                 CornerRadius="{DynamicResource AppControlCornerRadius}" FontSize="12.5" Padding="30,0,10,0"
+                 VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" />
+        <PathIcon Data="{StaticResource Icon.Search}" Width="14" Height="14" Margin="10,0,0,0"
+                  HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
+      </Grid>
+      <Button Command="{Binding RunSearchCommand}" ToolTip.Tip="搜索全部站点" Height="32" Padding="12,0"
+              CornerRadius="{DynamicResource AppControlCornerRadius}" Background="#0078D4" Foreground="White"
+              BorderThickness="0" FontSize="12.5" FontWeight="SemiBold" Cursor="Hand">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" VerticalAlignment="Center" />
+          <TextBlock Text="搜索" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+      <TextBlock Text="{Binding SearchSummary}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}"
+                 VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" IsVisible="{Binding SearchMode}" />
     </StackPanel>
 
-    <!-- 不向运行时展示不可点击的假筛选值；动态筛选协议待接。 -->
-    <StackPanel Grid.Row="1" Spacing="8">
+    <!-- 不向运行时展示不可点击的假筛选值；动态筛选协议待接。搜索结果视图下让位给结果网格。 -->
+    <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,28,0" IsVisible="{Binding !SearchMode}">
     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12" IsVisible="{Binding SupportsBasicFilters}">
       <TextBox Text="{Binding FilterClass}" PlaceholderText="类型" Width="120" />
       <TextBox Text="{Binding FilterArea}" PlaceholderText="地区" Width="120" />
       <TextBox Text="{Binding FilterYear}" PlaceholderText="年份" Width="100" />
       <TextBox Text="{Binding FilterLanguage}" PlaceholderText="语言" Width="120" />
       <Button Content="筛选" Command="{Binding ApplyFiltersCommand}" />
-      <Button Content="清空" Command="{Binding ClearFiltersCommand}" />
     </StackPanel>
 
-      <Button Content="重置筛选" Command="{Binding ClearFiltersCommand}" HorizontalAlignment="Left" />
       <ItemsControl ItemsSource="{Binding DynamicFilters}"><ItemsControl.ItemTemplate><DataTemplate>
         <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
           <ItemsControl ItemsSource="{Binding Values}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -60,8 +78,10 @@
       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
     </StackPanel>
 
-    <!-- 分类 Tab（来自当前站点 Class 列表，横向滚动） -->
-    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Hidden" Margin="0,0,0,12">
+    <!-- 分类 Tab（来自当前站点 Class 列表，横向滚动）；搜索时隐藏（结果是跨站点的，不属于任一分类）。
+         分类通常多于一行放不下的宽度，显示实际横向滚动条让「可以横滑」可见、可拖。 -->
+    <ScrollViewer x:Name="CategoryStrip" Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,28,12"
+                  IsVisible="{Binding !SearchMode}">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <ItemsControl ItemsSource="{Binding Categories}">
           <ItemsControl.ItemsPanel>
@@ -82,21 +102,24 @@
     </ScrollViewer>
 
     <!-- 海报网格：分块行 + ListBox 虚拟化（数据量大时只实例化可见行）。
-         加载态与网格同格叠加：首屏/切分类显示骨架，翻页只加底部加载条，都不清空已有内容。 -->
+         行内用 UniformGrid 按当前列数均分宽度——列宽随宿主宽度自适应，末端不会再留下
+         「最后一列到右滚动条」的大块空白（这是从海报行列布局定位修复，不是给内容加右内边距把滚动条贴右）。
+         页面内容整体右留白 28 让行不压在滚动条下；滚动到底由代码追加下一页。
+         每行末尾追加时只改动末行集合，保留滚动位置、只实例化可见行。 -->
     <Panel Grid.Row="3" x:Name="GridHost">
     <ListBox x:Name="PosterList" Classes="virtualRows" ItemsSource="{Binding Rows}" IsVisible="{Binding !Loading}" Background="Transparent" BorderThickness="0"
              Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,28,0">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" />
+                <UniformGrid Rows="1" Columns="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.Columns}" />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <StackPanel Width="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterWidth}" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
+                <StackPanel HorizontalAlignment="Stretch" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}">
               <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterHeight}" Background="#274064" ClipToBounds="True">
                 <Panel>
                   <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -111,6 +134,11 @@
               <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                 <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" /><Run Text=" · " /><Run Text="{Binding TypeName}" />
               </TextBlock>
+              <!-- 每张卡片都标出来源站点：聚合搜索结果是跨站点的（浏览内容无来源行时自动隐藏）。 -->
+              <TextBlock FontSize="10.5" Foreground="#4CC2FF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                         IsVisible="{Binding SourceName, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}">
+                <Run Text="来源：" /><Run Text="{Binding SourceName}" />
+              </TextBlock>
                 </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -119,18 +147,19 @@
       </ListBox.ItemTemplate>
     </ListBox>
 
-    <!-- 首屏 / 切分类骨架：按当前列数与海报尺寸铺占位卡，避免加载期间白屏 -->
+    <!-- 首屏 / 切分类骨架：按当前列数与海报尺寸铺占位卡，避免加载期间白屏。
+         与网格用同一套 UniformGrid 列布局，加载前后不会跳列、也不会在右侧留空白。 -->
     <ScrollViewer IsVisible="{Binding Loading}" HorizontalScrollBarVisibility="Disabled">
-    <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding Loading}">
+    <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding Loading}" Margin="0,0,28,0">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
-          <WrapPanel />
+          <UniformGrid Columns="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.Columns}" />
         </ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
         <DataTemplate>
-          <StackPanel Width="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterWidth}" Margin="0,0,18,18">
-            <Border Classes="skeleton poster" Height="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterHeight}" />
+          <StackPanel HorizontalAlignment="Stretch" Margin="0,0,18,18">
+            <Border Classes="skeleton poster" HorizontalAlignment="Stretch" Height="{Binding $parent[views:VodView].((vm:MainViewModel)DataContext).Vod.PosterHeight}" />
             <Border Classes="skeleton" Height="13" Width="112" Margin="0,8,0,0" HorizontalAlignment="Left" />
             <Border Classes="skeleton" Height="11" Width="78" Margin="0,2,0,0" HorizontalAlignment="Left" />
           </StackPanel>
@@ -139,15 +168,6 @@
     </ItemsControl>
     </ScrollViewer>
 
-    <!-- 翻页：保留当前页，只在左下角提示进度（与直播页一致的加载条样式） -->
-    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="{DynamicResource AppPanelCornerRadius}" Padding="12,8" Margin="0,0,12,12"
-            HorizontalAlignment="Left" VerticalAlignment="Bottom" IsVisible="{Binding Paging}">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <ProgressBar IsIndeterminate="True" Width="34" Height="4" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding Page, StringFormat='正在加载第 {0} 页…'}" FontSize="12" />
-      </StackPanel>
-    </Border>
-
     <!-- 空态 / 错误态：非空文案覆盖网格位置 -->
     <TextBlock Text="{Binding ItemsHint}" Margin="0,4" FontSize="12.5" TextWrapping="Wrap"
                HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -155,21 +175,17 @@
                IsVisible="{Binding ItemsHint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
     </Panel>
 
-    <!-- 分页 -->
-    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,16,0,0">
-      <Button Command="{Binding PrevPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="上一页" Width="30" Height="30" CornerRadius="{DynamicResource AppControlCornerRadius}"
-              Background="{DynamicResource CardHoverBrush}" BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Padding="0">
-        <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="18" Height="18" />
-      </Button>
-      <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="#264CC2FF" Width="30" Height="30">
-        <TextBlock Text="{Binding Page}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#4CC2FF" FontSize="12.5" />
-      </Border>
-      <TextBlock Text=" / " Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-      <TextBlock Text="{Binding PageCount}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-      <Button Command="{Binding NextPageCommand}" IsEnabled="{Binding !Paging}" ToolTip.Tip="下一页" Width="30" Height="30" CornerRadius="{DynamicResource AppControlCornerRadius}"
-              Background="{DynamicResource CardHoverBrush}" BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Padding="0">
-        <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="18" Height="18" />
-      </Button>
-    </StackPanel>
+    <!-- 无限滚动页脚：明确区分「加载中 / 已到底 / 失败可重试」，不留静默空白。
+         放在网格下方独立一行（隐藏时零高度，不盖住卡片）；重试复用同一条 append 路径。 -->
+    <Border Grid.Row="4" Background="{DynamicResource SurfaceBrush}" CornerRadius="{DynamicResource AppPanelCornerRadius}"
+            Padding="14,8" Margin="0,12,28,0" HorizontalAlignment="Center" IsVisible="{Binding FooterVisible}">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <ProgressBar IsIndeterminate="True" Width="34" Height="4" VerticalAlignment="Center" IsVisible="{Binding FooterLoading}" />
+        <TextBlock Text="{Binding FooterText}" FontSize="12" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="360" />
+        <Button Content="重试" Command="{Binding RetryFooterCommand}" IsVisible="{Binding FooterCanRetry}" Padding="10,2"
+                CornerRadius="{DynamicResource AppControlCornerRadius}" />
+      </StackPanel>
+    </Border>
   </Grid>
 </UserControl>

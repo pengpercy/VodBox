@@ -1,0 +1,9 @@
+{
+  "url": "https://raw.githubusercontent.com/bcgit/bc-java/ada71e4cf20c990e045a57ee1d42378d84050e03/LICENSE.html",
+  "tag": "r1rv78v1",
+  "commit": "ada71e4cf20c990e045a57ee1d42378d84050e03",
+  "path": "upstream/LICENSE.html",
+  "sha256": "edbbb10380b1271998b867a2e36b1cbee226e03d438726e1a91f80c5dde11849",
+  "embedded_license": "LICENSE-extracted-constant-pool.txt",
+  "method": "UTF8 constant-pool extraction from actual runtime JAR; no class execution"
+}

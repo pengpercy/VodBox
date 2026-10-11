@@ -248,10 +248,13 @@ public static class DesignData
         foreach (var s in sites)
         {
             var site = new SearchSiteResult(s.name, s.key) { Loading = s.loading };
-            foreach (var item in Items(Math.Min(s.count, 6))) site.Items.Add(item);
+            foreach (var item in Items(Math.Min(s.count, 6))) site.Items.Add(item with { SourceName = s.name });
             main.Search.SiteResults.Add(site);
         }
-        foreach (var item in Items(10)) main.Search.AllResults.Add(item);
+        // 设计预览也带来源站点名：卡片上的「来源」行在预览里要能看到。
+        var designIndex = 0;
+        foreach (var item in Items(10))
+            main.Search.AllResults.Add(item with { SourceName = sites[designIndex++ % sites.Length].name });
         // 分块行（5 张/行）
         for (var i = 0; i < main.Search.AllResults.Count; i += 5)
             main.Search.ResultRows.Add(new ResultRow(main.Search.AllResults.Skip(i).Take(5).ToList()));

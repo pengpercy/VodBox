@@ -8,8 +8,8 @@
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
 
-  <ScrollViewer Padding="28,12,28,28">
-    <Panel>
+  <ScrollViewer Padding="0" HorizontalScrollBarVisibility="Disabled">
+    <Panel Margin="28,12,28,28">
     <!-- 详情骨架：加载中占位（海报 + 元信息 + 线路 + 选集），避免整页白屏 -->
     <StackPanel Spacing="22" IsVisible="{Binding Detail.ShowSkeleton}">
       <Grid ColumnDefinitions="200,36,*,28,280">

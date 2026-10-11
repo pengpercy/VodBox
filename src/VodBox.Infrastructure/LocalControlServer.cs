@@ -25,6 +25,10 @@ public sealed class LocalControlServer : IAsyncDisposable
     private readonly string? _uploadDirectory;
     private readonly int _maxUploadBytes;
     private readonly SemaphoreSlim _uploads=new(1,1);
+    // 仅媒体代理的独立回环监听：遥控服务器未启动时，播放带 Cookie/Authorization 等头的媒体仍需要它。
+    private WebApplication? _mediaApp;
+    private string? _mediaAddress;
+    private readonly SemaphoreSlim _mediaLifecycle=new(1,1);
     public LocalControlServer(string? uploadDirectory=null,int maxUploadBytes=64*1024*1024)
     {
         _uploadDirectory=uploadDirectory;_maxUploadBytes=Math.Clamp(maxUploadBytes,1,64*1024*1024);
@@ -108,23 +112,7 @@ public sealed class LocalControlServer : IAsyncDisposable
             context.Response.Cookies.Delete("vodbox-session",new CookieOptions{Path="/",SameSite=SameSiteMode.Strict,HttpOnly=true});
             context.Response.StatusCode=204;return Task.CompletedTask;
         });
-        app.MapGet("/proxy/{id}", async (HttpContext context) =>
-        {
-            try { await Proxy.ServeAsync(context); }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
-            catch (Exception error) when (error is HttpRequestException or InvalidDataException or NotSupportedException or System.Xml.XmlException or UriFormatException or TaskCanceledException)
-            {
-                if (!context.Response.HasStarted) { context.Response.Clear(); context.Response.StatusCode = 502; }
-                else context.Abort();
-            }
-        });
-        app.MapGet("/cache/{id}",async(HttpContext context)=>
-        {
-            try { await Proxy.ServeCachedAsync(context); }
-            catch(OperationCanceledException)when(context.RequestAborted.IsCancellationRequested){}
-            catch(Exception error)when(error is HttpRequestException or InvalidDataException or IOException or TaskCanceledException)
-            {if(!context.Response.HasStarted){context.Response.Clear();context.Response.StatusCode=502;}else context.Abort();}
-        });
+        MapProxyRoutes(app);
         app.MapGet("/", async context =>
         {
             context.Response.ContentType = "text/html; charset=utf-8";
@@ -225,12 +213,84 @@ public sealed class LocalControlServer : IAsyncDisposable
         finally { _lifecycle.Release(); }
     }
 
+    /// <summary>
+    /// 把 <see cref="Proxy"/> 的流式/缓存路由挂到应用上；遥控服务器与独立媒体代理监听共用同一实现，
+    /// 保证两条路径的转发、重定向与错误语义完全一致。
+    /// </summary>
+    private void MapProxyRoutes(WebApplication app)
+    {
+        app.MapGet("/proxy/{id}", async (HttpContext context) =>
+        {
+            try { await Proxy.ServeAsync(context); }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
+            catch (Exception error) when (error is HttpRequestException or InvalidDataException or NotSupportedException or System.Xml.XmlException or UriFormatException or TaskCanceledException)
+            {
+                if (!context.Response.HasStarted) { context.Response.Clear(); context.Response.StatusCode = 502; }
+                else context.Abort();
+            }
+        });
+        app.MapGet("/cache/{id}",async(HttpContext context)=>
+        {
+            try { await Proxy.ServeCachedAsync(context); }
+            catch(OperationCanceledException)when(context.RequestAborted.IsCancellationRequested){}
+            catch(Exception error)when(error is HttpRequestException or InvalidDataException or IOException or TaskCanceledException)
+            {if(!context.Response.HasStarted){context.Response.Clear();context.Response.StatusCode=502;}else context.Abort();}
+        });
+    }
+
+    /// <summary>
+    /// 确保受控媒体代理在回环可用（只挂 <c>/proxy</c> 与 <c>/cache</c>，不含遥控/配对接口），返回其基地址。
+    /// 遥控服务器已运行时直接复用（同一个 <see cref="Proxy"/>），否则按需独立启动一个仅代理的监听。
+    /// </summary>
+    public async Task<string> EnsureMediaProxyAsync(CancellationToken ct = default)
+    {
+        if (Address is { } running) return running;
+        if (_mediaAddress is { } cached) return cached;
+        await _mediaLifecycle.WaitAsync(ct);
+        try
+        {
+            if (Address is { } nowRunning) return nowRunning;
+            if (_mediaAddress is { } existing) return existing;
+            var builder = WebApplication.CreateSlimBuilder();
+            builder.Logging.ClearProviders();
+            builder.WebHost.UseKestrel(options => options.Listen(System.Net.IPAddress.Loopback, 0));
+            var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                // 仅回环来源、且 Host 必须是回环地址：避免被本机以外的请求（含 DNS 重绑定）触达。
+                if (context.Request.Host.Host is not ("127.0.0.1" or "localhost" or "[::1]") ||
+                    !System.Net.IPAddress.IsLoopback(context.Connection.RemoteIpAddress ?? System.Net.IPAddress.None))
+                { context.Response.StatusCode = 403; return; }
+                await next();
+            });
+            MapProxyRoutes(app);
+            await app.StartAsync(ct);
+            _mediaApp = app;
+            _mediaAddress = "http://127.0.0.1:" + new Uri(app.Urls.Single()).Port;
+            return _mediaAddress;
+        }
+        finally { _mediaLifecycle.Release(); }
+    }
+
+    /// <summary>
+    /// 注册要播放的媒体到受控代理并返回本机代理地址。播放器无法直传的头（Cookie/Authorization 等）
+    /// 交由代理带上游；代理会按来源域隔离、跨源跳转/清单子资源剥离凭据。
+    /// </summary>
+    public async Task<string> RegisterPlaybackMediaAsync(string url, IReadOnlyDictionary<string, string>? headers = null, CancellationToken ct = default)
+    {
+        var address = Address ?? await EnsureMediaProxyAsync(ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        return address + Proxy.Register(url, headers);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _lifecycle.WaitAsync();
         try
         {
+        var mediaApp = _mediaApp; _mediaApp = null; _mediaAddress = null;
         var app = _app; _app = null; Address = null;LanEnabled=false; PairingCode=null;LanAddresses=[];_sessions.Clear();_pairAttempts.Clear();Proxy.Clear();
+        if (mediaApp is not null) { await mediaApp.StopAsync(); await mediaApp.DisposeAsync(); }
         if (app is null) return;
         await app.StopAsync(); await app.DisposeAsync();
         }

@@ -56,6 +56,17 @@ def elf(path, needed=(), soname=None, arch=62):
 
 
 class NativeTests(unittest.TestCase):
+    def test_macos_jre_bundle_layout_and_architecture(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as t:
+            root = Path(t)
+            launcher = root / 'Contents/Home/bin/java'
+            launcher.parent.mkdir(parents=True)
+            header = struct.pack('<IIIIIIII', 0xFEEDFACF, 0x0100000C, 0, 2, 0, 0, 0, 0)
+            launcher.write_bytes(header)
+            self.assertEqual(n.verify_jre(root, 'osx-arm64'), 'AArch64')
+            with self.assertRaises(n.NativeVerifyError):
+                n.verify_jre(root, 'osx-x64')
+
     def test_wrong_windows_architecture_rejected(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as t:
             p = Path(t) / 'native.dll'; pe(p, 0xaa64)

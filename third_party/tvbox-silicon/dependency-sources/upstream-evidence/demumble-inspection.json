@@ -1,0 +1,55 @@
+{
+  "repo": "demumble",
+  "commit": "cb6f349ba21f54e01936a06ea8e826caa1f4a702",
+  "url": "https://codeload.github.com/zhkl0228/demumble/tar.gz/cb6f349ba21f54e01936a06ea8e826caa1f4a702",
+  "archive": "archives/demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702.tar.gz",
+  "sha256": "ca89d74fc19403ca7055b62ed3d59706d181fd833f30cd613ec0813770b57543",
+  "size": 1239832,
+  "artifact": "com.github.zhkl0228:demumble:1.0.4",
+  "native_binary_comparison": [
+    {
+      "jar_entry": "natives/linux_arm64/libdemumble.so",
+      "sha256": "05a8d053caefd8909af41dbf08cd3ae2d242e2305c64b41430de83c7f5c6b05a",
+      "archive_matches": [
+        "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/src/main/resources/natives/linux_arm64/libdemumble.so"
+      ]
+    },
+    {
+      "jar_entry": "natives/osx_arm64/libdemumble.dylib",
+      "sha256": "b33949ff18c3a9a46f4c3e3ef2e5e4a43d820dc2f82566e2c3bfca5ad0bd664f",
+      "archive_matches": [
+        "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/src/main/resources/natives/osx_arm64/libdemumble.dylib"
+      ]
+    },
+    {
+      "jar_entry": "natives/osx_64/libdemumble.dylib",
+      "sha256": "e76288833a980a07f6e72b20e04e006a7d0225f5f642ccc243a4f60326b3a066",
+      "archive_matches": [
+        "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/src/main/resources/natives/osx_64/libdemumble.dylib"
+      ]
+    },
+    {
+      "jar_entry": "natives/linux_64/libdemumble.so",
+      "sha256": "f90d81f382235a6e828227fae4fc6bc8aa1af8edf758fb553cf26b95f9c082b9",
+      "archive_matches": [
+        "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/src/main/resources/natives/linux_64/libdemumble.so"
+      ]
+    }
+  ],
+  "license_files": [
+    "demumble-1.0.4/upstream/LICENSE",
+    "demumble-1.0.4/upstream/third_party/llvm/LICENSE.txt"
+  ],
+  "native_source_file_count": 57,
+  "build_input_files": [
+    "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/CMakeLists.txt",
+    "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/build_linux_x64.sh",
+    "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/build_windows_x64.sh",
+    "demumble-cb6f349ba21f54e01936a06ea8e826caa1f4a702/build_windows_x86.sh"
+  ],
+  "status": "pending",
+  "reason": "Release commit archive and bundled binaries inspected; complete corresponding-source/build provenance still requires review",
+  "release_pom_version": "1.0.4",
+  "release_pom_equals_cached_bytes": true,
+  "source_input_inventory": "upstream-evidence/demumble-source-inputs.json"
+}

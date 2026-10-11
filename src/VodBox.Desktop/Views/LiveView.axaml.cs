@@ -65,6 +65,18 @@ public partial class LiveView : UserControl
             main.Live.SetCardViewportWidth(Math.Max(1, e.NewSize.Width - 52));
     }
 
+    /// <summary>可用内容区高度决定展开节目表的上限（45%，且至少留一行频道卡片）。</summary>
+    private void OnLiveContentSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel main) main.Live.SetProgrammeViewportHeight(e.NewSize.Height);
+    }
+
+    private void OnToggleProgrammePanel(object? sender, RoutedEventArgs e) => VM.ToggleProgrammePanelCommand.Execute(null);
+
+    private void OnOpenEpgSettings(object? sender, RoutedEventArgs e) => VM.OpenEpgSettingsCommand.Execute(null);
+
+    private async void OnRetryEpg(object? sender, RoutedEventArgs e) => await VM.RetryEpgCommand.ExecuteAsync(null);
+
     private void OnPlayCard(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is Control { Tag: LiveChannel channel }) VM.PlayChannelCommand.Execute(channel);

@@ -248,6 +248,24 @@ public sealed class DrpySourceTests
         Assert.Equal("https://example.invalid/", request.Headers["Referer"]);
     }
 
+    [Fact]
+    public async Task PlaybackPreservesRawJxPlayUrlAndCredentialHeaders()
+    {
+        using var source = new DrpySource(Site, () => new FakeRuntime
+        {
+            PlayJson = """{"parse":0,"jx":1,"url":"https://cdn.example/video.mp4","playUrl":"https://jx.example/?url=","header":{"Cookie":"sid=1","Authorization":"Bearer t"}}"""
+        });
+        var id = (await source.GetDetailAsync("7", TestContext.Current.CancellationToken)).Lines[0].Episodes[0].Id;
+        var play = await source.ResolvePlaybackAsync("7", id, ct: TestContext.Current.CancellationToken);
+        // jx 原始标志与可选 playUrl 都保留，不再是只用于选 Resolution 的中间量。
+        Assert.Equal(ResolutionKind.Json, play.Resolution);
+        Assert.Equal("1", play.Jx);
+        Assert.Equal("https://jx.example/?url=", play.ParseEndpoint);
+        // Cookie/Authorization 等引擎直传不了的头完整保留，交由受控媒体代理转发。
+        Assert.Equal("sid=1", play.Headers["Cookie"]);
+        Assert.Equal("Bearer t", play.Headers["Authorization"]);
+    }
+
     private sealed class FakeRuntime : IDrpyRuntime
     {
         public string HomeJson = """{"class":[{"type_id":2,"type_name":"儿歌"}]}""";

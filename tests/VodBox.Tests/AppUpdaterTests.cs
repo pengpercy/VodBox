@@ -9,8 +9,32 @@ namespace VodBox.Tests;
 
 public class AppUpdaterTests
 {
+    private sealed class CaptureProgress(Action<UpdateDownloadProgress> report) : IProgress<UpdateDownloadProgress>
+    {
+        public void Report(UpdateDownloadProgress value) => report(value);
+    }
+
     private static JsonElement Release(string version, string name, string digest, string? url = null) =>
         JsonDocument.Parse($$"""{"draft":false,"prerelease":false,"tag_name":"{{version}}","html_url":"https://github.com/pengpercy/VodBox/releases/tag/{{version}}","assets":[{"name":"{{name.Replace("\\", "\\\\")}}","digest":"{{digest}}","browser_download_url":"{{url ?? $"https://github.com/pengpercy/VodBox/releases/download/{version}/{name}"}}"}]}""").RootElement.Clone();
+
+    [Theory]
+    [InlineData("win-x64", null, "VodBox_1.2.3.win-x64.zip")]
+    [InlineData("linux-x64", "deb", "vodbox_1.2.3_linux-x64.deb")]
+    [InlineData("linux-x64", null, "unused")]
+    public void Select_PreservesReleaseBodyAndAssetSize(string rid, string? package, string name)
+    {
+        var original = Release("v1.2.3", name, "sha256:" + new string('a', 64));
+        var json = System.Text.Json.Nodes.JsonNode.Parse(original.GetRawText())!;
+        const string notes = "## 更新说明\n\n- 修复播放\n- 支持 **更新确认**\nhttps://github.com/pengpercy/VodBox";
+        json["body"] = notes;
+        json["assets"]![0]!["size"] = 123456;
+        using var document = JsonDocument.Parse(json.ToJsonString());
+        var offer = AppUpdater.Select(document.RootElement, "1.0.0", rid, package);
+        Assert.NotNull(offer);
+        Assert.Equal(notes, offer.ReleaseNotes);
+        Assert.Equal(package is null && rid.StartsWith("linux", StringComparison.Ordinal) ? 0L : 123456L, offer.SizeBytes);
+        Assert.Equal("", AppUpdater.Select(original, "1.0.0", rid, package)?.ReleaseNotes);
+    }
 
     [Fact]
     public void Select_RejectsDowngradeMaliciousNamesAndUntrustedDigest()
@@ -67,7 +91,10 @@ public class AppUpdaterTests
             await File.WriteAllTextAsync(path, "cached", TestContext.Current.CancellationToken);
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("cached"))).ToLowerInvariant();
             var offer = new UpdateOffer("1.2.3", "unused", new Uri("https://example.invalid/synthetic.zip"), hash, "");
-            Assert.Equal(path, await AppUpdater.DownloadAsync(offer, dir, TestContext.Current.CancellationToken));
+            UpdateDownloadProgress? reported = null;
+            var progress = new CaptureProgress(value => reported = value);
+            Assert.Equal(path, await AppUpdater.DownloadAsync(offer, dir, TestContext.Current.CancellationToken, progress));
+            Assert.Equal(new UpdateDownloadProgress(6, 6, true), reported);
             Assert.True(await AppUpdater.MatchesAsync(path, hash, TestContext.Current.CancellationToken));
             Assert.False(await AppUpdater.MatchesAsync(path, new string('0', 64), TestContext.Current.CancellationToken));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => AppUpdater.DownloadAsync(offer with { Sha256 = new string('0', 64) }, dir, new CancellationToken(true)));

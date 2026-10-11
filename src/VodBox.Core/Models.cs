@@ -38,6 +38,8 @@ public sealed class TvBoxSite
     [JsonConverter(typeof(LenientStringConverter))] public string Name { get; set; } = "";
     public string Api { get; set; } = "";
     [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
+    /// <summary>站点自带 JAR 地址（相对订阅 origin 解析）；空则回退到配置级 spider。</summary>
+    public string? Jar { get; set; }
     public string? PlayUrl { get; set; }
     public int Type { get; set; }
     public int Searchable { get; set; } = 1;
@@ -46,10 +48,16 @@ public sealed class TvBoxSite
     public List<string> Categories { get; set; } = [];
     public int Timeout { get; set; }
     public JsonElement? Style { get; set; }
+    /// <summary>
+    /// 站点在配置里的原始字段（未建模的键，如 <c>jar</c>/<c>logo</c>/<c>playerType</c> 等）。
+    /// JAR 插件宿主需要「raw 上下文」时从这里取，避免为了兼容个别站点反复扩模型。
+    /// </summary>
+    [JsonExtensionData] public Dictionary<string, JsonElement>? Raw { get; set; }
 
     public SourceRuntime Runtime => Api.Contains(".js", StringComparison.OrdinalIgnoreCase) ? SourceRuntime.QuickJs
         : Api.Contains(".py", StringComparison.OrdinalIgnoreCase) ? SourceRuntime.Python
         : Api.StartsWith("csp_", StringComparison.Ordinal) ? SourceRuntime.Node /* 桌面端 csp_ 暂不支持，标记为 Node 待适配层提示 */
+        : Type == 4 ? SourceRuntime.Type4 /* TVBox type4：原生 HTTP + play/flag 回调 */
         : SourceRuntime.MacCms;
 }
 
@@ -84,6 +92,19 @@ public sealed record SourceInfo
     public bool Searchable { get; init; } = true;
     public bool Changeable { get; init; } = true;
     public List<string> Categories { get; init; } = [];
+    /// <summary>配置级全局 spider JAR（<c>config.spider</c> 原值，含 <c>;md5;</c> 段）。JAR 宿主用。</summary>
+    public string? Spider { get; init; }
+    /// <summary>站点自带 JAR（<c>site.jar</c> 原值，含 <c>;md5;</c> 段）。JAR 宿主用。</summary>
+    public string? Jar { get; init; }
+    /// <summary>订阅的最终 origin（跟随重定向后的地址），相对 jar/ext 以此为基准解析。</summary>
+    public string? Origin { get; init; }
+    /// <summary>
+    /// 站点级请求头（<c>site.header</c> 原值原样保留）。type4 等原生 HTTP 站点靠它带 Cookie/UA/Referer
+    /// 访问接口与上游媒体；不臆造缺失字段，也不把它改成全局会话。
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Header { get; init; }
+    /// <summary>站点在配置里的原始 JSON（raw 上下文），JAR 宿主按需透传，不臆造缺失字段。</summary>
+    public string? SiteJson { get; init; }
 }
 
 /// <summary>分类（Class）。</summary>
@@ -103,6 +124,11 @@ public sealed record MediaItem
     public string? Year { get; init; }
     public string? Area { get; init; }
     public string? TypeName { get; init; }
+    /// <summary>
+    /// 搜索结果来源站点的显示名（聚合搜索时按站点打标；浏览/详情条目为 null）。
+    /// 卡片据此显示「来源：××」——跨站点结果必须能一眼看出每条来自哪个站点。
+    /// </summary>
+    public string? SourceName { get; init; }
 }
 
 /// <summary>剧集。</summary>
@@ -141,13 +167,29 @@ public sealed record MediaDetail
 /// <summary>分页结果。</summary>
 public sealed record MediaPage(IReadOnlyList<MediaItem> Items, int Page, int PageCount);
 
+/// <summary>
+/// 一次播放返回里的一个可选地址（type4 的 <c>url</c> 数组 / 多线路）。<see cref="Name"/> 为展示名，
+/// <see cref="Uri"/> 为完整地址。多地址时由界面提供「线路地址」切换，不静默丢弃其余地址。
+/// </summary>
+public sealed record PlaybackChoice(string Name, string Uri);
+
 /// <summary>播放请求（解析完成或直连）。</summary>
 public sealed record PlaybackRequest
 {
     public required string Uri { get; init; }
+    /// <summary>
+    /// 同一选集返回的多个地址（如 type4 的 <c>url</c> 数组）。空表示只有 <see cref="Uri"/> 一个地址；
+    /// 多于一个时界面据此提供切换，<see cref="Uri"/> 始终是其中之一（首个）。
+    /// </summary>
+    public IReadOnlyList<PlaybackChoice> Choices { get; init; } = [];
     public string Title { get; init; } = "媒体";
     public ResolutionKind Resolution { get; init; }
     public string? ParseEndpoint {get;init;}
+    /// <summary>
+    /// 解析器标识（CatVod playerContent 的 <c>jx</c> / parse flag）。保留宿主返回的原始值，
+    /// 让上层能区分「用哪个解析器」而不是丢成一个布尔。
+    /// </summary>
+    public string? Jx { get; init; }
     public Dictionary<string, string> Headers { get; init; } = [];
     public long StartPositionMs { get; init; }
     public string SourceKey { get; init; } = "local";
@@ -220,7 +262,12 @@ public sealed record LiveGroup(string Name, IReadOnlyList<LiveChannel> Channels,
     /// <summary>面板显示的频道数（密码分组未解锁时也可显示总量的假计数）。</summary>
     public int Count => DisplayCount >= 0 ? DisplayCount : Channels.Count;
 }
-public sealed record Programme(string ChannelKey, string Title, DateTimeOffset Start, DateTimeOffset End, string ChannelName = "");
+/// <summary>
+/// 一条节目。ChannelKey 是来源内的原始频道 id；SourceId 标识来源命名空间，
+/// 跨源数字 id 不能当全局主键（CCTV1 在 112114 是 "CCTV1"，在 51zmt 是 1）。
+/// 手动导入 / 旧缓存的 SourceId 为空字符串。
+/// </summary>
+public sealed record Programme(string ChannelKey, string Title, DateTimeOffset Start, DateTimeOffset End, string ChannelName = "", string SourceId = "");
 
 // ---------- 历史与收藏 ----------
 

@@ -1,6 +1,10 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Path = System.IO.Path;
 using Avalonia.Headless.XUnit;
+using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VodBox.Desktop.ViewModels;
@@ -206,6 +210,85 @@ public sealed class SettingsWindowTests
             }
             Assert.All(widths, w => Assert.Equal(widths[0], w, 1));
             Assert.True(widths[0] > 300, $"卡片应有实际宽度，实际 {widths[0]}");
+        }
+        finally
+        {
+            window.Close();
+            services.Dispose(); // 先释放数据库连接：Windows 不允许删除仍被占用的文件
+            TempDataDirectory.TryDelete(directory);
+        }
+    }
+
+    [AvaloniaFact]
+    public void SettingsSidebarUsesOpaqueThemeBackgroundInsteadOfWindowMaterial()
+    {
+        // 需求：设置窗口的侧边菜单不再用 Mica 毛玻璃，改用符合主题的不透明底色。
+        // 若窗口仍声明 Mica/Acrylic（且背景 Transparent），导航区会随桌面壁纸变花、对比度不稳。
+        var window = new SettingsWindow { Width = 940, Height = 680 };
+        window.Show();
+        try
+        {
+            Assert.DoesNotContain(window.TransparencyLevelHint, level => level != WindowTransparencyLevel.None);
+            foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+            {
+                window.RequestedThemeVariant = theme;
+                Pump(window);
+                var background = Assert.IsAssignableFrom<ISolidColorBrush>(window.Background);
+                Assert.Equal((byte)255, background.Color.A);
+                Assert.Equal(1d, background.Opacity);
+
+                // 左栏底色矩形（宽 216、贴左）必须完全不透明，并跟随窗口主题。
+                var sidebar = window.GetVisualDescendants().OfType<Rectangle>()
+                    .First(r => Math.Abs(r.Bounds.X) < 0.5 && Math.Abs(r.Bounds.Width - 216) < 0.5);
+                Assert.Equal(1d, sidebar.Opacity);
+                var fill = Assert.IsAssignableFrom<ISolidColorBrush>(sidebar.Fill);
+                Assert.Equal((byte)255, fill.Color.A);
+                Assert.Equal(1d, fill.Opacity);
+                Assert.Equal(background.Color, fill.Color);
+            }
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void SubtitleDescriptionsStayFlushWithTheirRowTitleInEverySection()
+    {
+        // 回归：rowSubtitle 带 MaxWidth=420。Avalonia 12 的 ArrangeCore 对 Stretch + MaxWidth
+        // 也套用居中偏移，描述短句会缩进到行中间（用户报告「当前剧集播完后自动播放下一集。」不靠左）。
+        // 共享样式显式 Left 后，每个分区的描述左缘都应与其同行标题一致。
+        var directory = Path.Combine(Path.GetTempPath(), $"vodbox-left-{Guid.NewGuid():N}");
+        using var services = new VodBox.Desktop.Services.AppServices(directory);
+        var main = new MainViewModel(services);
+        main.AttachDispatcher(Dispatcher.UIThread);
+        var window = new SettingsWindow { Width = 940, Height = 680 };
+        window.Show();
+        try
+        {
+            Pump(window);
+            var vm = (SettingsWindowViewModel)window.DataContext!;
+            vm.Content = main.Settings;
+            var rows = 0;
+            var sawAutoNextEpisode = false;
+            foreach (var item in Items(vm))
+            {
+                item.SelectCommand.Execute(null);
+                Pump(window);
+                foreach (var subtitle in window.GetVisualDescendants().OfType<TextBlock>()
+                             .Where(t => t.Classes.Contains("rowSubtitle") && t.IsEffectivelyVisible))
+                {
+                    Assert.Equal(HorizontalAlignment.Left, subtitle.HorizontalAlignment);
+                    Assert.Equal(TextAlignment.Left, subtitle.TextAlignment);
+                    if (subtitle.Text == "当前剧集播完后自动播放下一集。") sawAutoNextEpisode = true;
+                    // 成对的行还应与标题左缘一致；独立说明段检查上面的对齐属性。
+                    var title = (subtitle.Parent as Panel)?.Children.OfType<TextBlock>()
+                        .FirstOrDefault(t => t.Classes.Contains("rowTitle"));
+                    if (title is null) continue;
+                    Assert.InRange(subtitle.Bounds.X - title.Bounds.X, -1, 1);
+                    rows++;
+                }
+            }
+            Assert.True(sawAutoNextEpisode, "应覆盖自动播放下一集的描述");
+            Assert.True(rows >= 5, $"应覆盖多个分区的描述行，实际只检查到 {rows} 行");
         }
         finally
         {

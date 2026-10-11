@@ -1,0 +1,135 @@
+{
+  "repo": "keystone",
+  "commit": "c0bfeb3ea47923dee2b530257ec1989f0fbc4201",
+  "url": "https://codeload.github.com/zhkl0228/keystone/tar.gz/c0bfeb3ea47923dee2b530257ec1989f0fbc4201",
+  "archive": "archives/keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201.tar.gz",
+  "sha256": "d8e11a971e8d612a658533c7fc9db65d2e799303373c3bd09c924e5029093a5f",
+  "size": 9129083,
+  "artifact": "com.github.zhkl0228:keystone:0.9.7",
+  "native_binary_comparison": [
+    {
+      "jar_entry": "linux-aarch64/libkeystone.so",
+      "sha256": "1c9494b7fa6a2cfd6ab03ddc666301888fc93833b03390cebc96b682188031e9",
+      "archive_matches": [
+        "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/java/src/main/resources/linux-aarch64/libkeystone.so"
+      ]
+    },
+    {
+      "jar_entry": "win32-x86/keystone.dll",
+      "sha256": "fc97fd94a2baa5b1dc3992d8872393687b93ef63cbbce3b02b2cb826cc46fae8",
+      "archive_matches": [
+        "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/java/src/main/resources/win32-x86/keystone.dll"
+      ]
+    },
+    {
+      "jar_entry": "win32-x86-64/keystone.dll",
+      "sha256": "32f9cd21c365dcbbc82861875a9c0caf50006b388b21a4145a4744d39cd8aacc",
+      "archive_matches": [
+        "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/java/src/main/resources/win32-x86-64/keystone.dll"
+      ]
+    },
+    {
+      "jar_entry": "darwin/libkeystone.dylib",
+      "sha256": "4df447bd05812cb507f4eb093fa5adc2d04522d00c4349f1f3c6b474405035fd",
+      "archive_matches": [
+        "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/java/src/main/resources/darwin/libkeystone.dylib"
+      ]
+    },
+    {
+      "jar_entry": "linux-x86-64/libkeystone.so",
+      "sha256": "fd0f6d537a47b78faf857f41830cfdbf02665c88a5b8da5ba53cea9752b19a4c",
+      "archive_matches": [
+        "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/java/src/main/resources/linux-x86-64/libkeystone.so"
+      ]
+    }
+  ],
+  "license_files": [
+    "keystone-0.9.7/upstream/COPYING",
+    "keystone-0.9.7/upstream/LICENSE-COM.TXT",
+    "keystone-0.9.7/upstream/bindings/java/LICENSE",
+    "keystone-0.9.7/upstream/bindings/nodejs/LICENSE",
+    "keystone-0.9.7/upstream/bindings/python/LICENSE.TXT",
+    "keystone-0.9.7/upstream/bindings/rust/COPYING",
+    "keystone-0.9.7/upstream/llvm/LICENSE.TXT",
+    "keystone-0.9.7/upstream/llvm/include/llvm/Support/LICENSE.TXT",
+    "keystone-0.9.7/upstream/llvm/keystone/LICENSE",
+    "keystone-0.9.7/upstream/llvm/lib/Target/ARM/LICENSE.TXT",
+    "keystone-0.9.7/upstream/suite/regress/LICENSE"
+  ],
+  "native_source_file_count": 472,
+  "build_input_files": [
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/go/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/nodejs/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/ocaml/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/python/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/python/build_wheel.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/ruby/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/bindings/rust/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/kstool/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/kstool/test-all.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/cmake/modules/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/include/llvm/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/keystone/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/MC/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/MC/MCParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Support/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/AArch64/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/AArch64/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/AArch64/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/AArch64/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/AArch64/Utils/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/ARM/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/ARM/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/ARM/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/ARM/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Hexagon/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Hexagon/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Hexagon/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Hexagon/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Mips/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Mips/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Mips/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Mips/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/PowerPC/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/PowerPC/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/PowerPC/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/PowerPC/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Sparc/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Sparc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Sparc/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/Sparc/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/SystemZ/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/SystemZ/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/SystemZ/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/SystemZ/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/X86/AsmParser/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/X86/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/X86/MCTargetDesc/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/llvm/lib/Target/X86/TargetInfo/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/make-afl.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/make-common.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/make-lib.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/make-share.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/samples/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/samples/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/archive.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/fuzz.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/fuzz/CMakeLists.txt",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/fuzz/gentargets.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/regress/c-crashers/Makefile",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/regress/c-crashers/run-all-overview.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/regress/c-crashers/run-all.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/test-all.sh",
+    "keystone-c0bfeb3ea47923dee2b530257ec1989f0fbc4201/suite/test_diag_printer.sh"
+  ],
+  "status": "pending",
+  "reason": "Release commit archive and bundled binaries inspected; complete corresponding-source/build provenance still requires review",
+  "release_pom_version": "0.9.7",
+  "release_pom_equals_cached_bytes": true,
+  "source_input_inventory": "upstream-evidence/keystone-source-inputs.json"
+}

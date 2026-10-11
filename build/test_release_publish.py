@@ -30,25 +30,113 @@ class ReleasePublishTests(unittest.TestCase):
                 Path("artifacts/release").mkdir(parents=True)
                 Path("artifacts/release/package.zip").write_bytes(b"package")
                 calls = []
+                uploaded = []
                 def gh(*args):
                     calls.append(args)
-                    if "--slurp" in args:
-                        if any(call[:2] == ("release", "create") for call in calls) and "releases?" in args[-1]:
-                            return json.dumps([[{"tag_name": "v1.0.0", "draft": True, "assets_url": "assets"}]])
-                        return "[[]]"
                     if "matching-refs" in " ".join(args):
                         return "[]"
-                    if args[:2] == ("api", "repos/owner/repo/releases/tags/v1.0.0"):
-                        return json.dumps({"draft": True, "assets_url": "assets"})
+                    if args[-1] == "repos/owner/repo/releases":
+                        return json.dumps({"id": 42, "draft": True})
+                    if "uploads.github.com" in args[-1]:
+                        uploaded.append(args[-1])
+                        return "{}"
+                    if args[-1] == "repos/owner/repo/releases/42/assets?per_page=100":
+                        # Remote state only shows the asset once the upload happened.
+                        if not uploaded:
+                            return json.dumps([[]])
+                        return json.dumps([[{"name": "package.zip", "size": 7,
+                                             "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
+                    if args[-1] == "repos/owner/repo/releases/42":
+                        return json.dumps({"id": 42, "draft": True})
                     return "{}"
                 with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
                     self.assertEqual(0, publish.main())
                 ref_index = next(i for i, args in enumerate(calls) if "repos/owner/repo/git/refs" in args)
-                create_index = next(i for i, args in enumerate(calls) if args[:2] == ("release", "create"))
+                create_index = next(i for i, args in enumerate(calls) if args[-1] == "repos/owner/repo/releases")
                 self.assertLess(ref_index, create_index)
-                self.assertIn("--verify-tag", calls[create_index])
-                self.assertIn("--draft", calls[create_index])
+                # The tag must already exist before the release is created against it.
+                self.assertIn("draft=true", calls[create_index])
+                self.assertIn("tag_name=v1.0.0", calls[create_index])
                 self.assertFalse(any("--clobber" in args for args in calls))
+            finally:
+                os.chdir(old)
+
+    def test_draft_is_resolved_by_returned_id_not_by_racing_list_lookup(self):
+        """A draft missing from the immediately-following list call must still be found by id."""
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("artifacts/release").mkdir(parents=True)
+                Path("artifacts/release/package.zip").write_bytes(b"package")
+                calls = []
+                uploaded = []
+                def gh(*args):
+                    calls.append(args)
+                    if "matching-refs" in " ".join(args):
+                        return "[]"
+                    # Creation returns the id; every later lookup by that id succeeds.
+                    if args[-1] == "repos/owner/repo/releases":
+                        return json.dumps({"id": 4242, "draft": True})
+                    if "uploads.github.com" in args[-1]:
+                        uploaded.append(args[-1])
+                        return "{}"
+                    if args[-1] == "repos/owner/repo/releases/4242/assets?per_page=100":
+                        if not uploaded:
+                            return json.dumps([[]])
+                        return json.dumps([[{"name": "package.zip", "size": 7,
+                                             "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
+                    if args[-1] == "repos/owner/repo/releases/4242":
+                        return json.dumps({"id": 4242, "draft": True})
+                    return "{}"
+                with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
+                    self.assertEqual(0, publish.main())
+                # The stale list is only ever a rerun probe: the fresh draft is resolved and
+                # driven by the id returned from creation, never by that list lookup.
+                self.assertTrue(any(args[-1] == "repos/owner/repo/releases/4242" for args in calls))
+                self.assertTrue(any("releases/4242/assets" in args[-1] for args in calls))
+                published = [args for args in calls if args[:2] == ("release", "edit")]
+                self.assertEqual(1, len(published))
+                self.assertIn("--draft=false", published[0])
+            finally:
+                os.chdir(old)
+
+    def test_draft_creation_survives_a_failing_notes_api(self):
+        """Auto-generated notes are optional; a notes failure must not block the draft."""
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("artifacts/release").mkdir(parents=True)
+                Path("artifacts/release/package.zip").write_bytes(b"package")
+                uploaded = []
+                calls = []
+                def gh(*args):
+                    calls.append(args)
+                    if "matching-refs" in " ".join(args):
+                        return "[]"
+                    if args[-1] == "repos/owner/repo/releases?per_page=100":
+                        return json.dumps([[]])
+                    if args[-1] == "repos/owner/repo/releases":
+                        if "generate_release_notes=true" in args:
+                            raise publish.PublicationError("HTTP 422: notes generation unavailable")
+                        return json.dumps({"id": 77, "draft": True})
+                    if "uploads.github.com" in args[-1]:
+                        uploaded.append(args[-1])
+                        return "{}"
+                    if args[-1] == "repos/owner/repo/releases/77/assets?per_page=100":
+                        if not uploaded:
+                            return json.dumps([[]])
+                        return json.dumps([[{"name": "package.zip", "size": 7,
+                                             "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
+                    if args[-1] == "repos/owner/repo/releases/77":
+                        return json.dumps({"id": 77, "draft": True})
+                    return "{}"
+                with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
+                    self.assertEqual(0, publish.main())
+                creates = [args for args in calls if args[-1] == "repos/owner/repo/releases"]
+                self.assertEqual(2, len(creates))
+                self.assertNotIn("generate_release_notes=true", creates[1])
             finally:
                 os.chdir(old)
 
@@ -64,12 +152,18 @@ class ReleasePublishTests(unittest.TestCase):
                     calls.append(args)
                     if "matching-refs" in " ".join(args):
                         return json.dumps([{"ref": "refs/tags/v1.0.0", "object": {"type": "commit", "sha": "abc"}}])
-                    if args[-1] == "assets":
-                        return json.dumps([[{"name": "package.zip", "size": 7, "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
-                    return json.dumps([[{"tag_name": "v1.0.0", "draft": False, "assets_url": "assets"}]])
+                    if args[-1] == "repos/owner/repo/releases?per_page=100":
+                        return json.dumps([[{"tag_name": "v1.0.0", "id": 7, "draft": False}]])
+                    if args[-1] == "repos/owner/repo/releases/7":
+                        return json.dumps({"id": 7, "draft": False})
+                    if args[-1] == "repos/owner/repo/releases/7/assets?per_page=100":
+                        return json.dumps([[{"name": "package.zip", "size": 7,
+                                             "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
+                    return "{}"
                 with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
                     self.assertEqual(0, publish.main())
-                self.assertFalse(any(args[0] == "release" or "POST" in args for args in calls))
+                self.assertFalse(any(args[0] == "release" for args in calls))
+                self.assertFalse(any("--method" in args and "POST" in args for args in calls))
             finally:
                 os.chdir(old)
 
@@ -85,9 +179,9 @@ class ReleasePublishTests(unittest.TestCase):
                     calls.append(args)
                     if "matching-refs" in " ".join(args):
                         return "[]"
-                    raise RuntimeError("HTTP 403: Resource not accessible by integration")
+                    raise publish.PublicationError("HTTP 403: Resource not accessible by integration")
                 with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
-                    with self.assertRaises(RuntimeError):
+                    with self.assertRaises(publish.PublicationError):
                         publish.main()
                 self.assertEqual(2, len(calls))
                 self.assertFalse(any(args[0] == "release" for args in calls))
@@ -109,6 +203,69 @@ class ReleasePublishTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         publish.main()
                 self.assertEqual(1, len(calls))
+            finally:
+                os.chdir(old)
+
+    def test_upload_is_idempotent_and_verified_before_publish(self):
+        """Every local package must be present with matching size+digest before the draft is published."""
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("artifacts/release").mkdir(parents=True)
+                Path("artifacts/release/package.zip").write_bytes(b"package")
+                uploaded = []
+                state = {"upload_calls": 0}
+                def gh(*args):
+                    if "matching-refs" in " ".join(args):
+                        return "[]"
+                    if args[-1] == "repos/owner/repo/releases":
+                        return json.dumps({"id": 99, "draft": True})
+                    if args[-1] == "repos/owner/repo/releases/99":
+                        return json.dumps({"id": 99, "draft": True})
+                    if args[-1] == "repos/owner/repo/releases/99/assets?per_page=100":
+                        # First read: nothing yet. Later reads: the uploaded asset, verified.
+                        if state["upload_calls"] == 0:
+                            return json.dumps([[]])
+                        return json.dumps([[{"name": "package.zip", "size": 7,
+                                             "digest": "sha256:" + hashlib.sha256(b"package").hexdigest()}]])
+                    if "uploads.github.com" in args[-1]:
+                        state["upload_calls"] += 1
+                        uploaded.append(args[-1])
+                        return "{}"
+                    return "{}"
+                with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
+                    self.assertEqual(0, publish.main())
+                self.assertEqual(1, len(uploaded))
+                self.assertIn("releases/99/assets?name=package.zip", uploaded[0])
+            finally:
+                os.chdir(old)
+
+    def test_publish_is_refused_while_a_local_package_is_still_missing_remotely(self):
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("artifacts/release").mkdir(parents=True)
+                Path("artifacts/release/package.zip").write_bytes(b"package")
+                calls = []
+                def gh(*args):
+                    calls.append(args)
+                    if "matching-refs" in " ".join(args):
+                        return "[]"
+                    if args[-1] == "repos/owner/repo/releases":
+                        return json.dumps({"id": 5, "draft": True})
+                    if args[-1] == "repos/owner/repo/releases/5":
+                        return json.dumps({"id": 5, "draft": True})
+                    if args[-1] == "repos/owner/repo/releases/5/assets?per_page=100":
+                        return json.dumps([[]])
+                    if "uploads.github.com" in args[-1]:
+                        return "{}"
+                    return "{}"
+                with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
+                    with self.assertRaises(ValueError):
+                        publish.main()
+                self.assertFalse(any(args[0] == "release" for args in calls))
             finally:
                 os.chdir(old)
 

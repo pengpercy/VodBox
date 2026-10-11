@@ -260,6 +260,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     public PlayerViewModel(AppServices services, MainViewModel main) : this(services.Player, services.Store, main, services.Prefs)
     {
         _getParses = () => services.Registry.Parses;
+        // Cookie/Authorization 等引擎无法直传的媒体头，统一经受控代理转发（按来源隔离，无全局 Cookie 会话）。
+        _registerProxiedMedia = (url, headers, ct) => services.LocalControl.RegisterPlaybackMediaAsync(url, headers, ct);
     }
 
     internal PlayerViewModel(IPlaybackEngine engine, ILibraryStore store, MainViewModel main, IPreferences? preferences = null)
@@ -362,8 +364,46 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private PlaybackRequest? _current;
     private Task _historyWrites = Task.CompletedTask;
+    /// <summary>解析后、代理前的请求（含多地址），供「线路地址」切换复用；引擎实际打开的是代理改写后的请求。</summary>
+    private PlaybackRequest? _resolvedRequest;
+    /// <summary>把带特殊头的媒体注册到受控代理并返回本机地址；未接线（如预览/测试）时为 null。</summary>
+    private Func<string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<string>>? _registerProxiedMedia;
+    [ObservableProperty] private int _addressChoiceIndex = -1;
+    /// <summary>当前集返回的多个地址（type4 等）；多于一个时由播放器设置菜单提供切换。</summary>
+    public IReadOnlyList<PlaybackChoice> AddressChoices => _resolvedRequest?.Choices ?? Array.Empty<PlaybackChoice>();
 
     public void Play(PlaybackRequest request) => _ = PlayResolvedAsync(_ => Task.FromResult(request));
+
+    /// <summary>
+    /// 引擎只能全局设置 UA/Referer；Cookie/Authorization 等其余媒体头必须经受控代理转发，
+    /// 不落全局状态，也不放宽引擎的拒绝条件。
+    /// </summary>
+    private static bool RequiresMediaProxy(PlaybackRequest request) =>
+        request.Headers.Keys.Any(key => !key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
+            && !key.Equals("Referer", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>需要时把媒体注册到受控代理，并把交给引擎的请求改成本机代理地址（头交给代理带上游）。</summary>
+    private async Task<PlaybackRequest> RouteThroughMediaProxyAsync(PlaybackRequest request, CancellationToken ct)
+    {
+        if (!RequiresMediaProxy(request)) return request;
+        if (_registerProxiedMedia is null)
+            throw new NotSupportedException($"媒体请求头 {string.Join("、", request.Headers.Keys)} 需要通过受控媒体代理转发，但当前没有可用代理。");
+        var proxied = await _registerProxiedMedia(request.Uri, request.Headers, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        return request with { Uri = proxied, Headers = new Dictionary<string, string>() };
+    }
+
+    /// <summary>切换同一集的多地址线路（type4 的 url 数组）：用同一份解析结果换地址重开，保留播放列表与进度。</summary>
+    public Task SelectAddressAsync(int index)
+    {
+        var source = _resolvedRequest;
+        if (source is null || index < 0 || index >= source.Choices.Count) return Task.CompletedTask;
+        var choice = source.Choices[index];
+        if (choice.Uri == source.Uri) return Task.CompletedTask;
+        var playlist = Playlist.ToArray();
+        var position = PlaylistIndex;
+        return PlayResolvedAsync(_ => Task.FromResult(source with { Uri = choice.Uri }), playlist.Length > 0 ? playlist : null, position);
+    }
 
     /// <summary>解析也属于播放会话；新播放和关闭都会取消旧解析。</summary>
     public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve, IReadOnlyList<PlaylistEntry>? playlist = null, int index = -1)
@@ -393,6 +433,8 @@ public sealed partial class PlayerViewModel : ObservableObject
                 {
                     var request = await resolve(ct);
                     ct.ThrowIfCancellationRequested();
+                    // 解析前的请求：多地址切换要以它为基（解析后 Uri 已换成直连地址，不能再选别的地址）。
+                    var originalRequest = request;
                     if (request.Resolution == ResolutionKind.Json)
                     {
                         using var http = new VodBox.Infrastructure.DefaultHttp();
@@ -412,6 +454,7 @@ public sealed partial class PlayerViewModel : ObservableObject
                         request = resolved ?? throw new InvalidOperationException("JSON解析未返回媒体地址。" + string.Join("；", failures));
                     }
                     if (request.Resolution == ResolutionKind.Sniff) throw new NotSupportedException("此媒体需要网页嗅探，当前尚未实现。");
+                    request = await RouteThroughMediaProxyAsync(request, ct);
                     await saved.WaitAsync(ct);
                     ct.ThrowIfCancellationRequested();
                     int volume = 100;
@@ -422,6 +465,10 @@ public sealed partial class PlayerViewModel : ObservableObject
                         volume = Volume;
                         rate = Rate;
                         if (intent != _intent) throw new OperationCanceledException(ct);
+                        _resolvedRequest = originalRequest;
+                        AddressChoiceIndex = originalRequest.Choices.Count == 0 ? -1
+                            : Math.Max(0, originalRequest.Choices.ToList().FindIndex(choice => choice.Uri == originalRequest.Uri));
+                        OnPropertyChanged(nameof(AddressChoices));
                         _current = request;
                         OnPropertyChanged(nameof(IsLive));
                         OnPropertyChanged(nameof(LoadingText));

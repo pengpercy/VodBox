@@ -26,15 +26,35 @@ public static class CategoryConverters
 
 public partial class VodView : UserControl
 {
+    /// <summary>距底部不足该像素时预取下一页；VM 内部再按代次/去重/终点门控，重复触发是安全的。</summary>
+    private const double PrefetchDistance = 320;
+
     public VodView()
     {
         InitializeComponent();
-        // 网格宽度决定列数。网格与骨架互斥显示，两个宿主都上报宽度：
+        // 网格宽度决定列数；宿主铺到右边缘，扣除移入内容层的 28 留白。
+        // 网格与骨架互斥显示，两个宿主都上报宽度：
         // 首次加载时只有骨架可见，靠 GridHost 也能算出正确列数（SetGridWidth 忽略 0 宽度）。
         foreach (var name in new[] { "GridHost", "PosterList" })
             if (this.FindControl<Control>(name) is { } host)
                 host.SizeChanged += (_, _) =>
-                { if (DataContext is MainViewModel main) main.Vod.SetGridWidth(host.Bounds.Width); };
+                { if (DataContext is MainViewModel main) main.Vod.SetGridWidth(host.Bounds.Width - 28); };
+        // 无限滚动：ListBox 内部 ScrollViewer 滚到底部附近时取下一页。
+        // 用冒泡的 ScrollChanged 事件监听，不依赖模板子控件；VM 做并发/去重/取消/终点门控。
+        if (this.FindControl<ListBox>("PosterList") is { } list)
+            list.AddHandler(ScrollViewer.ScrollChangedEvent, OnPosterScrolled);
+    }
+
+    /// <summary>滚到接近底部时预取下一页；到顶/无溢出/未到底都不触发。</summary>
+    private void OnPosterScrolled(object? sender, ScrollChangedEventArgs e)
+    {
+        if (e.Source is not ScrollViewer scroll) return;
+        if (scroll.Extent.Height <= 0 || scroll.Extent.Height <= scroll.Viewport.Height) return;
+        if (scroll.Offset.Y + scroll.Viewport.Height < scroll.Extent.Height - PrefetchDistance) return;
+        if (DataContext is not MainViewModel main) return;
+        // 上一次翻页失败：停在页脚的「重试」状态，等用户显式点击，不在滚动时反复重发。
+        if (main.Vod.FooterCanRetry) return;
+        main.Vod.LoadMoreCommand.Execute(null);
     }
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
@@ -59,18 +79,27 @@ public partial class VodView : UserControl
         }
     }
 
+    private void OnSearchKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Enter or Key.Return) VM.RunSearchCommand.Execute(null);
+    }
+
     private void OnSwitchSource(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button button) return;
-        var menu = new ContextMenu();
+        // 复用 XAML 里定义的弹层（固定宽度省略号 + 中性色的站点名样式挂在那里）。
+        var menu = button.ContextMenu ?? this.FindControl<ContextMenu>("SourceMenu");
+        if (menu is null) return;
+        menu.Items.Clear();
         foreach (var source in VM.AvailableSources)
         {
             var item = new MenuItem { Header = source.Name };
             item.Click += async (_, _) => await VM.SwitchSourceAsync(source.Key);
             menu.Items.Add(item);
         }
-        if (menu.Items.Count == 0) menu.Items.Add(new MenuItem { Header = "请先添加配置", IsEnabled = false });
-        button.ContextMenu = menu;
+        if (menu.Items.Count == 0) menu.Items.Add(new MenuItem { Header = VM.SourceSelectionHint, IsEnabled = false });
+        // 固定在当前站点按钮下方展开（控件锚点），不跟随鼠标点位定位。
+        menu.PlacementTarget = button;
         menu.Open(button);
     }
 }

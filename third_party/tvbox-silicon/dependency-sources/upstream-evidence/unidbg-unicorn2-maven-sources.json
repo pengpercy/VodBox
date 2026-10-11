@@ -1,0 +1,8 @@
+{
+  "url": "https://repo.maven.apache.org/maven2/com/github/zhkl0228/unidbg-unicorn2/0.9.8/unidbg-unicorn2-0.9.8-sources.jar",
+  "path": "maven-sources/unidbg-unicorn2-0.9.8-sources.jar",
+  "sha256": "3266c2d086f7c2a7f1c6e7e9d5a6b22d7f4657cb7546eb3e0793e98199c0a558",
+  "java_files": 11,
+  "native_source_entries": [],
+  "warning": "Maven source jar alone is not evidence of full native corresponding source"
+}

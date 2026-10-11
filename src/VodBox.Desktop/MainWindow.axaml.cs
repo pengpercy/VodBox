@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private PlayerViewModel? _observedPlayer;
     internal Views.PlayerWindow? PlaybackWindow { get; private set; }
     private Views.SettingsWindow? _settingsWindow;
+    private Services.SearchWindowService? _searchWindow;
     private bool _shutdownStarted;
     private bool _shutdownComplete;
     public MainWindow()
@@ -22,7 +23,12 @@ public partial class MainWindow : Window
         InitializeComponent();
         Closed += (_, _) =>
         {
-            if (DataContext is MainViewModel main) main.SettingsRequested -= ShowSettingsWindow;
+            _searchWindow?.Close();
+            if (DataContext is MainViewModel main)
+            {
+                main.SettingsRequested -= ShowSettingsWindow;
+                main.SearchRequested -= OnSearchRequested;
+            }
             StopObservingPlayer();
         };
         Closing+=OnClosing;
@@ -78,7 +84,12 @@ public partial class MainWindow : Window
         e.Cancel=true;
         if(_shutdownStarted)return;
         _shutdownStarted=true;
-        try { await main.ShutdownAsync(); }
+        try
+        {
+            // 主窗口关闭清理：先关独立搜索窗口（关窗会取消在途搜索，避免回调打在已停机的服务上），再整体停机。
+            _searchWindow?.Close();
+            await main.ShutdownAsync();
+        }
         catch(Exception error) { System.Diagnostics.Debug.WriteLine($"[shutdown] {error.Message}"); }
         finally
         {
@@ -104,6 +115,7 @@ public partial class MainWindow : Window
             _observedPlayer = playerOwner.Player;
             _observedPlayer.PropertyChanged += OnPlayerVisibilityChanged;
             playerOwner.SettingsRequested += ShowSettingsWindow;
+            playerOwner.SearchRequested += OnSearchRequested;
             SyncPlayerWindow();
         }
         if (DataContext is MainViewModel vm && Avalonia.Application.Current is App)
@@ -165,6 +177,31 @@ public partial class MainWindow : Window
             if (_settingsWindow is null) ShowSettingsWindow();
             return _settingsWindow;
         }
+    }
+
+    /// <summary>当前已打开的搜索窗口（只读观察用，没有副作用：不会顺手创建一个）。</summary>
+    internal Views.SearchWindow? OpenSearchWindow => _searchWindow?.Window;
+
+    /// <summary>UI smoke 用：拿到（必要时先创建）搜索窗口，验证独立搜索结果窗口能创建并渲染。</summary>
+    internal Views.SearchWindow? SearchWindowForSmoke
+    {
+        get
+        {
+            if (DataContext is not MainViewModel main) return null;
+            _searchWindow ??= new Services.SearchWindowService(main);
+            return _searchWindow.EnsureWindow();
+        }
+    }
+
+    /// <summary>
+    /// 搜索请求（侧栏搜索框回车、「跨站搜索」按钮）：打开或复用独立搜索结果窗口。
+    /// VM 只发布事件，窗口的开/关、去重与激活由这里统一管理。
+    /// </summary>
+    private void OnSearchRequested(string keyword)
+    {
+        if (DataContext is not MainViewModel main) return;
+        _searchWindow ??= new Services.SearchWindowService(main);
+        _searchWindow.Submit(keyword);
     }
 
     /// <summary>设置改为独立窗口：已开则提到最前（并切到请求的分区），否则新建一个。</summary>

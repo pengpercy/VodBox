@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VodBox.Core;
@@ -141,6 +143,26 @@ public sealed class SettingsSectionTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void SharedSubtitleStyleLeftAlignsDescriptionsOutsideTheSettingsWindow()
+    {
+        // 回归：分区控件挂在普通窗口时只有 App 级的 Resources/SettingsCardStyles.axaml 生效。
+        // 该共享样式也给 rowSubtitle 设了 MaxWidth，必须自带 Left，否则描述同样被居中缩进。
+        var (window, view) = Host<PlaybackSettingsView>(_settings,
+            v => v.Section = PlaybackSettingsView.PlaybackSettingsViewSection.Playback);
+        try
+        {
+            var subtitle = view.GetVisualDescendants().OfType<TextBlock>()
+                .First(t => t.Classes.Contains("rowSubtitle") && t.Text == "当前剧集播完后自动播放下一集。");
+            var title = ((Panel)subtitle.Parent!).Children.OfType<TextBlock>()
+                .First(t => t.Classes.Contains("rowTitle"));
+            Assert.Equal(HorizontalAlignment.Left, subtitle.HorizontalAlignment);
+            Assert.Equal(TextAlignment.Left, subtitle.TextAlignment);
+            Assert.Equal(title.Bounds.X, subtitle.Bounds.X, 1);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void SubtitleListRowCommandResolvesThroughParent()
     {
         // 字幕列表的行内按钮是清单点名的静默失效高风险点。
@@ -217,8 +239,9 @@ public sealed class SettingsSectionTests : IDisposable
         {
             var labels = view.GetVisualDescendants().OfType<Button>().Select(b => b.Content?.ToString()).ToArray();
             Assert.Contains("检查更新", labels);
-            Assert.Contains("获取更新", labels);
-            Assert.Contains("取消下载", labels);
+            Assert.DoesNotContain("获取更新", labels);
+            Assert.DoesNotContain("取消下载", labels);
+            Assert.Single(labels, label => label == "检查更新");
             Assert.NotNull(view.GetVisualDescendants().OfType<TextBlock>()
                 .FirstOrDefault(t => t.Text?.StartsWith("VodBox ", StringComparison.Ordinal) == true));
             Assert.True(view.GetVisualDescendants().OfType<CheckBox>().First().IsChecked);

@@ -14,9 +14,9 @@
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
-        "requested": "[10.0.12, )",
-        "resolved": "10.0.12",
-        "contentHash": "xi+BDjFpW+Sb+MHFHaH6Y/gV9I8BluFwRXc1QyCdoZbIK26eNiBeFuMTe/FMwc33G1wdHCyDg7CVTmb8OdQrMQ=="
+        "requested": "[10.0.11, )",
+        "resolved": "10.0.11",
+        "contentHash": "IBf7lbovvjGWVWXZX5cJ/cO0WXbId0Zq4BuSeT94mGZuOAP66oMeH9PTBZ9Jpp3Jb6jtK0qm/NyUbPRo1gC/wQ=="
       },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
@@ -380,9 +380,9 @@
           "Avalonia.Themes.Fluent": "[12.1.3, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
           "QRCoder": "[1.6.0, )",
-          "VodBox.Core": "[0.2.4, )",
-          "VodBox.Infrastructure": "[0.2.4, )",
-          "VodBox.Playback.Mpv": "[0.2.4, )"
+          "VodBox.Core": "[0.2.6, )",
+          "VodBox.Infrastructure": "[0.2.6, )",
+          "VodBox.Playback.Mpv": "[0.2.6, )"
         }
       },
       "vodbox.infrastructure": {
@@ -390,21 +390,21 @@
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.0, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.2.4, )",
-          "VodBox.PluginHost": "[0.2.4, )"
+          "VodBox.Core": "[0.2.6, )",
+          "VodBox.PluginHost": "[0.2.6, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.3, )",
-          "VodBox.Core": "[0.2.4, )"
+          "VodBox.Core": "[0.2.6, )"
         }
       },
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.2.4, )"
+          "VodBox.Core": "[0.2.6, )"
         }
       },
       "Avalonia": {

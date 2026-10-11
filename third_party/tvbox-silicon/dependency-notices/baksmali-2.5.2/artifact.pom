@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- This module was also published with a richer model, Gradle metadata,  -->
+  <!-- which should be used instead. Do not delete the following line which  -->
+  <!-- is to indicate to Gradle or any Gradle module metadata file consumer  -->
+  <!-- that they should prefer consuming it instead. -->
+  <!-- do_not_remove: published-with-gradle-metadata -->
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.smali</groupId>
+  <artifactId>baksmali</artifactId>
+  <version>2.5.2</version>
+  <name>baksmali</name>
+  <description>baksmali is a disassembler for dalvik bytecode</description>
+  <url>http://smali.org</url>
+  <licenses>
+    <license>
+      <name>The BSD 3-Clause License</name>
+      <url>http://opensource.org/licenses/BSD-3-Clause</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>jesusfreke</id>
+      <name>Ben Gruver</name>
+      <email>jesusfreke@jesusfreke.com</email>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:git://github.com/JesusFreke/smali.git</connection>
+    <developerConnection>scm:git:git@github.com:JesusFreke/smali.git</developerConnection>
+    <url>https://github.com/JesusFreke/smali/tree/master/baksmali</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.smali</groupId>
+      <artifactId>dexlib2</artifactId>
+      <version>2.5.2</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.smali</groupId>
+      <artifactId>util</artifactId>
+      <version>2.5.2</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>27.1-android</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.beust</groupId>
+      <artifactId>jcommander</artifactId>
+      <version>1.64</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+</project>

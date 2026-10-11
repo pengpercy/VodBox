@@ -64,7 +64,15 @@ public sealed class DefaultHttp : IDisposable
         return true;
     }
 
-    public async Task<byte[]> GetByteArrayAsync(string url, Dictionary<string, string>? headers = null, CancellationToken ct = default)
+    public async Task<byte[]> GetByteArrayAsync(string url, Dictionary<string, string>? headers = null, CancellationToken ct = default) =>
+        (await GetByteArrayWithFinalUriAsync(url, headers, ct).ConfigureAwait(false)).Bytes;
+
+    /// <summary>
+    /// 与 <see cref="GetByteArrayAsync"/> 相同，但同时返回**跟随重定向后的最终 URI**。
+    /// 订阅经短链/镜像跳转后，配置里的相对 jar/ext 必须以最终 origin 为基准解析，
+    /// 否则会错误地拼回原域名。
+    /// </summary>
+    public async Task<(byte[] Bytes, Uri FinalUri)> GetByteArrayWithFinalUriAsync(string url, Dictionary<string, string>? headers = null, CancellationToken ct = default)
     {
         url = NormalizeIdn(url);
         // 外层硬超时：覆盖 DNS/TLS/TFO 阶段挂起（远端黑洞时 20s HttpClient.Timeout 不可靠）
@@ -80,7 +88,9 @@ public sealed class DefaultHttp : IDisposable
         request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
         using var response = await _client.SendAsync(request, timeout.Token);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsByteArrayAsync(timeout.Token);
+        var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token);
+        var finalUri = response.RequestMessage?.RequestUri ?? new Uri(url, UriKind.Absolute);
+        return (bytes, finalUri);
     }
 
     /// <summary>响应头阶段开始流式读取；在分配大缓冲前限制解压后的字节量。</summary>

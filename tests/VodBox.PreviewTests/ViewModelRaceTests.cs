@@ -6,6 +6,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VodBox.Core;
+using VodBox.Infrastructure;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
 using VodBox.Desktop.Views;
@@ -487,6 +488,102 @@ public sealed class ViewModelRaceTests
         return Enumerable.Range(0, count).Select(i => (site, new MediaItem { Id = id + i, Title = id + i })).ToArray();
     }
 
+    private static (SourceInfo Site, MediaItem Item) Entry(string key, string name, string id) =>
+        (new SourceInfo { Key = key, Name = name, Runtime = SourceRuntime.MacCms }, Item(id));
+
+    /// <summary>把若干批次串成聚合流；用同步完成的 await 保持迭代器无上下文切换，批次顺序可控。</summary>
+    private static async IAsyncEnumerable<AggregateSearchBatch> Batches(params AggregateSearchBatch[] batches)
+    {
+        await Task.CompletedTask;
+        foreach (var batch in batches) yield return batch;
+    }
+
+    /// <summary>先挂起、由闸门放行的单批次流：复现「旧请求的迟到批次晚于新请求返回」。</summary>
+    private static async IAsyncEnumerable<AggregateSearchBatch> LateBatch(SourceInfo site, Task gate, string id)
+    {
+        await gate.ConfigureAwait(false);
+        yield return new AggregateSearchBatch(site, [Item(id)]);
+    }
+
+    [AvaloniaFact]
+    public async Task Search_EveryCardIsLabelledWithItsOwnSourceSite()
+    {
+        using var context = new Context();
+        var results = new[] { Entry("a", "甲站", "a1"), Entry("b", "乙站", "b1") };
+        var search = new SearchViewModel((_, _) => Task.FromResult<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>(results), context.Main) { Keyword = "测试" };
+        await Done(search.RunSearchAsync());
+        // 每张卡片都带上自己站点的来源名，且卡片与 AllResults 是同一批实例（虚拟化行不丢来源）。
+        Assert.Equal(["甲站", "乙站"], search.AllResults.Select(item => item.SourceName));
+        var cards = search.ResultRows.SelectMany(row => row.Items).ToArray();
+        Assert.Equal(search.AllResults, cards);
+        Assert.All(cards, card => Assert.False(string.IsNullOrEmpty(card.SourceName)));
+    }
+
+    [AvaloniaFact]
+    public async Task Search_PartialFailureStillLabelsSucceededCardsAndSurfacesFailedSites()
+    {
+        using var context = new Context();
+        var site = new SourceInfo { Key = "source", Name = "站点", Runtime = SourceRuntime.MacCms };
+        var failed = new SourceInfo { Key = "slow", Name = "慢站", Runtime = SourceRuntime.MacCms };
+        var search = new SearchViewModel((_, _) => Task.FromResult(SearchResults("ok")), context.Main) { Keyword = "测试" };
+        search.SetDetailedSearch((_, _) => Task.FromResult(new AggregateSearchResult(
+            [(site, Item("ok"))], [(failed, "超时（25s）")])));
+        await Done(search.RunSearchAsync());
+        // 部分失败：成功卡片保留且带正确来源，失败站点在汇总里可见（不能静默吞掉）。
+        Assert.Equal("站点", Assert.Single(search.AllResults).SourceName);
+        Assert.Contains("慢站", search.Summary);
+        Assert.Contains("超时", search.Summary);
+        Assert.Empty(search.Hint);
+    }
+
+    [AvaloniaFact]
+    public async Task Vod_StreamingSearchAppendsEachSiteBatchAndLabelsCardsWithTheirSource()
+    {
+        using var context = new Context();
+        var vod = new VodViewModel(context.Services, context.Main, () => context.Source);
+        var first = new SourceInfo { Key = "a", Name = "甲站", Runtime = SourceRuntime.MacCms };
+        var failing = new SourceInfo { Key = "c", Name = "丙站", Runtime = SourceRuntime.MacCms };
+        var second = new SourceInfo { Key = "b", Name = "乙站", Runtime = SourceRuntime.MacCms };
+        vod.SetSearchStream((_, _) => Batches(
+            new AggregateSearchBatch(first, [Item("a1"), Item("a2")]),
+            new AggregateSearchBatch(failing, [], "连接超时"),
+            new AggregateSearchBatch(second, [Item("b1")])));
+        vod.Keyword = "测试";
+        await Done(vod.RunSearchAsync());
+        // 流式逐站追加：先到的站点先上屏，失败站点只计失败、不影响已有卡片。
+        Assert.Equal(["a1", "a2", "b1"], vod.Items.Select(item => item.Id));
+        Assert.Equal(["甲站", "甲站", "乙站"], vod.Items.Select(item => item.SourceName));
+        Assert.Contains("3 个站点", vod.SearchSummary);
+        Assert.Contains("1 个站点失败", vod.SearchSummary);
+        Assert.False(vod.Searching);
+        Assert.False(vod.Loading);
+        Assert.Empty(vod.ItemsHint);
+    }
+
+    [AvaloniaFact]
+    public async Task Vod_StaleStreamBatchesCannotRepopulateAfterANewSearch()
+    {
+        using var context = new Context();
+        var vod = new VodViewModel(context.Services, context.Main, () => context.Source);
+        var oldSite = new SourceInfo { Key = "old", Name = "旧站", Runtime = SourceRuntime.MacCms };
+        var newSite = new SourceInfo { Key = "new", Name = "新站", Runtime = SourceRuntime.MacCms };
+        var release = Gate<bool>();
+        vod.SetSearchStream((query, _) => query == "旧"
+            ? LateBatch(oldSite, release.Task, "old1")
+            : Batches(new AggregateSearchBatch(newSite, [Item("new1")])));
+        vod.Keyword = "旧";
+        var stale = vod.RunSearchAsync();
+        vod.Keyword = "新";
+        await Done(vod.RunSearchAsync());
+        release.SetResult(true);
+        await Done(stale);
+        // 代次门控：旧请求的迟到批次不能回填新查询的结果（也不能盖掉新来源）。
+        Assert.Equal("new1", Assert.Single(vod.Items).Id);
+        Assert.Equal("新站", Assert.Single(vod.Items).SourceName);
+        Assert.DoesNotContain(vod.Items, item => item.SourceName == "旧站");
+        Assert.False(vod.Searching);
+    }
+
     [AvaloniaFact]
     public async Task Search_LateResultsCannotReplaceNewQuery()
     {
@@ -515,8 +612,11 @@ public sealed class ViewModelRaceTests
         await Done(search.RunSearchAsync());
         var site = Assert.Single(search.SiteResults);
         Assert.Equal(120, site.Items.Count);
+        // 每张卡片（含被虚拟化的后 40 条）都带来源站点名，不能在分批/分块时丢掉。
+        Assert.All(search.AllResults, item => Assert.Equal("站点", item.SourceName));
         search.SelectedSite = site;
         Assert.Equal(120, search.ResultRows.Sum(row => row.Items.Count));
+        Assert.All(search.ResultRows.SelectMany(row => row.Items), card => Assert.Equal("站点", card.SourceName));
         search.OpenItemCommand.Execute(search.AllResults[119]);
         Assert.Equal("item119", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
@@ -1238,13 +1338,15 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
-    public async Task Detail_CrossSourceSearchUsesActualMediaTitle()
+    public async Task Detail_CrossSourceSearchRequestsWindowWithActualMediaTitle()
     {
         using var context = new Context();
         await Done(context.Main.Detail.OpenAsync("source", Item("真实片名")));
+        string? requested = null;
+        context.Main.SearchRequested += keyword => requested = keyword;
         context.Main.Detail.SearchOtherSourcesCommand.Execute(null);
-        Assert.Equal(AppPage.Search, context.Main.Page);
-        Assert.Equal("真实片名", context.Main.Search.Keyword);
+        // 用真实片名发起全站搜索；结果窗口由主窗口负责打开，VM 不再切主窗口内的搜索页。
+        Assert.Equal("真实片名", requested);
     }
 
     [AvaloniaFact]
@@ -2154,7 +2256,7 @@ public sealed class ViewModelRaceTests
             var groupName = labels.Single(text => text.Text == "卫视");
             var groupCount = labels.Single(text => text.Text == "2 个频道");
             Assert.True(groupCount.TranslatePoint(default, selectedItem)!.Value.Y > groupName.TranslatePoint(default, selectedItem)!.Value.Y);
-            var check = selectedItem.GetVisualDescendants().OfType<PathIcon>().Single(icon => icon.Width == 16);
+            var check = selectedItem.GetVisualDescendants().OfType<PathIcon>().Single(icon => icon.Width == 18);
             Assert.True(check.IsVisible);
             var presenter = selectedItem.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>()
                 .Single(control => control.Name == "PART_ContentPresenter");
@@ -2241,7 +2343,7 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
-    public void LiveHidesGlobalSearchAndMovesContentUpWithoutAffectingHome()
+    public void SidebarGlobalSearchRemainsVisibleAcrossLiveAndHome()
     {
         using var context = new Context();
         var window = new VodBox.Desktop.MainWindow { DataContext = context.Main };
@@ -2255,7 +2357,7 @@ public sealed class ViewModelRaceTests
             Assert.True(search.IsVisible);
             context.Main.Navigate(AppPage.Live);
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
-            Assert.False(search.IsVisible);
+            Assert.True(search.IsVisible);
             var live = window.GetVisualDescendants().OfType<LiveView>().Single();
             if (OperatingSystem.IsMacOS())
                 Assert.True(live.TranslatePoint(default, window)!.Value.Y < originalY);
@@ -2818,7 +2920,7 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
-    public void SearchInputsShareLiveSearchShapeAndIconWithoutInterceptingInput()
+    public void SidebarSearchSharesShapeWithLiveSearchAndHasNoSearchMenuOrPage()
     {
         using var context = new Context();
         var window = new VodBox.Desktop.MainWindow { DataContext = context.Main };
@@ -2826,6 +2928,7 @@ public sealed class ViewModelRaceTests
         try
         {
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            // 侧栏顶部搜索框：与直播页频道搜索框同一形状，左侧图标不拦截输入。
             var global = window.FindControl<TextBox>("GlobalSearch")!;
             var globalIcon = window.FindControl<PathIcon>("GlobalSearchIcon")!;
             Assert.Equal(34, global.Bounds.Height);
@@ -2835,20 +2938,14 @@ public sealed class ViewModelRaceTests
             Assert.False(globalIcon.IsHitTestVisible);
             var hero = window.GetVisualDescendants().OfType<HomeView>().Single().FindControl<Border>("HeroCard")!;
             Assert.Equal(new Avalonia.CornerRadius(6), hero.CornerRadius);
-            context.Main.Navigate(AppPage.Search);
-            window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
-            var searchView = window.GetVisualDescendants().OfType<SearchView>().Single();
-            var result = searchView.FindControl<TextBox>("ResultSearch")!;
-            Assert.Equal(global.CornerRadius, result.CornerRadius);
-            Assert.Equal(global.Padding, result.Padding);
-            Assert.Equal(34, result.Bounds.Height);
-            Assert.False(searchView.FindControl<PathIcon>("ResultSearchIcon")!.IsHitTestVisible);
-            Assert.False(window.FindControl<Grid>("GlobalSearchContainer")!.IsEffectivelyVisible);
+            // 侧栏不再有「搜索」菜单项；主窗口内也不再有搜索页（结果改由独立窗口承载）。
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<NavItemView>(), item => item.Label == "搜索");
+            Assert.Empty(window.GetVisualDescendants().OfType<SearchView>());
             context.Main.Navigate(AppPage.Live);
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
             var liveSearch = window.GetVisualDescendants().OfType<LiveView>().Single().FindControl<TextBox>("ChannelSearch")!;
-            Assert.Equal(result.CornerRadius, liveSearch.CornerRadius);
-            Assert.Equal(result.Padding, liveSearch.Padding);
+            Assert.Equal(global.CornerRadius, liveSearch.CornerRadius);
+            Assert.Equal(global.Padding, liveSearch.Padding);
         }
         finally { window.Close(); }
     }

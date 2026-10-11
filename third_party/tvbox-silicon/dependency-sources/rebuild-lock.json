@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "generated_at": "2026-10-11T00:00:00Z",
+  "scope": "VodBox-managed rebuild path for distributed native artifacts. Records pinned public sources/toolchains for a from-source rebuild that REPLACES opaque upstream prebuilt natives. This is not a claim that any old binary matches any commit.",
+  "authoritative_recipe": "../rebuild/README.md",
+  "not_run": {
+    "build": true,
+    "test": true,
+    "typecheck": true,
+    "note": "No build was executed while authoring this path. Output hashes below are null until the main agent runs the scripts and records them."
+  },
+  "artifacts": [
+    {
+      "id": "backend-unicorn2",
+      "replaces": "natives/*/{libunicorn.so,libunicorn.dylib,unicorn.dll} inside com.github.zhkl0228:unidbg-unicorn2:0.9.8",
+      "covers_rids": ["linux-x64", "linux-arm64", "osx-x64", "osx-arm64", "win-x64"],
+      "excluded_rids": ["win-arm64"],
+      "pin": "../rebuild/backend-unicorn2/engine-pin.json",
+      "toolchains": "../rebuild/backend-unicorn2/toolchains.json",
+      "fetch": "../rebuild/backend-unicorn2/fetch-engine.sh",
+      "build": "../rebuild/backend-unicorn2/build-backend.sh",
+      "engine": {
+        "repo": "zhkl0228/unicorn",
+        "branch": "unicorn2",
+        "commit": "548eda466eb9a2c69723a0f74888aa7b889b4ed9",
+        "tag": "untagged",
+        "archive": "archives/unicorn-548eda466eb9a2c69723a0f74888aa7b889b4ed9.tar.gz",
+        "archive_sha256": "c90a485e10674c576c2977ba84afb190277530d74fd43db1ba94afb526928a4b",
+        "build_system": "cmake",
+        "superseded_commit": "15cad005ed027685e5e3da429eb84325fba55f8a",
+        "correction_reason": "15cad005 is the Unicorn1 line (tag 1.0.14) and lacks the bridge-required Control API (uc_ctl_set_cpu_model, uc_ctl_remove_cache, UC_CPU_ARM64_MAX, UC_CPU_ARM_CORTEX_A15). Retargeted to the unicorn2 branch HEAD that provides them. See engine-pin.json.pin_correction. A successful link against this pin proves API completeness for the bridge, NOT that the old prebuilt was built from this exact tree."
+      },
+      "output_sha256": null,
+      "disposition": "rebuild-from-pinned-public-source"
+    },
+    {
+      "id": "guest-sdk-hooks",
+      "replaces": "unidbg-android:0.9.8 hook libs: libhookzz.so, libwhale.so, libxhook.so (armeabi-v7a + arm64-v8a)",
+      "pin": "../rebuild/guest-sdk-hooks/hooks-pin.json",
+      "build": "../rebuild/guest-sdk-hooks/build-hooks.sh",
+      "output_sha256": null,
+      "disposition": "rebuild-from-pinned-public-source",
+      "abi_compat_check_required": "Dobby-vs-HookZz and rebuilt hook runtimes must pass the DEX acceptance suite before substituting; compatibility is not assumed."
+    },
+    {
+      "id": "guest-sdk-android",
+      "replaces": "unidbg-android:0.9.8 sdk19/lib, sdk23/lib, sdk23/lib64 guest libraries (26 files)",
+      "pin": "../rebuild/guest-sdk-android/aosp-pin.json",
+      "build": "../rebuild/guest-sdk-android/build-guest-sdk.sh",
+      "output_sha256": null,
+      "disposition": "rebuild-or-drop",
+      "fail_closed": "Any guest .so without a pinned AOSP tag/module must be dropped from distribution, never shipped unprovenanced."
+    }
+  ],
+  "preserved_compatibility_layer": {
+    "java_host": "upstream tvbox-silicon JavaHost reused unchanged",
+    "adapter": "vodbox-adapter ProcessAdapter.java unchanged",
+    "ipc_contract": "unchanged; rebuilt natives are drop-in behind the same JVM-visible com.github.unidbg.arm.backend.unicorn.Unicorn API"
+  },
+  "gate": {
+    "corresponding_source_complete": false,
+    "closes_when": "Every distributed native entry has either an executed VodBox rebuild with a recorded output SHA-256, or is removed from the distribution.",
+    "does_not_close_by": "Retaining upstream prebuilt natives, or matching a release archive/version string."
+  }
+}

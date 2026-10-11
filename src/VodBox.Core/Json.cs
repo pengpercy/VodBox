@@ -41,6 +41,7 @@ public static class Json
 [JsonSerializable(typeof(PlaybackLine))]
 [JsonSerializable(typeof(Category))]
 [JsonSerializable(typeof(PlaybackRequest))]
+[JsonSerializable(typeof(PlaybackChoice))]
 [JsonSerializable(typeof(HistoryEntry))]
 [JsonSerializable(typeof(FavoriteEntry))]
 [JsonSerializable(typeof(LiveChannel))]

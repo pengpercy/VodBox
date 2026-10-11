@@ -30,17 +30,26 @@ public sealed class ConfigLoader(DefaultHttp http)
     /// 抓取一次并自动判别载体形态：优先二进制隐写（JPEG 尾部 base64，如饭太硬），
     /// 再回退文本形态（明文 JSON / JS 变量包裹）。真实配置 URL 统一走这里。
     /// </summary>
-    public async Task<TvBoxConfig> LoadAnyAsync(string url, CancellationToken ct = default)
+    public async Task<TvBoxConfig> LoadAnyAsync(string url, CancellationToken ct = default) =>
+        (await LoadAnyWithOriginAsync(url, ct).ConfigureAwait(false)).Config;
+
+    /// <summary>
+    /// 与 <see cref="LoadAnyAsync"/> 相同，并返回订阅**最终 origin**（跟随重定向后的地址）。
+    /// 相对 jar/ext 的解析、以及 JAR 宿主上下文都依赖它。
+    /// </summary>
+    public async Task<LoadedConfig> LoadAnyWithOriginAsync(string url, CancellationToken ct = default)
     {
-        var bytes = await http.GetByteArrayAsync(url, ct: ct);
+        var (bytes, finalUri) = await http.GetByteArrayWithFinalUriAsync(url, ct: ct).ConfigureAwait(false);
         var config = ParseBytes(bytes) ?? Parse(DefaultHttp.Decode(bytes));
         if (config is null)
         {
             // 桌面浏览器 UA 被配置站点的 WAF 拦截时会返回 HTML 挑战页；回落 TVBox 客户端 UA 重试一次
-            bytes = await http.GetByteArrayAsync(url, TvBoxHeaders, ct);
+            (bytes, finalUri) = await http.GetByteArrayWithFinalUriAsync(url, TvBoxHeaders, ct).ConfigureAwait(false);
             config = ParseBytes(bytes) ?? Parse(DefaultHttp.Decode(bytes));
         }
-        return config ?? throw new InvalidDataException($"配置解析失败：{url}");
+        return config is null
+            ? throw new InvalidDataException($"配置解析失败：{url}")
+            : new LoadedConfig(config, finalUri.AbsoluteUri);
     }
 
     private static readonly Dictionary<string, string> TvBoxHeaders = new()
@@ -116,17 +125,29 @@ public sealed class ConfigLoader(DefaultHttp http)
     }
 
     /// <summary>把 TvBoxConfig 转为可用的内容源列表（过滤桌面端不支持的 csp_ 站点）。</summary>
-    public static List<SourceInfo> ToSources(TvBoxConfig config)
+    public static List<SourceInfo> ToSources(TvBoxConfig config) => ToSources(config, origin: null, includeJarPlugins: false);
+
+    /// <summary>
+    /// 把 TvBoxConfig 转为内容源列表。
+    /// <paramref name="includeJarPlugins"/> 为 true 时，未用 C# 原生实现的 csp_ JAR 站点不再被丢弃，
+    /// 而是标为 <see cref="SourceRuntime.Jar"/> 并携带全局 spider / 站点 jar / 最终 origin / 原始站点 JSON，
+    /// 交由外部 JAR 宿主执行（宿主不可用时由注册表保持未创建并提示）。默认 false 保持既有过滤行为。
+    /// </summary>
+    public static List<SourceInfo> ToSources(TvBoxConfig config, string? origin, bool includeJarPlugins)
     {
         var sources = new List<SourceInfo>();
         foreach (var site in config.Sites)
         {
             if (string.IsNullOrWhiteSpace(site.Key) || string.IsNullOrWhiteSpace(site.Name)) continue;
-            // csp_ 入口：已用 C# 原生重写的提升为 NativeSpider，其余（无桌面实现）保持 Node 并丢弃
+            // csp_ 入口：已用 C# 原生重写的提升为 NativeSpider，其余按策略处理（丢弃或转 JAR 宿主）
             var runtime = site.Runtime;
             if (runtime == SourceRuntime.Node && NativeSpiders.IsSupported(site))
                 runtime = SourceRuntime.NativeSpider;
-            if (runtime == SourceRuntime.Node) continue;
+            if (runtime == SourceRuntime.Node)
+            {
+                if (!includeJarPlugins) continue;
+                runtime = SourceRuntime.Jar;
+            }
             // .js 入口：按站点 key 有原生实现的提升为 NativeSpider（如 虎牙js→虎牙直播）；
             // 其余 .js 保持 QuickJs 待 S3a 的 JS 宿主
             if (runtime == SourceRuntime.QuickJs && NativeSpiders.IsSupportedKey(site.Key))
@@ -143,8 +164,34 @@ public sealed class ConfigLoader(DefaultHttp http)
                 Searchable = site.Searchable != 0,
                 Changeable = site.Changeable != 0,
                 Categories = site.Categories,
+                Spider = config.Spider,
+                Jar = site.Jar,
+                Origin = origin,
+                Header = ReadSiteHeader(site.Raw),
+                SiteJson = runtime == SourceRuntime.Jar ? JsonSerializer.Serialize(site, Json.TypeInfo<TvBoxSite>()) : null,
             });
         }
         return sources;
     }
+
+    /// <summary>
+    /// 读取站点原始 JSON 里的 <c>header</c>（未建模字段，保留原样不下发臆造值）。
+    /// 只收字符串标量并拒绝控制字符；非对象/非字符串一律忽略，避免污染请求头。
+    /// </summary>
+    private static IReadOnlyDictionary<string, string>? ReadSiteHeader(Dictionary<string, JsonElement>? raw)
+    {
+        if (raw is null || !raw.TryGetValue("header", out var header) || header.ValueKind != JsonValueKind.Object) return null;
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in header.EnumerateObject())
+        {
+            if (property.Value.ValueKind != JsonValueKind.String) continue;
+            var value = property.Value.GetString() ?? "";
+            if (property.Name.Length == 0 || property.Name.IndexOfAny(['\r', '\n', '\0']) >= 0 || value.IndexOfAny(['\r', '\n', '\0']) >= 0) continue;
+            result[property.Name] = value;
+        }
+        return result.Count > 0 ? result : null;
+    }
 }
+
+/// <summary>已加载的订阅：配置 + 最终 origin。</summary>
+public sealed record LoadedConfig(TvBoxConfig Config, string? Origin);

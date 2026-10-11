@@ -88,6 +88,12 @@ public sealed partial class LiveViewModel : ObservableObject
     public IReadOnlyList<string> ImportWarnings { get; private set; } = [];
     private VodBox.Infrastructure.ProgrammeStore ProgrammeCache => new(Path.Combine(_services.DataDir, "programmes.xml"));
     private IReadOnlyList<Programme> _programmes = [];
+
+    // ---- 内置节目表 ----
+    private readonly VodBox.Desktop.Services.EpgService _epg;
+    private VodBox.Infrastructure.EpgProgrammeIndex? _legacyIndex;
+    private bool _epgInitialized;
+    private static readonly VodBox.Infrastructure.EpgProgrammeIndex EmptyIndex = VodBox.Infrastructure.EpgProgrammeIndex.CreateEmpty("");
     public string CurrentLineLabel => $"线路 {_lineIndex + 1}";
     public string LiveSourceLabel
     {
@@ -117,7 +123,12 @@ public sealed partial class LiveViewModel : ObservableObject
             using var input = new MemoryStream(bytes);
             await ImportXmlTvAsync(input, bytes.Length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b,scope.Token);
             scope.Token.ThrowIfCancellationRequested();
-            if(generation==_epgDownloadGeneration)_services.Prefs.Set("live.epg-url", url);
+            if(generation==_epgDownloadGeneration)
+            {
+                _services.Prefs.Set(EpgService.ManualUrlKey, url);
+                // 手动订阅成功才切到手动数据；失败路径在上面直接抛出，旧缓存不受影响。
+                NotifyManualSubscription();
+            }
         }
         finally{if(ReferenceEquals(_epgDownload,scope))_epgDownload=null;}
     }
@@ -142,7 +153,7 @@ public sealed partial class LiveViewModel : ObservableObject
             if (generation != Volatile.Read(ref _epgImportGeneration)||ct.IsCancellationRequested) return;
             var xml=VodBox.Infrastructure.ProgrammeStore.Serialize(programmes);
             ct.ThrowIfCancellationRequested();
-            _services.Prefs.Set("live.epg-xml",xml);
+            _services.Prefs.Set(EpgService.ManualXmlKey,xml);
             try{await ProgrammeCache.SaveAsync(programmes,ct);}
             catch(Exception error)when(error is IOException or UnauthorizedAccessException){System.Diagnostics.Debug.WriteLine($"[epg cache] {error.Message}");}
         }
@@ -268,6 +279,8 @@ public sealed partial class LiveViewModel : ObservableObject
         _services = services;
         _main = main;
         _loadGroups = loadGroups;
+        _epg = new VodBox.Desktop.Services.EpgService(Path.Combine(services.DataDir, "epg"), services.Prefs);
+        _epg.Changed += OnEpgChanged;
         Groups.CollectionChanged += (_, _) => RefreshGroupOptions();
         RefreshGroupOptions();
         ChannelCards.CollectionChanged += (_, _) =>
@@ -276,6 +289,121 @@ public sealed partial class LiveViewModel : ObservableObject
             OnPropertyChanged(nameof(ShowChannelEmpty));
         };
 
+    }
+
+    // ---- 内置节目表：状态与初始化 ----
+
+    /// <summary>工具栏节目表状态入口文案（正常/异常都短）。手动导入的数据也算用户覆盖，不能谎称「内置节目表」。</summary>
+    public string EpgStatusLabel
+    {
+        get
+        {
+            if (_programmes.Count > 0)
+                return _services.Prefs.GetString(EpgService.ManualUrlKey).Length > 0 ? "手动订阅节目表" : "已导入节目表";
+            return _epg.StatusLabel;
+        }
+    }
+
+    /// <summary>数据覆盖日期（与「最近成功获取」分开，未知显示未知）。</summary>
+    public string EpgCoverageLabel
+    {
+        get
+        {
+            var end = _epg.CoverageEnd;
+            return end is { } value ? $"覆盖至 {value.ToLocalTime():MM-dd HH:mm}" : "覆盖日期未知";
+        }
+    }
+
+    public string EpgLastSuccessLabel
+    {
+        get
+        {
+            var last = _epg.LastSuccessAt;
+            return last is { } value ? $"最近成功 {value.ToLocalTime():MM-dd HH:mm}" : "尚未成功获取";
+        }
+    }
+
+    /// <summary>状态入口的悬停详情：状态 / 最近成功获取 / 数据覆盖，三者分开，未知就是未知。</summary>
+    public string EpgStatusDetail => $"{EpgStatusLabel}\n{EpgLastSuccessLabel}\n{EpgCoverageLabel}";
+
+    /// <summary>是否处于手动订阅覆盖（此时内置来源让位）。</summary>
+    public bool EpgManualOverride => _epg.IsManualOverride;
+
+    private void OnEpgChanged() => _main.RunOnUiAsync(() =>
+    {
+        OnPropertyChanged(nameof(EpgStatusLabel));
+        OnPropertyChanged(nameof(EpgStatusDetail));
+        OnPropertyChanged(nameof(EpgLastSuccessLabel));
+        OnPropertyChanged(nameof(EpgCoverageLabel));
+        OnPropertyChanged(nameof(EpgManualOverride));
+        RefreshProgrammeClock(DateTimeOffset.Now);
+    }).GetAwaiter().GetResult();
+
+    /// <summary>首次打开直播：立即读缓存，并发起内置刷新（手动订阅覆盖时不发）。</summary>
+    public async Task EnsureBuiltInEpgAsync()
+    {
+        if (_epgInitialized) { await _epg.EnsureFreshAsync(); return; }
+        _epgInitialized = true;
+        await _epg.LoadCacheAsync();
+        RefreshProgrammeClock(DateTimeOffset.Now);
+        await _epg.EnsureFreshAsync();
+    }
+
+    /// <summary>恢复/退到前台时调用：距离上次成功超过 2 小时才更新。</summary>
+    public Task NotifyForegroundAsync() => _epgInitialized ? _epg.EnsureFreshAsync() : EnsureBuiltInEpgAsync();
+
+    [RelayCommand]
+    private async Task RetryEpg()
+    {
+        _main.StatusMessage = "正在重试节目表…";
+        var ok = await _epg.RefreshAsync(force: true);
+        _main.StatusMessage = ok ? "节目表已更新" : _epg.StatusLabel;
+    }
+
+    /// <summary>定位到设置中的节目表区（源与订阅）。</summary>
+    [RelayCommand]
+    private void OpenEpgSettings()
+    {
+        _main.Settings.Section = 0;
+        _main.OpenSettings();
+    }
+
+    /// <summary>手动订阅成功后由设置调用：切到手动数据，内置索引不再参与展示。</summary>
+    public void NotifyManualSubscription()
+    {
+        _epg.NotifyManualOverrideChanged();
+        NotifyEpgStatusChanged();
+        RefreshProgrammeClock(DateTimeOffset.Now);
+    }
+
+    /// <summary>
+    /// 「恢复内置节目表」：清除手动订阅覆盖与手动导入数据，回到内置来源。
+    /// 只替换节目数据，不触发播放、切台或换线；旧内置缓存仍然可用，不先清空再等下载。
+    /// </summary>
+    public async Task RestoreBuiltInEpgAsync(CancellationToken ct = default)
+    {
+        // 先停掉可能正在进行的手动订阅下载，避免迟到结果把手动数据写回来。
+        _epgDownload?.Cancel();
+        _epgDownloadGeneration++;
+        Interlocked.Increment(ref _epgImportGeneration);
+        _services.Prefs.Set(EpgService.ManualUrlKey, "");
+        _services.Prefs.Set(EpgService.ManualXmlKey, "");
+        try { await ProgrammeCache.SaveAsync([], ct); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { System.Diagnostics.Debug.WriteLine($"[epg cache] 清空失败：{error.Message}"); }
+        _programmes = [];
+        _legacyIndex = EmptyIndex;
+        _programmeCacheLoaded = true;
+        _epg.NotifyManualOverrideChanged();
+        await _main.RunOnUiAsync(() =>
+        {
+            foreach (var channel in Groups.SelectMany(group => group.Channels)) channel.EpgNow = channel.EpgNext = "";
+            ApplyFilter();
+            RefreshProgrammeClock(DateTimeOffset.Now);
+        });
+        // 回到内置后立即确保有数据：没有缓存就下载，有缓存且未过期则不重复请求。
+        _epgInitialized = true;
+        await _epg.EnsureFreshAsync(ct);
     }
 
     partial void OnSelectedGroupChanged(LiveGroup? value)
@@ -294,8 +422,13 @@ public sealed partial class LiveViewModel : ObservableObject
             ChannelCards.Clear();
             foreach (var channel in VisibleChannels.OfType<LiveChannel>()) ChannelCards.Add(channel);
             RebuildCardRows();
+            // 只刷新可见/候选项的必要文案，不重建卡片集合、不改排序筛选与滚动位置。
+            if (EpgEngaged) foreach (var channel in ChannelCards) RefreshChannelEpgLabel(channel, DateTimeOffset.Now);
         }
     }
+
+    /// <summary>EPG 是否已介入展示（有手动数据、内置索引，或内置服务已有加载状态）。</summary>
+    private bool EpgEngaged => _programmes.Count > 0 || _epg.HasData || _epgInitialized;
 
     private void ApplyChannelFilter()
     {
@@ -352,9 +485,9 @@ public sealed partial class LiveViewModel : ObservableObject
         var generation = Volatile.Read(ref _epgImportGeneration);
         try
         {
-            var xml=_services.Prefs.GetString("live.epg-xml");
+            var xml=_services.Prefs.GetString(EpgService.ManualXmlKey);
             var programmes = xml.Length>0?VodBox.Infrastructure.XmlTvParser.Parse(xml):await ProgrammeCache.LoadAsync();
-            if(xml.Length==0&&programmes.Count>0)_services.Prefs.Set("live.epg-xml",VodBox.Infrastructure.ProgrammeStore.Serialize(programmes));
+            if(xml.Length==0&&programmes.Count>0)_services.Prefs.Set(EpgService.ManualXmlKey,VodBox.Infrastructure.ProgrammeStore.Serialize(programmes));
             await _main.RunOnUiAsync(() =>
             {
                 if (generation != Volatile.Read(ref _epgImportGeneration)) return;
@@ -377,10 +510,15 @@ public sealed partial class LiveViewModel : ObservableObject
 
     public void CancelPending()
     {
-        GroupPassword="";GroupUnlockOpen=false;_unlockedGroups.Clear();++_loadGeneration;Interlocked.Increment(ref _epgImportGeneration);++_epgDownloadGeneration;_epgDownload?.Cancel();_loadRequest?.Cancel();_loadRequest=null;Loading=false;
+        GroupPassword="";GroupUnlockOpen=false;_unlockedGroups.Clear();++_loadGeneration;Interlocked.Increment(ref _epgImportGeneration);++_epgDownloadGeneration;_epgDownload?.Cancel();_loadRequest?.Cancel();_loadRequest=null;Loading=false;_epg.Cancel();
     }
 
-    public Task LoadAsync() => LoadConfigurationAsync(_services.CurrentLiveConfig, false);
+    public async Task LoadAsync()
+    {
+        await LoadConfigurationAsync(_services.CurrentLiveConfig, false);
+        // 首次打开直播立即读缓存并发起内置刷新；与直播源加载互不阻塞、互不影响播放。
+        await EnsureBuiltInEpgAsync();
+    }
 
     public Task<bool> ApplyConfigurationAsync(string url) => LoadConfigurationAsync(url, true);
 
@@ -528,6 +666,12 @@ public sealed partial class LiveViewModel : ObservableObject
         OnPropertyChanged(nameof(CurrentLineLabel));
     }
 
+    partial void OnCurrentChannelChanged(LiveChannel? value)
+    {
+        OnPropertyChanged(nameof(HasChannelSummary));
+        if (value is null) ClearSummary();
+    }
+
     public void SetCurrent(LiveChannel channel)
     {
         foreach (var item in Groups.SelectMany(group => group.Channels)) item.IsCurrent = false;
@@ -542,27 +686,262 @@ public sealed partial class LiveViewModel : ObservableObject
     public void SetProgrammes(IReadOnlyList<Programme> programmes)
     {
         _programmes = programmes.ToArray();
+        _legacyIndex = BuildLegacyIndex(_programmes);
+        NotifyEpgStatusChanged();
         RefreshProgrammeClock(DateTimeOffset.Now);
+    }
+
+    /// <summary>节目表来源/状态变化时刷新工具栏状态入口文案。</summary>
+    private void NotifyEpgStatusChanged()
+    {
+        OnPropertyChanged(nameof(EpgStatusLabel));
+        OnPropertyChanged(nameof(EpgStatusDetail));
+        OnPropertyChanged(nameof(EpgManualOverride));
+    }
+
+    private static VodBox.Infrastructure.EpgProgrammeIndex BuildLegacyIndex(IReadOnlyList<Programme> programmes)
+    {
+        if (programmes.Count == 0) return EmptyIndex;
+        var names = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (var group in programmes.GroupBy(p => p.ChannelKey, StringComparer.Ordinal))
+        {
+            var declared = group.Select(p => p.ChannelName).Where(n => n.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
+            names[group.Key] = declared.Length > 0 ? declared : [group.Key];
+        }
+        return VodBox.Infrastructure.EpgProgrammeIndex.Build(new VodBox.Infrastructure.EpgSourceData("", programmes, names));
     }
 
     public void RefreshProgrammeClock(DateTimeOffset now) => RefreshEpgTimeline(now);
 
     private void RefreshEpgTimeline(DateTimeOffset? clock = null)
     {
-        EpgTimeline.Clear();
-        if (CurrentChannel is not { } channel) return;
         var now = clock ?? DateTimeOffset.Now;
-        var matches = _programmes.Where(programme => !string.IsNullOrWhiteSpace(channel.TvgId)
-            ? programme.ChannelKey == channel.TvgId
-            : programme.ChannelName == channel.Name).OrderBy(programme => programme.Start).ToArray();
-        channel.EpgNow = matches.FirstOrDefault(programme => programme.Start <= now && now < programme.End)?.Title ?? "";
-        channel.EpgNext = matches.FirstOrDefault(programme => programme.Start > now)?.Title ?? "";
-        foreach (var programme in matches.Where(programme => programme.End > now.AddHours(-6) && programme.Start < now.AddHours(24)))
-            EpgTimeline.Add(new LiveEpgCard
+        EpgTimeline.Clear();
+        if (CurrentChannel is not { } channel)
+        {
+            OnPropertyChanged(nameof(HasChannelSummary));
+            ClearSummary();
+            // 没有选中频道时也要推进卡片上的「当前节目」，否则时钟走了文案还停在旧节目。
+            foreach (var item in ChannelCards) RefreshChannelEpgLabel(item, now);
+            return;
+        }
+        var schedule = ResolveSchedule(channel, now, out var kind);
+        channel.EpgNow = EpgNowLabel(channel, schedule, kind, now, out var next);
+        channel.EpgNext = next?.Title ?? "";
+        if (schedule is not null)
+            foreach (var programme in schedule.Programmes.Where(p => p.End > now.AddHours(-6) && p.Start < now.AddHours(24)))
+                EpgTimeline.Add(new LiveEpgCard
+                {
+                    Title = programme.Title, Start = programme.Start, End = programme.End,
+                    IsNow = programme.Start <= now && now < programme.End, IsPast = programme.End <= now,
+                });
+        UpdateSummary(channel, schedule, now);
+        if (ProgrammePanelExpanded) RefreshProgrammeRowStates(now);
+        foreach (var item in ChannelCards) if (!ReferenceEquals(item, channel)) RefreshChannelEpgLabel(item, now);
+    }
+
+    /// <summary>
+    /// 为一个频道解析可信节目表：手动导入/旧缓存优先（用户显式覆盖），否则走内置来源。
+    /// 内置部分委托 <see cref="VodBox.Infrastructure.EpgScheduleResolver"/>：按来源命名空间匹配，
+    /// 仅当主源没有可信匹配、或主源可信匹配但「当前缺节目」时，才按来源级改用补充源，
+    /// 且整条时间表只来自一个来源，绝不把两源拼成看似连续的时间表。
+    /// </summary>
+    private VodBox.Infrastructure.EpgChannelSchedule? ResolveSchedule(LiveChannel channel, DateTimeOffset now,
+        out VodBox.Infrastructure.EpgMatchKind kind)
+    {
+        kind = VodBox.Infrastructure.EpgMatchKind.None;
+        if (_programmes.Count > 0)
+        {
+            var index = _legacyIndex ?? EmptyIndex;
+            kind = VodBox.Infrastructure.EpgChannelMatcher.Resolve(index, channel, out var legacyKey);
+            if (kind is VodBox.Infrastructure.EpgMatchKind.ByTvgId or VodBox.Infrastructure.EpgMatchKind.ByUniqueName)
+                return index.TryGetSchedule(legacyKey.ChannelId, out var schedule) ? schedule : null;
+            return null;
+        }
+        if (_epg.IsManualOverride || !_epg.HasData) return null;
+        return VodBox.Infrastructure.EpgScheduleResolver.Resolve(
+            _epg.PrimaryIndex, _epg.SupplementIndex, channel, now, out kind);
+    }
+
+    /// <summary>卡片一行文案：当前节目，或区分过的短状态（错误不冒充无匹配，过期不冒充无节目）。</summary>
+    private string EpgNowLabel(LiveChannel channel, VodBox.Infrastructure.EpgChannelSchedule? schedule,
+        VodBox.Infrastructure.EpgMatchKind kind, DateTimeOffset now, out Programme? next)
+    {
+        next = null;
+        if (schedule is null)
+        {
+            if (kind == VodBox.Infrastructure.EpgMatchKind.Ambiguous) return "频道匹配待确认";
+            // 已可信匹配、但该频道没有任何节目记录：是「无节目」，不是「未匹配」。
+            if (kind is VodBox.Infrastructure.EpgMatchKind.ByTvgId or VodBox.Infrastructure.EpgMatchKind.ByUniqueName)
+                return "暂无节目安排";
+            return NoDataStatus();
+        }
+        if (schedule.Current(now) is { } current)
+        {
+            next = schedule.Next(now);
+            return current.Title;
+        }
+        next = schedule.Next(now);
+        if (schedule.Programmes.Count == 0) return "暂无节目安排";
+        if (schedule.IsExpired(now)) return "节目表已过期";
+        return next is null ? "暂无节目安排" : "当前暂无节目";
+    }
+
+    /// <summary>无该频道数据时的状态：区分加载中 / 加载失败 / 未匹配（手动覆盖时不谎报内置状态）。</summary>
+    private string NoDataStatus()
+    {
+        if (_programmes.Count > 0) return "未匹配节目表";
+        if (_epg.IsManualOverride) return "手动订阅未含该频道";
+        return _epg.State switch
+        {
+            VodBox.Desktop.Services.EpgServiceState.Failed when !_epg.HasData => "节目表加载失败",
+            VodBox.Desktop.Services.EpgServiceState.Loading or VodBox.Desktop.Services.EpgServiceState.Updating => "正在加载节目表…",
+            _ => "未匹配节目表",
+        };
+    }
+
+    private void RefreshChannelEpgLabel(LiveChannel channel, DateTimeOffset now)
+    {
+        if (!EpgEngaged) return;
+        var schedule = ResolveSchedule(channel, now, out var kind);
+        channel.EpgNow = EpgNowLabel(channel, schedule, kind, now, out var next);
+        channel.EpgNext = next?.Title ?? "";
+    }
+
+    // ---- 底部选中频道摘要 + 展开的单频道节目表 ----
+
+    public bool HasChannelSummary => CurrentChannel is not null;
+    [ObservableProperty] private bool _programmePanelExpanded;
+    partial void OnProgrammePanelExpandedChanged(bool value) => OnPropertyChanged(nameof(ProgrammeToggleLabel));
+
+    /// <summary>摘要栏右侧的展开 / 收起按钮文案。</summary>
+    public string ProgrammeToggleLabel => ProgrammePanelExpanded ? "收起节目表" : "展开节目表";
+
+    [ObservableProperty] private string _summaryChannelName = "";
+    [ObservableProperty] private string _summaryNowTitle = "";
+    [ObservableProperty] private string _summaryNowRange = "";
+    [ObservableProperty] private string _summaryNextTitle = "";
+    [ObservableProperty] private string _summaryNextRange = "";
+    [ObservableProperty] private string _programmePanelStatus = "";
+    [ObservableProperty] private string _programmePanelDateLabel = "";
+    [ObservableProperty] private double _programmeListMaxHeight = 260;
+
+    /// <summary>展开后的单频道节目行（虚拟化绑定；时钟推进只更新状态，不重建列表）。</summary>
+    public ObservableCollection<LiveProgrammeRow> ProgrammeRows { get; } = [];
+    public ObservableCollection<ProgrammeDateOption> ProgrammeDates { get; } = [];
+    [ObservableProperty] private ProgrammeDateOption? _selectedProgrammeDate;
+    partial void OnSelectedProgrammeDateChanged(ProgrammeDateOption? value) => RebuildProgrammeRows();
+
+    /// <summary>由视图传入可用内容区高度：节目表上限 45%，并优先保留至少一行频道卡片（194 DIP + 摘要）。</summary>
+    public void SetProgrammeViewportHeight(double contentHeight)
+    {
+        if (!double.IsFinite(contentHeight) || contentHeight <= 0) return;
+        var fractionCap = contentHeight * 0.45;
+        var reserveForCards = contentHeight - 104 - 194; // 摘要 104 + 一行频道卡片 194
+        ProgrammeListMaxHeight = Math.Max(140, Math.Min(fractionCap, reserveForCards));
+    }
+
+    [RelayCommand]
+    private void ToggleProgrammePanel()
+    {
+        if (CurrentChannel is null) return;
+        ProgrammePanelExpanded = !ProgrammePanelExpanded;
+        if (ProgrammePanelExpanded) RefreshProgrammeClock(DateTimeOffset.Now);
+    }
+
+    /// <summary>关闭摘要/节目表（频道锁定或清空时同步隐藏）。</summary>
+    private void ClearSummary()
+    {
+        ProgrammePanelExpanded = false;
+        ProgrammeRows.Clear();
+        ProgrammeDates.Clear();
+        SelectedProgrammeDate = null;
+        SummaryChannelName = SummaryNowTitle = SummaryNowRange = SummaryNextTitle = SummaryNextRange = "";
+        ProgrammePanelStatus = ProgrammePanelDateLabel = "";
+    }
+
+    private void UpdateSummary(LiveChannel channel, VodBox.Infrastructure.EpgChannelSchedule? schedule, DateTimeOffset now)
+    {
+        SummaryChannelName = channel.Name;
+        OnPropertyChanged(nameof(HasChannelSummary));
+        if (schedule is null)
+        {
+            SummaryNowTitle = EpgNowLabel(channel, null, ResolveKind(channel), now, out _);
+            SummaryNowRange = ""; SummaryNextTitle = ""; SummaryNextRange = "";
+            // 展开面板时把「未匹配 / 暂无节目 / 加载中」这类状态显示在节目表区，别留一片空白。
+            ProgrammePanelStatus = SummaryNowTitle;
+        }
+        else
+        {
+            var current = schedule.Current(now);
+            var next = schedule.Next(now);
+            SummaryNowTitle = current?.Title ?? (schedule.IsExpired(now) ? "节目表已过期" : "当前暂无节目");
+            SummaryNowRange = current is null ? "" : LiveProgrammeRow.FormatRange(current.Start, current.End);
+            SummaryNextTitle = next is null ? "暂无后续节目" : next.Title;
+            SummaryNextRange = next is null ? "" : $"下一档 {next.Start.ToLocalTime():HH:mm}";
+        }
+        if (ProgrammePanelExpanded) RebuildProgrammeDates(schedule);
+    }
+
+    private VodBox.Infrastructure.EpgMatchKind ResolveKind(LiveChannel channel)
+    {
+        ResolveSchedule(channel, DateTimeOffset.Now, out var kind);
+        return kind;
+    }
+
+    private void RebuildProgrammeDates(VodBox.Infrastructure.EpgChannelSchedule? schedule)
+    {
+        // 只提供源里确实有数据的日期，外加「今日」：既默认定位到今天的当前节目，
+        // 又绝不臆造未来七天内容（今日无数据时如实显示「该日期没有节目数据」）。
+        var dates = new List<DateOnly>();
+        if (schedule is not null)
+            dates.AddRange(schedule.Programmes.Select(p => DateOnly.FromDateTime(p.Start.ToLocalTime().DateTime)).Distinct());
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.ToLocalTime().DateTime);
+        if (!dates.Contains(today)) dates.Add(today);
+        dates.Sort();
+        ProgrammeDates.Clear();
+        foreach (var date in dates) ProgrammeDates.Add(new ProgrammeDateOption(date, DateLabel(date)));
+        var preferred = ProgrammeDates.FirstOrDefault(option => option.Date == today) ?? ProgrammeDates.FirstOrDefault();
+        if (!ReferenceEquals(SelectedProgrammeDate, preferred)) SelectedProgrammeDate = preferred;
+        else RebuildProgrammeRows();
+        ProgrammePanelDateLabel = preferred is null ? "" : preferred.Label;
+    }
+
+    private void RebuildProgrammeRows()
+    {
+        ProgrammeRows.Clear();
+        var schedule = CurrentChannel is { } channel ? ResolveSchedule(channel, DateTimeOffset.Now, out _) : null;
+        if (schedule is null || SelectedProgrammeDate is null)
+        {
+            ProgrammePanelStatus = schedule is null ? (CurrentChannel is null ? "" : "暂无节目安排") : "该日期没有节目数据";
+            return;
+        }
+        var now = DateTimeOffset.Now;
+        var rows = schedule.Programmes.Where(p => DateOnly.FromDateTime(p.Start.ToLocalTime().DateTime) == SelectedProgrammeDate.Date);
+        foreach (var programme in rows)
+            ProgrammeRows.Add(new LiveProgrammeRow
             {
                 Title = programme.Title, Start = programme.Start, End = programme.End,
                 IsNow = programme.Start <= now && now < programme.End, IsPast = programme.End <= now,
             });
+        ProgrammePanelStatus = ProgrammeRows.Count == 0 ? "该日期没有节目数据" : "";
+    }
+
+    private void RefreshProgrammeRowStates(DateTimeOffset now)
+    {
+        foreach (var row in ProgrammeRows)
+        {
+            row.IsNow = row.Start <= now && now < row.End;
+            row.IsPast = row.End <= now;
+        }
+    }
+
+    private static string DateLabel(DateOnly date)
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.ToLocalTime().DateTime);
+        if (date == today) return $"今天 {date:MM-dd}";
+        if (date == today.AddDays(1)) return $"明天 {date:MM-dd}";
+        return date.ToString("MM-dd");
     }
 
     /// <summary>上一台（循环）：按 VisibleChannels 顺序回退。</summary>
@@ -628,6 +1007,37 @@ public sealed partial class LiveViewModel : ObservableObject
         catch (Exception error) { _main.StatusMessage = $"回看不可用：{error.Message}"; }
     }
 }
+
+/// <summary>展开的单频道节目表里的一行。只提供播出信息：过去节目不提供播放、seek 或回看入口。</summary>
+public sealed partial class LiveProgrammeRow : ObservableObject
+{
+    public string Title { get; init; } = "";
+    public DateTimeOffset Start { get; init; }
+    public DateTimeOffset End { get; init; }
+    [ObservableProperty] private bool _isNow;
+    [ObservableProperty] private bool _isPast;
+
+    partial void OnIsNowChanged(bool value) => OnPropertyChanged(nameof(StatusLabel));
+    partial void OnIsPastChanged(bool value) => OnPropertyChanged(nameof(StatusLabel));
+
+    /// <summary>本地时间范围；跨午夜的节目标注日期，避免与同一天的另一档混淆。</summary>
+    public string Range => FormatRange(Start, End);
+
+    /// <summary>「正在播出 / 已结束」文字；未开始的节目留空。</summary>
+    public string StatusLabel => IsNow ? "正在播出" : IsPast ? "已结束" : "";
+
+    public static string FormatRange(DateTimeOffset start, DateTimeOffset end)
+    {
+        var localStart = start.ToLocalTime();
+        var localEnd = end.ToLocalTime();
+        return localStart.Date == localEnd.Date
+            ? $"{localStart:HH:mm} — {localEnd:HH:mm}"
+            : $"{localStart:MM-dd HH:mm} — {localEnd:MM-dd HH:mm}";
+    }
+}
+
+/// <summary>节目表日期下拉项。只列出源里确实有数据的日期，不臆造未来七天。</summary>
+public sealed record ProgrammeDateOption(DateOnly Date, string Label);
 
 /// <summary>EPG 时间轴卡片（设计稿 p-live ④）。</summary>
 public sealed partial class LiveEpgCard : ObservableObject

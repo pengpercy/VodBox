@@ -23,7 +23,7 @@
 | 可缩放 | 是（默认 `CanResize=true`），不设 `SizeToContent` | 长列表设置需要拉伸 |
 | 标题 | `设置 — VodBox` | 任务栏/Dock 可区分；纯「设置」也可接受 |
 | Icon | `/Assets/Icons/linux/256/vodbox.png` | 与 MainWindow 一致 |
-| 材质 | `TransparencyLevelHint="Mica,AcrylicBlur,Blur"`，`TransparencyBackgroundFallback="{DynamicResource PageBackgroundBrush}"`，`Background="Transparent"` | 与 MainWindow/PlayerWindow 一致 |
+| 材质 | **不使用窗口材质**：不写 `TransparencyLevelHint`，`Background="{DynamicResource PageBackgroundBrush}"`（不透明），左栏用同一 `PageBackgroundBrush` 实心铺满 | 设置窗口的侧边菜单不要 Mica 毛玻璃，导航文字对比度不随桌面壁纸变化（与 MainWindow/PlayerWindow 的 Mica 方案不同，属有意为之） |
 | 客户区扩展 | `ExtendClientAreaToDecorationsHint="True"`，`ExtendClientAreaTitleBarHeightHint="44"`，`WindowDecorations="Full"` | 与主窗口统一 44px 自绘标题条 |
 | 主题 | **不要**写 `RequestedThemeVariant`，跟随 App/用户设置 | `界面` 分区有「跟随系统/浅色/深色」，硬编码 Dark 会让该设置失效 |
 | 字号基线 | 窗口级 `FontSize="13"` | 与 MainWindow 一致 |
@@ -43,8 +43,8 @@
 ## 2. 整体布局
 
 ```
-Panel                                   ← 材质底
-├─ Rectangle  Fill=PageBackgroundBrush  Opacity=0.40  Width=216  AlignLeft   ← 左栏着色（照抄 MainWindow.SidebarBackdrop）
+Panel                                   ← 不透明主题底（无窗口材质）
+├─ Rectangle  Fill=PageBackgroundBrush  Width=216  AlignLeft                 ← 左栏实心底色（不透明，非半透明着色）
 ├─ Rectangle  Fill=PageBackgroundBrush  Grid.Column=1                         ← 右栏不透明底（照抄 PageBackdrop）
 ├─ Grid ColumnDefinitions="216,*" RowDefinitions="44,*"
 │   ├─ [0,0] Border  DragArea  ElementRole=TitleBar  Margin=OnPlatform macOS '90,0,0,0'
@@ -164,7 +164,7 @@ Panel                                   ← 材质底
 |---|---|
 | 左侧图标（可选） | `PathIcon` **18×18** · `Foreground="{DynamicResource TextSecondaryBrush}"` · `Margin="0,0,14,0"` · 垂直居中。**仅用于身份性行**（如「点播配置」「直播配置」），纯开关行不加图标以减噪 |
 | 标题 | `FontSize=13.5` · `TextPrimaryBrush` · 单行不换行 |
-| 副标题 | `FontSize=11.5` · `TextTertiaryBrush` · 与标题间距 **3** · 允许换行（`TextWrapping=Wrap`），`MaxWidth=420` |
+| 副标题 | `FontSize=11.5` · `TextTertiaryBrush` · 与标题间距 **3** · 允许换行（`TextWrapping=Wrap`），`MaxWidth=420` · **`HorizontalAlignment=Left`**（必须：Avalonia 12 会把 Stretch+MaxWidth 的控件居中，不写 Left 短描述会缩进到行中间） |
 | 副标题若是可复制值/链接 | `Foreground="{DynamicResource AccentBrush}"`（#4CC2FF）+ `TextTrimming="CharacterEllipsis"` |
 | 右侧控件列 | `Auto` 宽 · 垂直居中 · 与文字列间距 **24**（`Margin="24,0,0,0"`） |
 | 行间分隔线 | 1px · 颜色 `{DynamicResource StrokeBrush}` · **左侧缩进 46px**（16 padding + 18 图标 + 12 gap）· 右侧 0 · 末行不加。用 `Border Height=1 Margin="46,0,0,0"`，**不要**用硬编码 `#17FFFFFF`（旧代码遗留），统一走 token |

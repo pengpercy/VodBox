@@ -265,13 +265,12 @@ public sealed partial class DetailViewModel : ObservableObject
     [RelayCommand]
     private void OpenRemoteControl()=>_main.Settings.OpenRemoteSettings();
 
+    /// <summary>「跨站搜索」：用当前片名发起全站聚合搜索，交给独立搜索窗口，不再跳主窗口内的搜索页。</summary>
     [RelayCommand]
     private void SearchOtherSources()
     {
         if (Detail is null) return;
-        _main.Search.Keyword = Detail.Item.Title;
-        _main.Navigate(AppPage.Search);
-        _main.Search.RunSearchCommand.Execute(null);
+        _main.RequestSearch(Detail.Item.Title);
     }
 
     [RelayCommand]

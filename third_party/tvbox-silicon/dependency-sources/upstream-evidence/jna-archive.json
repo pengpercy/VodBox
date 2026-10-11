@@ -1,0 +1,8 @@
+{
+  "repo": "java-native-access/jna",
+  "tag": "5.10.0",
+  "commit": "8230fd9c023246e331601690a2afb82f37e6d4b6",
+  "url": "https://codeload.github.com/java-native-access/jna/tar.gz/8230fd9c023246e331601690a2afb82f37e6d4b6",
+  "archive": "archives/jna-8230fd9c023246e331601690a2afb82f37e6d4b6.tar.gz",
+  "sha256": "e24711d22163b7f49f79065ee49c2db75d59a734dde98a01bed9106f603017a6"
+}

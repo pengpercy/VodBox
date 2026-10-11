@@ -1,0 +1,494 @@
+{
+  "schema": 1,
+  "generated": "2026-10-11",
+  "note": [
+    "JVM 侧宿主依赖的固定版本锁定表（DEX→JVM 转换 + SQLite JDBC + Android 运行时库 + ARM64 模拟 + 可选打包 JRE）。",
+    "每个 Maven 制品都带 sha256：build/fetch-dex-deps.py 下载后逐件校验，不匹配即失败（sha256 由 fetch 实测自 Maven Central）。",
+    "分四组：dex（DEX→JVM 转换引擎）、sqlite（SQLite JDBC 驱动）、runtime（普通插件常用的第三方运行时库）与 unidbg（ARM64 原生模拟）。",
+    "许可按各制品真实 pom <licenses>（必要时回溯 parent pom）逐件如实登记——不写“全部 Apache”。dex/sqlite/runtime 三组为 Apache-2.0 / MIT / BSD-3-Clause。",
+    "unidbg 组的编译期传递闭包含 GPL-2.0-only 组件（unicorn/keystone/demumble）。本表只陈述该事实；是否随包分发是本仓库自己的策略选择，",
+    "默认**不随包捆绑** unidbg 组，需要时由操作方显式配置（stage --groups unidbg --allow-non-distributable）。本表不对“能否与其它分发物共存”下断言。"
+  ],
+  "mavenRepository": "https://repo1.maven.org/maven2",
+  "artifactUrlTemplate": "{repository}/{groupPath}/{artifact}/{version}/{artifact}-{version}.jar",
+  "cacheRoot": ".cache/dex-deps",
+  "groups": {
+    "dex": {
+      "distribute": true,
+      "stageDirectory": "dex-tools",
+      "description": "DEX→JVM 转换（dex2jar 家族）及其运行时闭包。许可为 Apache-2.0 / BSD-3-Clause，随包分发到 <宿主目录>/dex-tools/。"
+    },
+    "sqlite": {
+      "distribute": true,
+      "stageDirectory": "sqlite-jdbc",
+      "description": "android.database.sqlite.* 的真实后端：xerial SQLite JDBC 驱动（Apache-2.0）。随包分发到 <宿主目录>/sqlite-jdbc/（JdbcSqliteEngine 的随包发现路径），六 RID 的原生库都在该 jar 内。"
+    },
+    "runtime": {
+      "distribute": true,
+      "stageDirectory": "runtime",
+      "description": "普通 Android 插件常用的纯 Java 运行时库（okhttp/okio/kotlin-stdlib/gson/jsoup，Apache-2.0 / MIT）及其 JVM 运行时闭包。随包分发到 <宿主目录>/runtime/。"
+    },
+    "unidbg": {
+      "distribute": false,
+      "stageDirectory": "unidbg",
+      "description": "ARM64 原生模拟（unidbg + Dynarmic 后端）。编译期传递闭包含 GPL-2.0-only（unicorn/keystone/demumble）；本仓库默认**不随包捆绑**，需要时由操作方显式配置。"
+    }
+  },
+  "artifacts": [
+    {
+      "group": "dex",
+      "coordinates": "de.femtopedia.dex2jar:dex-translator:2.4.37",
+      "license": "Apache-2.0",
+      "sha256": "b99cb078d50c06b5d81bf94c7d935970efc7e81579d6e8fb63584233687042d1",
+      "size": 124449,
+      "purpose": "转换入口，提供 com.googlecode.d2j.dex.Dex2jar"
+    },
+    {
+      "group": "dex",
+      "coordinates": "de.femtopedia.dex2jar:dex-reader:2.4.37",
+      "license": "Apache-2.0",
+      "sha256": "03949286dea6a13dd02894f7c394a1c18a2fb1d5a6a328d2b4ba4ce1d29ad922",
+      "size": 68645,
+      "purpose": "DEX 读取（含 MultiDexFileReader）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "de.femtopedia.dex2jar:dex-reader-api:2.4.37",
+      "license": "Apache-2.0",
+      "sha256": "fda83594ac0b4d31d18398aa830691558a169bf54fe5e1e5019c134fffa03a6b",
+      "size": 74254,
+      "purpose": "读取器 API（BaseDexFileReader 等）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "de.femtopedia.dex2jar:dex-ir:2.4.37",
+      "license": "Apache-2.0",
+      "sha256": "6d58194d25bce20a476219f615bb44b24cdc5c0a91c35f48116b45bb47320e31",
+      "size": 231400,
+      "purpose": "中间表示与字节码生成"
+    },
+    {
+      "group": "dex",
+      "coordinates": "de.femtopedia.dex2jar:d2j-external:2.4.37",
+      "license": "Apache-2.0",
+      "sha256": "90350ef7625283fbe7d1740498739c6161817b61b351d98c1635f576588760a6",
+      "size": 1160841,
+      "purpose": "转换所需的外部依赖类（含内嵌 asm 使用面）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "de.femtopedia.dex2jar:d2j-base-cmd:2.4.37",
+      "license": "Apache-2.0",
+      "sha256": "c77f3aeb86b51edd390900740bf352b5d2e21132aac875c8597cc92034bb71e2",
+      "size": 14152,
+      "purpose": "命令行基础（JarFile/任务骨架）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.ow2.asm:asm:9.10.1",
+      "license": "BSD-3-Clause",
+      "sha256": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb",
+      "size": 126151,
+      "purpose": "字节码读写核心"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.ow2.asm:asm-tree:9.10.1",
+      "license": "BSD-3-Clause",
+      "sha256": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b",
+      "size": 51958,
+      "purpose": "ASM 树 API"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.ow2.asm:asm-util:9.10.1",
+      "license": "BSD-3-Clause",
+      "sha256": "1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c",
+      "size": 95628,
+      "purpose": "ASM 工具（CheckClassAdapter 等）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.ow2.asm:asm-analysis:9.10.1",
+      "license": "BSD-3-Clause",
+      "sha256": "dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc",
+      "size": 35140,
+      "purpose": "ASM 数据流分析（AnalyzerAdapter）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.ow2.asm:asm-commons:9.10.1",
+      "license": "BSD-3-Clause",
+      "sha256": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895",
+      "size": 74840,
+      "purpose": "ASM 常用工具"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.smali:baksmali:2.5.2",
+      "license": "BSD-3-Clause",
+      "sha256": "1ed236266d7dc4907aade0b19a34f77efac25342b63c8ace52e579039941b389",
+      "size": 123309,
+      "purpose": "DEX 结构解析（供 dangling type 扫描与验收 oracle）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.smali:dexlib2:2.5.2",
+      "license": "BSD-3-Clause",
+      "sha256": "5a5c8982d8bd7d6e3bb1a0713049e3c78b719ec32b20f6b619885cec30a0dd61",
+      "size": 1103473,
+      "purpose": "DEX 读写库（baksmali 依赖）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "org.smali:util:2.5.2",
+      "license": "BSD-3-Clause",
+      "sha256": "4f580a9cff3ebb83cb3fd20bec88e37e4f183796ca652732992611620282daea",
+      "size": 27118,
+      "purpose": "smali 工具（baksmali 依赖）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "com.google.code.findbugs:jsr305:3.0.2",
+      "license": "Apache-2.0",
+      "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+      "size": 19936,
+      "purpose": "注解（编译期依赖，运行时无害）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "com.google.guava:guava:27.1-android",
+      "license": "Apache-2.0",
+      "sha256": "686404f2d1d4d221911f96bd627ff60dac2226a5dfa6fb8ba517073eb97ec0ef",
+      "size": 2603938,
+      "purpose": "baksmali 运行时依赖"
+    },
+    {
+      "group": "dex",
+      "coordinates": "com.google.guava:failureaccess:1.0.1",
+      "license": "Apache-2.0",
+      "sha256": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26",
+      "size": 4617,
+      "purpose": "Guava 运行时依赖"
+    },
+    {
+      "group": "dex",
+      "coordinates": "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava",
+      "license": "Apache-2.0",
+      "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+      "size": 2199,
+      "purpose": "Guava 占位（空实现）"
+    },
+    {
+      "group": "dex",
+      "coordinates": "com.beust:jcommander:1.64",
+      "license": "Apache-2.0",
+      "sha256": "156be736199c990321d9ff77090b199629cfc9865e2d6c13f7cd291bb1641817",
+      "size": 65585,
+      "purpose": "d2j-base-cmd 依赖"
+    },
+    {
+      "group": "sqlite",
+      "coordinates": "org.xerial:sqlite-jdbc:3.47.1.0",
+      "license": "Apache-2.0",
+      "sha256": "4164d95347aeab42b754cabb7945b93e54f29ddb2eded967dbe979b4045cb685",
+      "size": 14259880,
+      "purpose": "SQLite JDBC 驱动（org.sqlite.JDBC）；jar 内含 Mac/Linux/Windows 的 x86_64 与 aarch64 原生库，六 RID 全覆盖"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "com.squareup.okhttp3:okhttp:4.12.0",
+      "license": "Apache-2.0",
+      "sha256": "b1050081b14bb7a3a7e55a4d3ef01b5dcfabc453b4573a4fc019767191d5f4e0",
+      "size": 789531,
+      "purpose": "HTTP 客户端（插件常用）"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "com.squareup.okio:okio-jvm:3.6.0",
+      "license": "Apache-2.0",
+      "sha256": "67543f0736fc422ae927ed0e504b98bc5e269fda0d3500579337cb713da28412",
+      "size": 359580,
+      "purpose": "okhttp 的 JVM I/O 闭包（注意选 okio-jvm，root okio 只含 KMP 元数据）"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "org.jetbrains.kotlin:kotlin-stdlib:1.9.10",
+      "license": "Apache-2.0",
+      "sha256": "55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504",
+      "size": 1708006,
+      "purpose": "okhttp/okio 的 Kotlin 运行时（1.8 起 stdlib 已合并 jdk7/jdk8，故单件即可）"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "com.google.code.gson:gson:2.10.1",
+      "license": "Apache-2.0",
+      "sha256": "4241c14a7727c34feea6507ec801318a3d4a90f070e4525681079fb94ee4c593",
+      "size": 283367,
+      "purpose": "JSON（插件常用；无强制运行时依赖）"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "org.jsoup:jsoup:1.17.2",
+      "license": "MIT",
+      "sha256": "f60b33b38e9d7ac93eaaa68a6c70f706bb99036494b2e2add2bfee11d09ac6f5",
+      "size": 445706,
+      "purpose": "HTML 解析（插件常用；无运行时依赖）"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:unidbg-api:0.9.9",
+      "license": "Apache-2.0",
+      "sha256": "422a2d93c4f22de8436867415fc34bdacbdc62de351b828a0672651344c46efe",
+      "size": 418830,
+      "purpose": "模拟器核心 API（注意：编译期依赖含 GPL-2.0 组件，见 gplTransitives）"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:unidbg-android:0.9.9",
+      "license": "Apache-2.0",
+      "sha256": "ce52ddda7772ac79adb4606dbaf0a65c53c41af96e73299a98eadec608f270fc",
+      "size": 6128061,
+      "purpose": "Android ELF/DVM/JNI 装载"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:unidbg-dynarmic:0.9.9",
+      "license": "Apache-2.0",
+      "sha256": "d1decada24040ae543c7cd1182c87433b4a8e9700162e7129f18937b4f3edbb9",
+      "size": 8217374,
+      "purpose": "ARM64 JIT 后端（jar 内含 Dynarmic 原生库；Dynarmic 引擎许可为 0BSD）"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "org.scijava:native-lib-loader:2.3.5",
+      "license": "BSD-2-Clause",
+      "sha256": "7db19cf3e9cfe993e725e82cd9593a8f3e2d340ed3047c98d5c54370571c759d",
+      "size": 20352,
+      "purpose": "NativeLoader（显式直连，不经 GPL 传递）"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "org.slf4j:slf4j-api:2.0.16",
+      "license": "MIT",
+      "sha256": "a12578dde1ba00bd9b816d388a0b879928d00bab3c83c240f7013bf4196c579a",
+      "size": 69435,
+      "purpose": "日志门面（unidbg 父工程要求 2.0.16）"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "org.slf4j:slf4j-simple:2.0.16",
+      "license": "MIT",
+      "sha256": "effc32018658bea09d1e08c7d1060ccad46c086960f583d07dd7ffe9c1172a47",
+      "size": 15704,
+      "purpose": "日志实现"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:unicorn:1.0.15",
+      "license": "GPL-2.0-only",
+      "sha256": "7fbce2a0decf475b75b355cf33301349bf7c88f31cd93c7922e9dbbed3debf23",
+      "size": 6193524,
+      "purpose": "unidbg-api 编译期依赖；GPL-2.0-only，本仓库默认不随包分发"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:keystone:0.9.7",
+      "license": "GPL-2.0-only",
+      "sha256": "3db2ee22fa5b3a70800bc5dfb515acf6bcb62888be0da43c311ff8304411558b",
+      "size": 4731494,
+      "purpose": "unidbg-api 编译期依赖；GPL-2.0-only，本仓库默认不随包分发"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:demumble:1.0.4",
+      "license": "GPL-2.0-only",
+      "sha256": "2351bff06a0a494734924f4fa2e7084c0699d7e959a0be6e85e7d9ee17ae6eb6",
+      "size": 968653,
+      "purpose": "unidbg-api 编译期依赖；GPL-2.0-only，本仓库默认不随包分发"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.github.zhkl0228:capstone:3.1.8",
+      "license": "BSD-3-Clause",
+      "sha256": "920e5fd1d514f146891a82cfbbfb33ef20cfca746ddcd1a6e2b54fff2a2e53dc",
+      "size": 3159591,
+      "purpose": "反汇编（guard 需要）"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "net.java.dev.jna:jna:5.10.0",
+      "license": "LGPL-2.1-or-later OR Apache-2.0",
+      "sha256": "e335c10679f743207d822c5f7948e930319835492575a9dba6b94f8a3b96fcc8",
+      "size": 1756400,
+      "purpose": "capstone/keystone 原生绑定"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "commons-codec:commons-codec:1.21.0",
+      "license": "Apache-2.0",
+      "sha256": "4da851cb6abfb98bfe9eb77c5e5fc47f5414fa28b94e21b7fd9a646705dc167f",
+      "size": 402494,
+      "purpose": "unidbg-api 运行时依赖"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "org.apache.commons:commons-collections4:4.5.0",
+      "license": "Apache-2.0",
+      "sha256": "00f93263c267be201b8ae521b44a7137271b16688435340bf629db1bac0a5845",
+      "size": 898652,
+      "purpose": "unidbg-api 运行时依赖"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "commons-io:commons-io:2.21.0",
+      "license": "Apache-2.0",
+      "sha256": "7d643a2afea8b058b762aa6fb90e5b256f6c729739f8b3784c3370ddc609e88d",
+      "size": 585274,
+      "purpose": "unidbg-api 运行时依赖"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "com.alibaba:fastjson:1.2.83",
+      "license": "Apache-2.0",
+      "sha256": "641a4d65ab32fbfdccd9c718e3f83ebc4caabdb5e4fe5b3d51527c5fe692631d",
+      "size": 671701,
+      "purpose": "unidbg-api 运行时依赖"
+    },
+    {
+      "group": "unidbg",
+      "coordinates": "net.dongliu:apk-parser:2.6.10",
+      "license": "Apache-2.0",
+      "sha256": "4e07ef65005c0d7e7149f6e903828fdaa031f542ad3956f0d827197a5ccac640",
+      "size": 213647,
+      "purpose": "Android VM 的 APK 元数据解析"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "com.vaadin.external.google:android-json:0.0.20131108.vaadin1",
+      "license": "Apache-2.0",
+      "sha256": "dfb7bae2f404cfe0b72b4d23944698cb716b7665171812a0a4d0f5926c0fac79",
+      "size": 18279,
+      "purpose": "真实插件所需公共运行库"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "org.bouncycastle:bcprov-jdk18on:1.80",
+      "license": "MIT",
+      "sha256": "e8ad209f8c58d291a37ca9750e9e9fac60596956c983e49dd8282381dd8b3249",
+      "size": 8682747,
+      "purpose": "真实插件所需公共运行库"
+    },
+    {
+      "group": "runtime",
+      "coordinates": "org.simpleframework:simple-xml:2.7.1",
+      "license": "Apache-2.0",
+      "sha256": "7a43d2d5e488e0dac57a6de0284df4413a4733365239649309c4b693f4e429f9",
+      "size": 413197,
+      "purpose": "真实插件所需公共运行库"
+    }
+  ],
+  "gplTransitives": [
+    "com.github.zhkl0228:unicorn:1.0.14",
+    "com.github.zhkl0228:keystone:0.9.7",
+    "com.github.zhkl0228:demumble:1.0.4"
+  ],
+  "gplTransitivesNote": [
+    "实际随包版本以**上游 pom 的 Maven 闭包**为准：unicorn 解析为 1.0.14（不是本锁定表旧写的 1.0.15）。",
+    "本锁定表的 unidbg 分组与上游 pom 的闭包已发生漂移（pom 固定 unidbg-android/unidbg-unicorn2:0.9.8）；",
+    "该分组默认不随包分发，构建不读它，故漂移不影响发布内容，但对外声明版本时必须以 deps/ 实测为准。",
+    "native 覆盖同样按实测（见 nativePlatforms/nativeCoverage），不按本表旧条目。"
+  ],
+  "nativePlatforms": {
+    "backend": "unidbg-unicorn2",
+    "artifact": "com.github.zhkl0228:unidbg-unicorn2:0.9.8",
+    "artifactSource": "third_party/tvbox-silicon/Runtime/JavaHost/pom.xml（上游 JavaHost 的直接依赖，Maven 解析进 deps/）",
+    "verified": "2026-10-12（解包实际随包 deps/*.jar 读 natives/ 目录实测）",
+    "observedPresent": {
+      "osx-arm64": "natives/osx_arm64/libunicorn.so",
+      "osx-x64": "natives/osx_64/libunicorn.so",
+      "linux-x64": "natives/linux_64/libunicorn.so",
+      "linux-arm64": "natives/linux_arm64/libunicorn.so",
+      "win-x64": "natives/windows_64/unicorn.dll"
+    },
+    "observedMissing": {
+      "win-arm64": "发布 jar 内没有 natives/windows_arm64/**；上游 ARM64 模拟后端在 Windows ARM64 上无原生库。"
+    },
+    "note": [
+      "本表以**实际随包的上游依赖**为准：上游 pom 固定 unidbg-android:0.9.8 + unidbg-unicorn2:0.9.8（不是 Dynarmic），",
+      "所以 native 覆盖必须按 unidbg-unicorn2:0.9.8 与其传递的单片机/汇编库实测，而不是按任何未被解析进 deps/ 的制品。",
+      "unidbg-dynarmic:0.9.9 曾出现在旧锁定表里并被误当作随包后端：它**不在上游 pom 的依赖闭包里**，",
+      "因此它的 natives（含 linux_arm64/windows_64）不构成对任何 RID 的覆盖声明。本表不再据此断言。",
+      "win-arm64 在 unidbg-unicorn2:0.9.8 与其传递的 unicorn 里都没有 natives/windows_arm64/**：",
+      "宿主对含原生 guard 的插件在 win-arm64 上以 unsupported_native_library 明确失败，绝不伪报可跑。",
+      "capstone/keystone/demumble 的 natives 也各有缺口（见 nativeCoverage.assembler），它们属于汇编辅助而非模拟后端；",
+      "backendRids 只陈述 ARM64 模拟后端本身的原生覆盖。"
+    ],
+    "windowsArm64TemurinJre": "可选依赖（非模拟后端）：win-arm64 有 JRE，故纯 Java 插件仍可运行；缺的是 ARM64 模拟原生库。"
+  },
+  "nativeCoverage": {
+    "schema": 1,
+    "scope": "ARM64 原生模拟后端（unidbg-unicorn2:0.9.8）在六个 RID 的资产覆盖结论。",
+    "backendRids": {
+      "supported": [
+        "osx-x64",
+        "osx-arm64",
+        "linux-x64",
+        "linux-arm64",
+        "win-x64"
+      ],
+      "unsupported": [
+        "win-arm64"
+      ]
+    },
+    "assembler": {
+      "note": "辅助库使用不同加载布局：capstone含linux-aarch64/win32-x86-64/darwin及JNI disassembler；keystone含linux-aarch64/win32-x86-64/darwin；demumble含linux_arm64等。supported仅为所有JNI辅助均存在的交集，不代表其他平台没有库，运行可用性必须在对应runner验证。",
+      "supported": [
+        "osx-x64",
+        "osx-arm64",
+        "linux-x64"
+      ],
+      "unsupported": [
+        "linux-arm64",
+        "win-x64",
+        "win-arm64"
+      ]
+    },
+    "guarantee": "任何 RID 不在 backendRids.supported 中时，含原生 guard 的 JAR 插件必须失败为 unsupported_native_library；不得宣称支持。"
+  },
+  "jre": {
+    "required": "运行 Java 宿主需要 JRE/JDK >= 17；本锁定表以 Eclipse Temurin 21 LTS 为参考。",
+    "discovery": "先找随包目录 JavaHost/jre/（bin/java），再 VODBOX_JAR_JAVA，再 PATH，再 JAVA_HOME——随包即可用，无需用户手填环境变量。",
+    "distribution": "Eclipse Temurin (Adoptium)，GPL-2.0 WITH Classpath-exception-2.0，作为独立程序分发。",
+    "release": "jdk-21.0.12.1+1",
+    "architecture": "每个 RID 的资产是**该 RID 自己的架构**：打包必须取对应 RID 的资产，绝不复用构建机自带的 java（跨编译时会装进错误架构）。fetch-dex-deps.py jre 解包后按 RID 校验 bin/java 的 PE/ELF/Mach-O 机器类型。",
+    "sha256Source": "Adoptium 发布的 <asset>.sha256.txt（fetch-dex-deps.py 读取并据此校验）",
+    "assets": {
+      "osx-x64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_mac_hotspot_21.0.12.1_1.tar.gz",
+        "sha256": "6717ec641fd9ce0bb209ca083ee23b42202ac68cb6fcc5753496e0e4a0f41989"
+      },
+      "osx-arm64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_aarch64_mac_hotspot_21.0.12.1_1.tar.gz",
+        "sha256": "dec50fc6f9fcd4fe3ae8cabf5a5fa68f6afc48841f7698e468e9aa5d54beed84"
+      },
+      "linux-x64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_linux_hotspot_21.0.12.1_1.tar.gz",
+        "sha256": "2413149700df0f7d440500a84a8f764c535f21e5a5e87d38328b64eec2c5b500"
+      },
+      "linux-arm64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_aarch64_linux_hotspot_21.0.12.1_1.tar.gz",
+        "sha256": "14be1f35ebdbd1f6e8d57eb911a3ffb74d6d9aa255abc5daf2b1302002cf2cf2"
+      },
+      "win-x64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_windows_hotspot_21.0.12.1_1.zip",
+        "sha256": "d35f31e712f0fcf6ac5a093edc90204fbff22f720ba3950bd09d331d5e621636"
+      },
+      "win-arm64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_aarch64_windows_hotspot_21.0.12.1_1.zip",
+        "sha256": "e82cc17e0bf89a25b0b0ed106d072f2ea420587d0a6870534b71b1dce3ae28c3"
+      }
+    },
+    "note": "六 RID 都有 JRE 资产（含 win-arm64）；与 ARM64 模拟后端的平台缺口不同，Java 运行时本身不构成 Windows ARM64 限制。"
+  }
+}

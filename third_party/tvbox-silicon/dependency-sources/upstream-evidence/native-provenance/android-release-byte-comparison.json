@@ -1,0 +1,206 @@
+[
+  {
+    "jar_entry": "android/sdk23/lib64/libssl.so",
+    "jar_sha256": "446f3a34abb964f9cceac5ead974c767d92b1ff2a1543987cb25e1a5361a1d37",
+    "archive_sha256": "446f3a34abb964f9cceac5ead974c767d92b1ff2a1543987cb25e1a5361a1d37",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libcrypto.so",
+    "jar_sha256": "c4d313a5589c950c1396485df845bf57d3af75e732e05942314d9e34106cb22a",
+    "archive_sha256": "c4d313a5589c950c1396485df845bf57d3af75e732e05942314d9e34106cb22a",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libstdcpp.so",
+    "jar_sha256": "c544e9ab09cd76ae5e0dfc476fa73d3ec4b6202a71f99a38d7b342b66a169f80",
+    "archive_sha256": "c544e9ab09cd76ae5e0dfc476fa73d3ec4b6202a71f99a38d7b342b66a169f80",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libcpp.so",
+    "jar_sha256": "b88f180cb1c490a331b280f7ecbe0f9fdd97b19e2900adec8d5b912d82f5658d",
+    "archive_sha256": "b88f180cb1c490a331b280f7ecbe0f9fdd97b19e2900adec8d5b912d82f5658d",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libm.so",
+    "jar_sha256": "c7ed11763d11eafacb5e96309f228f60c3fabbddcbd843f0add6253574b3094e",
+    "archive_sha256": "c7ed11763d11eafacb5e96309f228f60c3fabbddcbd843f0add6253574b3094e",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/liblog.so",
+    "jar_sha256": "1556d7bd8629a12043d2385d83cb7ad16d3a17d20d28f8a9a87280b464ac7683",
+    "archive_sha256": "1556d7bd8629a12043d2385d83cb7ad16d3a17d20d28f8a9a87280b464ac7683",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libz.so",
+    "jar_sha256": "4313ca9e219894c79a62faf4db625c902e4bfc55790fab3c82771bebbc4a43a8",
+    "archive_sha256": "4313ca9e219894c79a62faf4db625c902e4bfc55790fab3c82771bebbc4a43a8",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libc.so",
+    "jar_sha256": "d2376df6d2ac3e0213f85e3614c4c7ad1d28c84c44926058d5c1b95c855563db",
+    "archive_sha256": "d2376df6d2ac3e0213f85e3614c4c7ad1d28c84c44926058d5c1b95c855563db",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib64/libdl.so",
+    "jar_sha256": "af9800fb1e46d5b877d2136e3376ffe52f7a7d210363fe34b3c552819fc21d8b",
+    "archive_sha256": "af9800fb1e46d5b877d2136e3376ffe52f7a7d210363fe34b3c552819fc21d8b",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libssl.so",
+    "jar_sha256": "1dc078aa8fd66654dc1c681db8bb86fffbda8d178f695d0535558d952ad5fa6d",
+    "archive_sha256": "1dc078aa8fd66654dc1c681db8bb86fffbda8d178f695d0535558d952ad5fa6d",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libcrypto.so",
+    "jar_sha256": "50088b33d5ff4b87bcbcb0ace898320c2a0de8cd72c1a2d5dc8bd8b1e1fe37f1",
+    "archive_sha256": "50088b33d5ff4b87bcbcb0ace898320c2a0de8cd72c1a2d5dc8bd8b1e1fe37f1",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libstdcpp.so",
+    "jar_sha256": "3c3767b97d583dcf260d7c552bafcee3dc649b5fc730da60449a4fbf759d3e7b",
+    "archive_sha256": "3c3767b97d583dcf260d7c552bafcee3dc649b5fc730da60449a4fbf759d3e7b",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libcpp.so",
+    "jar_sha256": "4c7a56fc8698323907bfd14cc237aa4434df0979c788c663bad5f09a0a11c9d5",
+    "archive_sha256": "4c7a56fc8698323907bfd14cc237aa4434df0979c788c663bad5f09a0a11c9d5",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libm.so",
+    "jar_sha256": "03089b7a1865c38730c3e8a22d82852aded761b3c6d830a183a753b1aa12e08c",
+    "archive_sha256": "03089b7a1865c38730c3e8a22d82852aded761b3c6d830a183a753b1aa12e08c",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/liblog.so",
+    "jar_sha256": "a25b685f61c3a4de3a6580a4aa5d2315946e52b5b551ac4a78b8a54e2376c1f5",
+    "archive_sha256": "a25b685f61c3a4de3a6580a4aa5d2315946e52b5b551ac4a78b8a54e2376c1f5",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libz.so",
+    "jar_sha256": "526999a903365c999c470a8a44e49eccea4cd2cfcc63a87b664e61535644770d",
+    "archive_sha256": "526999a903365c999c470a8a44e49eccea4cd2cfcc63a87b664e61535644770d",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libc.so",
+    "jar_sha256": "059ba02149eb58b607bf6eb93033fe9f3d29dd19cb761017ecba88b5a8cf3e25",
+    "archive_sha256": "059ba02149eb58b607bf6eb93033fe9f3d29dd19cb761017ecba88b5a8cf3e25",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk23/lib/libdl.so",
+    "jar_sha256": "920ff35f13b1bfdee97171e26becd46a5df860d46c11f15625da961d90455b4a",
+    "archive_sha256": "920ff35f13b1bfdee97171e26becd46a5df860d46c11f15625da961d90455b4a",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/armeabi-v7a/libdobby.so",
+    "jar_sha256": "d19afb8dccd6a5dacbaa8aa90192bd9cee98ed1c8ca8427d12f6b5ef56d84512",
+    "archive_sha256": "d19afb8dccd6a5dacbaa8aa90192bd9cee98ed1c8ca8427d12f6b5ef56d84512",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/armeabi-v7a/libxhook.so",
+    "jar_sha256": "02d96df92980fc06ffdd95c353a426afe58987f46ecfd1e194f6bdfe327ccebd",
+    "archive_sha256": "02d96df92980fc06ffdd95c353a426afe58987f46ecfd1e194f6bdfe327ccebd",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/armeabi-v7a/libhookzz.so",
+    "jar_sha256": "59989e3dcb0cad2f468dcee66e155441893774749d99244e32515fcb4bf5e950",
+    "archive_sha256": "59989e3dcb0cad2f468dcee66e155441893774749d99244e32515fcb4bf5e950",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/armeabi-v7a/libwhale.so",
+    "jar_sha256": "aa7e63126d4be8be85d56c24824fc1bf1a14b22c2771f28f03d175b245c86b90",
+    "archive_sha256": "aa7e63126d4be8be85d56c24824fc1bf1a14b22c2771f28f03d175b245c86b90",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/arm64-v8a/libdobby.so",
+    "jar_sha256": "25b8ffe10cea81aebde6993f910d60788e3e187f45083eb5eca06d6e41e29d78",
+    "archive_sha256": "25b8ffe10cea81aebde6993f910d60788e3e187f45083eb5eca06d6e41e29d78",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/arm64-v8a/libxhook.so",
+    "jar_sha256": "16b564f73a8715e9f6025bbd47679f53b607e99465193d174eb147652768c380",
+    "archive_sha256": "16b564f73a8715e9f6025bbd47679f53b607e99465193d174eb147652768c380",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/arm64-v8a/libhookzz.so",
+    "jar_sha256": "a5553a45a8a069d544e55320f5744ccb11349a40a8922dcfd4435e4e3b0cc561",
+    "archive_sha256": "a5553a45a8a069d544e55320f5744ccb11349a40a8922dcfd4435e4e3b0cc561",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/lib/arm64-v8a/libwhale.so",
+    "jar_sha256": "8b8f641953b33e1df58eb100da65f010f8bf79efa09ea8da3d0d4befe1e7f416",
+    "archive_sha256": "8b8f641953b33e1df58eb100da65f010f8bf79efa09ea8da3d0d4befe1e7f416",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libssl.so",
+    "jar_sha256": "bfc6f026f75e562e797e575919c8862f87741881128f4e919ccb726d596b591c",
+    "archive_sha256": "bfc6f026f75e562e797e575919c8862f87741881128f4e919ccb726d596b591c",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libcrypto.so",
+    "jar_sha256": "03117cd4619a3bd1a622d3acfc673c113aea6d0c603ddf66683cfa1cb24c4ae4",
+    "archive_sha256": "03117cd4619a3bd1a622d3acfc673c113aea6d0c603ddf66683cfa1cb24c4ae4",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libstdcpp.so",
+    "jar_sha256": "96ea75dd6c97eccfeab46d75f8feea0fa423c0e7c5b007108c6e561a3ea6bb0d",
+    "archive_sha256": "96ea75dd6c97eccfeab46d75f8feea0fa423c0e7c5b007108c6e561a3ea6bb0d",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libm.so",
+    "jar_sha256": "d8188d3365e3e0fa732c94d9df1e4763e08cfecdab9e327b549348d308eddf98",
+    "archive_sha256": "d8188d3365e3e0fa732c94d9df1e4763e08cfecdab9e327b549348d308eddf98",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/liblog.so",
+    "jar_sha256": "583318d9210bc18796d8be1cf56767f17cec48c73623f4b05c1598882aadf408",
+    "archive_sha256": "583318d9210bc18796d8be1cf56767f17cec48c73623f4b05c1598882aadf408",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libz.so",
+    "jar_sha256": "1041525c1742ffc7b63958e78bd17e714b5987acd3cbdd922a84ee92ca5efde9",
+    "archive_sha256": "1041525c1742ffc7b63958e78bd17e714b5987acd3cbdd922a84ee92ca5efde9",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libc.so",
+    "jar_sha256": "7ca3538285210d3a99afc6522535fae527e3171ca8a6c1055c0589000a20d9b2",
+    "archive_sha256": "7ca3538285210d3a99afc6522535fae527e3171ca8a6c1055c0589000a20d9b2",
+    "matches": true
+  },
+  {
+    "jar_entry": "android/sdk19/lib/libdl.so",
+    "jar_sha256": "a912bbf7e4e92449fd8cb7f7d0613ebdda6ac7ae25d1a45f1ce5c2521b28037a",
+    "archive_sha256": "a912bbf7e4e92449fd8cb7f7d0613ebdda6ac7ae25d1a45f1ce5c2521b28037a",
+    "matches": true
+  }
+]

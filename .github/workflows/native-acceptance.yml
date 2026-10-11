@@ -1,0 +1,72 @@
+name: Native acceptance
+# Six-RID native acceptance on demand. This is the manual entry that exercises the full
+# build.yml matrix (AOT publish, bundled libmpv/QuickJS/JavaHost, native closure and adapter
+# verification on each of the six runners) **without** touching release: it packages nothing
+# and publishes nothing, so it is safe to run against any branch while the native closure is
+# still incomplete. It reuses build.yml, so the two can never drift apart.
+#
+# The closure job below *reports* both gates and never fails them: the six-RID run is evidence, not
+# a publication, and the corresponding-source obligation is deliberately still pending while the
+# rebuild path is authored. That is why it reports without --require, unlike release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version stamped into the AOT publish; empty uses VERSION at the source commit.
+        type: string
+        default: ''
+      source_sha:
+        description: Commit to verify; empty uses the triggering ref.
+        type: string
+        default: ''
+      reuse:
+        description: Reuse a successful build of an identical source tree; false forces a real rebuild.
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  resolve:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - id: version
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then version=$(cat VERSION); fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  # Reuse the release/build workflow verbatim: all six RIDs, the real native verification steps.
+  # No release job consumes this run, so a green result is acceptance evidence, not a publication.
+  build:
+    needs: resolve
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.resolve.outputs.version }}
+      source_sha: ${{ needs.resolve.outputs.sha }}
+      reuse_existing: ${{ inputs.reuse }}
+      platforms: all
+  # Make the native-closure verdict explicit in the acceptance log, offline and manifest-driven.
+  closure:
+    needs: resolve
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      # Report, do not gate: an acceptance run is allowed to finish while the closure is open. The
+      # RID coverage (binaries) and the corresponding source (obligation) are separate questions and
+      # are reported separately so the log can never be read as "source closure 5/6".
+      - name: Report native binary coverage
+        shell: bash
+        run: python3 build/native_coverage.py closure
+      - name: Report corresponding-source closure
+        shell: bash
+        run: python3 build/native_coverage.py source-closure

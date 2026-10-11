@@ -6,6 +6,26 @@ namespace VodBox.Tests;
 public sealed class SourceManagementTests
 {
     [Fact]
+    public async Task FtySupportedSitesRemainManuallySelectableDespiteChangeableZero()
+    {
+        using var registry = new SourceRegistry(async (_, ct) =>
+            ConfigLoader.ParseBytes(await File.ReadAllBytesAsync(
+                Path.Combine(AppContext.BaseDirectory, "fixtures", "fty-in.bmp"), ct))
+            ?? throw new InvalidDataException("饭太硬测试配置解析失败"));
+        await registry.LoadConfigAsync("https://example.com/fty", TestContext.Current.CancellationToken);
+        Assert.Equal(12, registry.SelectableSources.Count);
+        Assert.All(registry.SelectableSources, site =>
+        {
+            Assert.False(site.Changeable);
+            Assert.Equal(VodBox.Core.SourceRuntime.NativeSpider, site.Runtime);
+            Assert.NotNull(registry.Get(site.Key));
+        });
+        Assert.Empty(registry.ChangeableSources);
+        Assert.Equal(36, registry.ImportWarnings.Count);
+        Assert.Equal("YGP", registry.Default()!.Key);
+    }
+
+    [Fact]
     public async Task HiddenSearchAndOrderPreferencesSurviveRegistryRecreation()
     {
         var directory = Path.Combine(AppContext.BaseDirectory, "sites-" + Guid.NewGuid().ToString("N"));
@@ -27,6 +47,7 @@ public sealed class SourceManagementTests
             Assert.Equal("b", second.Sources[0].Key);
             Assert.Single(second.VisibleSources);
             Assert.Empty(second.ChangeableSources);
+            Assert.Equal("b", Assert.Single(second.SelectableSources).Key);
             Assert.False(second.CanSearch(second.VisibleSources[0]));
             var results = await second.SearchAllAsync("anything", TestContext.Current.CancellationToken);
             Assert.Empty(results);

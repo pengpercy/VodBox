@@ -45,27 +45,56 @@ jobs:
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-  build:
-    if: inputs.package_run == '' && inputs.build_run == ''
+  # Gate the whole chain on both real closure verdicts, before a single package is built: the binary
+  # RID coverage (build/dex-deps.json) and the corresponding-source obligation
+  # (native-source-manifest.json). Neither has a written-in "complete" flag to edit, and this job
+  # never passes --allow-incomplete, so an uncovered RID OR an open source obligation stops the
+  # release here. The two are not the same question and cannot stand in for each other.
+  preflight:
+    if: always() && needs.version.result == 'success'
     needs: version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require complete native and source closures
+        shell: bash
+        run: python3 build/release_preflight.py --skip-permissions
+  build:
+    if: needs.preflight.result == 'success' && inputs.package_run == '' && inputs.build_run == ''
+    needs: [version, preflight]
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.value }}
       source_sha: ${{ needs.version.outputs.sha }}
   package:
-    if: always() && inputs.package_run == '' && needs.version.result == 'success' && (needs.build.result == 'success' || inputs.build_run != '')
-    needs: [version, build]
+    if: always() && inputs.package_run == '' && needs.version.result == 'success' && needs.preflight.result == 'success' && (needs.build.result == 'success' || inputs.build_run != '')
+    needs: [version, preflight, build]
     uses: ./.github/workflows/package.yml
     with:
       version: ${{ needs.version.outputs.value }}
       source_sha: ${{ needs.version.outputs.sha }}
       source_run: ${{ inputs.build_run }}
   release:
-    if: always() && needs.version.result == 'success' && (needs.package.result == 'success' || inputs.package_run != '')
-    needs: [version, package]
+    if: always() && needs.version.result == 'success' && needs.preflight.result == 'success' && (needs.package.result == 'success' || inputs.package_run != '')
+    needs: [version, preflight, package]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+      # Fail fast on an incomplete native closure and on a token that cannot publish, before any
+      # packaging output is trusted. The verdicts are derived from build/dex-deps.json (binary RID
+      # coverage) and native-source-manifest.json (corresponding source) on every run; neither is a
+      # string anyone edits to "complete".
+      - name: Preflight native closure and publish permissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: python3 build/release_preflight.py
+      # The corresponding-source obligation is a separate gate from RID coverage: five of six RIDs
+      # having backend natives does not close the source of the distributed binaries. Fail closed
+      # and never pass --allow-incomplete here.
+      - name: Preflight corresponding-source closure
+        shell: bash
+        run: python3 build/native_coverage.py source-closure --require
       - name: Verify existing package metadata
         if: inputs.package_run != ''
         env:

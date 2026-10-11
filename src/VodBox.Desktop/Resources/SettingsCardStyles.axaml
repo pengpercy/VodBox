@@ -27,6 +27,9 @@
       <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="MaxWidth" Value="420" />
+      <!-- 显式左对齐，避免 Stretch + MaxWidth 让描述相对行标题居中偏移。 -->
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="TextAlignment" Value="Left" />
       <Setter Property="Margin" Value="0,3,0,0" />
     </Style>
     <!-- 行间分隔线：1px StrokeBrush，左缩进 46（16 padding + 18 图标 + 12 gap） -->

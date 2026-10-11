@@ -1,0 +1,18 @@
+{
+  "generator": "build/dex_fixture.py",
+  "single": {
+    "file": "sample-single.dex",
+    "class": "dev.vodbox.fixture.Sample",
+    "sha256": "b05978c3edeed1482550bb3bad1cd9a7388888191284ba1a089386ec0bd1d6df",
+    "size": 670
+  },
+  "multidex": {
+    "file": "sample-multidex.zip",
+    "classes": [
+      "dev.vodbox.fixture.Sample",
+      "dev.vodbox.fixture.Second"
+    ],
+    "sha256": "6c751c59c51f65d722bcc16b196833f83bb996bc3691f0cf444c8124d6124c46",
+    "size": 1082
+  }
+}

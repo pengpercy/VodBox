@@ -1,0 +1,43 @@
+{
+  "component": "guest-sdk-android",
+  "status": "template-unfilled",
+  "why_template": "Public evidence does not let us name the exact AOSP release/module that produced each packaged guest .so. Guessing a tag would repeat the provenance error this rebuild path exists to avoid. Each entry must be filled from a read AOSP release manifest before build; else the file is dropped (fail closed).",
+  "distribution_policy": "rebuild-or-drop",
+  "inventory_source": "The 26 concrete entries below were enumerated from the retained unidbg-android-0.9.8 jar (third_party/tvbox-silicon/Runtime/JavaHost/target/dependency/unidbg-android-0.9.8.jar), cross-checked against dependency-sources/upstream-evidence/native-provenance/binary-inventory.json. Source guesses (bionic / external/boringssl) are leads only, not pins.",
+  "libraries": [
+    {"path": "android/sdk19/lib/libc.so",      "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk19/lib/libcrypto.so", "module": null, "aosp_tag": null, "source": "external/boringssl", "disposition": "pending"},
+    {"path": "android/sdk19/lib/libdl.so",     "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk19/lib/liblog.so",    "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk19/lib/libm.so",      "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk19/lib/libssl.so",    "module": null, "aosp_tag": null, "source": "external/boringssl", "disposition": "pending"},
+    {"path": "android/sdk19/lib/libstdcpp.so", "module": null, "aosp_tag": null, "source": "bionic/libc++",      "disposition": "pending"},
+    {"path": "android/sdk19/lib/libz.so",      "module": null, "aosp_tag": null, "source": "external/zlib",      "disposition": "pending"},
+
+    {"path": "android/sdk23/lib/libc.so",      "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib/libcpp.so",    "module": null, "aosp_tag": null, "source": "bionic/libc++",      "disposition": "pending"},
+    {"path": "android/sdk23/lib/libcrypto.so", "module": null, "aosp_tag": null, "source": "external/boringssl", "disposition": "pending"},
+    {"path": "android/sdk23/lib/libdl.so",     "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib/liblog.so",    "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib/libm.so",      "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib/libssl.so",    "module": null, "aosp_tag": null, "source": "external/boringssl", "disposition": "pending"},
+    {"path": "android/sdk23/lib/libstdcpp.so", "module": null, "aosp_tag": null, "source": "bionic/libc++",      "disposition": "pending"},
+    {"path": "android/sdk23/lib/libz.so",      "module": null, "aosp_tag": null, "source": "external/zlib",      "disposition": "pending"},
+
+    {"path": "android/sdk23/lib64/libc.so",      "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libcpp.so",    "module": null, "aosp_tag": null, "source": "bionic/libc++",      "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libcrypto.so", "module": null, "aosp_tag": null, "source": "external/boringssl", "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libdl.so",     "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib64/liblog.so",    "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libm.so",      "module": null, "aosp_tag": null, "source": "bionic",             "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libssl.so",    "module": null, "aosp_tag": null, "source": "external/boringssl", "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libstdcpp.so", "module": null, "aosp_tag": null, "source": "bionic/libc++",      "disposition": "pending"},
+    {"path": "android/sdk23/lib64/libz.so",      "module": null, "aosp_tag": null, "source": "external/zlib",      "disposition": "pending"}
+  ],
+  "note_full_inventory": "This now covers all 26 concrete packaged guest .so files (8 sdk19/lib, 9 sdk23/lib, 9 sdk23/lib64). The remaining 8 distributed natives are the hook libs, tracked in ../guest-sdk-hooks/hooks-pin.json (34 total = 26 guest SDK + 8 hook).",
+  "reference_evidence": {
+    "report": "../../dependency-sources/upstream-evidence/native-provenance/REPORT.md",
+    "byte_comparison": "../../dependency-sources/upstream-evidence/native-provenance/android-release-byte-comparison.json",
+    "license_status": "../../dependency-notices/unidbg-android-0.9.8/NATIVE-LICENSE-STATUS.md"
+  }
+}

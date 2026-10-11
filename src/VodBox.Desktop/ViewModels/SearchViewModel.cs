@@ -120,7 +120,10 @@ public sealed partial class SearchViewModel : ObservableObject
             {
                 if (generation != _generation || ct.IsCancellationRequested) return;
                 // 单一结果集合用于卡片、站点过滤及归属映射，避免展示可见却打不开的卡片。
-                var retained = results.Take(500).ToArray();
+                // 入集合前给每条结果打上来源站点名（卡片、站点过滤、归属映射共用同一批实例）。
+                var retained = results.Take(500)
+                    .Select(result => (result.Site, Item: result.Item with { SourceName = result.Site.Name }))
+                    .ToArray();
                 foreach (var (site, item) in retained)
                 {
                     AllResults.Add(item);

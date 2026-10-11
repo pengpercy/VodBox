@@ -45,7 +45,7 @@ public class App : Application
                 {
                     await Task.Delay(TimeSpan.FromSeconds(20));
                     if (window.IsVisible && main.Settings.AutoCheckUpdates)
-                        await main.Settings.CheckUpdateAsync(); // Only updates the settings label; never interrupts playback.
+                        await main.Settings.CheckUpdateAsync(window, automatic: true);
                 };
             }
             if(desktop.Args?.Contains("--ui-smoke")==true)
@@ -55,10 +55,15 @@ public class App : Application
                 {
                     try
                     {
-                        foreach(var page in new[]{AppPage.Home,AppPage.Vod,AppPage.Live,AppPage.Search,AppPage.Favorites,AppPage.History,AppPage.Files})
+                        foreach(var page in new[]{AppPage.Home,AppPage.Vod,AppPage.Live,AppPage.Favorites,AppPage.History,AppPage.Files})
                         {
                             main.Navigate(page);window.UpdateLayout();await Task.Delay(100);
                         }
+                        // 搜索改为独立窗口：验证窗口能创建并渲染（含 SearchView + 结果网格绑定）。
+                        var searchWindow=window.SearchWindowForSmoke??throw new InvalidOperationException("搜索窗口未创建。");
+                        searchWindow.UpdateLayout();await Task.Delay(50);
+                        if(!searchWindow.IsVisible)throw new InvalidOperationException("搜索窗口未显示。");
+                        searchWindow.Close();window.UpdateLayout();await Task.Delay(50);
                         // 设置已改为独立窗口：逐个分区在真实窗口里渲染一遍，确认没有空分区或绑定失败。
                         var settingsWindow=window.SettingsWindowForSmoke??throw new InvalidOperationException("设置窗口未创建。");
                         for(var section=0;section<9;section++)

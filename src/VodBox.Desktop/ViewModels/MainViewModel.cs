@@ -6,7 +6,7 @@ using VodBox.Desktop.Services;
 
 namespace VodBox.Desktop.ViewModels;
 
-public enum AppPage { Home, Vod, Live, Search, Favorites, History, Files, Settings, Detail }
+public enum AppPage { Home, Vod, Live, Favorites, History, Files, Settings, Detail }
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -113,6 +113,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Detail.CancelPending();Vod.CancelPending();Search.CancelPending();Live.CancelPending();Settings.CancelSubtitleSearch();
         Favorites.CancelPending();History.CancelPending();
+        await Settings.StopUpdatesAsync();
         await _services.LocalControl.DisposeAsync();
         Settings.ClearPairingPresentation();
         await Player.CloseCommand.ExecuteAsync(null);
@@ -168,11 +169,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void AttachDispatcher(Avalonia.Threading.Dispatcher dispatcher) => uidispatcher = dispatcher;
 
-    public bool ShowGlobalSearch => Page is not (AppPage.Search or AppPage.Live);
     public Avalonia.Thickness PageContentMargin => GetPageContentMargin(Page, OperatingSystem.IsMacOS());
 
     /// <summary>设置改为独立窗口后，由主窗口订阅此事件来打开窗口（VM 不直接创建窗口）。</summary>
     public event Action? SettingsRequested;
+
+    /// <summary>
+    /// 搜索改为独立窗口后，由主窗口订阅此事件来打开/复用窗口（VM 不直接创建窗口）。
+    /// 参数是已 trim 的非空关键词；窗口的去重与激活由主窗口负责。
+    /// </summary>
+    public event Action<string>? SearchRequested;
 
     /// <summary>
     /// 打开设置窗口。设置不再是主窗口的一页，所以这里**不切页**（切过去只会留下空白内容区），
@@ -190,7 +196,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnPageChanged(AppPage value)
     {
-        OnPropertyChanged(nameof(ShowGlobalSearch));
         OnPropertyChanged(nameof(PageContentMargin));
         if (value != AppPage.Detail) Detail.CancelPending();
         if (_designTime) return; // 设计时假数据已就位，不触网、不覆盖
@@ -217,9 +222,6 @@ public sealed partial class MainViewModel : ObservableObject
     private void GoLive() => Navigate(AppPage.Live);
 
     [RelayCommand]
-    private void GoSearch() => Navigate(AppPage.Search);
-
-    [RelayCommand]
     private void GoFavorites() => Navigate(AppPage.Favorites);
 
     [RelayCommand]
@@ -231,12 +233,18 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void GoSettings() => OpenSettings();
 
+    /// <summary>
+    /// 侧栏搜索框提交（回车）：发起全站聚合搜索请求。结果不落在主窗口的页面里，而是由主窗口打开/复用
+    /// 独立搜索结果窗口，避免进入空白搜索页，也避免主窗口被搜索结果页占住。
+    /// </summary>
     [RelayCommand]
-    private void SubmitSearch()
+    private void SubmitSearch() => RequestSearch(SearchKeyword);
+
+    /// <summary>请求打开（或复用）搜索窗口并对关键词发起搜索；空白关键词直接忽略。</summary>
+    public void RequestSearch(string keyword)
     {
-        if (string.IsNullOrWhiteSpace(SearchKeyword)) return;
-        Search.Keyword = SearchKeyword;
-        Search.RunSearchCommand.Execute(null);
-        Navigate(AppPage.Search);
+        var query = keyword.Trim();
+        if (query.Length == 0) return;
+        SearchRequested?.Invoke(query);
     }
 }

@@ -17,13 +17,7 @@ public sealed class MediaProxy : IDisposable
     public string Register(string url, IReadOnlyDictionary<string, string>? headers = null)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new InvalidDataException("代理地址必须为HTTP(S)。");
-        var safeHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in headers ?? new Dictionary<string, string>())
-        {
-            if (key is not ("User-Agent" or "Referer")) continue;
-            if (value.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("代理请求头非法。");
-            safeHeaders[key] = value;
-        }
+        var safeHeaders = NormalizeHeaders(headers);
         var registrationKey=uri.AbsoluteUri+"\n"+string.Join("\n",safeHeaders.OrderBy(header=>header.Key,StringComparer.OrdinalIgnoreCase).Select(header=>header.Key.ToLowerInvariant()+":"+header.Value));
         lock(_registrationGate)
         {
@@ -41,6 +35,48 @@ public sealed class MediaProxy : IDisposable
             return "/proxy/"+id;
         }
     }
+
+    /// <summary>逐跳/帧长度请求头：代理自己计算，不能由调用方注入（避免请求走私/长度错乱）。</summary>
+    private static readonly HashSet<string> RestrictedProxyHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Host", "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Proxy-Connection",
+        "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Expect",
+        "Content-Length", "Content-Type", "Content-Encoding", "Range",
+    };
+
+    /// <summary>
+    /// 规范化要转发的媒体请求头：保留 Cookie/Authorization/Referer/UA 等真实播放所需头（完整透传），
+    /// 但拒绝逐跳与帧长度头以及非法字符。凭据只绑定到本次注册的句柄，不做全局 Cookie 会话。
+    /// </summary>
+    private static Dictionary<string, string> NormalizeHeaders(IReadOnlyDictionary<string, string>? headers)
+    {
+        var safe = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in headers ?? new Dictionary<string, string>())
+        {
+            if (key.Length == 0 || key.Length > 256 || !IsHeaderToken(key) || RestrictedProxyHeaders.Contains(key)) continue;
+            if (value.Length > 8192 || value.IndexOfAny(['\r', '\n', '\0']) >= 0) throw new InvalidDataException("代理请求头非法。");
+            safe[key] = value;
+        }
+        return safe;
+    }
+
+    /// <summary>RFC 7230 token 字符：非 token 的头名（含空格、冒号等）会被丢弃而非原样转发。</summary>
+    private static bool IsHeaderToken(string name)
+    {
+        foreach (var c in name)
+            if (!char.IsAsciiLetterOrDigit(c) && !"!#$%&'*+-.^_`|~".Contains(c)) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 跨源请求只保留 UA：Cookie/Authorization/Referer 等凭据绝不跟随重定向或清单子资源到别的源站。
+    /// </summary>
+    private static Dictionary<string, string> CrossOriginHeaders(IReadOnlyDictionary<string, string> headers) =>
+        headers.Where(header => header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
+
+    private static bool SameOrigin(Uri left, Uri right) =>
+        left.GetLeftPart(UriPartial.Authority).Equals(right.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
 
     public async Task ServeCachedAsync(HttpContext context)
     {
@@ -83,9 +119,8 @@ public sealed class MediaProxy : IDisposable
             string RegisterChild(string url)
             {
                 var target = new Uri(url);
-                // 清单指向别的源站时不继承原站Referer，避免跨源泄露。
-                var headers = target.GetLeftPart(UriPartial.Authority) == entry.Uri.GetLeftPart(UriPartial.Authority)
-                    ? entry.Headers : entry.Headers.Where(header => header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)).ToDictionary(header => header.Key, header => header.Value);
+                // 清单指向别的源站时只保留 UA，不携带 Cookie/Authorization/Referer，避免跨源泄露凭据。
+                var headers = SameOrigin(target, entry.Uri) ? entry.Headers : CrossOriginHeaders(entry.Headers);
                 return Register(url, headers);
             }
             var rewritten = dash ? RewriteDash(text.ToString(), effectiveUri, RegisterChild) : RewriteHls(text.ToString(), effectiveUri, RegisterChild);
@@ -105,9 +140,9 @@ public sealed class MediaProxy : IDisposable
         for(var attempt=0;attempt<=5;attempt++)
         {
             using var request=new HttpRequestMessage(HttpMethod.Get,target);
-            foreach(var (key,value) in entry.Headers)
-                if(!key.Equals("Referer",StringComparison.OrdinalIgnoreCase)||target.GetLeftPart(UriPartial.Authority)==entry.Uri.GetLeftPart(UriPartial.Authority))
-                    request.Headers.TryAddWithoutValidation(key,value);
+            // 重定向到别的源站时只带 UA：Cookie/Authorization/Referer 等凭据不跟随跨源跳转。
+            foreach(var (key,value) in SameOrigin(target,entry.Uri)?entry.Headers:CrossOriginHeaders(entry.Headers))
+                request.Headers.TryAddWithoutValidation(key,value);
             if(context.Request.Headers.TryGetValue("Range",out var range))
             {
                 if(!System.Net.Http.Headers.RangeHeaderValue.TryParse(range.ToString(),out var parsed))throw new InvalidDataException("Range请求无效。");

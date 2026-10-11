@@ -5,18 +5,54 @@
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              x:Class="VodBox.Desktop.Views.LiveView" x:DataType="vm:MainViewModel">
+  <UserControl.Styles>
+    <!-- 展开的单频道节目行：中性底，仅「正在播出」用 CardHoverBrush 轻背景 + 明确文字。 -->
+    <Style Selector="Border.programmeRow">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+    <Style Selector="Border.programmeRow.current">
+      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+    </Style>
+    <Style Selector="Border.programmeRow.past TextBlock.programmeTitle">
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+    </Style>
+    <Style Selector="ListBox.programmeList ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <ControlTemplate><ContentPresenter Content="{TemplateBinding Content}"
+            ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" /></ControlTemplate>
+      </Setter>
+    </Style>
+  </UserControl.Styles>
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <Grid DataContext="{Binding Live}">
 
     <!-- 主窗口仅浏览频道，播放交给独立窗口。 -->
-    <Grid RowDefinitions="Auto,*" Margin="0">
+    <Grid x:Name="LiveContentGrid" RowDefinitions="Auto,*,Auto" Margin="0" SizeChanged="OnLiveContentSizeChanged">
       <!-- 紧凑工具栏：选中组名单行显示，搜索固定宽度，弹出菜单才使用两行。 -->
       <Grid x:Name="LiveToolbar" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="28,0,20,12" MinHeight="38">
         <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,12,0">
           <TextBlock Text="频道列表" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding ChannelCards.Count, StringFormat='共 {0} 个频道'}" FontSize="10.5" Opacity="0.6" />
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <TextBlock Text="{Binding ChannelCards.Count, StringFormat='共 {0} 个频道'}" FontSize="10.5" Opacity="0.6" VerticalAlignment="Center" />
+            <!-- 紧凑节目表状态入口：正常显示「内置节目表」，异常显示短状态；点击定位设置里的节目表区。 -->
+            <Button x:Name="EpgStatusButton" Click="OnOpenEpgSettings" Padding="6,1" MinHeight="0"
+                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                    CornerRadius="{DynamicResource AppControlCornerRadius}"
+                    ToolTip.Tip="{Binding EpgStatusDetail}">
+              <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <PathIcon Data="{StaticResource Icon.Playlist}" Width="12" Height="12" Opacity="0.7" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding EpgStatusLabel}" FontSize="10.5" Opacity="0.75" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
         </StackPanel>
         <ComboBox x:Name="GroupSelector" Grid.Column="1" ItemsSource="{Binding GroupOptions}" SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
                   MinWidth="150" MaxWidth="280" Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,0" VerticalAlignment="Center"
@@ -53,7 +89,7 @@
                   <PathIcon Data="{StaticResource Icon.Lock}" Width="12" Height="12" IsVisible="{Binding Locked}" VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Grid.Row="1" Text="{Binding Count, StringFormat='{}{0} 个频道'}" FontSize="11" Opacity="0.6" />
-                <PathIcon Grid.Column="1" Grid.RowSpan="2" Data="{StaticResource Icon.Check}" Width="16" Height="16"
+                <PathIcon Grid.Column="1" Grid.RowSpan="2" Data="{StaticResource Icon.Check}" Width="18" Height="18"
                           Margin="12,0,0,0" VerticalAlignment="Center" IsVisible="{Binding $parent[ComboBoxItem].IsSelected}" />
               </Grid>
             </DataTemplate>
@@ -132,9 +168,9 @@
                       <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                       <views:RemotePoster Grid.Column="1" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Width="32" Height="18" Stretch="Uniform" Margin="6,0,0,0" />
                     </Grid>
-                    <TextBlock Grid.Row="2" Text="{Binding EpgNow}" Margin="0,2,0,0" FontSize="11"
-                               Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis"
-                               IsVisible="{Binding EpgNow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <!-- EPG 行固定预留一行：加载中显示状态占位，避免卡片高度随数据跳变。 -->
+                    <TextBlock Grid.Row="2" Text="{Binding EpgNow}" Margin="0,2,0,0" FontSize="11" MinHeight="14"
+                               Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                   </Grid>
                 </Button>
               </DataTemplate>
@@ -164,6 +200,84 @@
           </StackPanel>
         </Border>
       </Panel>
+
+      <!-- 底部：选中频道的当前/下一摘要，可展开为同一区域的单频道虚拟化节目表。
+           节目表是播出信息，不是回看入口：过去节目只读、不提供播放/seek。 -->
+      <Border Grid.Row="2" Margin="28,0,20,12" Padding="14,10"
+              CornerRadius="{DynamicResource AppPanelCornerRadius}"
+              Background="{DynamicResource SurfaceBrush}" BorderThickness="1"
+              BorderBrush="{DynamicResource StrokeBrush}"
+              IsVisible="{Binding HasChannelSummary}">
+        <Grid RowDefinitions="Auto,Auto">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <TextBlock Grid.Column="0" Text="{Binding SummaryChannelName}" FontSize="14" FontWeight="SemiBold"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding SummaryNowTitle}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding SummaryNowRange}" FontSize="11" Opacity="0.6" VerticalAlignment="Center"
+                           IsVisible="{Binding SummaryNowRange, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding SummaryNextTitle}" FontSize="11.5" Opacity="0.75" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding SummaryNextRange}" FontSize="11" Opacity="0.5" VerticalAlignment="Center"
+                           IsVisible="{Binding SummaryNextRange, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="secondary" Content="重试" Click="OnRetryEpg"
+                      IsVisible="{Binding ProgrammePanelExpanded}" />
+              <Button Classes="secondary" Click="OnOpenEpgSettings" Content="节目表设置"
+                      IsVisible="{Binding ProgrammePanelExpanded}" />
+              <Button x:Name="ProgrammeToggleButton" Classes="secondary" Content="{Binding ProgrammeToggleLabel}"
+                      Click="OnToggleProgrammePanel" />
+            </StackPanel>
+          </Grid>
+
+          <Grid Grid.Row="1" Margin="0,10,0,0" RowDefinitions="Auto,Auto,Auto"
+                IsVisible="{Binding ProgrammePanelExpanded}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+              <ComboBox x:Name="ProgrammeDateSelector" Grid.Column="0" ItemsSource="{Binding ProgrammeDates}"
+                        SelectedItem="{Binding SelectedProgrammeDate, Mode=TwoWay}"
+                        MinWidth="130" Height="30" Padding="10,0" VerticalAlignment="Center"
+                        CornerRadius="{DynamicResource AppControlCornerRadius}" MaxDropDownHeight="300">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ProgrammeDateOption">
+                    <TextBlock Text="{Binding Label}" FontSize="12" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Grid.Column="1" Text="{Binding ProgrammePanelStatus}" FontSize="11.5" Opacity="0.7"
+                         VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="2" Text="节目表为播出信息，不含回看" FontSize="10.5" Opacity="0.45"
+                         VerticalAlignment="Center" />
+            </Grid>
+            <!-- 有限视口 + 虚拟化：ListBox 自己拥有滚动，MaxHeight 由可用内容区 45% 决定。 -->
+            <ListBox x:Name="ProgrammeList" Grid.Row="1" Classes="programmeList" Margin="0,8,0,0"
+                     ItemsSource="{Binding ProgrammeRows}" MaxHeight="{Binding ProgrammeListMaxHeight}"
+                     Background="Transparent" BorderThickness="0" Padding="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LiveProgrammeRow">
+                  <Border Classes="programmeRow" Classes.current="{Binding IsNow}" Classes.past="{Binding IsPast}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                      <TextBlock Grid.Column="0" Text="{Binding Range}" FontSize="11.5" Opacity="0.65"
+                                 VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="programmeTitle" Text="{Binding Title}" FontSize="13"
+                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding StatusLabel}" FontSize="11" Opacity="0.7"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
+        </Grid>
+      </Border>
 
     </Grid>
     <Border IsVisible="{Binding GroupUnlockOpen}" Background="{DynamicResource SurfaceBrush}" Padding="24" CornerRadius="{DynamicResource AppPanelCornerRadius}" Width="360" HorizontalAlignment="Center" VerticalAlignment="Center">

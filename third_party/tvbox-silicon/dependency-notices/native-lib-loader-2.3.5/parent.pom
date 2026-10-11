@@ -1,0 +1,4672 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.scijava</groupId>
+		<artifactId>pom-scijava-base</artifactId>
+		<version>12.0.0</version>
+		<relativePath />
+	</parent>
+
+	<artifactId>pom-scijava</artifactId>
+	<version>30.0.0</version>
+	<packaging>pom</packaging>
+
+	<name>SciJava Parent POM</name>
+	<description>This POM provides a parent from which participating projects can declare their build configurations. It ensures that projects all use a compatible build environment, including Java version, as well as versions of dependencies and plugins.</description>
+	<url>https://scijava.org/</url>
+	<inceptionYear>2011</inceptionYear>
+	<organization>
+		<name>SciJava</name>
+		<url>https://scijava.org/</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>Unlicense</name>
+			<url>https://unlicense.org/</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<id>ctrueden</id>
+			<name>Curtis Rueden</name>
+			<url>https://imagej.net/User:Rueden</url>
+			<roles>
+				<role>founder</role>
+				<role>lead</role>
+				<role>developer</role>
+				<role>debugger</role>
+				<role>reviewer</role>
+				<role>support</role>
+				<role>maintainer</role>
+			</roles>
+		</developer>
+	</developers>
+	<contributors>
+		<contributor>
+			<name>Mark Hiner</name>
+			<url>https://imagej.net/User:Hinerm</url>
+			<properties><id>hinerm</id></properties>
+		</contributor>
+		<contributor>
+			<name>Johannes Schindelin</name>
+			<url>https://imagej.net/User:Schindelin</url>
+			<properties><id>dscho</id></properties>
+		</contributor>
+		<contributor>
+			<name>Sébastien Besson</name>
+			<url>https://imagej.net/User:Sbesson</url>
+			<properties><id>sbesson</id></properties>
+		</contributor>
+		<contributor>
+			<name>John Bogovic</name>
+			<url>https://imagej.net/User:Bogovic</url>
+			<properties><id>bogovicj</id></properties>
+		</contributor>
+		<contributor>
+			<name>Nicolas Chiaruttini</name>
+			<url>https://imagej.net/User:NicoKiaru</url>
+			<properties><id>NicoKiaru</id></properties>
+		</contributor>
+		<contributor>
+			<name>Barry DeZonia</name>
+			<url>https://imagej.net/User:Bdezonia</url>
+			<properties><id>bdezonia</id></properties>
+		</contributor>
+		<contributor>
+			<name>Richard Domander</name>
+			<url>https://imagej.net/User:Rdom</url>
+			<properties><id>rimadoma</id></properties>
+		</contributor>
+		<contributor>
+			<name>Karl Duderstadt</name>
+			<properties><id>karlduderstadt</id></properties>
+		</contributor>
+		<contributor>
+			<name>Jan Eglinger</name>
+			<url>https://imagej.net/User:Eglinger</url>
+			<properties><id>imagejan</id></properties>
+		</contributor>
+		<contributor>
+			<name>Gabriel Einsdorf</name>
+			<url>https://imagej.net/User:Gab1one</url>
+			<properties><id>gab1one</id></properties>
+		</contributor>
+		<contributor>
+			<name>Tiago Ferreira</name>
+			<url>https://imagej.net/User:Tiago</url>
+			<properties><id>tferr</id></properties>
+		</contributor>
+		<contributor>
+			<name>David Gault</name>
+			<properties><id>dgault</id></properties>
+		</contributor>
+		<contributor>
+			<name>Ulrik Günther</name>
+			<url>https://imagej.net/User:Skalarproduktraum</url>
+			<properties><id>skalarproduktraum</id></properties>
+		</contributor>
+		<contributor>
+			<name>Philipp Hanslovsky</name>
+			<url>https://imagej.net/User:Hanslovsky</url>
+			<properties><id>hanslovsky</id></properties>
+		</contributor>
+		<contributor>
+			<name>Stefan Helfrich</name>
+			<url>https://imagej.net/User:stelfrich</url>
+			<properties><id>stelfrich</id></properties>
+		</contributor>
+		<contributor>
+			<name>Cameron Lloyd</name>
+			<properties><id>camlloyd</id></properties>
+		</contributor>
+		<contributor>
+			<name>Hadrien Mary</name>
+			<url>https://imagej.net/User:Hadim</url>
+			<properties><id>hadim</id></properties>
+		</contributor>
+		<contributor>
+			<name>Tobias Pietzsch</name>
+			<url>https://imagej.net/User:Pietzsch</url>
+			<properties><id>tpietzsch</id></properties>
+		</contributor>
+		<contributor>
+			<name>Stephan Preibisch</name>
+			<url>https://imagej.net/User:StephanP</url>
+			<properties><id>StephanPreibisch</id></properties>
+		</contributor>
+		<contributor>
+			<name>Stephan Saalfeld</name>
+			<url>https://imagej.net/User:Saalfeld</url>
+			<properties><id>axtimwalde</id></properties>
+		</contributor>
+		<contributor>
+			<name>Deborah Schmidt</name>
+			<url>https://imagej.net/User:Frauzufall</url>
+			<properties><id>frauzufall</id></properties>
+		</contributor>
+		<contributor>
+			<name>Lorenzo Scianatico</name>
+			<url>https://imagej.net/User:LoreScianatico</url>
+			<properties><id>LoreScianatico</id></properties>
+		</contributor>
+		<contributor>
+			<name>Jean-Yves Tinevez</name>
+			<url>https://imagej.net/User:JeanYvesTinevez</url>
+			<properties><id>tinevez</id></properties>
+		</contributor>
+		<contributor>
+			<name>Christian Tischer</name>
+			<properties><id>tischi</id></properties>
+		</contributor>
+		<contributor>
+			<name>Gabriella Turek</name>
+			<url>https://imagej.net/User:Turek</url>
+			<properties><id>turekg</id></properties>
+		</contributor>
+	</contributors>
+
+	<mailingLists>
+		<mailingList>
+			<name>SciJava</name>
+			<subscribe>https://groups.google.com/group/scijava</subscribe>
+			<unsubscribe>https://groups.google.com/group/scijava</unsubscribe>
+			<post>scijava@googlegroups.com</post>
+			<archive>https://groups.google.com/group/scijava</archive>
+		</mailingList>
+	</mailingLists>
+
+	<scm>
+		<connection>scm:git:git://github.com/scijava/pom-scijava</connection>
+		<developerConnection>scm:git:git@github.com:scijava/pom-scijava</developerConnection>
+		<tag>pom-scijava-30.0.0</tag>
+		<url>https://github.com/scijava/pom-scijava</url>
+	</scm>
+	<issueManagement>
+		<system>GitHub Issues</system>
+		<url>https://github.com/scijava/pom-scijava/issues</url>
+	</issueManagement>
+	<ciManagement>
+		<system>Travis CI</system>
+		<url>https://travis-ci.org/scijava/pom-scijava</url>
+	</ciManagement>
+
+	<properties>
+		<!--
+		HACK: The following list of allowed-to-be-duplicated classes
+		facilitates intended combinations of artifacts:
+		==
+		TEMP: Until ome/ome-common-java#50 and ome/bioformats#3557 merge.
+		Classes:
+			com.esotericsoftware.kryo.*,
+			com.esotericsoftware.minlog.*,
+			com.esotericsoftware.reflectasm.*
+		Part of:
+			com.esotericsoftware.kryo:kryo,
+			com.esotericsoftware:kryo,
+			com.esotericsoftware:minlog,
+			com.esotericsoftware:reflectasm
+		Enables:
+			org.openmicroscopy:ome-common (com.esotericsoftware.kryo:kryo) +
+			graphics.scenery:scenery (com.esotericsoftware:kryo)
+		==
+		Classes: com.google.inject.*
+		Part of: com.google.inject:guice:no_aop
+		Also in: org.sonatype.sisu:sisu-guice
+		Enables:
+			org.apache.maven:maven-core (guice) +
+			org.apache.maven.shared:maven-common-artifact-filters (sisu-guice)
+		==
+		TEMP: Until jruby/jruby#6205 is addressed.
+		Classes: jnr.ffi.*
+		Part of: com.github.jnr:jnr-ffi
+		Also in: org.jruby:jruby-core
+		Enables: org.jruby:jruby-core + org.python:jython-slim (jnr-ffi)
+		==
+		Classes: org.apache.hadoop.yarn.*.package-info
+		Part of: org.apache.hadoop:hadoop-yarn-*
+		Enables:
+			org.apache.hadoop:hadoop-yarn-<foo> +
+			org.apache.hadoop:hadoop-yarn-<bar>
+		==
+		Classes: org.apache.spark.unused.UnusedStubClass
+		Part of: org.apache.spark:spark-*
+		Enables: org.apache.spark:spark-core_2.11 (spark-*)
+		==
+		Classes: org.hibernate.stat.ConcurrentStatisticsImpl
+		Part of: org.hibernate:hibernate-core
+		Also in: org.openmicroscopy:omero-blitz
+		Enables:
+			org.openmicroscopy:omero-blitz +
+			org.openmicroscopy:omero-model (hibernate-core)
+		==
+		Classes: org.junit.runner.Runner
+		Part of: junit:junit
+		Also in: org.jmockit:jmockit
+		Enables: junit:junit + org.jmockit:jmockit
+		==
+		Classes: org.jetbrains.kotlin.daemon.common.*
+		Part of: kotlin-daemon-client, kotlin-daemon-embeddable
+		Enables:
+			org.jetbrains.kotlin:kotlin-compiler-embeddable (kotlin-daemon-embeddable) +
+			org.jetbrains.kotlin:kotlin-script-util (kotlin-compiler-client)
+		-->
+		<scijava.allowedDuplicateClasses>com.esotericsoftware.kryo.*,com.esotericsoftware.minlog.*,com.esotericsoftware.reflectasm.*,com.google.inject.*,jnr.ffi.*,org.apache.hadoop.yarn.*.package-info,org.apache.spark.unused.UnusedStubClass,org.hibernate.stat.ConcurrentStatisticsImpl,org.jetbrains.kotlin.daemon.common.*,org.junit.runner.Runner</scijava.allowedDuplicateClasses>
+		<!--
+		NB: The scijava.allowedDuplicateClasses property above makes it easier to
+		append to the list of allowed duplicate classes in downstream projects.
+		Simply override the property in your POM with something like this:
+		<allowedDuplicateClasses>${scijava.allowedDuplicateClasses},com.example.AnotherDuplicate</allowedDuplicateClasses>
+		-->
+		<allowedDuplicateClasses>${scijava.allowedDuplicateClasses}</allowedDuplicateClasses>
+
+		<!--
+		NB: We override these properties to make the enforcer happy.
+		You will need to override them in your POM, too... to valid values.
+		-->
+		<license.licenseName>N/A</license.licenseName>
+		<license.copyrightOwners>N/A</license.copyrightOwners>
+
+		<!-- Managed dependency versions - SciJava component collection -->
+
+		<!--
+		If two artifacts on the classpath use two different versions of the same
+		dependency, behavior is inconsistent at best, and often broken. The
+		following properties facilitate consistency of dependency versions between
+		various projects in the SciJava software stack.
+
+		When possible, we advise declaring your SciJava dependencies without a
+		version since the versions of all SciJava components are managed in this
+		POM's <dependencyManagement> section.
+
+		If you need to override the version of a particular component, then simply
+		override that component's version property in your POM's <properties>
+		section, rather than hardcoding them.
+
+		WARNING: While most artifacts in this BOM can be successfully combined,
+		there are a handful of exceptions requiring some downstream effort:
+
+		- net.imagej:imagej-server depends on Dropwizard, which ships its own
+		  metrics-graphite and metrics-logback libraries, among other issues.
+		- org.apache.spark:spark-core_2.11 has a large number of dependencies,
+		  some of which are incompatible with other artifact trees in this BOM;
+		  e.g., Spark depends on kryo-shaded while Bio-Formats depends on kryo.
+
+		If you make use of any of the above artifacts, you may need to add
+		dependency exclusions, ignore additional duplicate class patterns,
+		and/or manually tune your runtime classpath.
+		-->
+
+		<!-- SciJava - https://github.com/scijava -->
+
+		<!-- Batch Processor - https://github.com/scijava/batch-processor -->
+		<batch-processor.version>0.4.1</batch-processor.version>
+
+		<!-- JUnit Benchmarks - https://github.com/scijava/junit-benchmarks -->
+		<junit-benchmarks.version>0.7.4-scijava</junit-benchmarks.version>
+
+		<!-- MiniMaven - https://github.com/scijava/minimaven -->
+		<minimaven.version>2.2.2</minimaven.version>
+
+		<!-- Native Lib Loader - https://github.com/scijava/native-lib-loader -->
+		<native-lib-loader.version>2.3.4</native-lib-loader.version>
+
+		<!-- Parsington - https://github.com/scijava/parsington -->
+		<parsington.version>2.0.0</parsington.version>
+
+		<!-- SciJava Cache - https://github.com/scijava/scijava-cache -->
+		<scijava-cache.version>0.1.2</scijava-cache.version>
+
+		<!-- SciJava Common - https://github.com/scijava/scijava-common -->
+		<scijava-common.version>2.85.0</scijava-common.version>
+
+		<!-- SciJava Config - https://github.com/scijava/scijava-config -->
+		<scijava-config.version>2.0.2</scijava-config.version>
+
+		<!-- SciJava Grab - https://github.com/scijava/scijava-grab -->
+		<scijava-grab.version>0.1.0</scijava-grab.version>
+
+		<!-- SciJava I/O: HTTP - https://github.com/scijava/scijava-io-http -->
+		<scijava-io-http.version>0.2.1</scijava-io-http.version>
+
+		<!-- SciJava Java 3D Tools - https://github.com/scijava/scijava-java3d -->
+		<scijava-java3d.version>0.1.0</scijava-java3d.version>
+
+		<!-- SciJava Listeners - https://github.com/scijava/scijava-listeners -->
+		<scijava-listeners.version>1.0.0-beta-3</scijava-listeners.version>
+
+		<!-- SciJava SLF4J Logging - https://github.com/scijava/scijava-log-slf4j -->
+		<scijava-log-slf4j.version>1.0.5</scijava-log-slf4j.version>
+
+		<!-- SciJava Optional - https://github.com/scijava/scijava-optional -->
+		<scijava-optional.version>1.0.0</scijava-optional.version>
+
+		<!-- SciJava Plugins: Commands - https://github.com/scijava/scijava-plugins-commands -->
+		<scijava-plugins-commands.version>0.2.3</scijava-plugins-commands.version>
+
+		<!-- SciJava Plugins: I/O: Table - https://github.com/scijava/scijava-plugins-io-table -->
+		<scijava-plugins-io-table.version>0.4.0</scijava-plugins-io-table.version>
+
+		<!-- SciJava Plugins: Platforms - https://github.com/scijava/scijava-plugins-platforms -->
+		<scijava-plugins-platforms.version>0.3.1</scijava-plugins-platforms.version>
+
+		<!-- SciJava Plugins: Text: Markdown - https://github.com/scijava/scijava-plugins-text-markdown -->
+		<scijava-plugins-text-markdown.version>0.1.3</scijava-plugins-text-markdown.version>
+
+		<!-- SciJava Plugins: Text: Plain - https://github.com/scijava/scijava-plugins-text-plain -->
+		<scijava-plugins-text-plain.version>0.1.3</scijava-plugins-text-plain.version>
+
+		<!-- SciJava Search - https://github.com/scijava/scijava-search -->
+		<scijava-search.version>0.7.0</scijava-search.version>
+
+		<!-- SciJava Table - https://github.com/scijava/scijava-table -->
+		<scijava-table.version>0.7.0</scijava-table.version>
+
+		<!-- SciJava UI: AWT - https://github.com/scijava/scijava-ui-awt -->
+		<scijava-ui-awt.version>0.1.7</scijava-ui-awt.version>
+
+		<!-- SciJava UI: Swing - https://github.com/scijava/scijava-ui-swing -->
+		<scijava-ui-swing.version>0.13.2</scijava-ui-swing.version>
+
+		<!-- Script Editor - https://github.com/scijava/script-editor -->
+		<script-editor.version>0.5.6</script-editor.version>
+
+		<!-- Scripting: BeanShell - https://github.com/scijava/scripting-beanshell -->
+		<scripting-beanshell.version>0.3.4</scripting-beanshell.version>
+
+		<!-- Scripting: Clojure - https://github.com/scijava/scripting-clojure -->
+		<scripting-clojure.version>0.1.6</scripting-clojure.version>
+
+		<!-- Scripting: Groovy - https://github.com/scijava/scripting-groovy -->
+		<scripting-groovy.version>0.3.0</scripting-groovy.version>
+
+		<!-- Scripting: Java - https://github.com/scijava/scripting-java -->
+		<scripting-java.version>0.4.1</scripting-java.version>
+
+		<!-- Scripting: JavaScript - https://github.com/scijava/scripting-javascript -->
+		<scripting-javascript.version>0.5.0</scripting-javascript.version>
+
+		<!-- Scripting: JRuby - https://github.com/scijava/scripting-jruby -->
+		<scripting-jruby.version>0.3.1</scripting-jruby.version>
+
+		<!-- Scripting: Jython - https://github.com/scijava/scripting-jython -->
+		<scripting-jython.version>1.0.0</scripting-jython.version>
+
+		<!-- Scripting: Kotlin - https://github.com/scijava/scripting-kotlin -->
+		<scripting-kotlin.version>0.1.1</scripting-kotlin.version>
+
+		<!-- Scripting: MATLAB - https://github.com/scijava/scripting-matlab -->
+		<scripting-matlab.version>0.5.2</scripting-matlab.version>
+
+		<!-- Scripting: Renjin - https://github.com/scijava/scripting-renjin -->
+		<scripting-renjin.version>0.2.3</scripting-renjin.version>
+
+		<!-- Scripting: Scala - https://github.com/scijava/scripting-scala -->
+		<scripting-scala.version>0.2.2</scripting-scala.version>
+
+		<!-- Swing Checkbox Tree - https://github.com/scijava/swing-checkbox-tree -->
+		<swing-checkbox-tree.version>1.0.2</swing-checkbox-tree.version>
+
+		<!-- UI Behaviour - https://github.com/scijava/ui-behaviour -->
+		<ui-behaviour.version>2.0.3</ui-behaviour.version>
+
+		<!-- ImageJ - https://github.com/imagej -->
+
+		<!-- ImageJ - https://github.com/imagej/imagej -->
+		<imagej.version>2.2.0</imagej.version>
+
+		<!-- ImageJ 1.x - https://github.com/imagej/ImageJA -->
+		<imagej1.version>1.53d</imagej1.version>
+		<ij.version>${imagej1.version}</ij.version>
+
+		<!-- ImageJ 1.x patcher - https://github.com/imagej/ij1-patcher -->
+		<ij1-patcher.version>1.2.0</ij1-patcher.version>
+
+		<!-- ImageJ Common - https://github.com/imagej/imagej-common -->
+		<imagej-common.version>0.34.0</imagej-common.version>
+
+		<!-- ImageJ Deprecated - https://github.com/imagej/imagej-deprecated -->
+		<imagej-deprecated.version>0.1.4</imagej-deprecated.version>
+
+		<!-- ImageJ Launcher - https://github.com/imagej/imagej-launcher -->
+		<imagej-launcher.version>6.0.1</imagej-launcher.version>
+
+		<!-- ImageJ Legacy - https://github.com/imagej/imagej-legacy -->
+		<imagej-legacy.version>0.37.4</imagej-legacy.version>
+
+		<!-- ImageJ MATLAB - https://github.com/imagej/imagej-matlab -->
+		<imagej-matlab.version>0.7.4</imagej-matlab.version>
+
+		<!-- ImageJ Mesh - https://github.com/imagej/imagej-mesh -->
+		<imagej-mesh.version>0.8.0</imagej-mesh.version>
+
+		<!-- ImageJ Mesh IO - https://github.com/imagej/imagej-mesh-io -->
+		<imagej-mesh-io.version>0.1.2</imagej-mesh-io.version>
+
+		<!-- ImageJ Notebook - https://github.com/imagej/imagej-notebook -->
+		<imagej-notebook.version>0.7.1</imagej-notebook.version>
+
+		<!-- ImageJ-OMERO - https://github.com/imagej/imagej-omero -->
+		<imagej-omero.version>1.0.0-5.5</imagej-omero.version>
+
+		<!-- ImageJ-OMERO Legacy - https://github.com/imagej/imagej-omero-legacy -->
+		<imagej-omero-legacy.version>1.0.0-5.5</imagej-omero-legacy.version>
+
+		<!-- ImageJ OpenCV - https://github.com/imagej/imagej-opencv -->
+		<imagej-opencv.version>0.1.1</imagej-opencv.version>
+
+		<!-- ImageJ Ops - https://github.com/imagej/imagej-ops -->
+		<imagej-ops.version>0.45.5</imagej-ops.version>
+
+		<!-- ImageJ Plugins: Batch - https://github.com/imagej/imagej-plugins-batch -->
+		<imagej-plugins-batch.version>0.1.1</imagej-plugins-batch.version>
+
+		<!-- ImageJ Plugins: Commands - https://github.com/imagej/imagej-plugins-commands -->
+		<imagej-plugins-commands.version>0.8.1</imagej-plugins-commands.version>
+
+		<!-- ImageJ Plugins: Tools - https://github.com/imagej/imagej-plugins-tools -->
+		<imagej-plugins-tools.version>0.3.1</imagej-plugins-tools.version>
+
+		<!-- ImageJ Plugins: Uploader: SSH - https://github.com/imagej/imagej-plugins-uploader-ssh -->
+		<imagej-plugins-uploader-ssh.version>0.3.2</imagej-plugins-uploader-ssh.version>
+
+		<!-- ImageJ Plugins: Uploader: WebDAV - https://github.com/imagej/imagej-plugins-uploader-webdav -->
+		<imagej-plugins-uploader-webdav.version>0.3.2</imagej-plugins-uploader-webdav.version>
+
+		<!-- ImageJ Scripting - https://github.com/imagej/imagej-scripting -->
+		<imagej-scripting.version>0.8.2</imagej-scripting.version>
+
+		<!-- ImageJ Server - https://github.com/imagej/imagej-server -->
+		<imagej-server.version>0.2.0</imagej-server.version>
+
+		<!-- ImageJ TensorFlow - https://github.com/imagej/imagej-tensorflow -->
+		<imagej-tensorflow.version>1.1.5</imagej-tensorflow.version>
+
+		<!-- ImageJ UI: AWT - https://github.com/imagej/imagej-ui-awt -->
+		<imagej-ui-awt.version>0.3.1</imagej-ui-awt.version>
+
+		<!-- ImageJ UI: Swing - https://github.com/imagej/imagej-ui-swing -->
+		<imagej-ui-swing.version>0.23.2</imagej-ui-swing.version>
+
+		<!-- ImageJ Updater - https://github.com/imagej/imagej-updater -->
+		<imagej-updater.version>0.10.5</imagej-updater.version>
+
+		<!-- Op Finder - https://github.com/imagej/op-finder -->
+		<op-finder.version>0.1.4</op-finder.version>
+
+		<!-- ImgLib2 - https://github.com/imglib -->
+
+		<!-- ImgLib2 - https://github.com/imglib/imglib2 -->
+		<imglib2.version>5.11.1</imglib2.version>
+
+		<!-- ImgLib2 Algorithms - https://github.com/imglib/imglib2-algorithm -->
+		<imglib2-algorithm.version>0.11.2</imglib2-algorithm.version>
+
+		<!-- ImgLib2 Algorithms FFT - https://github.com/imglib/imglib2-algorithm-fft -->
+		<imglib2-algorithm-fft.version>0.2.0</imglib2-algorithm-fft.version>
+
+		<!-- ImgLib2 Algorithms GPL - https://github.com/imglib/imglib2-algorithm-gpl -->
+		<imglib2-algorithm-gpl.version>0.2.5</imglib2-algorithm-gpl.version>
+
+		<!-- ImgLib2 Cache - https://github.com/imglib/imglib2-cache -->
+		<imglib2-cache.version>1.0.0-beta-15</imglib2-cache.version>
+
+		<!-- ImgLib2 IJ - https://github.com/imglib/imglib2-ij -->
+		<imglib2-ij.version>2.0.0-beta-46</imglib2-ij.version>
+
+		<!-- ImgLib2 RealTransform - https://github.com/imglib/imglib2-realtransform -->
+		<imglib2-realtransform.version>3.1.0</imglib2-realtransform.version>
+
+		<!-- ImgLib2 ROI - https://github.com/imglib/imglib2-roi -->
+		<imglib2-roi.version>0.10.4</imglib2-roi.version>
+
+		<!-- ImgLib2 Scripting - https://github.com/imglib/imglib2-script -->
+		<imglib2-script.version>0.2.4</imglib2-script.version>
+
+		<!-- ImgLib2 UI - https://github.com/imglib/imglib2-ui -->
+		<imglib2-ui.version>2.0.1</imglib2-ui.version>
+
+		<!-- ImgLib2 Unsafe - https://github.com/imglib/imglib2-unsafe -->
+		<imglib2-unsafe.version>0.4.0</imglib2-unsafe.version>
+
+		<!-- SCIFIO - https://github.com/scifio -->
+
+		<!-- SCIFIO - https://github.com/scifio/scifio -->
+		<scifio.version>0.41.1</scifio.version>
+
+		<!-- SCIFIO-BF-compat - https://github.com/scifio/scifio-bf-compat -->
+		<scifio-bf-compat.version>4.1.0</scifio-bf-compat.version>
+
+		<!-- SCIFIO Command Line Tools - https://github.com/scifio/scifio-cli -->
+		<scifio-cli.version>0.6.1</scifio-cli.version>
+
+		<!-- SCIFIO HDF5 - https://github.com/scifio/scifio-hdf5 -->
+		<scifio-hdf5.version>0.2.1</scifio-hdf5.version>
+
+		<!-- SCIFIO JAI Image I/O - https://github.com/scifio/scifio-jai-imageio -->
+		<scifio-jai-imageio.version>1.1.1</scifio-jai-imageio.version>
+
+		<!-- SCIFIO-LifeSci - https://github.com/scifio/scifio-lifesci -->
+		<scifio-lifesci.version>0.9.0</scifio-lifesci.version>
+
+		<!-- SCIFIO-OME-XML - https://github.com/scifio/scifio-ome-xml -->
+		<scifio-ome-xml.version>0.16.1</scifio-ome-xml.version>
+
+		<!-- Fiji - https://github.com/fiji -->
+
+		<!-- Fiji - https://github.com/fiji/fiji -->
+		<fiji.version>2.2.0</fiji.version>
+
+		<!-- Standard Fiji projects -->
+
+		<AnalyzeSkeleton.version>3.4.2</AnalyzeSkeleton.version>
+		<AnalyzeSkeleton_.version>${AnalyzeSkeleton.version}</AnalyzeSkeleton_.version>
+		<Anisotropic_Diffusion_2D.version>2.0.1</Anisotropic_Diffusion_2D.version>
+		<Archipelago_Plugins.version>0.5.4</Archipelago_Plugins.version>
+		<Arrow.version>2.0.2</Arrow.version>
+		<Arrow_.version>${Arrow.version}</Arrow_.version>
+		<Auto_Local_Threshold.version>1.10.1</Auto_Local_Threshold.version>
+		<Auto_Threshold.version>1.17.2</Auto_Threshold.version>
+		<BalloonSegmentation.version>3.0.1</BalloonSegmentation.version>
+		<BalloonSegmentation_.version>${BalloonSegmentation.version}</BalloonSegmentation_.version>
+		<Bug_Submitter.version>2.1.1</Bug_Submitter.version>
+		<CPU_Meter.version>2.0.1</CPU_Meter.version>
+		<Calculator_Plus.version>2.0.1</Calculator_Plus.version>
+		<Cell_Counter.version>3.0.0</Cell_Counter.version>
+		<Colocalisation_Analysis.version>3.0.5</Colocalisation_Analysis.version>
+		<Color_Histogram.version>2.0.7</Color_Histogram.version>
+		<Color_Inspector_3D.version>2.5.0</Color_Inspector_3D.version>
+		<Colour_Deconvolution.version>3.0.3</Colour_Deconvolution.version>
+		<CorrectBleach.version>2.0.3</CorrectBleach.version>
+		<CorrectBleach_.version>${CorrectBleach.version}</CorrectBleach_.version>
+		<Correct_3D_Drift.version>1.0.6</Correct_3D_Drift.version>
+		<Descriptor_based_registration.version>2.1.7</Descriptor_based_registration.version>
+		<Dichromacy.version>2.1.2</Dichromacy.version>
+		<Dichromacy_.version>${Dichromacy.version}</Dichromacy_.version>
+		<Directionality.version>2.3.0</Directionality.version>
+		<Directionality_.version>${Directionality.version}</Directionality_.version>
+		<FS_Align_TrakEM2.version>2.0.3</FS_Align_TrakEM2.version>
+		<Feature_Detection.version>2.0.2</Feature_Detection.version>
+		<Fiji_3D_Blob_Segmentation.version>3.0.1</Fiji_3D_Blob_Segmentation.version>
+		<Fiji_Archipelago.version>2.0.1</Fiji_Archipelago.version>
+		<Fiji_Developer.version>2.0.7</Fiji_Developer.version>
+		<Fiji_Package_Maker.version>2.1.1</Fiji_Package_Maker.version>
+		<Fiji_Plugins.version>3.1.1</Fiji_Plugins.version>
+		<FilamentDetector.version>1.0.0</FilamentDetector.version>
+		<FlowJ.version>2.0.1</FlowJ.version>
+		<FlowJ_.version>${FlowJ.version}</FlowJ_.version>
+		<Graph_Cut.version>1.0.2</Graph_Cut.version>
+		<Gray_Morphology.version>2.3.5</Gray_Morphology.version>
+		<H5J_Loader_Plugin.version>1.1.0</H5J_Loader_Plugin.version>
+		<HDF5_Vibez.version>1.1.0</HDF5_Vibez.version>
+		<Helmholtz_Analysis.version>2.0.2</Helmholtz_Analysis.version>
+		<IJ_Robot.version>2.0.1</IJ_Robot.version>
+		<IO.version>4.1.0</IO.version>
+		<IO_.version>${IO.version}</IO_.version>
+		<ImageJ_3D_Objects_Counter.version>2.0.1</ImageJ_3D_Objects_Counter.version>
+		<ImageJ_3D_Viewer.version>4.0.3</ImageJ_3D_Viewer.version>
+		<Image_5D.version>2.0.2</Image_5D.version>
+		<Image_Expression_Parser.version>3.0.1</Image_Expression_Parser.version>
+		<Interactive_3D_Surface_Plot.version>3.0.0</Interactive_3D_Surface_Plot.version>
+		<IsoData_Classifier.version>2.0.1</IsoData_Classifier.version>
+		<Kappa.version>2.0.0</Kappa.version>
+		<Kuwahara_Filter.version>2.0.1</Kuwahara_Filter.version>
+		<KymographBuilder.version>2.1.1</KymographBuilder.version>
+		<LSM_Reader.version>4.1.2</LSM_Reader.version>
+		<LSM_Toolbox.version>4.1.2</LSM_Toolbox.version>
+		<Lasso_and_Blow_Tool.version>2.0.2</Lasso_and_Blow_Tool.version>
+		<Linear_Kuwahara.version>2.0.1</Linear_Kuwahara.version>
+		<LocalThickness.version>4.0.3</LocalThickness.version>
+		<LocalThickness_.version>${LocalThickness.version}</LocalThickness_.version>
+		<MTrack2.version>2.0.1</MTrack2.version>
+		<MTrack2_.version>${MTrack2.version}</MTrack2_.version>
+		<M_I_P.version>2.0.1</M_I_P.version>
+		<Manual_Tracking.version>2.1.1</Manual_Tracking.version>
+		<Multi_Kymograph.version>3.0.1</Multi_Kymograph.version>
+		<OMEVisual.version>2.0.0</OMEVisual.version>
+		<PIV_analyser.version>1.1.2</PIV_analyser.version>
+		<QuickPALM.version>1.1.2</QuickPALM.version>
+		<QuickPALM_.version>${QuickPALM.version}</QuickPALM_.version>
+		<RATS.version>2.0.2</RATS.version>
+		<RATS_.version>${RATS.version}</RATS_.version>
+		<Reconstruct_Reader.version>2.0.4</Reconstruct_Reader.version>
+		<SPIM_Opener.version>2.0.2</SPIM_Opener.version>
+		<SPIM_Registration.version>5.0.21</SPIM_Registration.version>
+		<Samples.version>2.0.2</Samples.version>
+		<Samples_.version>${Samples.version}</Samples_.version>
+		<Series_Labeler.version>2.0.1</Series_Labeler.version>
+		<Siox_Segmentation.version>1.0.5</Siox_Segmentation.version>
+		<Skeletonize3D.version>2.1.1</Skeletonize3D.version>
+		<Skeletonize3D_.version>${Skeletonize3D.version}</Skeletonize3D_.version>
+		<SplineDeformationGenerator.version>2.0.2</SplineDeformationGenerator.version>
+		<SplineDeformationGenerator_.version>${SplineDeformationGenerator.version}</SplineDeformationGenerator_.version>
+		<Stack_Manipulation.version>2.1.2</Stack_Manipulation.version>
+		<Statistical_Region_Merging.version>2.0.1</Statistical_Region_Merging.version>
+		<Stitching.version>3.1.6</Stitching.version>
+		<Stitching_.version>${Stitching.version}</Stitching_.version>
+		<Sync_Win.version>1.7-fiji4</Sync_Win.version>
+		<Thread_Killer.version>2.0.1</Thread_Killer.version>
+		<Time_Lapse.version>2.1.1</Time_Lapse.version>
+		<Time_Stamper.version>2.1.0</Time_Stamper.version>
+		<ToAST.version>25.0.2</ToAST.version>
+		<ToAST_.version>${ToAST.version}</ToAST_.version>
+		<TopoJ.version>2.0.1</TopoJ.version>
+		<TopoJ_.version>${TopoJ.version}</TopoJ_.version>
+		<TrackMate.version>6.0.1</TrackMate.version>
+		<TrackMate_.version>${TrackMate.version}</TrackMate_.version>
+		<Trainable_Segmentation.version>3.2.34</Trainable_Segmentation.version>
+		<TrakEM2_Archipelago.version>2.0.3</TrakEM2_Archipelago.version>
+		<VIB-lib.version>2.2.0</VIB-lib.version>
+		<VIB.version>3.0.3</VIB.version>
+		<VIB_.version>${VIB.version}</VIB_.version>
+		<Vaa3d_Reader.version>2.0.3</Vaa3d_Reader.version>
+		<Vaa3d_Writer.version>1.0.3</Vaa3d_Writer.version>
+		<Video_Editing.version>2.0.1</Video_Editing.version>
+		<View5D.version>2.3.1</View5D.version>
+		<View5D_.version>${View5D.version}</View5D_.version>
+		<Volume_Calculator.version>2.0.2</Volume_Calculator.version>
+		<Volume_Viewer.version>2.01.2</Volume_Viewer.version>
+		<bUnwarpJ.version>2.6.13</bUnwarpJ.version>
+		<bUnwarpJ_.version>${bUnwarpJ.version}</bUnwarpJ_.version>
+		<bij.version>1.0.0</bij.version>
+		<blockmatching.version>2.1.3</blockmatching.version>
+		<blockmatching_.version>${blockmatching.version}</blockmatching_.version>
+		<fiji-lib.version>2.1.2</fiji-lib.version>
+		<legacy-imglib1.version>1.1.9</legacy-imglib1.version>
+		<level_sets.version>1.0.2</level_sets.version>
+		<pal-optimization.version>2.0.1</pal-optimization.version>
+		<panorama.version>3.0.2</panorama.version>
+		<panorama_.version>${panorama.version}</panorama_.version>
+		<register_virtual_stack_slices.version>3.0.5</register_virtual_stack_slices.version>
+		<registration_3d.version>2.0.1</registration_3d.version>
+		<weave_jy2java.version>2.1.1</weave_jy2java.version>
+
+		<!-- External Fiji projects -->
+
+		<!-- SNT - https://github.com/morphonets/SNT -->
+		<SNT.version>3.1.112</SNT.version>
+
+		<!-- JITK TPS - https://github.com/saalfeldlab/jitk-tps -->
+		<jitk-tps.version>3.0.1</jitk-tps.version>
+
+		<!-- BigWarp - https://github.com/saalfeldlab/bigwarp -->
+		<bigwarp.version>6.0.0</bigwarp.version>
+		<bigwarp_fiji.version>${bigwarp.version}</bigwarp_fiji.version>
+
+		<!-- MPI-CBG - https://github.com/axtimwalde/mpicbg -->
+		<mpicbg.version>1.4.1</mpicbg.version>
+		<mpicbg_.version>${mpicbg.version}</mpicbg_.version>
+
+		<!-- TrakEM2 TPS - https://github.com/saalfeldlab/trakem2-tps -->
+		<trakem2_tps.version>1.1.4</trakem2_tps.version>
+
+		<!-- Z-Spacing correction - https://github.com/saalfeldlab/z-spacing -->
+		<z_spacing.version>1.1.1</z_spacing.version>
+
+		<!-- BigDataViewer - https://github.com/bigdataviewer -->
+
+		<bigdataviewer-core.version>9.0.6</bigdataviewer-core.version>
+		<bigdataviewer-server.version>3.0.0</bigdataviewer-server.version>
+		<bigdataviewer-vistools.version>1.0.0-beta-21</bigdataviewer-vistools.version>
+		<bigdataviewer_fiji.version>6.2.0</bigdataviewer_fiji.version>
+		<spim_data.version>2.2.4</spim_data.version>
+
+		<!-- TrakEM2 - https://github.com/trakem2 -->
+
+		<T2-NIT.version>1.1.3</T2-NIT.version>
+		<T2-TreelineGraph.version>1.1.3</T2-TreelineGraph.version>
+		<TrakEM2.version>1.3.4</TrakEM2.version>
+		<TrakEM2_.version>${TrakEM2.version}</TrakEM2_.version>
+		<VectorString.version>2.0.2</VectorString.version>
+		<trakem2-transform.version>1.0.1</trakem2-transform.version>
+
+		<!-- N5 - https://github.com/saalfeldlab/n5 -->
+
+		<imglib2-label-multisets.version>0.9.0</imglib2-label-multisets.version>
+		<n5.version>2.2.1</n5.version>
+		<n5-aws-s3.version>3.1.3</n5-aws-s3.version>
+		<n5-blosc.version>1.1.0</n5-blosc.version>
+		<n5-google-cloud.version>3.2.2</n5-google-cloud.version>
+		<n5-hdf5.version>1.1.0</n5-hdf5.version>
+		<n5-imglib2.version>3.5.1</n5-imglib2.version>
+		<n5-viewer_fiji.version>2.2.0</n5-viewer_fiji.version>
+		<n5-zarr.version>0.0.4</n5-zarr.version>
+
+		<!--
+		BEGIN MANUALLY MANAGED VERSIONS
+
+		The SciJava project uses tools in https://github.com/scijava/scijava-scripts
+		and https://github.com/scijava/scijava-maven-plugin to manage the properties
+		above.
+		-->
+
+		<!-- BoneJ - http://bonej.org/ -->
+		<bonej.version>7.0.7</bonej.version>
+		<bonej-plugins.version>${bonej.version}</bonej-plugins.version>
+		<bonej-ops.version>${bonej.version}</bonej-ops.version>
+		<bonej-legacy-plugins_.version>${bonej.version}</bonej-legacy-plugins_.version>
+		<bonej-legacy-util_.version>${bonej.version}</bonej-legacy-util_.version>
+		<bonej-utilities.version>${bonej.version}</bonej-utilities.version>
+
+		<!-- Open Microscopy Environment - https://github.com/ome -->
+
+		<!-- OME Common Java - https://github.com/ome/ome-common-java -->
+		<ome-common.version>6.0.4</ome-common.version>
+
+		<!-- Metakit - https://github.com/ome/ome-metakit -->
+		<metakit.version>5.3.2</metakit.version>
+
+		<!-- OME POI - https://github.com/ome/ome-poi -->
+		<ome-poi.version>5.3.3</ome-poi.version>
+
+		<!-- OME Model - https://github.com/ome/ome-model -->
+		<ome-xml.version>6.1.0</ome-xml.version>
+
+		<!-- Glencoe Software jxrlib - https://github.com/glencoesoftware/jxrlib -->
+		<jxrlib.version>0.2.4</jxrlib.version>
+		<jxrlib-all.version>${jxrlib.version}</jxrlib-all.version>
+
+		<!-- Bio-Formats - https://github.com/ome/bioformats -->
+		<bio-formats.version>6.5.1</bio-formats.version>
+		<bio-formats_plugins.version>${bio-formats.version}</bio-formats_plugins.version>
+		<formats-api.version>${bio-formats.version}</formats-api.version>
+		<formats-bsd.version>${bio-formats.version}</formats-bsd.version>
+		<formats-gpl.version>${bio-formats.version}</formats-gpl.version>
+
+		<!-- OMERO Blitz - https://github.com/ome/omero-blitz -->
+		<omero-blitz.version>5.5.6</omero-blitz.version>
+
+		<!-- OMERO Common - https://github.com/ome/omero-common -->
+		<omero-common.version>5.5.5</omero-common.version>
+
+		<!-- OMERO DSL Plugin - https://github.com/ome/omero-dsl-plugin -->
+		<omero-dsl-plugin.version>5.5.0</omero-dsl-plugin.version>
+
+		<!-- OMERO Gateway - https://github.com/ome/omero-gateway-java -->
+		<omero-gateway.version>5.6.3</omero-gateway.version>
+
+		<!-- OMERO Model - https://github.com/ome/omero-model -->
+		<omero-model.version>5.6.0</omero-model.version>
+
+		<!-- OMERO Renderer - https://github.com/ome/omero-renderer -->
+		<omero-renderer.version>5.5.5</omero-renderer.version>
+
+		<!-- OMERO ROMIO - https://github.com/ome/omero-romio -->
+		<omero-romio.version>5.6.0</omero-romio.version>
+
+		<!-- OMERO Server - https://github.com/ome/omero-server -->
+		<omero-server.version>5.5.6</omero-server.version>
+
+		<!-- Other SciJava components -->
+
+		<!-- MorphoLibJ - https://github.com/ijpb/MorphoLibJ -->
+		<MorphoLibJ.version>1.4.2.1</MorphoLibJ.version>
+		<MorphoLibJ_.version>${MorphoLibJ.version}</MorphoLibJ_.version>
+
+		<!-- BigStitcher - https://github.com/PreibischLab/BigStitcher -->
+		<BigStitcher.version>0.5.8</BigStitcher.version>
+
+		<!-- multiview-reconstruction - https://github.com/PreibischLab/multiview-reconstruction -->
+		<multiview-reconstruction.version>0.7.2</multiview-reconstruction.version>
+
+		<!-- multiview-simulation - https://github.com/PreibischLab/multiview-simulation -->
+		<multiview-simulation.version>0.2.0</multiview-simulation.version>
+
+		<!-- CoreMem - https://github.com/ClearControl/CoreMem -->
+		<coremem.version>0.4.8</coremem.version>
+
+		<!-- ClearGL - https://github.com/ClearVolume/ClearGL -->
+		<cleargl.version>2.2.10</cleargl.version>
+
+		<!-- Scenery - https://github.com/scenerygraphics/scenery -->
+		<scenery.version>0.7.0-beta-7</scenery.version>
+
+		<!-- SciView - https://github.com/scenerygraphics/SciView -->
+		<sciview.version>0.2.0-beta-5</sciview.version>
+
+		<!-- Third party components -->
+
+		<!-- Amazon S3 - https://aws.amazon.com/sdkforjava -->
+		<aws-java-sdk-s3.version>1.11.796</aws-java-sdk-s3.version>
+
+		<!-- Apache Groovy - https://groovy-lang.org/ -->
+		<groovy.version>3.0.4</groovy.version>
+		<groovy-ant.version>${groovy.version}</groovy-ant.version>
+		<groovy-astbuilder.version>${groovy.version}</groovy-astbuilder.version>
+		<groovy-bsf.version>${groovy.version}</groovy-bsf.version>
+		<groovy-cli-commons.version>${groovy.version}</groovy-cli-commons.version>
+		<groovy-cli-picocli.version>${groovy.version}</groovy-cli-picocli.version>
+		<groovy-console.version>${groovy.version}</groovy-console.version>
+		<groovy-datetime.version>${groovy.version}</groovy-datetime.version>
+		<groovy-dateutil.version>${groovy.version}</groovy-dateutil.version>
+		<groovy-docgenerator.version>${groovy.version}</groovy-docgenerator.version>
+		<groovy-groovydoc.version>${groovy.version}</groovy-groovydoc.version>
+		<groovy-groovysh.version>${groovy.version}</groovy-groovysh.version>
+		<groovy-jaxb.version>${groovy.version}</groovy-jaxb.version>
+		<groovy-jmx.version>${groovy.version}</groovy-jmx.version>
+		<groovy-json.version>${groovy.version}</groovy-json.version>
+		<groovy-macro.version>${groovy.version}</groovy-macro.version>
+		<groovy-nio.version>${groovy.version}</groovy-nio.version>
+		<groovy-servlet.version>${groovy.version}</groovy-servlet.version>
+		<groovy-sql.version>${groovy.version}</groovy-sql.version>
+		<groovy-swing.version>${groovy.version}</groovy-swing.version>
+		<groovy-templates.version>${groovy.version}</groovy-templates.version>
+		<groovy-test.version>${groovy.version}</groovy-test.version>
+		<groovy-test-junit5.version>${groovy.version}</groovy-test-junit5.version>
+		<groovy-testng.version>${groovy.version}</groovy-testng.version>
+		<groovy-xml.version>${groovy.version}</groovy-xml.version>
+		<groovy-yaml.version>${groovy.version}</groovy-yaml.version>
+
+		<!-- Apache Maven - https://maven.apache.org/ -->
+		<maven-artifact-transfer.version>0.12.0</maven-artifact-transfer.version>
+		<maven-common-artifact-filters.version>3.1.0</maven-common-artifact-filters.version>
+		<maven-core.version>3.6.3</maven-core.version>
+		<maven-plugin-tools-api.version>3.6.0</maven-plugin-tools-api.version>
+		<sisu-inject-bean.version>2.6.0</sisu-inject-bean.version>
+		<sisu-inject-plexus.version>2.6.0</sisu-inject-plexus.version>
+
+		<!-- Apache POI - https://poi.apache.org/ -->
+		<poi.version>3.17</poi.version>
+
+		<!-- Apache Spark - https://spark.apache.org/ -->
+		<spark.version>2.3.1</spark.version>
+
+		<!-- Apache HTTPComponents - https://hc.apache.org/ -->
+		<httpclient.version>4.5.12</httpclient.version>
+		<httpcore.version>4.4.13</httpcore.version>
+
+		<!-- Batik - https://xmlgraphics.apache.org/batik/ -->
+		<batik.version>1.13</batik.version>
+		<batik-anim.version>${batik.version}</batik-anim.version>
+		<batik-awt-util.version>${batik.version}</batik-awt-util.version>
+		<batik-bridge.version>${batik.version}</batik-bridge.version>
+		<batik-codec.version>${batik.version}</batik-codec.version>
+		<batik-constants.version>${batik.version}</batik-constants.version>
+		<batik-css.version>${batik.version}</batik-css.version>
+		<batik-dom.version>${batik.version}</batik-dom.version>
+		<batik-ext.version>${batik.version}</batik-ext.version>
+		<batik-extension.version>${batik.version}</batik-extension.version>
+		<batik-gui-util.version>${batik.version}</batik-gui-util.version>
+		<batik-gvt.version>${batik.version}</batik-gvt.version>
+		<batik-i18n.version>${batik.version}</batik-i18n.version>
+		<batik-parser.version>${batik.version}</batik-parser.version>
+		<batik-rasterizer.version>${batik.version}</batik-rasterizer.version>
+		<batik-rasterizer-ext.version>${batik.version}</batik-rasterizer-ext.version>
+		<batik-script.version>${batik.version}</batik-script.version>
+		<batik-slideshow.version>${batik.version}</batik-slideshow.version>
+		<batik-squiggle.version>${batik.version}</batik-squiggle.version>
+		<batik-squiggle-ext.version>${batik.version}</batik-squiggle-ext.version>
+		<batik-svg-dom.version>${batik.version}</batik-svg-dom.version>
+		<batik-svggen.version>${batik.version}</batik-svggen.version>
+		<batik-svgpp.version>${batik.version}</batik-svgpp.version>
+		<batik-swing.version>${batik.version}</batik-swing.version>
+		<batik-transcoder.version>${batik.version}</batik-transcoder.version>
+		<batik-ttf2svg.version>${batik.version}</batik-ttf2svg.version>
+		<batik-util.version>${batik.version}</batik-util.version>
+		<batik-xml.version>${batik.version}</batik-xml.version>
+		<xmlgraphics-commons.version>2.4</xmlgraphics-commons.version>
+
+		<!-- Blosc - https://blosc.org/ -->
+		<jblosc.version>1.0.1</jblosc.version>
+		<libblosc.version>1.18.1</libblosc.version>
+
+		<!-- CDI - http://cdi-spec.org/ -->
+		<cdi-api.version>1.2</cdi-api.version>
+
+		<!-- Commons BeanUtils - https://commons.apache.org/proper/commons-beanutils/ -->
+		<commons-beanutils.version>1.9.4</commons-beanutils.version>
+
+		<!-- Commons Codec - https://commons.apache.org/proper/commons-codec/ -->
+		<commons-codec.version>1.14</commons-codec.version>
+
+		<!-- Commons Collections - https://commons.apache.org/proper/commons-collections/ -->
+		<commons-collections.version>3.2.2</commons-collections.version>
+
+		<!-- Commons Compress - https://commons.apache.org/proper/commons-compress/ -->
+		<commons-compress.version>1.20</commons-compress.version>
+
+		<!-- Commons IO - https://commons.apache.org/proper/commons-io/ -->
+		<commons-io.version>2.7</commons-io.version>
+
+		<!-- Commons Lang - https://commons.apache.org/proper/commons-lang/ -->
+		<commons-lang.version>2.6</commons-lang.version>
+		<commons-lang3.version>3.10</commons-lang3.version>
+
+		<!-- Commons Logging - https://commons.apache.org/proper/commons-logging/ -->
+		<commons-logging.version>1.2</commons-logging.version>
+
+		<!-- Commons Math - https://commons.apache.org/proper/commons-math/ -->
+		<commons-math3.version>3.6.1</commons-math3.version>
+
+		<!-- Commons Text - https://commons.apache.org/proper/commons-text/ -->
+		<commons-text.version>1.8</commons-text.version>
+
+		<!-- Byte Code Generation Library - https://github.com/cglib/cglib -->
+		<cglib.version>3.3.0</cglib.version>
+		
+		<!--  Eclipse Collections - https://www.eclipse.org/collections/ -->
+		<eclipse-collections.version>10.4.0</eclipse-collections.version>
+		<eclipse-collections-api.version>${eclipse-collections.version}</eclipse-collections-api.version>
+		<eclipse-collections-forkjoin.version>${eclipse-collections.version}</eclipse-collections-forkjoin.version>
+		<eclipse-collections-testutils.version>${eclipse-collections.version}</eclipse-collections-testutils.version>
+
+		<!-- Eclipse SWT - https://www.eclipse.org/swt/ -->
+		<eclipse-swt.version>4.3</eclipse-swt.version>
+		<org.eclipse.swt.cocoa.macosx.version>${eclipse-swt.version}</org.eclipse.swt.cocoa.macosx.version>
+		<org.eclipse.swt.cocoa.macosx.x86_64.version>${eclipse-swt.version}</org.eclipse.swt.cocoa.macosx.x86_64.version>
+		<org.eclipse.swt.gtk.aix.ppc.version>${eclipse-swt.version}</org.eclipse.swt.gtk.aix.ppc.version>
+		<org.eclipse.swt.gtk.aix.ppc64.version>${eclipse-swt.version}</org.eclipse.swt.gtk.aix.ppc64.version>
+		<org.eclipse.swt.gtk.hpux.ia64.version>${eclipse-swt.version}</org.eclipse.swt.gtk.hpux.ia64.version>
+		<org.eclipse.swt.gtk.linux.ppc.version>${eclipse-swt.version}</org.eclipse.swt.gtk.linux.ppc.version>
+		<org.eclipse.swt.gtk.linux.ppc64.version>${eclipse-swt.version}</org.eclipse.swt.gtk.linux.ppc64.version>
+		<org.eclipse.swt.gtk.linux.s390.version>${eclipse-swt.version}</org.eclipse.swt.gtk.linux.s390.version>
+		<org.eclipse.swt.gtk.linux.s390x.version>${eclipse-swt.version}</org.eclipse.swt.gtk.linux.s390x.version>
+		<org.eclipse.swt.gtk.linux.x86.version>${eclipse-swt.version}</org.eclipse.swt.gtk.linux.x86.version>
+		<org.eclipse.swt.gtk.linux.x86_64.version>${eclipse-swt.version}</org.eclipse.swt.gtk.linux.x86_64.version>
+		<org.eclipse.swt.gtk.solaris.sparc.version>${eclipse-swt.version}</org.eclipse.swt.gtk.solaris.sparc.version>
+		<org.eclipse.swt.gtk.solaris.x86.version>${eclipse-swt.version}</org.eclipse.swt.gtk.solaris.x86.version>
+		<org.eclipse.swt.win32.win32.x86.version>${eclipse-swt.version}</org.eclipse.swt.win32.win32.x86.version>
+		<org.eclipse.swt.win32.win32.x86_64.version>${eclipse-swt.version}</org.eclipse.swt.win32.win32.x86_64.version>
+
+		<!-- Google Cloud Storage - https://github.com/googleapis/google-cloud-java -->
+		<google-cloud-nio.version>0.120.0-alpha</google-cloud-nio.version>
+		<google-cloud-resourcemanager.version>0.117.2-alpha</google-cloud-resourcemanager.version>
+		<google-cloud-storage.version>1.108.0</google-cloud-storage.version>
+
+		<!-- Gson - https://code.google.com/p/google-gson/ -->
+		<gson.version>2.8.6</gson.version>
+
+		<!-- Guava - https://github.com/google/guava -->
+		<guava.version>21.0</guava.version>
+
+		<!-- HyperSQL DataBase - http://hsqldb.org/ -->
+		<hsqldb.version>1.8.0.10</hsqldb.version>
+
+		<!-- iText PDF - https://github.com/itext/itextpdf -->
+		<itextpdf.version>5.5.13.1</itextpdf.version>
+
+		<!-- Jackrabbit WebDAV - https://jackrabbit.apache.org/jcr/components/jackrabbit-webdav-library.html -->
+		<jackrabbit-webdav.version>2.21.1</jackrabbit-webdav.version>
+
+		<!-- Jackson - https://github.com/FasterXML/jackson -->
+		<jackson-databind.version>2.11.0</jackson-databind.version>
+
+		<!-- Java Advanced Imaging - https://java.net/projects/jai-core -->
+		<jai.version>1.1.3</jai.version>
+		<jai-codec.version>${jai.version}</jai-codec.version>
+		<jai-core.version>${jai.version}</jai-core.version>
+
+		<!-- JAMA - https://math.nist.gov/javanumerics/jama/ -->
+		<jama.version>1.0.3</jama.version>
+
+		<!-- Java 3D - https://github.com/scijava/java3d-core -->
+		<java3d.version>1.6.0-scijava-2</java3d.version>
+		<j3dcore.version>${java3d.version}</j3dcore.version>
+		<j3dutils.version>${java3d.version}</j3dutils.version>
+		<vecmath.version>${java3d.version}</vecmath.version>
+
+		<!-- Javassist - https://www.javassist.org/ -->
+		<javassist.version>3.27.0-GA</javassist.version>
+
+		<!-- JDOM - http://www.jdom.org/ -->
+		<jdom2.version>2.0.6</jdom2.version>
+
+		<!-- Java Expression Parser - https://github.com/scijava/jep -->
+		<jep.version>2.4.2</jep.version>
+
+		<!-- Jetty - https://www.eclipse.org/jetty/ -->
+		<jetty.version>9.4.29.v20200521</jetty.version>
+		<jetty-annotations.version>${jetty.version}</jetty-annotations.version>
+		<!--
+		NB: We do not manage jetty-ant. It depends on ant with old groupId (ant),
+		which conflicts with other dependencies using new groupId (org.apache.ant).
+		-->
+		<jetty-client.version>${jetty.version}</jetty-client.version>
+		<jetty-continuation.version>${jetty.version}</jetty-continuation.version>
+		<jetty-deploy.version>${jetty.version}</jetty-deploy.version>
+		<jetty-http.version>${jetty.version}</jetty-http.version>
+		<jetty-http-spi.version>${jetty.version}</jetty-http-spi.version>
+		<jetty-io.version>${jetty.version}</jetty-io.version>
+		<jetty-jaas.version>${jetty.version}</jetty-jaas.version>
+		<jetty-jaspi.version>${jetty.version}</jetty-jaspi.version>
+		<jetty-jmx.version>${jetty.version}</jetty-jmx.version>
+		<jetty-jndi.version>${jetty.version}</jetty-jndi.version>
+		<!--
+		NB: We do not manage jetty-jspc-maven-plugin or jetty-maven-plugin.
+		Their dependencies include several artifacts conflicting with elsewhere:
+		* classworlds:classworlds vs. org.codehaus.plexus:plexus-classworlds
+		* javax.annotation:jsr250-api vs. javax.annotation:javax.annotation-api
+		* javax.websocket:javax.websocket-api vs. javax.websocket:javax.websocket-client-api
+		* org.mortbay.jasper:apache-el vs. javax.el:javax.el-api
+		-->
+		<jetty-nosql.version>${jetty.version}</jetty-nosql.version>
+		<jetty-plus.version>${jetty.version}</jetty-plus.version>
+		<jetty-proxy.version>${jetty.version}</jetty-proxy.version>
+		<jetty-rewrite.version>${jetty.version}</jetty-rewrite.version>
+		<!-- NB: We do not manage jetty-runner. It is an unshaded uber-JAR. -->
+		<jetty-security.version>${jetty.version}</jetty-security.version>
+		<jetty-server.version>${jetty.version}</jetty-server.version>
+		<jetty-servlet.version>${jetty.version}</jetty-servlet.version>
+		<jetty-servlets.version>${jetty.version}</jetty-servlets.version>
+		<jetty-spring.version>${jetty.version}</jetty-spring.version>
+		<jetty-start.version>${jetty.version}</jetty-start.version>
+		<jetty-util.version>${jetty.version}</jetty-util.version>
+		<jetty-util-ajax.version>${jetty.version}</jetty-util-ajax.version>
+		<jetty-webapp.version>${jetty.version}</jetty-webapp.version>
+		<jetty-xml.version>${jetty.version}</jetty-xml.version>
+
+		<!-- JFreeChart - http://www.jfree.org/jfreechart/ -->
+		<jfreechart.version>1.5.0</jfreechart.version>
+
+		<!-- JFreeSVG - http://www.jfree.org/jfreesvg/ -->
+		<jfreesvg.version>3.4</jfreesvg.version>
+
+		<!-- JGraphT - https://github.com/jgrapht/jgrapht -->
+		<jgrapht.version>1.4.0</jgrapht.version>
+		<jgrapht-core.version>${jgrapht.version}</jgrapht-core.version>
+		<jgrapht-demo.version>${jgrapht.version}</jgrapht-demo.version>
+		<jgrapht-ext.version>${jgrapht.version}</jgrapht-ext.version>
+		<jgrapht-guava.version>${jgrapht.version}</jgrapht-guava.version>
+		<jgrapht-io.version>${jgrapht.version}</jgrapht-io.version>
+		<jgrapht-opt.version>${jgrapht.version}</jgrapht-opt.version>
+
+		<!-- JGraphX - https://github.com/jgraph/jgraphx -->
+		<jgraphx.version>4.1.0</jgraphx.version>
+
+		<!-- JHDF5 - https://wiki-bsse.ethz.ch/label/JHDF5/hdf5 -->
+		<jhdf5.version>14.12.6</jhdf5.version>
+
+		<!-- JMH - https://openjdk.java.net/projects/code-tools/jmh/ -->
+		<jmh.version>1.23</jmh.version>
+		<jmh-core.version>${jmh.version}</jmh-core.version>
+		<jmh-generator-annprocess.version>${jmh.version}</jmh-generator-annprocess.version>
+
+		<!-- JMockit - https://jmockit.github.io/ -->
+		<jmockit.version>1.49</jmockit.version>
+
+		<!-- JNA - https://github.com/twall/jna -->
+		<jna.version>4.5.2</jna.version>
+
+		<!-- Joda-Time - https://www.joda.org/joda-time/ -->
+		<joda-time.version>2.10.6</joda-time.version>
+
+		<!-- JOGL - https://jogamp.org/jogl/ -->
+		<jogl.version>2.3.2</jogl.version>
+		<gluegen-rt-main.version>${jogl.version}</gluegen-rt-main.version>
+		<joal-main.version>${jogl.version}</joal-main.version>
+		<jocl-main.version>${jogl.version}</jocl-main.version>
+		<jogl-all-main.version>${jogl.version}</jogl-all-main.version>
+
+		<!-- JOML - https://joml-ci.github.io/JOML/ -->
+		<joml.version>1.9.25</joml.version>
+
+		<!-- JPedal - http://jpedal.org/ (defunct) -->
+		<jpedal.version>2.80b11</jpedal.version>
+		<jpedalSTD.version>${jpedal.version}</jpedalSTD.version>
+
+		<!-- JSch - http://www.jcraft.com/jsch/ -->
+		<jsch.version>0.1.55</jsch.version>
+
+		<!-- JUnit 4 - https://junit.org/junit4/ -->
+		<junit.version>4.13</junit.version>
+
+		<!-- JUnit 5 - https://junit.org/junit5/ -->
+		<junit-jupiter.version>5.6.2</junit-jupiter.version>
+		<junit-jupiter-api.version>${junit-jupiter.version}</junit-jupiter-api.version>
+		<junit-jupiter-engine.version>${junit-jupiter.version}</junit-jupiter-engine.version>
+		<junit-jupiter-migrationsupport.version>${junit-jupiter.version}</junit-jupiter-migrationsupport.version>
+		<junit-jupiter-params.version>${junit-jupiter.version}</junit-jupiter-params.version>
+		<junit-vintage-engine.version>${junit-jupiter.version}</junit-vintage-engine.version>
+
+		<!-- Jython - https://jython.org/ -->
+		<jython.version>2.7.2</jython.version>
+		<jython-slim.version>${jython.version}</jython-slim.version>
+
+		<!-- JZlib - http://www.jcraft.com/jzlib/ -->
+		<jzlib.version>1.1.3</jzlib.version>
+
+		<!-- Kotlin - https://kotlinlang.org/ -->
+		<!-- NB: kotlin.version is defined in pom-scijava-base. -->
+		<kotlin-compiler-embeddable.version>${kotlin.version}</kotlin-compiler-embeddable.version>
+		<kotlin-daemon-embeddable.version>${kotlin.version}</kotlin-daemon-embeddable.version>
+		<kotlin-reflect.version>${kotlin.version}</kotlin-reflect.version>
+		<kotlin-script-runtime.version>${kotlin.version}</kotlin-script-runtime.version>
+		<kotlin-script-util.version>${kotlin.version}</kotlin-script-util.version>
+		<kotlin-scripting-common.version>${kotlin.version}</kotlin-scripting-common.version>
+		<kotlin-scripting-compiler-embeddable.version>${kotlin.version}</kotlin-scripting-compiler-embeddable.version>
+		<kotlin-scripting-jvm.version>${kotlin.version}</kotlin-scripting-jvm.version>
+		<kotlin-stdlib.version>${kotlin.version}</kotlin-stdlib.version>
+		<kotlin-stdlib-common.version>${kotlin.version}</kotlin-stdlib-common.version>
+		<kotlin-stdlib-jdk8.version>${kotlin.version}</kotlin-stdlib-jdk8.version>
+
+
+		<!-- Logback - https://logback.qos.ch/ -->
+		<logback.version>1.2.3</logback.version>
+		<logback-classic.version>${logback.version}</logback-classic.version>
+		<logback-core.version>${logback.version}</logback-core.version>
+
+		<!-- LZ4 compression for Java - https://github.com/lz4/lz4-java -->
+		<lz4-java.version>1.7.1</lz4-java.version>
+
+		<!-- MapDB - https://www.mapdb.org/ -->
+		<mapdb.version>3.0.8</mapdb.version>
+
+		<!-- MigLayout - http://www.miglayout.com/ -->
+		<miglayout.version>5.2</miglayout.version>
+		<miglayout-core.version>${miglayout.version}</miglayout-core.version>
+		<miglayout-swing.version>${miglayout.version}</miglayout-swing.version>
+		<miglayout-swt.version>${miglayout.version}</miglayout-swt.version>
+
+		<!-- Mines JTK - https://github.com/dhale/jtk -->
+		<mines-jtk.version>20151125</mines-jtk.version>
+
+		<!-- Mockito - https://site.mockito.org/ -->
+		<mockito.version>2.19.0</mockito.version>
+		<mockito-core.version>${mockito.version}</mockito-core.version>
+
+		<!-- oj! Algorithms - https://github.com/optimatika/ojAlgo -->
+		<ojalgo.version>45.1.1</ojalgo.version>
+
+		<!-- OpenCSV - http://opencsv.sourceforge.net/ -->
+		<opencsv.version>5.2</opencsv.version>
+
+		<!-- picocli - https://picocli.info/ -->
+		<picocli.version>4.3.2</picocli.version>
+
+		<!-- PostgreSQL JDBC Driver - https://jdbc.postgresql.org/ -->
+		<postgresql.version>42.2.12</postgresql.version>
+
+		<!-- RSyntaxTextArea - https://bobbylight.github.io/RSyntaxTextArea/ -->
+		<rsyntaxtextarea.version>3.1.1</rsyntaxtextarea.version>
+		<autocomplete.version>3.1.0</autocomplete.version>
+		<languagesupport.version>3.1.0</languagesupport.version>
+
+		<!-- SLF4J - http://slf4j.org/ -->
+		<slf4j.version>1.7.30</slf4j.version>
+		<slf4j-api.version>${slf4j.version}</slf4j-api.version>
+		<slf4j-ext.version>${slf4j.version}</slf4j-ext.version>
+		<slf4j-jcl.version>${slf4j.version}</slf4j-jcl.version>
+		<slf4j-jdk14.version>${slf4j.version}</slf4j-jdk14.version>
+		<slf4j-nop.version>${slf4j.version}</slf4j-nop.version>
+		<slf4j-simple.version>${slf4j.version}</slf4j-simple.version>
+		<jcl-over-slf4j.version>${slf4j.version}</jcl-over-slf4j.version>
+
+		<!-- SnakeYAML - https://bitbucket.org/asomov/snakeyaml -->
+		<snakeyaml.version>1.26</snakeyaml.version>
+
+		<!-- SnakeYAML Engine - https://bitbucket.org/asomov/snakeyaml-engine -->
+		<snakeyaml-engine.version>2.1</snakeyaml-engine.version>
+
+		<!-- Spring - https://spring.io/ -->
+		<!--
+		NB: 3.2.9.RELEASE is the last version not to depend properly on
+		aopalliance:aopalliance, rather than including org.aopalliance
+		classes unshadowed!
+		-->
+		<spring-aop.version>3.2.9.RELEASE</spring-aop.version>
+
+		<!-- TensorFlow - https://www.tensorflow.org/ -->
+		<tensorflow.version>1.12.0</tensorflow.version>
+		<libtensorflow.version>${tensorflow.version}</libtensorflow.version>
+		<libtensorflow_jni.version>${tensorflow.version}</libtensorflow_jni.version>
+		<libtensorflow_jni_gpu.version>${tensorflow.version}</libtensorflow_jni_gpu.version>
+		<proto.version>${tensorflow.version}</proto.version>
+
+		<!-- Trove - http://trove.starlight-systems.com/ -->
+		<trove4j.version>3.0.3</trove4j.version>
+
+		<!-- Weka - https://www.cs.waikato.ac.nz/ml/weka/ -->
+		<weka.version>3.9.4</weka.version>
+		<weka-dev.version>${weka.version}</weka-dev.version>
+
+		<!-- XZ for Java - https://tukaani.org/xz/java.html -->
+		<xz.version>1.8</xz.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- SciJava - https://github.com/scijava -->
+
+			<!-- Batch Processor - https://github.com/scijava/batch-processor -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>batch-processor</artifactId>
+				<version>${batch-processor.version}</version>
+			</dependency>
+
+			<!-- MiniMaven - https://github.com/scijava/minimaven -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>minimaven</artifactId>
+				<version>${minimaven.version}</version>
+			</dependency>
+
+			<!-- Native Lib Loader - https://github.com/scijava/native-lib-loader -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>native-lib-loader</artifactId>
+				<version>${native-lib-loader.version}</version>
+			</dependency>
+
+			<!-- Parsington - https://github.com/scijava/parsington -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>parsington</artifactId>
+				<version>${parsington.version}</version>
+			</dependency>
+
+			<!-- SciJava Cache - https://github.com/scijava/scijava-cache -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-cache</artifactId>
+				<version>${scijava-cache.version}</version>
+			</dependency>
+
+			<!-- SciJava Common - https://github.com/scijava/scijava-common -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-common</artifactId>
+				<version>${scijava-common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-common</artifactId>
+				<version>${scijava-common.version}</version>
+				<classifier>tests</classifier>
+			</dependency>
+
+			<!-- SciJava Config - https://github.com/scijava/scijava-config -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-config</artifactId>
+				<version>${scijava-config.version}</version>
+			</dependency>
+
+			<!-- SciJava Grab - https://github.com/scijava/scijava-grab -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-grab</artifactId>
+				<version>${scijava-grab.version}</version>
+			</dependency>
+
+			<!-- SciJava I/O: HTTP - https://github.com/scijava/scijava-io-http -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-io-http</artifactId>
+				<version>${scijava-io-http.version}</version>
+			</dependency>
+
+			<!-- SciJava Java 3D Tools - https://github.com/scijava/scijava-java3d -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-java3d</artifactId>
+				<version>${scijava-java3d.version}</version>
+			</dependency>
+
+			<!-- SciJava Listeners - https://github.com/scijava/scijava-listeners -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-listeners</artifactId>
+				<version>${scijava-listeners.version}</version>
+			</dependency>
+
+			<!-- SciJava SLF4J Logging - https://github.com/scijava/scijava-log-slf4j -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-log-slf4j</artifactId>
+				<version>${scijava-log-slf4j.version}</version>
+			</dependency>
+
+			<!-- SciJava Optional - https://github.com/scijava/scijava-optional -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-optional</artifactId>
+				<version>${scijava-optional.version}</version>
+			</dependency>
+
+			<!-- SciJava Plugins: Commands - https://github.com/scijava/scijava-plugins-commands -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-plugins-commands</artifactId>
+				<version>${scijava-plugins-commands.version}</version>
+			</dependency>
+
+			<!-- SciJava Plugins: I/O: Table - https://github.com/scijava/scijava-plugins-io-table -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-plugins-io-table</artifactId>
+				<version>${scijava-plugins-io-table.version}</version>
+			</dependency>
+
+			<!-- SciJava Plugins: Platforms - https://github.com/scijava/scijava-plugins-platforms -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-plugins-platforms</artifactId>
+				<version>${scijava-plugins-platforms.version}</version>
+			</dependency>
+
+			<!-- SciJava Plugins: Text: Markdown - https://github.com/scijava/scijava-plugins-text-markdown -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-plugins-text-markdown</artifactId>
+				<version>${scijava-plugins-text-markdown.version}</version>
+			</dependency>
+
+			<!-- SciJava Plugins: Text: Plain - https://github.com/scijava/scijava-plugins-text-plain -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-plugins-text-plain</artifactId>
+				<version>${scijava-plugins-text-plain.version}</version>
+			</dependency>
+
+			<!-- SciJava Search - https://github.com/scijava/scijava-search -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-search</artifactId>
+				<version>${scijava-search.version}</version>
+			</dependency>
+
+			<!-- SciJava Table - https://github.com/scijava/scijava-table -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-table</artifactId>
+				<version>${scijava-table.version}</version>
+			</dependency>
+
+			<!-- SciJava UI: AWT - https://github.com/scijava/scijava-ui-awt -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-ui-awt</artifactId>
+				<version>${scijava-ui-awt.version}</version>
+			</dependency>
+
+			<!-- SciJava UI: Swing - https://github.com/scijava/scijava-ui-swing -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scijava-ui-swing</artifactId>
+				<version>${scijava-ui-swing.version}</version>
+			</dependency>
+
+			<!-- Script Editor - https://github.com/scijava/script-editor -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>script-editor</artifactId>
+				<version>${script-editor.version}</version>
+			</dependency>
+
+			<!-- Scripting: BeanShell - https://github.com/scijava/scripting-beanshell -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-beanshell</artifactId>
+				<version>${scripting-beanshell.version}</version>
+			</dependency>
+
+			<!-- Scripting: Clojure - https://github.com/scijava/scripting-clojure -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-clojure</artifactId>
+				<version>${scripting-clojure.version}</version>
+			</dependency>
+
+			<!-- Scripting: Groovy - https://github.com/scijava/scripting-groovy -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-groovy</artifactId>
+				<version>${scripting-groovy.version}</version>
+			</dependency>
+
+			<!-- Scripting: Java - https://github.com/scijava/scripting-java -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-java</artifactId>
+				<version>${scripting-java.version}</version>
+			</dependency>
+
+			<!-- Scripting: JavaScript - https://github.com/scijava/scripting-javascript -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-javascript</artifactId>
+				<version>${scripting-javascript.version}</version>
+			</dependency>
+
+			<!-- Scripting: JRuby - https://github.com/scijava/scripting-jruby -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-jruby</artifactId>
+				<version>${scripting-jruby.version}</version>
+			</dependency>
+
+			<!-- Scripting: Jython - https://github.com/scijava/scripting-jython -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-jython</artifactId>
+				<version>${scripting-jython.version}</version>
+			</dependency>
+
+			<!-- Scripting: Kotlin - https://github.com/scijava/scripting-kotlin -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-kotlin</artifactId>
+				<version>${scripting-kotlin.version}</version>
+			</dependency>
+
+			<!-- Scripting: MATLAB - https://github.com/scijava/scripting-matlab -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-matlab</artifactId>
+				<version>${scripting-matlab.version}</version>
+			</dependency>
+
+			<!-- Scripting: Renjin - https://github.com/scijava/scripting-renjin -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-renjin</artifactId>
+				<version>${scripting-renjin.version}</version>
+			</dependency>
+
+			<!-- Scripting: Scala - https://github.com/scijava/scripting-scala -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>scripting-scala</artifactId>
+				<version>${scripting-scala.version}</version>
+			</dependency>
+
+			<!-- Swing Checkbox Tree - https://github.com/scijava/swing-checkbox-tree -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>swing-checkbox-tree</artifactId>
+				<version>${swing-checkbox-tree.version}</version>
+			</dependency>
+
+			<!-- UI Behaviour - https://github.com/scijava/ui-behaviour -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>ui-behaviour</artifactId>
+				<version>${ui-behaviour.version}</version>
+			</dependency>
+
+			<!-- ImageJ - https://github.com/imagej -->
+
+			<!-- ImageJ - https://github.com/imagej/imagej -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej</artifactId>
+				<version>${imagej.version}</version>
+			</dependency>
+
+			<!-- ImageJ 1.x - https://github.com/imagej/ImageJA -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>ij</artifactId>
+				<version>${ij.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>com.sun</groupId>
+						<artifactId>tools</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- ImageJ 1.x patcher - https://github.com/imagej/ij1-patcher -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>ij1-patcher</artifactId>
+				<version>${ij1-patcher.version}</version>
+			</dependency>
+
+			<!-- ImageJ Common - https://github.com/imagej/imagej-common -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-common</artifactId>
+				<version>${imagej-common.version}</version>
+			</dependency>
+
+			<!-- ImageJ Deprecated - https://github.com/imagej/imagej-deprecated -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-deprecated</artifactId>
+				<version>${imagej-deprecated.version}</version>
+			</dependency>
+
+			<!-- ImageJ Launcher - https://github.com/imagej/imagej-launcher -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-launcher</artifactId>
+				<version>${imagej-launcher.version}</version>
+			</dependency>
+
+			<!-- ImageJ Legacy - https://github.com/imagej/imagej-legacy -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-legacy</artifactId>
+				<version>${imagej-legacy.version}</version>
+			</dependency>
+
+			<!-- ImageJ MATLAB - https://github.com/imagej/imagej-matlab -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-matlab</artifactId>
+				<version>${imagej-matlab.version}</version>
+			</dependency>
+
+			<!-- ImageJ Mesh - https://github.com/imagej/imagej-mesh -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-mesh</artifactId>
+				<version>${imagej-mesh.version}</version>
+			</dependency>
+
+			<!-- ImageJ Mesh IO - https://github.com/imagej/imagej-mesh-io -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-mesh-io</artifactId>
+				<version>${imagej-mesh-io.version}</version>
+			</dependency>
+
+			<!-- ImageJ Notebook - https://github.com/imagej/imagej-notebook -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-notebook</artifactId>
+				<version>${imagej-notebook.version}</version>
+			</dependency>
+
+			<!-- ImageJ OMERO - https://github.com/imagej/imagej-omero -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-omero</artifactId>
+				<version>${imagej-omero.version}</version>
+			</dependency>
+
+			<!-- ImageJ OMERO Legacy - https://github.com/imagej/imagej-omero-legacy -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-omero-legacy</artifactId>
+				<version>${imagej-omero-legacy.version}</version>
+			</dependency>
+
+			<!-- ImageJ OpenCV - https://github.com/imagej/imagej-opencv -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-opencv</artifactId>
+				<version>${imagej-opencv.version}</version>
+			</dependency>
+
+			<!-- ImageJ Ops - https://github.com/imagej/imagej-ops -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-ops</artifactId>
+				<version>${imagej-ops.version}</version>
+			</dependency>
+
+			<!-- ImageJ Plugins: Batch - https://github.com/imagej/imagej-plugins-batch -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-plugins-batch</artifactId>
+				<version>${imagej-plugins-batch.version}</version>
+			</dependency>
+
+			<!-- ImageJ Plugins: Commands - https://github.com/imagej/imagej-plugins-commands -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-plugins-commands</artifactId>
+				<version>${imagej-plugins-commands.version}</version>
+			</dependency>
+
+			<!-- ImageJ Plugins: Tools - https://github.com/imagej/imagej-plugins-tools -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-plugins-tools</artifactId>
+				<version>${imagej-plugins-tools.version}</version>
+			</dependency>
+
+			<!-- ImageJ Plugins: Uploader: SSH - https://github.com/imagej/imagej-plugins-uploader-ssh -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-plugins-uploader-ssh</artifactId>
+				<version>${imagej-plugins-uploader-ssh.version}</version>
+			</dependency>
+
+			<!-- ImageJ Plugins: Uploader: WebDAV - https://github.com/imagej/imagej-plugins-uploader-webdav -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-plugins-uploader-webdav</artifactId>
+				<version>${imagej-plugins-uploader-webdav.version}</version>
+			</dependency>
+
+			<!-- ImageJ Scripting - https://github.com/imagej/imagej-scripting -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-scripting</artifactId>
+				<version>${imagej-scripting.version}</version>
+			</dependency>
+
+			<!-- ImageJ Server - https://github.com/imagej/imagej-server -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-server</artifactId>
+				<version>${imagej-server.version}</version>
+			</dependency>
+
+			<!-- ImageJ TensorFlow - https://github.com/imagej/imagej-tensorflow -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-tensorflow</artifactId>
+				<version>${imagej-tensorflow.version}</version>
+			</dependency>
+
+			<!-- ImageJ UI: AWT - https://github.com/imagej/imagej-ui-awt -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-ui-awt</artifactId>
+				<version>${imagej-ui-awt.version}</version>
+			</dependency>
+
+			<!-- ImageJ UI: Swing - https://github.com/imagej/imagej-ui-swing -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-ui-swing</artifactId>
+				<version>${imagej-ui-swing.version}</version>
+			</dependency>
+
+			<!-- ImageJ Updater - https://github.com/imagej/imagej-updater -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-updater</artifactId>
+				<version>${imagej-updater.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>imagej-updater</artifactId>
+				<version>${imagej-updater.version}</version>
+				<classifier>tests</classifier>
+			</dependency>
+
+			<!-- Op-Finder - https://github.com/imagej/op-finder -->
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>op-finder</artifactId>
+				<version>${op-finder.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 - https://github.com/imglib -->
+
+			<!-- ImgLib2 - https://github.com/imglib/imglib2 -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2</artifactId>
+				<version>${imglib2.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 Algorithms - https://github.com/imglib/imglib2-algorithm -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-algorithm</artifactId>
+				<version>${imglib2-algorithm.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 Algorithms FFT - https://github.com/imglib/imglib2-algorithm-fft -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-algorithm-fft</artifactId>
+				<version>${imglib2-algorithm-fft.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 Algorithms GPL - https://github.com/imglib/imglib2-algorithm-gpl -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-algorithm-gpl</artifactId>
+				<version>${imglib2-algorithm-gpl.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 Cache - https://github.com/imglib/imglib2-cache -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-cache</artifactId>
+				<version>${imglib2-cache.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 IJ - https://github.com/imglib/imglib2-ij -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-ij</artifactId>
+				<version>${imglib2-ij.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 RealTransform - https://github.com/imglib/imglib2-realtransform -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-realtransform</artifactId>
+				<version>${imglib2-realtransform.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 ROI - https://github.com/imglib/imglib2-roi -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-roi</artifactId>
+				<version>${imglib2-roi.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 Scripting - https://github.com/imglib/imglib2-script -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-script</artifactId>
+				<version>${imglib2-script.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 UI - https://github.com/imglib/imglib2-ui -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-ui</artifactId>
+				<version>${imglib2-ui.version}</version>
+			</dependency>
+
+			<!-- ImgLib2 Unsafe - https://github.com/imglib/imglib2-unsafe -->
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-unsafe</artifactId>
+				<version>${imglib2-unsafe.version}</version>
+			</dependency>
+
+			<!-- SCIFIO - https://github.com/scifio -->
+
+			<!-- SCIFIO - https://github.com/scifio/scifio -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio</artifactId>
+				<version>${scifio.version}</version>
+			</dependency>
+
+			<!-- SCIFIO-BF-compat - https://github.com/scifio/scifio-bf-compat -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio-bf-compat</artifactId>
+				<version>${scifio-bf-compat.version}</version>
+			</dependency>
+
+			<!-- SCIFIO Command Line Tools - https://github.com/scifio/scifio-cli -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio-cli</artifactId>
+				<version>${scifio-cli.version}</version>
+			</dependency>
+
+			<!-- SCIFIO HDF5 - https://github.com/scifio/scifio-hdf5 -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio-hdf5</artifactId>
+				<version>${scifio-hdf5.version}</version>
+			</dependency>
+
+			<!-- SCIFIO JAI Image I/O - https://github.com/scifio/scifio-jai-imageio -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio-jai-imageio</artifactId>
+				<version>${scifio-jai-imageio.version}</version>
+			</dependency>
+
+			<!-- SCIFIO-LifeSci - https://github.com/scifio/scifio-lifesci -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio-lifesci</artifactId>
+				<version>${scifio-lifesci.version}</version>
+			</dependency>
+
+			<!-- SCIFIO-OME-XML - https://github.com/scifio/scifio-ome-xml -->
+			<dependency>
+				<groupId>io.scif</groupId>
+				<artifactId>scifio-ome-xml</artifactId>
+				<version>${scifio-ome-xml.version}</version>
+			</dependency>
+
+			<!-- Fiji - https://github.com/fiji -->
+
+			<!-- Fiji - https://github.com/fiji/fiji -->
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>fiji</artifactId>
+				<version>${fiji.version}</version>
+			</dependency>
+
+			<!-- Standard Fiji projects -->
+
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>AnalyzeSkeleton_</artifactId>
+				<version>${AnalyzeSkeleton_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Anisotropic_Diffusion_2D</artifactId>
+				<version>${Anisotropic_Diffusion_2D.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Archipelago_Plugins</artifactId>
+				<version>${Archipelago_Plugins.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Arrow_</artifactId>
+				<version>${Arrow_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Auto_Local_Threshold</artifactId>
+				<version>${Auto_Local_Threshold.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Auto_Threshold</artifactId>
+				<version>${Auto_Threshold.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>BalloonSegmentation_</artifactId>
+				<version>${BalloonSegmentation_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Bug_Submitter</artifactId>
+				<version>${Bug_Submitter.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>CPU_Meter</artifactId>
+				<version>${CPU_Meter.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Calculator_Plus</artifactId>
+				<version>${Calculator_Plus.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Cell_Counter</artifactId>
+				<version>${Cell_Counter.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Colocalisation_Analysis</artifactId>
+				<version>${Colocalisation_Analysis.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Color_Histogram</artifactId>
+				<version>${Color_Histogram.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Color_Inspector_3D</artifactId>
+				<version>${Color_Inspector_3D.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Colour_Deconvolution</artifactId>
+				<version>${Colour_Deconvolution.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>CorrectBleach_</artifactId>
+				<version>${CorrectBleach_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Correct_3D_Drift</artifactId>
+				<version>${Correct_3D_Drift.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Descriptor_based_registration</artifactId>
+				<version>${Descriptor_based_registration.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Dichromacy_</artifactId>
+				<version>${Dichromacy_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Directionality_</artifactId>
+				<version>${Directionality_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>FS_Align_TrakEM2</artifactId>
+				<version>${FS_Align_TrakEM2.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Feature_Detection</artifactId>
+				<version>${Feature_Detection.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>3D_Blob_Segmentation</artifactId>
+				<version>${Fiji_3D_Blob_Segmentation.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Fiji_Archipelago</artifactId>
+				<version>${Fiji_Archipelago.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Fiji_Developer</artifactId>
+				<version>${Fiji_Developer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Fiji_Package_Maker</artifactId>
+				<version>${Fiji_Package_Maker.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Fiji_Plugins</artifactId>
+				<version>${Fiji_Plugins.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>FilamentDetector</artifactId>
+				<version>${FilamentDetector.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>FlowJ_</artifactId>
+				<version>${FlowJ_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Graph_Cut</artifactId>
+				<version>${Graph_Cut.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Gray_Morphology</artifactId>
+				<version>${Gray_Morphology.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia</groupId>
+				<artifactId>H5J_Loader_Plugin</artifactId>
+				<version>${H5J_Loader_Plugin.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>HDF5_Vibez</artifactId>
+				<version>${HDF5_Vibez.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Helmholtz_Analysis</artifactId>
+				<version>${Helmholtz_Analysis.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>IJ_Robot</artifactId>
+				<version>${IJ_Robot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>IO_</artifactId>
+				<version>${IO_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Image_5D</artifactId>
+				<version>${Image_5D.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>3D_Objects_Counter</artifactId>
+				<version>${ImageJ_3D_Objects_Counter.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>3D_Viewer</artifactId>
+				<version>${ImageJ_3D_Viewer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Image_Expression_Parser</artifactId>
+				<version>${Image_Expression_Parser.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Interactive_3D_Surface_Plot</artifactId>
+				<version>${Interactive_3D_Surface_Plot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>IsoData_Classifier</artifactId>
+				<version>${IsoData_Classifier.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Kappa</artifactId>
+				<version>${Kappa.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Kuwahara_Filter</artifactId>
+				<version>${Kuwahara_Filter.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>KymographBuilder</artifactId>
+				<version>${KymographBuilder.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>LSM_Reader</artifactId>
+				<version>${LSM_Reader.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>LSM_Toolbox</artifactId>
+				<version>${LSM_Toolbox.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Lasso_and_Blow_Tool</artifactId>
+				<version>${Lasso_and_Blow_Tool.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Linear_Kuwahara</artifactId>
+				<version>${Linear_Kuwahara.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>LocalThickness_</artifactId>
+				<version>${LocalThickness_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>MTrack2_</artifactId>
+				<version>${MTrack2_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>M_I_P</artifactId>
+				<version>${M_I_P.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Manual_Tracking</artifactId>
+				<version>${Manual_Tracking.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Multi_Kymograph</artifactId>
+				<version>${Multi_Kymograph.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>OMEVisual</artifactId>
+				<version>${OMEVisual.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>PIV_analyser</artifactId>
+				<version>${PIV_analyser.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>QuickPALM_</artifactId>
+				<version>${QuickPALM_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>RATS_</artifactId>
+				<version>${RATS_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Reconstruct_Reader</artifactId>
+				<version>${Reconstruct_Reader.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>SPIM_Opener</artifactId>
+				<version>${SPIM_Opener.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>SPIM_Registration</artifactId>
+				<version>${SPIM_Registration.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Samples_</artifactId>
+				<version>${Samples_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Series_Labeler</artifactId>
+				<version>${Series_Labeler.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Siox_Segmentation</artifactId>
+				<version>${Siox_Segmentation.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Skeletonize3D_</artifactId>
+				<version>${Skeletonize3D_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>SplineDeformationGenerator_</artifactId>
+				<version>${SplineDeformationGenerator_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Stack_Manipulation</artifactId>
+				<version>${Stack_Manipulation.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Statistical_Region_Merging</artifactId>
+				<version>${Statistical_Region_Merging.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Stitching_</artifactId>
+				<version>${Stitching_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Sync_Win</artifactId>
+				<version>${Sync_Win.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Thread_Killer</artifactId>
+				<version>${Thread_Killer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Time_Lapse</artifactId>
+				<version>${Time_Lapse.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Time_Stamper</artifactId>
+				<version>${Time_Stamper.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>ToAST_</artifactId>
+				<version>${ToAST_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>TopoJ_</artifactId>
+				<version>${TopoJ_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>TrackMate_</artifactId>
+				<version>${TrackMate_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Trainable_Segmentation</artifactId>
+				<version>${Trainable_Segmentation.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>TrakEM2_Archipelago</artifactId>
+				<version>${TrakEM2_Archipelago.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>VIB-lib</artifactId>
+				<version>${VIB-lib.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>VIB_</artifactId>
+				<version>${VIB_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Vaa3d_Reader</artifactId>
+				<version>${Vaa3d_Reader.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Vaa3d_Writer</artifactId>
+				<version>${Vaa3d_Writer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Video_Editing</artifactId>
+				<version>${Video_Editing.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>View5D_</artifactId>
+				<version>${View5D_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Volume_Calculator</artifactId>
+				<version>${Volume_Calculator.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>Volume_Viewer</artifactId>
+				<version>${Volume_Viewer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bUnwarpJ_</artifactId>
+				<version>${bUnwarpJ_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bij</artifactId>
+				<version>${bij.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>blockmatching_</artifactId>
+				<version>${blockmatching_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>fiji-lib</artifactId>
+				<version>${fiji-lib.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>legacy-imglib1</artifactId>
+				<version>${legacy-imglib1.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>level_sets</artifactId>
+				<version>${level_sets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>pal-optimization</artifactId>
+				<version>${pal-optimization.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>panorama_</artifactId>
+				<version>${panorama_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>register_virtual_stack_slices</artifactId>
+				<version>${register_virtual_stack_slices.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>registration_3d</artifactId>
+				<version>${registration_3d.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>weave_jy2java</artifactId>
+				<version>${weave_jy2java.version}</version>
+			</dependency>
+
+			<!-- External Fiji projects -->
+
+			<!-- SNT - https://github.com/morphonets/SNT -->
+			<dependency>
+				<groupId>org.morphonets</groupId>
+				<artifactId>SNT</artifactId>
+				<version>${SNT.version}</version>
+			</dependency>
+
+			<!-- JITK TPS - https://github.com/saalfeldlab/jitk-tps -->
+			<dependency>
+				<groupId>jitk</groupId>
+				<artifactId>jitk-tps</artifactId>
+				<version>${jitk-tps.version}</version>
+			</dependency>
+
+			<!-- BigWarp - https://github.com/saalfeldlab/bigwarp -->
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bigwarp_fiji</artifactId>
+				<version>${bigwarp_fiji.version}</version>
+			</dependency>
+
+			<!-- MPI-CBG - https://github.com/axtimwalde/mpicbg -->
+			<dependency>
+				<groupId>mpicbg</groupId>
+				<artifactId>mpicbg</artifactId>
+				<version>${mpicbg.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>mpicbg</groupId>
+				<artifactId>mpicbg_</artifactId>
+				<version>${mpicbg_.version}</version>
+			</dependency>
+
+			<!-- TrakEM2 TPS - https://github.com/saalfeldlab/trakem2-tps -->
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>trakem2_tps</artifactId>
+				<version>${trakem2_tps.version}</version>
+			</dependency>
+
+			<!-- Z-Spacing correction - https://github.com/saalfeldlab/z-spacing -->
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>z_spacing</artifactId>
+				<version>${z_spacing.version}</version>
+			</dependency>
+
+			<!-- BigDataViewer - https://github.com/bigdataviewer -->
+
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bigdataviewer-core</artifactId>
+				<version>${bigdataviewer-core.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bigdataviewer-server</artifactId>
+				<version>${bigdataviewer-server.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bigdataviewer-vistools</artifactId>
+				<version>${bigdataviewer-vistools.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>bigdataviewer_fiji</artifactId>
+				<version>${bigdataviewer_fiji.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>spim_data</artifactId>
+				<version>${spim_data.version}</version>
+			</dependency>
+
+			<!-- TrakEM2 - https://github.com/trakem2 -->
+
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>T2-NIT</artifactId>
+				<version>${T2-NIT.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>T2-TreelineGraph</artifactId>
+				<version>${T2-TreelineGraph.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>TrakEM2_</artifactId>
+				<version>${TrakEM2_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>VectorString</artifactId>
+				<version>${VectorString.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>sc.fiji</groupId>
+				<artifactId>trakem2-transform</artifactId>
+				<version>${trakem2-transform.version}</version>
+			</dependency>
+
+			<!-- N5 - https://github.com/saalfeldlab/n5 -->
+
+			<dependency>
+				<groupId>net.imglib2</groupId>
+				<artifactId>imglib2-label-multisets</artifactId>
+				<version>${imglib2-label-multisets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5</artifactId>
+				<version>${n5.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-aws-s3</artifactId>
+				<version>${n5-aws-s3.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-blosc</artifactId>
+				<version>${n5-blosc.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-google-cloud</artifactId>
+				<version>${n5-google-cloud.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-hdf5</artifactId>
+				<version>${n5-hdf5.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-imglib2</artifactId>
+				<version>${n5-imglib2.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-viewer_fiji</artifactId>
+				<version>${n5-viewer_fiji.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.janelia.saalfeldlab</groupId>
+				<artifactId>n5-zarr</artifactId>
+				<version>${n5-zarr.version}</version>
+			</dependency>
+
+			<!-- BoneJ - http://bonej.org/ -->
+
+			<dependency>
+				<groupId>org.bonej</groupId>
+				<artifactId>bonej-plugins</artifactId>
+				<version>${bonej-plugins.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.bonej</groupId>
+				<artifactId>bonej-ops</artifactId>
+				<version>${bonej-ops.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.bonej</groupId>
+				<artifactId>bonej-legacy-plugins_</artifactId>
+				<version>${bonej-legacy-plugins_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.bonej</groupId>
+				<artifactId>bonej-legacy-util_</artifactId>
+				<version>${bonej-legacy-util_.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.bonej</groupId>
+				<artifactId>bonej-utilities</artifactId>
+				<version>${bonej-utilities.version}</version>
+			</dependency>
+
+			<!-- Open Microscopy Environment - https://github.com/ome -->
+
+			<!-- Metakit - https://github.com/ome/ome-metakit -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>metakit</artifactId>
+				<version>${metakit.version}</version>
+				<exclusions>
+					<exclusion>
+						<!--
+						The banDuplicateClasses rule of the maven-enforcer-plugin reports a
+						conflict between logback-classic & slf4j-simple in some scenarios.
+						Both include an SLF4J binding (org.slf4j.impl.StaticLoggerBinder).
+						Perhaps the classpath of the tooling also includes slf4j-simple?
+						Regardless, it is generally problematic to inflict a specific SLF4J
+						binding on downstream consumers. "Embedded components such as
+						libraries or frameworks should not declare a dependency on any
+						SLF4J binding but only depend on slf4j-api."
+						See: https://www.slf4j.org/manual.html#libraries
+						-->
+						<groupId>ch.qos.logback</groupId>
+						<artifactId>logback-classic</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- OME Common Java - https://github.com/ome/ome-common-java -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>ome-common</artifactId>
+				<version>${ome-common.version}</version>
+				<exclusions>
+					<exclusion>
+						<!--
+						The banDuplicateClasses rule of the maven-enforcer-plugin reports a
+						conflict between logback-classic & slf4j-simple in some scenarios.
+						Both include an SLF4J binding (org.slf4j.impl.StaticLoggerBinder).
+						Perhaps the classpath of the tooling also includes slf4j-simple?
+						Regardless, it is generally problematic to inflict a specific SLF4J
+						binding on downstream consumers. "Embedded components such as
+						libraries or frameworks should not declare a dependency on any
+						SLF4J binding but only depend on slf4j-api."
+						See: https://www.slf4j.org/manual.html#libraries
+						-->
+						<groupId>ch.qos.logback</groupId>
+						<artifactId>logback-classic</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>serializer</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>xalan</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- OME POI - https://github.com/ome/ome-poi -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>ome-poi</artifactId>
+				<version>${ome-poi.version}</version>
+			</dependency>
+
+			<!-- OME Model - https://github.com/ome/ome-model -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>ome-xml</artifactId>
+				<version>${ome-xml.version}</version>
+			</dependency>
+
+			<!-- Glencoe Software jxrlib - https://github.com/glencoesoftware/jxrlib -->
+			<dependency>
+				<groupId>ome</groupId>
+				<artifactId>jxrlib-all</artifactId>
+				<version>${jxrlib-all.version}</version>
+			</dependency>
+
+			<!-- Bio-Formats - https://github.com/ome/bioformats -->
+			<dependency>
+				<groupId>ome</groupId>
+				<artifactId>bio-formats_plugins</artifactId>
+				<version>${bio-formats_plugins.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>ome</groupId>
+				<artifactId>formats-api</artifactId>
+				<version>${formats-api.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>serializer</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>xalan</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>ome</groupId>
+				<artifactId>formats-bsd</artifactId>
+				<version>${formats-bsd.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>serializer</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>xalan</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>ome</groupId>
+				<artifactId>formats-gpl</artifactId>
+				<version>${formats-gpl.version}</version>
+			</dependency>
+
+			<!-- OMERO Blitz - https://github.com/ome/omero-blitz -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-blitz</artifactId>
+				<version>${omero-blitz.version}</version>
+				<exclusions>
+					<exclusion>
+						<!-- Conflicts with javax.activation:activation -->
+						<groupId>com.sun.activation</groupId>
+						<artifactId>javax.activation</artifactId>
+					</exclusion>
+					<exclusion>
+						<!-- Uber-JAR of all batik components -->
+						<groupId>org.apache.xmlgraphics</groupId>
+						<artifactId>batik-all</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- OMERO Common - https://github.com/ome/omero-common -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-common</artifactId>
+				<version>${omero-common.version}</version>
+				<exclusions>
+					<exclusion>
+						<!--
+						The banDuplicateClasses rule of the maven-enforcer-plugin reports a
+						conflict between logback-classic & slf4j-simple in some scenarios.
+						Both include an SLF4J binding (org.slf4j.impl.StaticLoggerBinder).
+						Perhaps the classpath of the tooling also includes slf4j-simple?
+						Regardless, it is generally problematic to inflict a specific SLF4J
+						binding on downstream consumers. "Embedded components such as
+						libraries or frameworks should not declare a dependency on any
+						SLF4J binding but only depend on slf4j-api."
+						See: https://www.slf4j.org/manual.html#libraries
+						-->
+						<groupId>ch.qos.logback</groupId>
+						<artifactId>logback-classic</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- OMERO DSL Plugin - https://github.com/ome/omero-dsl-plugin -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-dsl-plugin</artifactId>
+				<version>${omero-dsl-plugin.version}</version>
+			</dependency>
+
+			<!-- OMERO Gateway - https://github.com/ome/omero-gateway-java -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-gateway</artifactId>
+				<version>${omero-gateway.version}</version>
+			</dependency>
+
+			<!-- OMERO Model - https://github.com/ome/omero-model -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-model</artifactId>
+				<version>${omero-model.version}</version>
+				<exclusions>
+					<exclusion>
+						<!-- Conflicts with javax.transaction:javax.transaction-api -->
+						<groupId>javax.transaction</groupId>
+						<artifactId>jta</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- OMERO Renderer - https://github.com/ome/omero-renderer -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-renderer</artifactId>
+				<version>${omero-renderer.version}</version>
+				<exclusions>
+					<exclusion>
+						<!-- Conflicts with com.mchange:c3p0 and com.mchange:mchange-commons-java -->
+						<groupId>c3p0</groupId>
+						<artifactId>c3p0</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- OMERO ROMIO - https://github.com/ome/omero-romio -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-romio</artifactId>
+				<version>${omero-romio.version}</version>
+			</dependency>
+
+			<!-- OMERO Server - https://github.com/ome/omero-server -->
+			<dependency>
+				<groupId>org.openmicroscopy</groupId>
+				<artifactId>omero-server</artifactId>
+				<version>${omero-server.version}</version>
+				<exclusions>
+					<exclusion>
+						<!-- Conflicts with com.mchange:c3p0 and com.mchange:mchange-commons-java -->
+						<groupId>c3p0</groupId>
+						<artifactId>c3p0</artifactId>
+					</exclusion>
+					<exclusion>
+						<!-- Conflicts with javax.mail:mail -->
+						<groupId>com.sun.mail</groupId>
+						<artifactId>javax.mail</artifactId>
+					</exclusion>
+					<exclusion>
+						<!--
+						Conflicts with jakarta.activation:activation-api
+						See: https://wiki.eclipse.org/Jakarta_EE_Maven_Coordinates
+						-->
+						<groupId>javax.activation</groupId>
+						<artifactId>activation</artifactId>
+					</exclusion>
+					<exclusion>
+						<!-- Uber-JAR of all batik components -->
+						<groupId>org.apache.xmlgraphics</groupId>
+						<artifactId>batik-all</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- Other SciJava components -->
+
+			<!-- MorphoLibJ - https://github.com/ijpb/MorphoLibJ -->
+			<dependency>
+				<groupId>fr.inra.ijpb</groupId>
+				<artifactId>MorphoLibJ_</artifactId>
+				<version>${MorphoLibJ_.version}</version>
+			</dependency>
+
+			<!-- BigStitcher - https://github.com/PreibischLab/BigStitcher -->
+			<dependency>
+				<groupId>net.preibisch</groupId>
+				<artifactId>BigStitcher</artifactId>
+				<version>${BigStitcher.version}</version>
+			</dependency>
+
+			<!-- multiview-reconstruction - https://github.com/PreibischLab/multiview-reconstruction -->
+			<dependency>
+				<groupId>net.preibisch</groupId>
+				<artifactId>multiview-reconstruction</artifactId>
+				<version>${multiview-reconstruction.version}</version>
+			</dependency>
+
+			<!-- multiview-simulation - https://github.com/PreibischLab/multiview-simulation -->
+			<dependency>
+				<groupId>net.preibisch</groupId>
+				<artifactId>multiview-simulation</artifactId>
+				<version>${multiview-simulation.version}</version>
+			</dependency>
+
+			<!-- CoreMem - https://github.com/ClearControl/CoreMem -->
+			<dependency>
+				<groupId>net.clearcontrol</groupId>
+				<artifactId>coremem</artifactId>
+				<version>${coremem.version}</version>
+				<exclusions>
+					<exclusion>
+						<!-- Conflicts with junit:junit. We don't need Android here. -->
+						<groupId>com.google.android.tools</groupId>
+						<artifactId>dx</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- ClearGL - https://github.com/ClearVolume/ClearGL -->
+			<dependency>
+				<groupId>net.clearvolume</groupId>
+				<artifactId>cleargl</artifactId>
+				<version>${cleargl.version}</version>
+			</dependency>
+
+			<!-- Scenery - https://github.com/scenerygraphics/scenery -->
+			<dependency>
+				<groupId>graphics.scenery</groupId>
+				<artifactId>scenery</artifactId>
+				<version>${scenery.version}</version>
+			</dependency>
+
+			<!-- SciView - https://github.com/scenerygraphics/SciView -->
+			<dependency>
+				<groupId>sc.iview</groupId>
+				<artifactId>sciview</artifactId>
+				<version>${sciview.version}</version>
+			</dependency>
+
+			<!-- Third party components -->
+
+			<!-- Amazon S3 - https://aws.amazon.com/sdkforjava -->
+			<dependency>
+				<groupId>com.amazonaws</groupId>
+				<artifactId>aws-java-sdk-s3</artifactId>
+				<version>${aws-java-sdk-s3.version}</version>
+			</dependency>
+
+			<!-- Apache Groovy - https://groovy-lang.org/ -->
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy</artifactId>
+				<version>${groovy.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-ant</artifactId>
+				<version>${groovy-ant.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-astbuilder</artifactId>
+				<version>${groovy-astbuilder.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-bsf</artifactId>
+				<version>${groovy-bsf.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-cli-commons</artifactId>
+				<version>${groovy-cli-commons.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-cli-picocli</artifactId>
+				<version>${groovy-cli-picocli.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-console</artifactId>
+				<version>${groovy-console.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-datetime</artifactId>
+				<version>${groovy-datetime.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-dateutil</artifactId>
+				<version>${groovy-dateutil.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-docgenerator</artifactId>
+				<version>${groovy-docgenerator.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-groovydoc</artifactId>
+				<version>${groovy-groovydoc.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-groovysh</artifactId>
+				<version>${groovy-groovysh.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-jaxb</artifactId>
+				<version>${groovy-jaxb.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-jmx</artifactId>
+				<version>${groovy-jmx.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-json</artifactId>
+				<version>${groovy-json.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-macro</artifactId>
+				<version>${groovy-macro.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-nio</artifactId>
+				<version>${groovy-nio.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-servlet</artifactId>
+				<version>${groovy-servlet.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-sql</artifactId>
+				<version>${groovy-sql.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-swing</artifactId>
+				<version>${groovy-swing.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-templates</artifactId>
+				<version>${groovy-templates.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-test</artifactId>
+				<version>${groovy-test.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-test-junit5</artifactId>
+				<version>${groovy-test-junit5.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-testng</artifactId>
+				<version>${groovy-testng.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-xml</artifactId>
+				<version>${groovy-xml.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.groovy</groupId>
+				<artifactId>groovy-yaml</artifactId>
+				<version>${groovy-yaml.version}</version>
+			</dependency>
+
+			<!-- Apache Maven - https://maven.apache.org/ -->
+			<dependency>
+				<groupId>org.apache.maven.shared</groupId>
+				<artifactId>maven-artifact-transfer</artifactId>
+				<version>${maven-artifact-transfer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.maven.shared</groupId>
+				<artifactId>maven-common-artifact-filters</artifactId>
+				<version>${maven-common-artifact-filters.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.maven</groupId>
+				<artifactId>maven-core</artifactId>
+				<version>${maven-core.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.maven.plugin-tools</groupId>
+				<artifactId>maven-plugin-tools-api</artifactId>
+				<version>${maven-plugin-tools-api.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.sonatype.sisu</groupId>
+				<artifactId>sisu-inject-bean</artifactId>
+				<version>${sisu-inject-bean.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.sonatype.sisu</groupId>
+				<artifactId>sisu-inject-plexus</artifactId>
+				<version>${sisu-inject-plexus.version}</version>
+			</dependency>
+
+			<!-- Apache POI - https://poi.apache.org/ -->
+			<dependency>
+				<groupId>org.apache.poi</groupId>
+				<artifactId>poi</artifactId>
+				<version>${poi.version}</version>
+			</dependency>
+
+			<!-- Apache Spark - https://spark.apache.org/ -->
+			<dependency>
+				<groupId>org.apache.spark</groupId>
+				<artifactId>spark-core_2.11</artifactId>
+				<version>${spark.version}</version>
+				<exclusions>
+					<exclusion>
+						<!--
+						Conflicts with javax.ws.rs:javax.ws.rs-api
+						And this artifact is a ghost anyway somehow...
+						Not sure why/how it gets brought in.
+						-->
+						<groupId>com.sun.jersey</groupId>
+						<artifactId>jersey-core</artifactId>
+					</exclusion>
+					<exclusion>
+						<!--
+						Conflicts with commons-beanutils:commons-beanutils
+						and commons-collections:commons-collections
+						-->
+						<groupId>commons-beanutils</groupId>
+						<artifactId>commons-beanutils-core</artifactId>
+					</exclusion>
+					<exclusion>
+						<!-- Uber-JAR of all netty components -->
+						<groupId>io.netty</groupId>
+						<artifactId>netty-all</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- Apache HTTPComponents - https://hc.apache.org/ -->
+			<dependency>
+				<groupId>org.apache.httpcomponents</groupId>
+				<artifactId>httpclient</artifactId>
+				<version>${httpclient.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.httpcomponents</groupId>
+				<artifactId>httpcore</artifactId>
+				<version>${httpcore.version}</version>
+			</dependency>
+
+			<!-- Batik - https://xmlgraphics.apache.org/batik/ -->
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-anim</artifactId>
+				<version>${batik-anim.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-awt-util</artifactId>
+				<version>${batik-awt-util.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-bridge</artifactId>
+				<version>${batik-bridge.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>xalan</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-codec</artifactId>
+				<version>${batik-codec.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-constants</artifactId>
+				<version>${batik-constants.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-css</artifactId>
+				<version>${batik-css.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-dom</artifactId>
+				<version>${batik-dom.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xalan</groupId>
+						<artifactId>xalan</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-ext</artifactId>
+				<version>${batik-ext.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-extension</artifactId>
+				<version>${batik-extension.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-gui-util</artifactId>
+				<version>${batik-gui-util.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-gvt</artifactId>
+				<version>${batik-gvt.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-i18n</artifactId>
+				<version>${batik-i18n.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-parser</artifactId>
+				<version>${batik-parser.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-rasterizer</artifactId>
+				<version>${batik-rasterizer.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-rasterizer-ext</artifactId>
+				<version>${batik-rasterizer-ext.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.apache.xmlgraphics</groupId>
+						<artifactId>batik-extensions</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-script</artifactId>
+				<version>${batik-script.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-slideshow</artifactId>
+				<version>${batik-slideshow.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-squiggle</artifactId>
+				<version>${batik-squiggle.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-squiggle-ext</artifactId>
+				<version>${batik-squiggle-ext.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.apache.xmlgraphics</groupId>
+						<artifactId>batik-extensions</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-svg-dom</artifactId>
+				<version>${batik-svg-dom.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-svggen</artifactId>
+				<version>${batik-svggen.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-svgpp</artifactId>
+				<version>${batik-svgpp.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-swing</artifactId>
+				<version>${batik-swing.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-transcoder</artifactId>
+				<version>${batik-transcoder.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-ttf2svg</artifactId>
+				<version>${batik-ttf2svg.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-util</artifactId>
+				<version>${batik-util.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>batik-xml</artifactId>
+				<version>${batik-xml.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.xmlgraphics</groupId>
+				<artifactId>xmlgraphics-commons</artifactId>
+				<version>${xmlgraphics-commons.version}</version>
+			</dependency>
+
+			<!-- Blosc - https://blosc.org/ -->
+			<dependency>
+				<groupId>org.lasersonlab</groupId>
+				<artifactId>jblosc</artifactId>
+				<version>${jblosc.version}</version>
+			</dependency>
+
+			<!-- CDI - http://cdi-spec.org/ -->
+			<dependency>
+				<groupId>javax.enterprise</groupId>
+				<artifactId>cdi-api</artifactId>
+				<version>${cdi-api.version}</version>
+			</dependency>
+
+			<!-- Commons BeanUtils - https://commons.apache.org/proper/commons-beanutils/ -->
+			<dependency>
+				<groupId>commons-beanutils</groupId>
+				<artifactId>commons-beanutils</artifactId>
+				<version>${commons-beanutils.version}</version>
+			</dependency>
+
+			<!-- Commons Codec - https://commons.apache.org/proper/commons-codec/ -->
+			<dependency>
+				<groupId>commons-codec</groupId>
+				<artifactId>commons-codec</artifactId>
+				<version>${commons-codec.version}</version>
+			</dependency>
+
+			<!-- Commons Collections - https://commons.apache.org/proper/commons-collections/ -->
+			<dependency>
+				<groupId>commons-collections</groupId>
+				<artifactId>commons-collections</artifactId>
+				<version>${commons-collections.version}</version>
+			</dependency>
+
+			<!-- Commons Compress - https://commons.apache.org/proper/commons-compress/ -->
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-compress</artifactId>
+				<version>${commons-compress.version}</version>
+			</dependency>
+
+			<!-- Commons IO - https://commons.apache.org/proper/commons-io/ -->
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>${commons-io.version}</version>
+			</dependency>
+
+			<!-- Commons Lang - https://commons.apache.org/proper/commons-lang/ -->
+			<dependency>
+				<groupId>commons-lang</groupId>
+				<artifactId>commons-lang</artifactId>
+				<version>${commons-lang.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-lang3</artifactId>
+				<version>${commons-lang3.version}</version>
+			</dependency>
+
+			<!-- Commons Logging - https://commons.apache.org/proper/commons-logging/ -->
+			<dependency>
+				<groupId>commons-logging</groupId>
+				<artifactId>commons-logging</artifactId>
+				<version>${commons-logging.version}</version>
+			</dependency>
+
+			<!-- Commons Math - https://commons.apache.org/proper/commons-math/ -->
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-math3</artifactId>
+				<version>${commons-math3.version}</version>
+			</dependency>
+
+			<!-- Commons Text - https://commons.apache.org/proper/commons-text/ -->
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-text</artifactId>
+				<version>${commons-text.version}</version>
+			</dependency>
+
+			<!-- Byte Code Generation Library - https://github.com/cglib/cglib -->
+			<dependency>
+				<groupId>cglib</groupId>
+				<artifactId>cglib</artifactId>
+				<version>${cglib.version}</version>
+			</dependency>
+
+			<!-- Eclipse Collections - https://www.eclipse.org/collections/ -->
+			<dependency>
+				<groupId>org.eclipse.collections</groupId>
+				<artifactId>eclipse-collections</artifactId>
+				<version>${eclipse-collections.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.collections</groupId>
+				<artifactId>eclipse-collections-api</artifactId>
+				<version>${eclipse-collections-api.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.collections</groupId>
+				<artifactId>eclipse-collections-forkjoin</artifactId>
+				<version>${eclipse-collections-forkjoin.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.collections</groupId>
+				<artifactId>eclipse-collections-testutils</artifactId>
+				<version>${eclipse-collections-testutils.version}</version>
+			</dependency>
+
+			<!-- Eclipse SWT - https://www.eclipse.org/swt/ -->
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.cocoa.macosx</artifactId>
+				<version>${org.eclipse.swt.cocoa.macosx.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.cocoa.macosx.x86_64</artifactId>
+				<version>${org.eclipse.swt.cocoa.macosx.x86_64.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.aix.ppc</artifactId>
+				<version>${org.eclipse.swt.gtk.aix.ppc.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.aix.ppc64</artifactId>
+				<version>${org.eclipse.swt.gtk.aix.ppc64.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.hpux.ia64</artifactId>
+				<version>${org.eclipse.swt.gtk.hpux.ia64.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.linux.ppc</artifactId>
+				<version>${org.eclipse.swt.gtk.linux.ppc.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.linux.ppc64</artifactId>
+				<version>${org.eclipse.swt.gtk.linux.ppc64.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.linux.s390</artifactId>
+				<version>${org.eclipse.swt.gtk.linux.s390.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.linux.s390x</artifactId>
+				<version>${org.eclipse.swt.gtk.linux.s390x.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.linux.x86</artifactId>
+				<version>${org.eclipse.swt.gtk.linux.x86.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
+				<version>${org.eclipse.swt.gtk.linux.x86_64.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.solaris.sparc</artifactId>
+				<version>${org.eclipse.swt.gtk.solaris.sparc.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.gtk.solaris.x86</artifactId>
+				<version>${org.eclipse.swt.gtk.solaris.x86.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.win32.win32.x86</artifactId>
+				<version>${org.eclipse.swt.win32.win32.x86.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.swt</groupId>
+				<artifactId>org.eclipse.swt.win32.win32.x86_64</artifactId>
+				<version>${org.eclipse.swt.win32.win32.x86_64.version}</version>
+			</dependency>
+
+			<!-- Google Cloud Storage - https://github.com/googleapis/google-cloud-java -->
+			<dependency>
+				<groupId>com.google.cloud</groupId>
+				<artifactId>google-cloud-nio</artifactId>
+				<version>${google-cloud-nio.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.cloud</groupId>
+				<artifactId>google-cloud-resourcemanager</artifactId>
+				<version>${google-cloud-resourcemanager.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.cloud</groupId>
+				<artifactId>google-cloud-storage</artifactId>
+				<version>${google-cloud-storage.version}</version>
+			</dependency>
+
+			<!-- Gson - https://code.google.com/p/google-gson/ -->
+			<dependency>
+				<groupId>com.google.code.gson</groupId>
+				<artifactId>gson</artifactId>
+				<version>${gson.version}</version>
+			</dependency>
+
+			<!-- Guava - https://github.com/google/guava -->
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>${guava.version}</version>
+			</dependency>
+
+			<!-- HyperSQL DataBase - http://hsqldb.org/ -->
+			<dependency>
+				<groupId>hsqldb</groupId>
+				<artifactId>hsqldb</artifactId>
+				<version>${hsqldb.version}</version>
+			</dependency>
+
+			<!-- iText PDF - https://github.com/itext/itextpdf -->
+			<dependency>
+				<groupId>com.itextpdf</groupId>
+				<artifactId>itextpdf</artifactId>
+				<version>${itextpdf.version}</version>
+			</dependency>
+
+			<!-- Jackrabbit WebDAV - https://jackrabbit.apache.org/jcr/components/jackrabbit-webdav-library.html -->
+			<dependency>
+				<groupId>org.apache.jackrabbit</groupId>
+				<artifactId>jackrabbit-webdav</artifactId>
+				<version>${jackrabbit-webdav.version}</version>
+				<exclusions>
+					<exclusion>
+						<!--
+						Conflicts with commons-logging:commons-logging.
+						If you depend on jackrabbit-webdav, add either
+						commons-logging or jcl-over-slfj to your deps.
+						See: http://www.slf4j.org/legacy.html#jcl-over-slf4j
+						-->
+						<groupId>org.slf4j</groupId>
+						<artifactId>jcl-over-slf4j</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- Jackson - https://github.com/FasterXML/jackson -->
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-databind</artifactId>
+				<version>${jackson-databind.version}</version>
+			</dependency>
+
+			<!-- Java Advanced Imaging - https://java.net/projects/jai-core -->
+			<dependency>
+				<groupId>com.sun.media</groupId>
+				<artifactId>jai-codec</artifactId>
+				<version>${jai-codec.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>javax.media</groupId>
+				<artifactId>jai-core</artifactId>
+				<version>${jai-core.version}</version>
+			</dependency>
+
+			<!-- JAMA - http://math.nist.gov/javanumerics/jama/ -->
+			<dependency>
+				<groupId>gov.nist.math</groupId>
+				<artifactId>jama</artifactId>
+				<version>${jama.version}</version>
+			</dependency>
+
+			<!-- Java 3D - https://github.com/scijava/java3d-core -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>j3dcore</artifactId>
+				<version>${j3dcore.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>j3dutils</artifactId>
+				<version>${j3dutils.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>vecmath</artifactId>
+				<version>${vecmath.version}</version>
+			</dependency>
+
+			<!-- Javassist - http://www.javassist.org/ -->
+			<dependency>
+				<groupId>org.javassist</groupId>
+				<artifactId>javassist</artifactId>
+				<version>${javassist.version}</version>
+			</dependency>
+
+			<!-- JDOM - http://www.jdom.org/ -->
+			<dependency>
+				<groupId>org.jdom</groupId>
+				<artifactId>jdom2</artifactId>
+				<version>${jdom2.version}</version>
+			</dependency>
+
+			<!-- Java Expression Parser - https://github.com/scijava/jep -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>jep</artifactId>
+				<version>${jep.version}</version>
+			</dependency>
+
+			<!-- Jetty - http://eclipse.org/jetty/ -->
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-annotations</artifactId>
+				<version>${jetty-annotations.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-client</artifactId>
+				<version>${jetty-client.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-continuation</artifactId>
+				<version>${jetty-continuation.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-deploy</artifactId>
+				<version>${jetty-deploy.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-http</artifactId>
+				<version>${jetty-http.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-http-spi</artifactId>
+				<version>${jetty-http-spi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-io</artifactId>
+				<version>${jetty-io.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-jaas</artifactId>
+				<version>${jetty-jaas.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-jaspi</artifactId>
+				<version>${jetty-jaspi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-jmx</artifactId>
+				<version>${jetty-jmx.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-jndi</artifactId>
+				<version>${jetty-jndi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-nosql</artifactId>
+				<version>${jetty-nosql.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-plus</artifactId>
+				<version>${jetty-plus.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-proxy</artifactId>
+				<version>${jetty-proxy.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-rewrite</artifactId>
+				<version>${jetty-rewrite.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-security</artifactId>
+				<version>${jetty-security.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-server</artifactId>
+				<version>${jetty-server.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-servlet</artifactId>
+				<version>${jetty-servlet.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-servlets</artifactId>
+				<version>${jetty-servlets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-spring</artifactId>
+				<version>${jetty-spring.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-start</artifactId>
+				<version>${jetty-start.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-util</artifactId>
+				<version>${jetty-util.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-util-ajax</artifactId>
+				<version>${jetty-util-ajax.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-webapp</artifactId>
+				<version>${jetty-webapp.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-xml</artifactId>
+				<version>${jetty-xml.version}</version>
+			</dependency>
+
+			<!-- JFreeChart - http://www.jfree.org/jfreechart/ -->
+			<dependency>
+				<groupId>org.jfree</groupId>
+				<artifactId>jfreechart</artifactId>
+				<version>${jfreechart.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>xml-apis</groupId>
+						<artifactId>xml-apis</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- JFreeSVG - http://www.jfree.org/jfreesvg/ -->
+			<dependency>
+				<groupId>org.jfree</groupId>
+				<artifactId>jfreesvg</artifactId>
+				<version>${jfreesvg.version}</version>
+			</dependency>
+
+			<!-- JGraphT - https://github.com/jgrapht/jgrapht -->
+			<dependency>
+				<groupId>org.jgrapht</groupId>
+				<artifactId>jgrapht-core</artifactId>
+				<version>${jgrapht-core.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jgrapht</groupId>
+				<artifactId>jgrapht-demo</artifactId>
+				<version>${jgrapht-demo.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jgrapht</groupId>
+				<artifactId>jgrapht-ext</artifactId>
+				<version>${jgrapht-ext.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jgrapht</groupId>
+				<artifactId>jgrapht-guava</artifactId>
+				<version>${jgrapht-guava.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jgrapht</groupId>
+				<artifactId>jgrapht-io</artifactId>
+				<version>${jgrapht-io.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jgrapht</groupId>
+				<artifactId>jgrapht-opt</artifactId>
+				<version>${jgrapht-opt.version}</version>
+			</dependency>
+
+			<!-- JGraphX - https://github.com/jgraph/jgraphx -->
+			<dependency>
+				<groupId>com.github.vlsi.mxgraph</groupId>
+				<artifactId>jgraphx</artifactId>
+				<version>${jgraphx.version}</version>
+			</dependency>
+
+			<!-- JHDF5 - https://wiki-bsse.ethz.ch/label/JHDF5/hdf5 -->
+			<dependency>
+				<groupId>cisd</groupId>
+				<artifactId>jhdf5</artifactId>
+				<version>${jhdf5.version}</version>
+			</dependency>
+
+			<!-- JNA - https://github.com/twall/jna -->
+			<dependency>
+				<groupId>net.java.dev.jna</groupId>
+				<artifactId>jna</artifactId>
+				<version>${jna.version}</version>
+			</dependency>
+
+			<!-- Joda-Time - http://www.joda.org/joda-time/ -->
+			<dependency>
+				<groupId>joda-time</groupId>
+				<artifactId>joda-time</artifactId>
+				<version>${joda-time.version}</version>
+			</dependency>
+
+			<!-- JOGL - https://jogamp.org/jogl/ -->
+			<dependency>
+				<groupId>org.jogamp.gluegen</groupId>
+				<artifactId>gluegen-rt-main</artifactId>
+				<version>${gluegen-rt-main.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jogamp.joal</groupId>
+				<artifactId>joal-main</artifactId>
+				<version>${joal-main.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jogamp.jocl</groupId>
+				<artifactId>jocl-main</artifactId>
+				<version>${jocl-main.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jogamp.jogl</groupId>
+				<artifactId>jogl-all-main</artifactId>
+				<version>${jogl-all-main.version}</version>
+			</dependency>
+
+			<!-- JOML - http://joml-ci.github.io/JOML/ -->
+			<dependency>
+				<groupId>org.joml</groupId>
+				<artifactId>joml</artifactId>
+				<version>${joml.version}</version>
+			</dependency>
+
+			<!-- JPedal - http://jpedal.org/ (defunct) -->
+			<dependency>
+				<groupId>org.jpedal</groupId>
+				<artifactId>jpedalSTD</artifactId>
+				<version>${jpedalSTD.version}</version>
+			</dependency>
+
+			<!-- JSch - http://www.jcraft.com/jsch/ -->
+			<dependency>
+				<groupId>com.jcraft</groupId>
+				<artifactId>jsch</artifactId>
+				<version>${jsch.version}</version>
+			</dependency>
+
+			<!-- Jython - https://jython.org/ -->
+			<dependency>
+				<groupId>org.python</groupId>
+				<artifactId>jython-slim</artifactId>
+				<version>${jython-slim.version}</version>
+			</dependency>
+
+			<!-- JZlib - http://www.jcraft.com/jzlib/ -->
+			<dependency>
+				<groupId>com.jcraft</groupId>
+				<artifactId>jzlib</artifactId>
+				<version>${jzlib.version}</version>
+			</dependency>
+
+			<!-- Kotlin - https://kotlinlang.org/ -->
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-compiler-embeddable</artifactId>
+				<version>${kotlin-compiler-embeddable.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-daemon-embeddable</artifactId>
+				<version>${kotlin-daemon-embeddable.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-reflect</artifactId>
+				<version>${kotlin-reflect.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-script-runtime</artifactId>
+				<version>${kotlin-script-runtime.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-script-util</artifactId>
+				<version>${kotlin-script-util.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-scripting-common</artifactId>
+				<version>${kotlin-scripting-common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-scripting-compiler-embeddable</artifactId>
+				<version>${kotlin-scripting-compiler-embeddable.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-scripting-jvm</artifactId>
+				<version>${kotlin-scripting-jvm.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-stdlib</artifactId>
+				<version>${kotlin-stdlib.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-stdlib-common</artifactId>
+				<version>${kotlin-stdlib-common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-stdlib-jdk8</artifactId>
+				<version>${kotlin-stdlib-jdk8.version}</version>
+			</dependency>
+
+			<!-- Logback - http://logback.qos.ch/ -->
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-classic</artifactId>
+				<version>${logback-classic.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-core</artifactId>
+				<version>${logback-core.version}</version>
+			</dependency>
+
+			<!-- LZ4 compression for Java - https://github.com/lz4/lz4-java -->
+			<dependency>
+				<groupId>org.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>${lz4-java.version}</version>
+			</dependency>
+
+			<!-- MapDB - http://www.mapdb.org/ -->
+			<dependency>
+				<groupId>org.mapdb</groupId>
+				<artifactId>mapdb</artifactId>
+				<version>${mapdb.version}</version>
+				<exclusions>
+					<exclusion>
+						<!--
+						Conflicts with org.lz4:lz4-java.
+						You may need to add it to your deps.
+						-->
+						<groupId>net.jpountz.lz4</groupId>
+						<artifactId>lz4</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- MigLayout - http://www.miglayout.com/ -->
+			<dependency>
+				<groupId>com.miglayout</groupId>
+				<artifactId>miglayout-core</artifactId>
+				<version>${miglayout-core.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.miglayout</groupId>
+				<artifactId>miglayout-swing</artifactId>
+				<version>${miglayout-swing.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.miglayout</groupId>
+				<artifactId>miglayout-swt</artifactId>
+				<version>${miglayout-swt.version}</version>
+			</dependency>
+
+			<!-- Mines JTK - https://github.com/dhale/jtk -->
+			<dependency>
+				<groupId>edu.mines</groupId>
+				<artifactId>mines-jtk</artifactId>
+				<version>${mines-jtk.version}</version>
+			</dependency>
+
+			<!-- oj! Algorithms - https://github.com/optimatika/ojAlgo -->
+			<dependency>
+				<groupId>org.ojalgo</groupId>
+				<artifactId>ojalgo</artifactId>
+				<version>${ojalgo.version}</version>
+			</dependency>
+
+			<!-- OpenCSV - http://opencsv.sourceforge.net/ -->
+			<dependency>
+				<groupId>com.opencsv</groupId>
+				<artifactId>opencsv</artifactId>
+				<version>${opencsv.version}</version>
+			</dependency>
+
+			<!-- picocli - http://picocli.info/ -->
+			<dependency>
+				<groupId>info.picocli</groupId>
+				<artifactId>picocli</artifactId>
+				<version>${picocli.version}</version>
+			</dependency>
+
+			<!-- PostgreSQL JDBC Driver - https://jdbc.postgresql.org/ -->
+			<dependency>
+				<groupId>org.postgresql</groupId>
+				<artifactId>postgresql</artifactId>
+				<version>${postgresql.version}</version>
+			</dependency>
+
+			<!-- RSyntaxTextArea - http://bobbylight.github.io/RSyntaxTextArea/ -->
+			<dependency>
+				<groupId>com.fifesoft</groupId>
+				<artifactId>rsyntaxtextarea</artifactId>
+				<version>${rsyntaxtextarea.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.fifesoft</groupId>
+				<artifactId>autocomplete</artifactId>
+				<version>${autocomplete.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.fifesoft</groupId>
+				<artifactId>languagesupport</artifactId>
+				<version>${languagesupport.version}</version>
+			</dependency>
+
+			<!-- SLF4J - http://slf4j.org/ -->
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>${slf4j-api.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-ext</artifactId>
+				<version>${slf4j-ext.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-jcl</artifactId>
+				<version>${slf4j-jcl.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-jdk14</artifactId>
+				<version>${slf4j-jdk14.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-nop</artifactId>
+				<version>${slf4j-nop.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-simple</artifactId>
+				<version>${slf4j-simple.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>jcl-over-slf4j</artifactId>
+				<version>${jcl-over-slf4j.version}</version>
+			</dependency>
+
+			<!-- SnakeYAML - https://bitbucket.org/asomov/snakeyaml -->
+			<dependency>
+				<groupId>org.yaml</groupId>
+				<artifactId>snakeyaml</artifactId>
+				<version>${snakeyaml.version}</version>
+			</dependency>
+
+			<!-- SnakeYAML Engine - https://bitbucket.org/asomov/snakeyaml-engine -->
+			<dependency>
+				<groupId>org.snakeyaml</groupId>
+				<artifactId>snakeyaml-engine</artifactId>
+				<version>${snakeyaml-engine.version}</version>
+			</dependency>
+
+			<!-- Spring - https://spring.io/ -->
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-aop</artifactId>
+				<version>${spring-aop.version}</version>
+			</dependency>
+
+			<!-- TensorFlow - https://www.tensorflow.org/ -->
+			<dependency>
+				<groupId>org.tensorflow</groupId>
+				<artifactId>tensorflow</artifactId>
+				<version>${tensorflow.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.tensorflow</groupId>
+				<artifactId>libtensorflow</artifactId>
+				<version>${libtensorflow.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.tensorflow</groupId>
+				<artifactId>libtensorflow_jni</artifactId>
+				<version>${libtensorflow_jni.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.tensorflow</groupId>
+				<artifactId>libtensorflow_jni_gpu</artifactId>
+				<version>${libtensorflow_jni_gpu.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.tensorflow</groupId>
+				<artifactId>proto</artifactId>
+				<version>${proto.version}</version>
+			</dependency>
+
+			<!-- Trove - http://trove.starlight-systems.com/ -->
+			<dependency>
+				<groupId>net.sf.trove4j</groupId>
+				<artifactId>trove4j</artifactId>
+				<version>${trove4j.version}</version>
+			</dependency>
+
+			<!-- Weka - http://www.cs.waikato.ac.nz/ml/weka/ -->
+			<dependency>
+				<groupId>nz.ac.waikato.cms.weka</groupId>
+				<artifactId>weka-dev</artifactId>
+				<version>${weka-dev.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>com.github.fommil.netlib</groupId>
+						<artifactId>all</artifactId>
+					</exclusion>
+					<exclusion>
+						<!-- Conflicts with com.github.vbmacher:java-cup -->
+						<groupId>com.github.vbmacher</groupId>
+						<artifactId>java-cup-runtime</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>com.googlecode.netlib-java</groupId>
+						<artifactId>netlib-java</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>nz.ac.waikato.cms.weka.thirdparty</groupId>
+						<artifactId>java-cup-11b</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>nz.ac.waikato.cms.weka.thirdparty</groupId>
+						<artifactId>java-cup-11b-runtime</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>net.sourceforge.f2j</groupId>
+						<artifactId>arpack_combined_all</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
+			<!-- XZ for Java - https://tukaani.org/xz/java.html -->
+			<dependency>
+				<groupId>org.tukaani</groupId>
+				<artifactId>xz</artifactId>
+				<version>${xz.version}</version>
+			</dependency>
+
+			<!-- Test scope dependencies -->
+
+			<!-- JUnit 4 - https://junit.org/junit4/ -->
+			<dependency>
+				<groupId>junit</groupId>
+				<artifactId>junit</artifactId>
+				<version>${junit.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+			<!-- JUnit 5 - https://junit.org/junit5/ -->
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter-api</artifactId>
+				<version>${junit-jupiter-api.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter-engine</artifactId>
+				<version>${junit-jupiter-engine.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter-migrationsupport</artifactId>
+				<version>${junit-jupiter-migrationsupport.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter-params</artifactId>
+				<version>${junit-jupiter-params.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.junit.vintage</groupId>
+				<artifactId>junit-vintage-engine</artifactId>
+				<version>${junit-vintage-engine.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+			<!-- JUnit Benchmarks - https://github.com/scijava/junit-benchmarks -->
+			<dependency>
+				<groupId>org.scijava</groupId>
+				<artifactId>junit-benchmarks</artifactId>
+				<version>${junit-benchmarks.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+			<!-- JMockit - https://jmockit.github.io/ -->
+			<dependency>
+				<groupId>org.jmockit</groupId>
+				<artifactId>jmockit</artifactId>
+				<version>${jmockit.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+			<!-- Mockito - http://site.mockito.org/ -->
+			<dependency>
+				<groupId>org.mockito</groupId>
+				<artifactId>mockito-core</artifactId>
+				<version>${mockito-core.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+			<!-- JMH - http://openjdk.java.net/projects/code-tools/jmh/ -->
+			<dependency>
+				<groupId>org.openjdk.jmh</groupId>
+				<artifactId>jmh-core</artifactId>
+				<version>${jmh-core.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.openjdk.jmh</groupId>
+				<artifactId>jmh-generator-annprocess</artifactId>
+				<version>${jmh-generator-annprocess.version}</version>
+				<scope>test</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<profiles>
+		<!--
+		These developer profiles make it easy to pin to SNAPSHOT versions.
+		Add an empty dev.<organization> file in your ~/.scijava directory, and
+		dependencies will automatically update! You may also need to refresh
+		your IDE; e.g., in Eclipse: right click, Maven > Update Project...
+		-->
+		<profile>
+			<id>dev.ome</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.ome</exists>
+				</file>
+			</activation>
+			<properties>
+				<ome-common.version>LATEST</ome-common.version>
+				<metakit.version>LATEST</metakit.version>
+				<ome-poi.version>LATEST</ome-poi.version>
+				<ome-xml.version>LATEST</ome-xml.version>
+				<jxrlib-all.version>LATEST</jxrlib-all.version>
+				<bio-formats.version>LATEST</bio-formats.version>
+				<omero-blitz.version>LATEST</omero-blitz.version>
+				<omero-common.version>LATEST</omero-common.version>
+				<omero-dsl-plugin.version>LATEST</omero-dsl-plugin.version>
+				<omero-gateway.version>LATEST</omero-gateway.version>
+				<omero-model.version>LATEST</omero-model.version>
+				<omero-renderer.version>LATEST</omero-renderer.version>
+				<omero-romio.version>LATEST</omero-romio.version>
+				<omero-server.version>LATEST</omero-server.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.scijava</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.scijava</exists>
+				</file>
+			</activation>
+			<properties>
+				<batch-processor.version>LATEST</batch-processor.version>
+				<minimaven.version>LATEST</minimaven.version>
+				<native-lib-loader.version>LATEST</native-lib-loader.version>
+				<parsington.version>LATEST</parsington.version>
+				<scijava-cache.version>LATEST</scijava-cache.version>
+				<scijava-config.version>LATEST</scijava-config.version>
+				<scijava-grab.version>LATEST</scijava-grab.version>
+				<scijava-io-http.version>LATEST</scijava-io-http.version>
+				<scijava-java3d.version>LATEST</scijava-java3d.version>
+				<scijava-jupyter-kernel.version>LATEST</scijava-jupyter-kernel.version>
+				<scijava-listeners.version>LATEST</scijava-listeners.version>
+				<scijava-log-slf4j.version>LATEST</scijava-log-slf4j.version>
+				<scijava-optional.version>LATEST</scijava-optional.version>
+				<scijava-plugins-commands.version>LATEST</scijava-plugins-commands.version>
+				<scijava-plugins-io-table.version>LATEST</scijava-plugins-io-table.version>
+				<scijava-plugins-platforms.version>LATEST</scijava-plugins-platforms.version>
+				<scijava-plugins-text-markdown.version>LATEST</scijava-plugins-text-markdown.version>
+				<scijava-plugins-text-plain.version>LATEST</scijava-plugins-text-plain.version>
+				<scijava-search.version>LATEST</scijava-search.version>
+				<scijava-table.version>LATEST</scijava-table.version>
+				<scijava-ui-awt.version>LATEST</scijava-ui-awt.version>
+				<scijava-ui-swing.version>LATEST</scijava-ui-swing.version>
+				<script-editor.version>LATEST</script-editor.version>
+				<scripting-beanshell.version>LATEST</scripting-beanshell.version>
+				<scripting-clojure.version>LATEST</scripting-clojure.version>
+				<scripting-groovy.version>LATEST</scripting-groovy.version>
+				<scripting-java.version>LATEST</scripting-java.version>
+				<scripting-javascript.version>LATEST</scripting-javascript.version>
+				<scripting-jruby.version>LATEST</scripting-jruby.version>
+				<scripting-jython.version>LATEST</scripting-jython.version>
+				<scripting-kotlin.version>LATEST</scripting-kotlin.version>
+				<scripting-matlab.version>LATEST</scripting-matlab.version>
+				<scripting-renjin.version>LATEST</scripting-renjin.version>
+				<scripting-scala.version>LATEST</scripting-scala.version>
+				<swing-checkbox-tree.version>LATEST</swing-checkbox-tree.version>
+				<ui-behaviour.version>LATEST</ui-behaviour.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.imagej</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.imagej</exists>
+				</file>
+			</activation>
+			<properties>
+				<imagej.version>LATEST</imagej.version>
+				<ij1-patcher.version>LATEST</ij1-patcher.version>
+				<imagej-common.version>LATEST</imagej-common.version>
+				<imagej-deprecated.version>LATEST</imagej-deprecated.version>
+				<imagej-launcher.version>LATEST</imagej-launcher.version>
+				<imagej-legacy.version>LATEST</imagej-legacy.version>
+				<imagej-mesh.version>LATEST</imagej-mesh.version>
+				<imagej-mesh-io.version>LATEST</imagej-mesh-io.version>
+				<imagej-notebook.version>LATEST</imagej-notebook.version>
+				<imagej-omero.version>LATEST</imagej-omero.version>
+				<imagej-omero-legacy.version>LATEST</imagej-omero-legacy.version>
+				<imagej-opencv.version>LATEST</imagej-opencv.version>
+				<imagej-ops.version>LATEST</imagej-ops.version>
+				<imagej-plugins-batch.version>LATEST</imagej-plugins-batch.version>
+				<imagej-plugins-commands.version>LATEST</imagej-plugins-commands.version>
+				<imagej-plugins-tools.version>LATEST</imagej-plugins-tools.version>
+				<imagej-plugins-uploader-ssh.version>LATEST</imagej-plugins-uploader-ssh.version>
+				<imagej-plugins-uploader-webdav.version>LATEST</imagej-plugins-uploader-webdav.version>
+				<imagej-scripting.version>LATEST</imagej-scripting.version>
+				<imagej-server.version>LATEST</imagej-server.version>
+				<imagej-tensorflow.version>LATEST</imagej-tensorflow.version>
+				<imagej-ui-awt.version>LATEST</imagej-ui-awt.version>
+				<imagej-ui-swing.version>LATEST</imagej-ui-swing.version>
+				<imagej-updater.version>LATEST</imagej-updater.version>
+				<op-finder.version>LATEST</op-finder.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.imglib2</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.imglib2</exists>
+				</file>
+			</activation>
+			<properties>
+				<imglib2.version>LATEST</imglib2.version>
+				<imglib2-algorithm.version>LATEST</imglib2-algorithm.version>
+				<imglib2-algorithm-fft.version>LATEST</imglib2-algorithm-fft.version>
+				<imglib2-algorithm-gpl.version>LATEST</imglib2-algorithm-gpl.version>
+				<imglib2-cache.version>LATEST</imglib2-cache.version>
+				<imglib2-ij.version>LATEST</imglib2-ij.version>
+				<imglib2-realtransform.version>LATEST</imglib2-realtransform.version>
+				<imglib2-roi.version>LATEST</imglib2-roi.version>
+				<imglib2-script.version>LATEST</imglib2-script.version>
+				<imglib2-ui.version>LATEST</imglib2-ui.version>
+				<imglib2-unsafe.version>LATEST</imglib2-unsafe.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.scifio</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.scifio</exists>
+				</file>
+			</activation>
+			<properties>
+				<scifio.version>LATEST</scifio.version>
+				<scifio-bf-compat.version>LATEST</scifio-bf-compat.version>
+				<scifio-cli.version>LATEST</scifio-cli.version>
+				<scifio-jai-imageio.version>LATEST</scifio-jai-imageio.version>
+				<scifio-lifesci.version>LATEST</scifio-lifesci.version>
+				<scifio-ome-xml.version>LATEST</scifio-ome-xml.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.fiji</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.fiji</exists>
+				</file>
+			</activation>
+			<properties>
+				<!-- Fiji -->
+				<fiji.version>LATEST</fiji.version>
+
+				<!-- Standard Fiji projects -->
+				<AnalyzeSkeleton.version>LATEST</AnalyzeSkeleton.version>
+				<Anisotropic_Diffusion_2D.version>LATEST</Anisotropic_Diffusion_2D.version>
+				<Archipelago_Plugins.version>LATEST</Archipelago_Plugins.version>
+				<Arrow.version>LATEST</Arrow.version>
+				<Auto_Local_Threshold.version>LATEST</Auto_Local_Threshold.version>
+				<Auto_Threshold.version>LATEST</Auto_Threshold.version>
+				<BalloonSegmentation.version>LATEST</BalloonSegmentation.version>
+				<Bug_Submitter.version>LATEST</Bug_Submitter.version>
+				<CPU_Meter.version>LATEST</CPU_Meter.version>
+				<Calculator_Plus.version>LATEST</Calculator_Plus.version>
+				<Cell_Counter.version>LATEST</Cell_Counter.version>
+				<Colocalisation_Analysis.version>LATEST</Colocalisation_Analysis.version>
+				<Color_Histogram.version>LATEST</Color_Histogram.version>
+				<Color_Inspector_3D.version>LATEST</Color_Inspector_3D.version>
+				<Colour_Deconvolution.version>LATEST</Colour_Deconvolution.version>
+				<CorrectBleach.version>LATEST</CorrectBleach.version>
+				<Correct_3D_Drift.version>LATEST</Correct_3D_Drift.version>
+				<Descriptor_based_registration.version>LATEST</Descriptor_based_registration.version>
+				<Dichromacy.version>LATEST</Dichromacy.version>
+				<Directionality.version>LATEST</Directionality.version>
+				<FS_Align_TrakEM2.version>LATEST</FS_Align_TrakEM2.version>
+				<Feature_Detection.version>LATEST</Feature_Detection.version>
+				<Fiji_3D_Blob_Segmentation.version>LATEST</Fiji_3D_Blob_Segmentation.version>
+				<Fiji_Archipelago.version>LATEST</Fiji_Archipelago.version>
+				<Fiji_Developer.version>LATEST</Fiji_Developer.version>
+				<Fiji_Package_Maker.version>LATEST</Fiji_Package_Maker.version>
+				<Fiji_Plugins.version>LATEST</Fiji_Plugins.version>
+				<FilamentDetector.version>LATEST</FilamentDetector.version>
+				<FlowJ.version>LATEST</FlowJ.version>
+				<Graph_Cut.version>LATEST</Graph_Cut.version>
+				<Gray_Morphology.version>LATEST</Gray_Morphology.version>
+				<H5J_Loader_Plugin.version>LATEST</H5J_Loader_Plugin.version>
+				<HDF5_Vibez.version>LATEST</HDF5_Vibez.version>
+				<Helmholtz_Analysis.version>LATEST</Helmholtz_Analysis.version>
+				<IJ_Robot.version>LATEST</IJ_Robot.version>
+				<IO.version>LATEST</IO.version>
+				<ImageJ_3D_Objects_Counter.version>LATEST</ImageJ_3D_Objects_Counter.version>
+				<ImageJ_3D_Viewer.version>LATEST</ImageJ_3D_Viewer.version>
+				<Image_5D.version>LATEST</Image_5D.version>
+				<Image_Expression_Parser.version>LATEST</Image_Expression_Parser.version>
+				<Interactive_3D_Surface_Plot.version>LATEST</Interactive_3D_Surface_Plot.version>
+				<IsoData_Classifier.version>LATEST</IsoData_Classifier.version>
+				<Kappa.version>LATEST</Kappa.version>
+				<Kuwahara_Filter.version>LATEST</Kuwahara_Filter.version>
+				<KymographBuilder.version>LATEST</KymographBuilder.version>
+				<LSM_Reader.version>LATEST</LSM_Reader.version>
+				<LSM_Toolbox.version>LATEST</LSM_Toolbox.version>
+				<Lasso_and_Blow_Tool.version>LATEST</Lasso_and_Blow_Tool.version>
+				<Linear_Kuwahara.version>LATEST</Linear_Kuwahara.version>
+				<LocalThickness.version>LATEST</LocalThickness.version>
+				<MTrack2.version>LATEST</MTrack2.version>
+				<M_I_P.version>LATEST</M_I_P.version>
+				<Manual_Tracking.version>LATEST</Manual_Tracking.version>
+				<Multi_Kymograph.version>LATEST</Multi_Kymograph.version>
+				<OMEVisual.version>LATEST</OMEVisual.version>
+				<PIV_analyser.version>LATEST</PIV_analyser.version>
+				<QuickPALM.version>LATEST</QuickPALM.version>
+				<RATS.version>LATEST</RATS.version>
+				<Reconstruct_Reader.version>LATEST</Reconstruct_Reader.version>
+				<SPIM_Opener.version>LATEST</SPIM_Opener.version>
+				<SPIM_Registration.version>LATEST</SPIM_Registration.version>
+				<Samples.version>LATEST</Samples.version>
+				<Series_Labeler.version>LATEST</Series_Labeler.version>
+				<Simple_Neurite_Tracer.version>LATEST</Simple_Neurite_Tracer.version>
+				<Siox_Segmentation.version>LATEST</Siox_Segmentation.version>
+				<Skeletonize3D.version>LATEST</Skeletonize3D.version>
+				<SplineDeformationGenerator.version>LATEST</SplineDeformationGenerator.version>
+				<Stack_Manipulation.version>LATEST</Stack_Manipulation.version>
+				<Statistical_Region_Merging.version>LATEST</Statistical_Region_Merging.version>
+				<Stitching.version>LATEST</Stitching.version>
+				<Sync_Win.version>LATEST</Sync_Win.version>
+				<Thread_Killer.version>LATEST</Thread_Killer.version>
+				<Time_Lapse.version>LATEST</Time_Lapse.version>
+				<Time_Stamper.version>LATEST</Time_Stamper.version>
+				<ToAST.version>LATEST</ToAST.version>
+				<TopoJ.version>LATEST</TopoJ.version>
+				<TrackMate.version>LATEST</TrackMate.version>
+				<Trainable_Segmentation.version>LATEST</Trainable_Segmentation.version>
+				<TrakEM2_Archipelago.version>LATEST</TrakEM2_Archipelago.version>
+				<VIB-lib.version>LATEST</VIB-lib.version>
+				<VIB.version>LATEST</VIB.version>
+				<Vaa3d_Reader.version>LATEST</Vaa3d_Reader.version>
+				<Vaa3d_Writer.version>LATEST</Vaa3d_Writer.version>
+				<Video_Editing.version>LATEST</Video_Editing.version>
+				<View5D.version>LATEST</View5D.version>
+				<Volume_Calculator.version>LATEST</Volume_Calculator.version>
+				<Volume_Viewer.version>LATEST</Volume_Viewer.version>
+				<bUnwarpJ.version>LATEST</bUnwarpJ.version>
+				<bij.version>LATEST</bij.version>
+				<blockmatching.version>LATEST</blockmatching.version>
+				<fiji-lib.version>LATEST</fiji-lib.version>
+				<legacy-imglib1.version>LATEST</legacy-imglib1.version>
+				<level_sets.version>LATEST</level_sets.version>
+				<pal-optimization.version>LATEST</pal-optimization.version>
+				<panorama.version>LATEST</panorama.version>
+				<register_virtual_stack_slices.version>LATEST</register_virtual_stack_slices.version>
+				<registration_3d.version>LATEST</registration_3d.version>
+				<weave_jy2java.version>LATEST</weave_jy2java.version>
+
+				<!-- External Fiji projects -->
+				<SNT.version>LATEST</SNT.version>
+				<jitk-tps.version>LATEST</jitk-tps.version>
+				<bigwarp.version>LATEST</bigwarp.version>
+				<mpicbg.version>LATEST</mpicbg.version>
+				<trakem2_tps.version>LATEST</trakem2_tps.version>
+				<z_spacing.version>LATEST</z_spacing.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.bdv</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.bdv</exists>
+				</file>
+			</activation>
+			<properties>
+				<bigdataviewer-core.version>LATEST</bigdataviewer-core.version>
+				<bigdataviewer-server.version>LATEST</bigdataviewer-server.version>
+				<bigdataviewer-vistools.version>LATEST</bigdataviewer-vistools.version>
+				<bigdataviewer_fiji.version>LATEST</bigdataviewer_fiji.version>
+				<spim_data.version>LATEST</spim_data.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+		<profile>
+			<id>dev.trakem2</id>
+			<activation>
+				<file>
+					<exists>${user.home}/.scijava/dev.trakem2</exists>
+				</file>
+			</activation>
+			<properties>
+				<T2-NIT.version>LATEST</T2-NIT.version>
+				<T2-TreelineGraph.version>LATEST</T2-TreelineGraph.version>
+				<TrakEM2.version>LATEST</TrakEM2.version>
+				<VectorString.version>LATEST</VectorString.version>
+				<trakem2-transform.version>LATEST</trakem2-transform.version>
+			</properties>
+			<repositories>
+				<repository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+				</repository>
+			</repositories>
+			<pluginRepositories>
+				<pluginRepository>
+					<id>scijava.public</id>
+					<url>https://maven.scijava.org/content/groups/public</url>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</pluginRepository>
+			</pluginRepositories>
+		</profile>
+	</profiles>
+</project>

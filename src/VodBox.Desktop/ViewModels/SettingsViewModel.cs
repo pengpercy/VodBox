@@ -50,68 +50,37 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnAutoCheckUpdatesChanged(bool value) => _services.Prefs.Set("updates.auto-check", value);
     public string AppVersion => typeof(App).Assembly.GetName().Version?.ToString(3) ?? "未知";
     public UpdateOffer? AvailableUpdate { get; private set; }
-    public bool UpdateBusy { get; private set; }
-    private CancellationTokenSource? _updateCancellation;
+    [ObservableProperty] private bool _updateBusy;
+    private readonly UpdateWindowService _updateWindows = new();
+    private CancellationTokenSource? _updateCheckCancellation;
+    private bool _updatesStopped;
 
-    public async Task CheckUpdateAsync()
+    public async Task CheckUpdateAsync(Avalonia.Controls.Window? owner = null, bool automatic = false)
     {
-        if (UpdateBusy) return;
+        if (_updatesStopped || (!automatic && _updateWindows.ActivateExisting()) || UpdateBusy) return;
         UpdateBusy = true;
+        using var cancellation = new CancellationTokenSource();
+        _updateCheckCancellation = cancellation;
         UpdateMessage = "正在检查更新…";
         try
         {
-            AvailableUpdate = await AppUpdater.CheckAsync(AppVersion);
-            UpdateMessage = AvailableUpdate is { } offer
-                ? OperatingSystem.IsLinux()
-                    ? offer.Name.Length == 0 ? $"发现新版本 {offer.Version}；请查看发行说明并选择适合系统的安装包" : $"发现新版本 {offer.Version}；可下载 {offer.Name}，请通过系统包管理器安装"
-                    : $"发现新版本 {offer.Version}"
-                : "当前已是最新版本，或暂无可用的安全更新包";
-            if (!OperatingSystem.IsLinux() && !AppUpdater.IsPackaged(Environment.ProcessPath ?? "")) UpdateMessage += "；开发模式请安装正式发行包";
+            AvailableUpdate = await AppUpdater.CheckAsync(AppVersion, cancellation.Token);
+            if (_updatesStopped || cancellation.IsCancellationRequested) return;
+            UpdateMessage = AvailableUpdate is { } offer ? $"发现新版本 {offer.Version}" : "当前已是最新版本，或暂无可用的安全更新包";
+            owner ??= (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            if (AvailableUpdate is { } update && owner is { IsVisible: true } && (!automatic || AutoCheckUpdates))
+                _updateWindows.Show(update, AppVersion, owner, automatic, message => UpdateMessage = message);
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { UpdateMessage = "已取消检查更新"; }
         catch (Exception error) { UpdateMessage = $"检查更新失败：{error.Message}"; }
-        finally { UpdateBusy = false; }
+        finally { _updateCheckCancellation = null; UpdateBusy = false; }
     }
 
-    public void CancelUpdate() => _updateCancellation?.Cancel();
-
-    public async Task InstallUpdateAsync()
+    public async Task StopUpdatesAsync()
     {
-        if (UpdateBusy || AvailableUpdate is not { } offer) return;
-        if (OperatingSystem.IsLinux())
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo { FileName = offer.Url.AbsoluteUri, UseShellExecute = true });
-                UpdateMessage = offer.Name.Length == 0 ? "已打开发行说明页面；请选择适合系统的安装包" : $"已打开 {offer.Name} 下载地址；请通过系统包管理器安装";
-            }
-            catch (Exception error) { UpdateMessage = $"打开下载地址失败：{error.Message}"; }
-            return;
-        }
-        UpdateBusy = true;
-        using var cancellation = new CancellationTokenSource();
-        _updateCancellation = cancellation;
-        var cache = Path.Combine(Path.GetTempPath(), "vodbox-update-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            if (!AppUpdater.IsPackaged(Environment.ProcessPath ?? "")) throw new InvalidOperationException("当前是开发模式，不能原地更新。");
-            UpdateMessage = "正在下载并校验更新包…";
-            var progress = new Progress<long>(bytes => UpdateMessage = $"正在下载更新包：{bytes / (1024d * 1024):F1} MiB…");
-            var archive = await AppUpdater.DownloadAsync(offer, cache, cancellation.Token, progress);
-            UpdateMessage = "正在验证并准备更新器…";
-            await AppUpdater.PrepareAndLaunchAsync(archive, Environment.ProcessPath!, cache, cancellation.Token);
-            UpdateMessage = "更新器已启动；关闭 VodBox 后将替换并重启。";
-            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-                desktop.Shutdown();
-        }
-        catch (OperationCanceledException) { UpdateMessage = "已取消更新"; }
-        catch (Exception error) { UpdateMessage = $"更新失败：{error.Message}"; }
-        finally
-        {
-            _updateCancellation = null;
-            UpdateBusy = false;
-            // Detached updater still needs its script and staged payload after this process exits.
-            if (!UpdateMessage.StartsWith("更新器已启动", StringComparison.Ordinal) && Directory.Exists(cache)) Directory.Delete(cache, true);
-        }
+        _updatesStopped = true;
+        _updateCheckCancellation?.Cancel();
+        await _updateWindows.CloseAsync();
     }
 
 
@@ -150,6 +119,41 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool IsAboutSection=>Section==7;
     public bool IsDiagnosticsSection=>Section==8;
     public PlayerViewModel PlayerSettings=>_main.Player;
+
+    // ---- 内置节目表（源与订阅 → 节目订阅）----
+    /// <summary>当前生效的节目表来源状态：内置 / 手动订阅 / 失败文案，与直播页状态入口一致。</summary>
+    public string EpgStatusText => _main.Live.EpgStatusLabel;
+    /// <summary>状态详情：状态 / 最近成功获取 / 数据覆盖，未知显示未知。</summary>
+    public string EpgStatusDetailText => _main.Live.EpgStatusDetail;
+    /// <summary>手动订阅覆盖生效时为 true：此时内置来源让位，「恢复内置节目表」才有意义。</summary>
+    public bool EpgManualOverride => _main.Live.EpgManualOverride;
+
+    /// <summary>节目表状态变化后刷新设置页展示（由 LiveViewModel 的属性通知驱动）。</summary>
+    private void RefreshEpgStatus()
+    {
+        OnPropertyChanged(nameof(EpgStatusText));
+        OnPropertyChanged(nameof(EpgStatusDetailText));
+        OnPropertyChanged(nameof(EpgManualOverride));
+    }
+
+    /// <summary>
+    /// 「恢复内置节目表」：清除手动订阅地址与手动导入数据，回到内置主源 + 补充源。
+    /// 不触发播放、切台或换线；只在手动覆盖存在时可用。
+    /// </summary>
+    [RelayCommand]
+    private async Task RestoreBuiltInEpg()
+    {
+        try
+        {
+            Message = "正在恢复内置节目表…";
+            await _main.Live.RestoreBuiltInEpgAsync();
+            EpgSubscriptionUrl = "";
+            Message = "已恢复内置节目表；失败或过期时保留有效缓存";
+        }
+        catch (Exception error) { Message = $"恢复内置节目表失败：{error.Message}"; }
+        finally { RefreshEpgStatus(); }
+    }
+
     // ---- 诊断（日志）----
     private bool _logEnabled = true;
     /// <summary>日志开关。关闭后不再写入，用于日常降低噪音；排障时打开。</summary>
@@ -246,6 +250,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         _proxyPushedMedia = services.Prefs.GetBool("push.use-proxy", false);
         _themeIndex = Math.Clamp(services.Prefs.GetInt("ui.theme", 0), 0, 2);
         _posterDensity=Math.Clamp(services.Prefs.GetInt("ui.poster-density",1),0,2);
+        // 节目表状态入口由直播页维护；设置页转发它的变化，避免两处状态各说各话。
+        _main.Live.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(LiveViewModel.EpgStatusLabel)
+                or nameof(LiveViewModel.EpgStatusDetail)
+                or nameof(LiveViewModel.EpgManualOverride)) RefreshEpgStatus();
+        };
     }
 
     [RelayCommand]
@@ -290,9 +301,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Message = "正在刷新节目订阅…";
             await _main.Live.RefreshEpgSubscriptionAsync(EpgSubscriptionUrl);
-            Message = "节目订阅刷新成功，缓存已保存";
+            Message = "节目订阅刷新成功，缓存已保存；已覆盖内置节目表";
         }
         catch (Exception error) { Message = $"节目订阅刷新失败，保留原缓存：{error.Message}"; }
+        finally { RefreshEpgStatus(); }
     }
 
     [RelayCommand]
@@ -564,6 +576,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         await LoadLiveConfigHistory();
         await _main.Live.ReloadProgrammeBackupAsync();
         EpgSubscriptionUrl=_services.Prefs.GetString("live.epg-url");
+        RefreshEpgStatus();
         Message = "备份已合并；播放偏好在下次启动生效，当前播放不受影响";
     }
 

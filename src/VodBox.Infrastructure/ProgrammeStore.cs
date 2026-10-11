@@ -12,11 +12,17 @@ public sealed class ProgrammeStore(string path)
     public static string Serialize(IReadOnlyList<Programme> programmes)
     {
         var root = new XElement("tv");
-        foreach (var group in programmes.GroupBy(x => x.ChannelKey))
-            root.Add(new XElement("channel", new XAttribute("id", group.Key), new XElement("display-name", group.First().ChannelName)));
+        // 按 (SourceId, ChannelKey) 分组：跨源同 id 不合并。调用方按来源写入独立文件时 ChannelKey 天然唯一。
+        foreach (var group in programmes.GroupBy(x => (x.SourceId, x.ChannelKey)))
+            root.Add(new XElement("channel", new XAttribute("id", group.Key.ChannelKey),
+                new XElement("display-name", group.First().ChannelName)));
         foreach (var item in programmes)
-            root.Add(new XElement("programme", new XAttribute("channel", item.ChannelKey),
-                new XAttribute("start", Time(item.Start)), new XAttribute("stop", Time(item.End)), new XElement("title", item.Title)));
+        {
+            var element = new XElement("programme", new XAttribute("channel", item.ChannelKey),
+                new XAttribute("start", Time(item.Start)), new XAttribute("stop", Time(item.End)), new XElement("title", item.Title));
+            if (!string.IsNullOrEmpty(item.SourceId)) element.SetAttributeValue("source", item.SourceId);
+            root.Add(element);
+        }
         return root.ToString(SaveOptions.DisableFormatting);
     }
 

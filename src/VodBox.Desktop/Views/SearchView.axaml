@@ -128,15 +128,21 @@
                       <Panel>
                         <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <views:RemotePoster Url="{Binding Poster}" />
-                        <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Right"
-                                VerticalAlignment="Top" Margin="6">
-                          <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" MaxWidth="90" />
+                        <!-- 时长/备注角标：统一放海报左下角，中性灰文字（不用主题蓝），避免遮住右上区域。 -->
+                        <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Left"
+                                VerticalAlignment="Bottom" Margin="6">
+                          <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="{DynamicResource PosterBadgeTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="90" />
                         </Border>
                       </Panel>
                     </Border>
                     <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
                     <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                       <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
+                    </TextBlock>
+                    <!-- 每张卡片都标出来源站点：聚合结果是跨站点的，没有来源就无法判断该信谁。 -->
+                    <TextBlock FontSize="10.5" Foreground="#4CC2FF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding SourceName, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}">
+                      <Run Text="来源：" /><Run Text="{Binding SourceName}" />
                     </TextBlock>
                   </StackPanel>
                 </DataTemplate>

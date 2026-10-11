@@ -9,12 +9,23 @@ public enum SourceRuntime
     MacCms,
     /// <summary>原生 C# 重写的 csp_ 爬虫（无 JVM/脚本，见 CspSpiders 注册表）。</summary>
     NativeSpider,
+    /// <summary>
+    /// TVBox <c>site.type == 4</c> 站点：原生 HTTP 协议直连接口取分类/列表/详情，
+    /// 播放时以 <c>{play, flag}</c> 回调向同一接口补取播放内容（多地址、playUrl、parse/jx、header、UA）。
+    /// 该协议与 csp_/脚本站点无关，也不需要 JAR 宿主。
+    /// </summary>
+    Type4,
     /// <summary>drpy .js 脚本（QuickJS 宿主）。</summary>
     QuickJs,
     /// <summary>.py 脚本。</summary>
     Python,
     /// <summary>csp_ Java jar/其他无桌面实现，桌面端不支持。</summary>
     Node,
+    /// <summary>
+    /// 外部 JAR 插件宿主（CatVod csp_ Java 字节码）。仅在宿主可用时创建；不可用时源保持未注册，
+    /// 由 <c>ImportWarnings</c> 明确提示「需要 Android 插件宿主」，不伪装成可播放。
+    /// </summary>
+    Jar,
     /// <summary>本地媒体。</summary>
     Local,
 }

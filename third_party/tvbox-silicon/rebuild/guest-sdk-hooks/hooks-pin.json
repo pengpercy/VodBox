@@ -1,0 +1,72 @@
+{
+  "component": "guest-sdk-hooks",
+  "description": "VodBox-pinned inline-hook runtimes that replace the opaque hook .so files packaged in unidbg-android:0.9.8.",
+  "actual_packaged_set": {
+    "source_of_truth": "../../dependency-sources/upstream-evidence/native-provenance/binary-inventory.json (read from the retained unidbg-android-0.9.8.jar)",
+    "files": [
+      "android/lib/armeabi-v7a/libdobby.so",
+      "android/lib/armeabi-v7a/libhookzz.so",
+      "android/lib/armeabi-v7a/libwhale.so",
+      "android/lib/armeabi-v7a/libxhook.so",
+      "android/lib/arm64-v8a/libdobby.so",
+      "android/lib/arm64-v8a/libhookzz.so",
+      "android/lib/arm64-v8a/libwhale.so",
+      "android/lib/arm64-v8a/libxhook.so"
+    ],
+    "note": "FOUR distinct libraries per ABI (8 total), not three. libdobby.so and libhookzz.so are separate distributed artifacts: libdobby.so carries DobbyHook/DobbyInstrument strings, while libhookzz.so is a different binary (GCC 4.9 build, libhookzz.so strings). Dobby is therefore the source for libdobby.so ONLY, never a substitute for libhookzz.so.",
+    "correction": "An earlier revision of this pin listed only 3 libs and described Dobby as a substitute for the packaged libhookzz.so. Retained jar evidence disproves that; hookzz is now tracked separately and fails closed."
+  },
+  "why_replace": "The packaged hook binaries were imported over unidbg history, not built from a pinned manifest in the release. xHook was bumped to v1.1.12 but BOTH ABIs changed again without source/build provenance (REPORT.md). Exact historical source is not recoverable from public evidence; a pinned self-build is the defensible replacement.",
+  "hooks": {
+    "dobby": {
+      "repo": "jmpews/Dobby",
+      "commit": "5dfc8546954ce3b3198132ab13fddb89ee92cdd7",
+      "commit_source": "Tag 'latest' resolves to this commit (dobby-tags.json). Current reference only; historical HookZz version/license is NOT established.",
+      "archive_url": "https://codeload.github.com/jmpews/Dobby/tar.gz/5dfc8546954ce3b3198132ab13fddb89ee92cdd7",
+      "archive_sha256": "01a417233c40929aa21098c8a9724c00f6f05b5cde3f11abcac84b8e00053748",
+      "archive_path": "../../dependency-sources/archives/dobby-reference-5dfc8546954ce3b3198132ab13fddb89ee92cdd7.tar.gz",
+      "license": "Apache-2.0",
+      "abinames": ["libdobby.so"],
+      "build": "CMake, target 'dobby' (SHARED) -> libdobby.so; matches the packaged artifact of the same name",
+      "replaces": "libdobby.so only"
+    },
+    "hookzz": {
+      "repo": "jmpews/HookZz",
+      "commit": null,
+      "commit_source": "UNRESOLVED. Retained evidence (upstream-evidence/native-provenance/hookzz-*.json) does not pin the historical HookZz revision, and the packaged libhookzz.so is byte-distinct from libdobby.so.",
+      "abinames": ["libhookzz.so"],
+      "disposition": "rebuild-or-drop",
+      "fail_closed": "No pinned source => libhookzz.so is not built and must be dropped from distribution. It must NEVER be satisfied by copying libdobby.so into its place; that would ship an unverified ABI under a name the emulator loads by that name.",
+      "why_not_dobby": "Dobby is HookZz's successor but is not ABI-identical to the packaged libhookzz.so; compatibility is not assumed (rebuild-lock.json abi_compat_check_required)."
+    },
+    "xhook": {
+      "repo": "iqiyi/xHook",
+      "commit": "3f41ae82bc72695208377304b30dc6698621453f",
+      "ref": "v1.1.12",
+      "commit_source": "Annotated tag v1.1.12 peels to this commit (dependency-sources/upstream-evidence/native-provenance/xhook-tag-refs.txt). This is a grounded candidate, explicitly NOT the proved final binary source.",
+      "archive_url": "https://codeload.github.com/iqiyi/xHook/tar.gz/3f41ae82bc72695208377304b30dc6698621453f",
+      "archive_sha256": "see dependency-sources/SHA256SUMS: xhook-reference-3f41ae82bc72695208377304b30dc6698621453f.tar.gz",
+      "archive_path": "../../dependency-sources/archives/xhook-reference-3f41ae82bc72695208377304b30dc6698621453f.tar.gz",
+      "license": "MIT + BSD-2-Clause (tree.h) + BSD-3-Clause (queue.h); LICENSE-docs retained separately",
+      "abinames": ["libxhook.so"],
+      "build": "ndk-build -C libxhook/jni (module 'xhook'), NOT cmake; the pinned tree has no CMakeLists.txt",
+      "replaces": "libxhook.so"
+    },
+    "whale": {
+      "repo": "asLody/whale",
+      "commit": "6a661b27cc4cf83b7b5a3b02451597ee1ac7f264",
+      "commit_source": "Current upstream HEAD observed via git ls-remote (whale-head-ref.txt). Current reference only, not a claim it built the historical libwhale.so.",
+      "archive_url": "https://codeload.github.com/asLody/whale/tar.gz/6a661b27cc4cf83b7b5a3b02451597ee1ac7f264",
+      "archive_path": "../../dependency-sources/archives/whale-reference-6a661b27cc4cf83b7b5a3b02451597ee1ac7f264.tar.gz",
+      "license": "Apache-2.0",
+      "abinames": ["libwhale.so"],
+      "build": "CMake from the repo-root CMakeLists.txt (add_subdirectory(whale))",
+      "replaces": "libwhale.so"
+    }
+  },
+  "not_claimed": [
+    "That these builds byte-match the packaged hook libs in unidbg-android:0.9.8.",
+    "That the historical HookZz revision or license is established.",
+    "That Dobby is drop-in ABI-compatible with the packaged libhookzz.so without a runtime check."
+  ]
+}

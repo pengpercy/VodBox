@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+        xmlns:views="clr-namespace:VodBox.Desktop.Views"
+        xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
+        x:Class="VodBox.Desktop.Views.SearchWindow" x:DataType="vm:MainViewModel"
+        Title="搜索 — VodBox" Icon="/Assets/Icons/linux/256/vodbox.png"
+        Width="1040" Height="720" MinWidth="720" MinHeight="480"
+        Background="{DynamicResource PageBackgroundBrush}"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="44"
+        WindowDecorations="Full"
+        WindowStartupLocation="CenterOwner"
+        FontSize="13">
+
+  <!-- 独立搜索结果窗口：内容区直接复用 SearchView（与主 VM 绑定，搜索状态唯一）。
+       顶部留出 44px 标题栏拖拽区，右侧给 Windows 三键让位。 -->
+  <Grid RowDefinitions="44,*" Background="Transparent">
+    <Border Grid.Row="0" Background="Transparent"
+            Margin="{OnPlatform Default='0,0,132,0', macOS='0'}"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar">
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="20,0" VerticalAlignment="Center">
+        <PathIcon Data="{StaticResource Icon.Search}" Width="16" Height="16" VerticalAlignment="Center" Opacity="0.85" />
+        <TextBlock Text="搜索" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+    <views:SearchView Grid.Row="1" />
+  </Grid>
+</Window>

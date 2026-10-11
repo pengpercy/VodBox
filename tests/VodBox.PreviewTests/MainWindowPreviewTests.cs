@@ -66,7 +66,8 @@ public sealed class MainWindowPreviewTests
             Assert.Equal(WindowDecorationsElementRole.User, WindowDecorationProperties.GetElementRole((Visual)divider.Parent!));
 
             var items = window.GetVisualDescendants().OfType<NavItemView>().ToArray();
-            Assert.Equal(8, items.Length);
+            Assert.Equal(7, items.Length);
+            Assert.DoesNotContain(items, item => item.Label == "搜索");
             Assert.All(items, item =>
             {
                 var icon = item.FindControl<PathIcon>("IconPath")!;

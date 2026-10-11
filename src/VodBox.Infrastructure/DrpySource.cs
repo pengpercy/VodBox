@@ -131,6 +131,9 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
         if(parse is not (0 or 1)||jx is not (0 or 1))throw new NotSupportedException("drpy返回不支持的解析标志。");
         if (jx==0&&parse == 1 && !MediaExtension().IsMatch(uri.AbsolutePath))
             throw new NotSupportedException("该 drpy 选集需要网页嗅探（尚未实现）。");
+        // 规则若显式返回 playUrl（jx 接口），保留为解析端点；缺失/非标量一律当作没有，不臆造。
+        var playUrl = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("playUrl", out var playUrlValue) &&
+            playUrlValue.ValueKind is JsonValueKind.String or JsonValueKind.Number ? playUrlValue.ToString().Trim() : "";
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if ((root.TryGetProperty("header", out var h) && h.ValueKind != JsonValueKind.Null) || root.TryGetProperty("headers", out h))
         {
@@ -143,7 +146,11 @@ public sealed partial class DrpySource : IResolvingContentSource, IDisposable
         }
         return new PlaybackRequest
         {
-            Uri = url, Resolution = jx==1?ResolutionKind.Json:ResolutionKind.Direct, Headers = headers,
+            Uri = url, Resolution = jx==1?ResolutionKind.Json:ResolutionKind.Direct,
+            // 完整保留原始 jx 标志与可选 playUrl：引擎直传不了的 Cookie/Authorization 等头交由受控媒体代理转发。
+            Jx = jx != 0 ? jx.ToString(CultureInfo.InvariantCulture) : null,
+            ParseEndpoint = playUrl.Length > 0 ? playUrl : null,
+            Headers = headers,
             SourceKey = Key, SourceName = Name, MediaId = mediaId, LineId = entry.LineId, EpisodeId = episodeId,
             Title = parsed.Detail.Item.Title + " · " + entry.Title,
             Poster = parsed.Detail.Item.Poster, Remarks = parsed.Detail.Item.Remarks

@@ -5,7 +5,7 @@ three operating systems, and a verification step that silently degrades to "assu
 one of them is worse than none. Every parser here fails loudly on malformed input.
 
 The two things a bundle must prove before it ships:
-  * architecture  - the copied DLL/ELF is the machine type the RID claims (an arm64 package that
+  * architecture  - the copied DLL/ELF/Mach-O is the machine type the RID claims (an arm64 package that
     carries an x86-64 libmpv installs fine and then fails to load at runtime);
   * closure       - on Linux, libmpv and every bundled `.so` resolve each other plus the base
     loader/glibc, with no dependency left for the user to install.
@@ -17,6 +17,11 @@ from pathlib import Path
 
 PE_MACHINE = {0x8664: "x86-64", 0xAA64: "Aarch64", 0x014C: "i386", 0x01C4: "ARM"}
 ELF_MACHINE = {62: "x86-64", 183: "AArch64", 3: "i386", 40: "ARM"}
+MACHO_CPU = {0x01000007: "x86-64", 0x0100000C: "AArch64", 7: "i386", 12: "ARM"}
+# Mach-O magics: a thin image is a single architecture in little-endian 64/32-bit form; a
+# universal binary starts with one of the FAT magics and lists one slice per architecture.
+MACHO_THIN_64, MACHO_THIN_32 = 0xFEEDFACF, 0xFEEDFACE
+MACHO_FAT, MACHO_FAT_64 = 0xCAFEBABE, 0xCAFEBABF
 
 # The RID's expected native architecture, as reported by the parsers above.
 EXPECTED_ARCH = {
@@ -24,6 +29,8 @@ EXPECTED_ARCH = {
     "win-arm64": "Aarch64",
     "linux-x64": "x86-64",
     "linux-arm64": "AArch64",
+    "osx-x64": "x86-64",
+    "osx-arm64": "AArch64",
 }
 
 # Libraries every Linux host provides: the C runtime, the dynamic loader and the C++ runtime's
@@ -215,3 +222,72 @@ def verify_linux_closure(libdir: Path, rid: str) -> dict:
         detail = "; ".join(f"{dep} (needed by {', '.join(sorted(set(users)))})" for dep, users in sorted(missing.items()))
         raise NativeVerifyError(f"{rid}: bundled media kernel has unresolved dependencies: {detail}")
     return {"count": len(files), "arch": expected}
+
+
+# --- Mach-O (macOS executable) ------------------------------------------------------------
+
+def macho_arch(path: Path) -> str:
+    """Architecture of a Mach-O image, or the set of slices in a universal binary."""
+    data = _read(path)
+    if len(data) < 8:
+        raise NativeVerifyError(f"{path}: too small to be a Mach-O image")
+    magic_le = struct.unpack_from("<I", data, 0)[0]
+    if magic_le in (MACHO_THIN_64, MACHO_THIN_32):
+        cputype = struct.unpack_from("<i", data, 4)[0] & 0xFFFFFFFF
+        return MACHO_CPU.get(cputype, f"unknown(0x{cputype:x})")
+    # Universal binaries are written big-endian regardless of host.
+    magic_be = struct.unpack_from(">I", data, 0)[0]
+    if magic_be in (MACHO_FAT, MACHO_FAT_64):
+        count = struct.unpack_from(">I", data, 4)[0]
+        step = 32 if magic_be == MACHO_FAT_64 else 20
+        base = 8
+        if base + count * step > len(data):
+            raise NativeVerifyError(f"{path}: truncated universal Mach-O header")
+        slices = []
+        for index in range(count):
+            cputype = struct.unpack_from(">i", data, base + index * step)[0] & 0xFFFFFFFF
+            slices.append(MACHO_CPU.get(cputype, f"unknown(0x{cputype:x})"))
+        # A universal image is usable only if the target slice is present; collapse duplicates and
+        # report the whole set so the caller can test membership.
+        return "+".join(sorted(set(slices)))
+    raise NativeVerifyError(f"{path}: not a Mach-O image (magic 0x{magic_le:08x})")
+
+
+def verify_executable_arch(path: Path, rid: str) -> str:
+    """Assert a native executable (`.exe`/`java`/DLL/`.so`/`.dylib`) matches the RID's architecture.
+
+    Dispatches on the container magic so one check covers the JVM launcher on all three hosts.
+    Returns the architecture string the parser reported.
+    """
+    expected = EXPECTED_ARCH.get(rid)
+    if expected is None:
+        raise NativeVerifyError(f"{rid}: no expected architecture defined")
+    data = _read(path)[:4]
+    if data[:2] == b"MZ":
+        actual = pe_machine(path)
+    elif data[:4] == b"\x7fELF":
+        actual = elf_arch(path)
+    else:
+        # Mach-O is reported as a set for universal binaries; membership is the correct test.
+        actual = macho_arch(path)
+        if any(part.lower() == expected.lower() for part in actual.split("+")):
+            return actual
+        raise NativeVerifyError(f"{path}: {actual} image in a {rid} ({expected}) bundle")
+    if actual.lower() != expected.lower():
+        raise NativeVerifyError(f"{path}: {actual} image in a {rid} ({expected}) bundle")
+    return actual
+
+
+def verify_jre(directory: Path, rid: str) -> str:
+    """Assert a bundled JRE's `bin/java` is the RID's architecture, never the build host's.
+
+    This is the guard against a cross-compile leg accidentally shipping the runner's own runtime:
+    an x86-64 launcher inside an arm64 bundle installs fine and then fails to exec.
+    """
+    directory = Path(directory)
+    launcher = directory / "bin" / ("java.exe" if rid.startswith("win") else "java")
+    if not launcher.is_file() and rid.startswith("osx"):
+        launcher = directory / "Contents" / "Home" / "bin" / "java"
+    if not launcher.is_file():
+        raise NativeVerifyError(f"{directory}: bundled JRE is missing its platform Java launcher")
+    return verify_executable_arch(launcher, rid)
