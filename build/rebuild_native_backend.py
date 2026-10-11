@@ -477,8 +477,11 @@ def build(rid: str, deps: Path, *, engine_cache: Path, out_root: Path) -> dict:
             "VODBOX_ENGINE_GENERATOR": toolchain["engine_generator"],
             "VODBOX_ENGINE_MAKE": toolchain["engine_make"],
         })
-    _run(["bash", str(REBUILD / "fetch-engine.sh")], env=env)
-    _run(["bash", str(REBUILD / "build-backend.sh")], env=env)
+    shell = os.environ.get("VODBOX_NATIVE_BASH", "bash")
+    if rid == "win-x64" and shell == "bash":
+        raise RebuildError("Windows source rebuild requires explicit VODBOX_NATIVE_BASH; bare bash may select WSL")
+    _run([shell, str(REBUILD / "fetch-engine.sh")], env=env)
+    _run([shell, str(REBUILD / "build-backend.sh")], env=env)
     library = built_library(rid, out_root)
 
     with tempfile.TemporaryDirectory(prefix=f"native-receipt-{rid}-") as scratch:

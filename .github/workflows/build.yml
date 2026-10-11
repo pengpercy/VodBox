@@ -104,6 +104,7 @@ jobs:
           echo "VODBOX_ENGINE_CMAKE=$(cygpath -m "$(command -v cmake)")" >> "$GITHUB_ENV"
           echo "VODBOX_ENGINE_MAKE=$(cygpath -m "$(command -v ninja)")" >> "$GITHUB_ENV"
           echo "VODBOX_ENGINE_GENERATOR=Ninja" >> "$GITHUB_ENV"
+          echo "VODBOX_NATIVE_BASH=$(cygpath -m /usr/bin/bash.exe)" >> "$GITHUB_ENV"
       - name: Linux native dependencies
         if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
         run: |

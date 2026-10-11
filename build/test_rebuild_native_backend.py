@@ -81,6 +81,7 @@ class RebuildEnvironmentTests(unittest.TestCase):
 
                 with patch.dict(os.environ, {"JAVA_HOME": str(root / "jdk"),
                                              "VODBOX_NATIVE_CC": "C:/tool chain/gcc.exe",
+                        "VODBOX_NATIVE_BASH": "C:/msys/usr/bin/bash.exe",
                                              "VODBOX_ENGINE_CMAKE": "C:/tool chain/cmake.exe",
                                              "VODBOX_ENGINE_MAKE": "C:/tool chain/ninja.exe",
                                              "VODBOX_ENGINE_GENERATOR": "Ninja"}), \

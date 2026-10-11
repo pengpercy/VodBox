@@ -37,6 +37,7 @@ jobs:
             version="${{ inputs.version }}"
             sha="${{ inputs.source_sha }}"
             git fetch --depth=1 origin "$sha"
+            sha=$(git rev-parse FETCH_HEAD)
             test "$(git show "$sha:VERSION" | tr -d '[:space:]')" = "$version"
           else
             version=$(cat VERSION)
@@ -62,6 +63,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
       - name: Declare the native/source obligation state before the build
         shell: bash
         run: python3 build/release_preflight.py --skip-permissions --allow-unrebuilt-receipts
@@ -86,6 +89,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
       # Fail fast on a token that cannot publish, and re-derive the closure verdicts from the
       # repository's own trees. This is a declaration check, not the evidence check: the packages
       # do not exist yet at this point, and a gate that demanded packaging output here would be
@@ -142,6 +147,15 @@ jobs:
         if: inputs.package_run == ''
         with:
           github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+          pattern: vodbox-meta.*
+          merge-multiple: true
+          path: artifacts/meta
+      - uses: actions/download-artifact@v8
+        if: inputs.package_run == ''
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
           pattern: native-backend-receipt.*
           merge-multiple: true
           path: artifacts/receipts
@@ -152,10 +166,15 @@ jobs:
       - name: Verify the real downloaded packages, per RID
         shell: bash
         run: |
+          for rid in win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64; do
+            test -f "artifacts/meta/$rid.json"
+          done
           python3 build/release_evidence.py \
             --archives artifacts/release \
             --meta artifacts/meta \
-            --receipts artifacts/receipts
+            --receipts artifacts/receipts \
+            --expected-sha "${{ needs.version.outputs.sha }}" \
+            --version "${{ needs.version.outputs.value }}"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

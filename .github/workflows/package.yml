@@ -28,10 +28,12 @@ jobs:
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha }}
       - name: Test packaging reuse guards
         shell: bash
         run: python3 build/test_package_reuse.py
-      # Tooling belongs to the workflow revision; metadata keeps the actual compiled source SHA.
+      # Validate metadata and package inputs with the tooling at the requested source SHA.
       - name: Validate native build metadata
         id: source
         shell: bash
@@ -54,7 +56,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n package.${{ matrix.rid }} -D artifacts/packages
+        run: |
+          gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n package.${{ matrix.rid }} -D artifacts/packages
+          gh run download "${{ inputs.source_run }}" --repo "$GITHUB_REPOSITORY" -n native-backend-receipt.${{ matrix.rid }} -D artifacts/receipts
       - name: Fetch verified build artifact
         if: steps.source.outputs.reuse_package != 'true'
         shell: bash
@@ -104,6 +108,7 @@ jobs:
       # The per-RID source-rebuild receipt, published as its own artifact so the release job can
       # verify exactly the receipt that travelled with this package instead of a workspace copy.
       - name: Collect the packaged source-rebuild receipt
+        if: steps.source.outputs.reuse_package != 'true'
         shell: bash
         run: |
           receipt=$(find artifacts/publish/${{ matrix.rid }} -name native-backend-receipt.json -print -quit)
