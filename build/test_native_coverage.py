@@ -5,12 +5,14 @@ The regression this guards: `build/dex-deps.json` used to describe coverage from
 `unidbg-unicorn2:0.9.8`. Prose drifted from the jars and "Windows ARM64 supported" was claimable
 with no native library behind it. These tests derive the verdict from real zip contents instead.
 
-A second regression lives here too: conflating *binary* RID coverage with *source* closure. The five
-of six RIDs that carry the backend native library is a property of the shipped binaries; the
-corresponding-source obligation for those binaries is a different question, tracked in
-`native-source-manifest.json` and still pending. "Source closure 5/6" is not a thing this module
-will ever produce — the source side is pending for every distributed artifact, and it must be read
-from the source manifest, not from the RID coverage table.
+A second regression lives here too: conflating *binary* RID coverage with the *redistribution*
+obligation of the distributed natives. The five of six RIDs that carry the backend native library is
+a property of the shipped binaries; whether each distributed native's obligation is discharged is a
+different question, answered per component from real evidence — an executed from-pinned-source
+rebuild receipt for the GPL engine, or the retained upstream notice files for a permissive
+notice-only native. "Source closure 5/6" is not a thing this module will ever produce: the two GPL
+engine components stay open until a receipt exists, and a summary flag or status token never closes
+them.
 """
 import json
 import pathlib
@@ -133,8 +135,8 @@ class CoverageTests(unittest.TestCase):
     def test_source_closure_is_a_different_question_than_rid_coverage(self):
         # The bug this guards: reading the five/six RID coverage table and announcing "source closure
         # 5/6". The two manifest files answer different questions; the source side must be read from
-        # the source manifest, which is still pending, and must therefore be *incomplete* for a
-        # six-RID release even though five RIDs have covered natives.
+        # the source manifest's per-component evidence, which is still open for the GPL engine even
+        # though five RIDs have covered natives.
         coverage.require_closure(['linux-x64', 'osx-arm64'])  # scoping clears the *binary* gate
         with self.assertRaises(coverage.NativeCoverageError):
             coverage.require_source_closure()
@@ -142,10 +144,26 @@ class CoverageTests(unittest.TestCase):
         self.assertFalse(state['complete'])
         self.assertFalse(state['summary_complete'])
         self.assertEqual(state['unclassified'], [])
-        # Every distributed native artifact is pending, not just the RID that lacks a native library.
-        self.assertEqual(sorted(state['pending']), sorted(coverage.DISTRIBUTED_SOURCE_ARTIFACTS))
+        # Only the two GPL-engine components stay open; the permissive notice-only natives are read
+        # as satisfied from their retained notices, not hard-coded pending.
+        self.assertEqual(sorted(state['pending']),
+                         ['com.github.zhkl0228:unicorn:1.0.14',
+                          'com.github.zhkl0228:unidbg-unicorn2:0.9.8'])
         self.assertEqual(state['artifacts']['com.github.zhkl0228:unidbg-unicorn2:0.9.8'],
                          'pending-engine-source-commit')
+
+    def test_obligations_distinguish_source_from_notice_only(self):
+        # The per-component audit surface: the GPL engine carries the source obligation; the guest
+        # SDK/hook libs and the other permissive natives are notice-only.
+        state = coverage.source_closure_state()
+        self.assertEqual(state['obligations']['com.github.zhkl0228:unidbg-unicorn2:0.9.8'],
+                         'gpl-corresponding-source')
+        self.assertEqual(state['obligations']['com.github.zhkl0228:unicorn:1.0.14'],
+                         'gpl-corresponding-source')
+        for coordinate in ('com.github.zhkl0228:unidbg-android:0.9.8', 'net.java.dev.jna:jna:5.10.0',
+                           'com.github.zhkl0228:keystone:0.9.7', 'com.github.zhkl0228:demumble:1.0.4'):
+            self.assertEqual(state['obligations'][coordinate], 'permissive-notice-only')
+            self.assertNotIn(coordinate, state['pending'])
 
     def test_source_closure_reads_the_real_source_manifest_not_the_lock_table(self):
         # The source verdict must come from native-source-manifest.json, whose overall status is the
@@ -158,9 +176,17 @@ class CoverageTests(unittest.TestCase):
         # The source manifest carries no RID-split "5/6" table at all: the number is not its shape.
         self.assertNotIn('nativeCoverage', manifest)
 
+    def test_gpl_engine_stays_open_with_no_rebuild_receipt(self):
+        # The default blocked case: the old, un-rebuilt library has no executed-rebuild receipt, so
+        # the corresponding-source obligation is open regardless of the manifest's status token.
+        state = coverage.source_closure_state()
+        self.assertIn('com.github.zhkl0228:unidbg-unicorn2:0.9.8', state['pending'])
+        self.assertIn('no rebuild receipt', ' '.join(state['problems'][
+            'com.github.zhkl0228:unidbg-unicorn2:0.9.8']))
+
     def test_source_closure_fails_closed_when_the_summary_flag_is_hand_edited(self):
-        # Flipping corresponding_source_complete to true must not close the obligation while any
-        # artifact still carries a pending status. The per-artifact evidence decides, not the flag.
+        # Flipping corresponding_source_complete to true must not close the obligation while the GPL
+        # engine still has no executed-rebuild receipt. The per-component evidence decides.
         manifest = json.loads((ROOT / 'third_party/tvbox-silicon/dependency-sources'
                                / 'native-source-manifest.json').read_text())
         edited = json.loads(json.dumps(manifest))
@@ -172,34 +198,42 @@ class CoverageTests(unittest.TestCase):
             with self.assertRaises(coverage.NativeCoverageError):
                 coverage.require_source_closure()
 
-    def test_source_closure_opens_when_an_entry_is_pending_even_if_others_match(self):
-        complete_entry = {'status': 'matched-release-source-collected', 'corresponding_source_complete': True}
-        pending_entry = {'status': 'pending-engine-source-commit', 'corresponding_source_complete': False}
-        manifest = {
-            'corresponding_source_complete': True,
-            'dependencies': [
-                {'artifact': coordinate, 'status': pending_entry['status'],
-                 'corresponding_source_complete': False}
-                for coordinate in coverage.DISTRIBUTED_SOURCE_ARTIFACTS
-            ],
-        }
-        with unittest.mock.patch.object(coverage, '_source_manifest', return_value=manifest):
-            with self.assertRaisesRegex(coverage.NativeCoverageError, 'pending'):
-                coverage.require_source_closure()
-        # All entries closed and the summary true -> the obligation is discharged.
-        manifest['dependencies'] = [
-            {'artifact': coordinate, **complete_entry}
-            for coordinate in coverage.DISTRIBUTED_SOURCE_ARTIFACTS
-        ]
-        with unittest.mock.patch.object(coverage, '_source_manifest', return_value=manifest):
-            state = coverage.require_source_closure()
-        self.assertTrue(state['complete'])
+    def test_a_status_token_alone_does_not_close_the_gpl_obligation(self):
+        # Even a manifest status of 'matched-release-source-collected' must not close the engine
+        # without an executed-rebuild receipt: a status token is not evidence of the distributed
+        # binary's source.
+        manifest = json.loads((ROOT / 'third_party/tvbox-silicon/dependency-sources'
+                               / 'native-source-manifest.json').read_text())
+        edited = json.loads(json.dumps(manifest))
+        edited['corresponding_source_complete'] = True
+        for entry in edited['dependencies']:
+            entry['status'] = 'matched-release-source-collected'
+            entry['corresponding_source_complete'] = True
+        for entry in edited['additional_native_dependencies']:
+            entry['status'] = 'matched-release-source-collected'
+            entry['corresponding_source_complete'] = True
+        with unittest.mock.patch.object(coverage, '_source_manifest', return_value=edited):
+            state = coverage.source_closure_state()
+        self.assertFalse(state['complete'])
+        self.assertIn('com.github.zhkl0228:unidbg-unicorn2:0.9.8', state['pending'])
 
     def test_source_closure_fails_closed_on_a_distributed_artifact_with_no_entry(self):
         manifest = {'corresponding_source_complete': False, 'dependencies': []}
         with unittest.mock.patch.object(coverage, '_source_manifest', return_value=manifest):
-            with self.assertRaisesRegex(coverage.NativeCoverageError, 'no manifest entry'):
+            with self.assertRaises(coverage.NativeCoverageError):
                 coverage.require_source_closure()
+
+    def test_source_closure_fails_closed_when_the_notice_dir_is_not_retained(self):
+        # A notice-only component is closed by its retained license files actually being on disk; a
+        # component whose notice directory is not retained stays open rather than being trusted.
+        obligation = dict(coverage.NATIVE_COMPONENT_OBLIGATIONS)
+        obligation['com.github.zhkl0228:demumble:1.0.4'] = {
+            'class': 'permissive-notice-only', 'notice_dir': 'does-not-exist-9.9.9'}
+        with unittest.mock.patch.dict(coverage.NATIVE_COMPONENT_OBLIGATIONS, obligation):
+            state = coverage.source_closure_state()
+        self.assertIn('com.github.zhkl0228:demumble:1.0.4', state['pending'])
+        self.assertIn('no retained license notice', ' '.join(
+            state['problems']['com.github.zhkl0228:demumble:1.0.4']))
 
     def _deps(self, directories):
         import contextlib

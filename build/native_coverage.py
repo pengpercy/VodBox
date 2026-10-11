@@ -71,16 +71,101 @@ DISTRIBUTED_SOURCE_ARTIFACTS = (
     "net.java.dev.jna:jna:5.10.0",
 )
 
-# A per-artifact status only closes the source obligation when it is one of these. The manifest
-# uses these tokens for "the case is settled" — either the release source was collected and matched,
-# or the artifact is entirely out of the distributed set. Anything else ("pending-...") stays open.
-SOURCE_STATUS_CLOSED = frozenset({"matched-release-source-collected", "not-distributed", "excluded"})
+# NOTE: the manifest's per-artifact `status` token is *informational* here, never a verdict. A
+# status of "matched-release-source-collected" on the GPL engine must not close the obligation — a
+# token is not evidence of the distributed binary's source. The verdict is derived per component
+# from real evidence (an executed rebuild receipt, or a retained notice file) below.
 
 # The upstream JavaHost pom at the pinned tvbox-silicon commit. Both coordinates must be present in
 # the resolved `deps/` for this component to be the one the coverage table describes.
 UPSTREAM_POM = ROOT / "third_party/tvbox-silicon/Runtime/JavaHost/pom.xml"
 BACKEND_ARTIFACT_PREFIX = "unidbg-unicorn2"
 BACKEND_VERSION = "0.9.8"
+
+# Where `rebuild_native_backend.py` writes its per-RID receipts. A receipt is the *evidence* a
+# distributed native was rebuilt from pinned source: it records the built library hash, the engine
+# source-archive hash, the bridge source digest and the jar-rewrite that removed every foreign
+# native. The source gate reads these receipts and re-derives the obligation per distributed
+# native — it never accepts the manifest's summary flag or a bare status token as the verdict.
+RECEIPTS_DIR = ROOT / "third_party/tvbox-silicon/dependency-sources/rebuild-receipts"
+
+# Which obligation a distributed native component carries, and what actually discharges it. This is
+# the per-component audit surface the source gate walks — *not* the manifest's summary flag. Two
+# obligation classes exist and they must not be merged:
+#
+#   * "gpl-corresponding-source"  — a GPL/copyleft native statically linked into a distributed
+#     library. Only an executed from-pinned-source rebuild with a recorded output hash (a
+#     `rebuild_native_backend` receipt) closes it, or removal from the distribution.
+#   * "permissive-notice-only"    — a permissive (BSD/ISC/MIT/zlib/Apache) native. Redistribution
+#     requires the upstream license text(s) + copyright + disclaimer be *retained*; there is no
+#     source obligation. Closed by the retained notice files actually being present on disk.
+#
+# `notice_dir` names the retained license material for the permissive class: the upstream license /
+# notice files under `dependency-notices/<notice_dir>/`. A component whose notices are *not*
+# retained stays open (fail closed) — the earlier hard `corresponding_source_complete=false`
+# blanket is replaced by reading the real per-component obligation. For `unidbg-android` the
+# manifest additionally records the exact retained notice paths (`licenses_physically_retained`),
+# and those are re-resolved to real files rather than trusted as strings.
+NATIVE_COMPONENT_OBLIGATIONS = {
+    "com.github.zhkl0228:unidbg-unicorn2:0.9.8": {
+        "class": "gpl-corresponding-source",
+        "receipts": ("backend-0.9.8",),
+        "note": "Unicorn2 engine statically linked into the distributed libunicorn.{so,dylib}/"
+                "unicorn.dll; the only full-source obligation. Closed by an executed rebuild receipt.",
+    },
+    "com.github.zhkl0228:unicorn:1.0.14": {
+        "class": "gpl-corresponding-source",
+        "receipts": ("backend-0.9.8",),
+        "note": "Unicorn1 Java parent types keep their classes, but the GPL native natives/* is "
+                "quarantined; the receipt records the removed entries + pinned source archive.",
+    },
+    "com.github.zhkl0228:unidbg-android:0.9.8": {
+        "class": "permissive-notice-only",
+        "notice_dir": "unidbg-android-0.9.8",
+        "evidence": "licenses_physically_retained",
+        "evidence_base": "unidbg-android-0.9.8",
+        "note": "34 guest SDK/hook natives: all permissive (bionic BSD, libc++ MIT/Illinois, zlib, "
+                "OpenSSL 1.0.1e, BoringSSL, xHook MIT/BSD, whale/Dobby/HookZz Apache-2.0). "
+                "Notice-only; the GPL obligation belongs to the engine above, not here.",
+    },
+    "com.github.zhkl0228:keystone:0.9.7": {
+        "class": "permissive-notice-only",
+        "notice_dir": "keystone-0.9.7",
+        "note": "keystone assembler native, permissive (LLVM/BSD + Apache on the Java binding). "
+                "Notice-only.",
+    },
+    "com.github.zhkl0228:demumble:1.0.4": {
+        "class": "permissive-notice-only",
+        "notice_dir": "demumble-1.0.4",
+        "note": "demumble demangler native, permissive (Apache-2.0/BSD); notice-only.",
+    },
+    "net.java.dev.jna:jna:5.10.0": {
+        "class": "permissive-notice-only",
+        "notice_dir": "jna-5.10.0",
+        "note": "JNA is dual Apache-2.0/LGPL-2.1; distributed under Apache-2.0 (notice-only).",
+    },
+}
+
+# A retained notice path in the manifest is only "retained" if the file actually resolves under
+# the source tree. A recorded path is evidence, not proof; the gate re-checks existence.
+DEPENDENCY_SOURCES = ROOT / "third_party/tvbox-silicon/dependency-sources"
+DEPENDENCY_NOTICES = ROOT / "third_party/tvbox-silicon/dependency-notices"
+
+# The license-file names a notice directory is expected to carry. A directory with none of these is
+# not "retained license material" and must not close a notice-only obligation.
+NOTICE_FILE_NAMES = ("LICENSE", "LICENSE.txt", "LICENSE.TXT", "LICENSE-COM.TXT", "COPYING",
+                     "NOTICE", "LICENSE.md")
+
+
+def sha256_file(path: Path) -> str:
+    import hashlib
+
+    with Path(path).open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def _backend_jar_glob() -> str:
+    return f"{BACKEND_ARTIFACT_PREFIX}-*.jar"
 
 # A jar's `natives/<dir>/` directory name -> the RID that reads it at runtime. This is the mapping
 # the upstream loader uses; a directory here with no file is not coverage, so resolution is per file.
@@ -230,78 +315,300 @@ def _manifest_artifacts(manifest: dict) -> dict[str, dict]:
     return entries
 
 
-def source_closure_state() -> dict:
-    """The *source* closure verdict for every distributed native artifact, read from the manifest.
+def load_receipts(receipts_dir: Path | None = None) -> dict[str, dict]:
+    """Every `rebuild_native_backend` receipt on disk, keyed by the key its filename carries.
+
+    A receipt is the *evidence* a distributed native was rebuilt from pinned source. The gate reads
+    the receipts rather than trusting the manifest's summary: a receipt records the built library
+    hash, the engine source-archive hash, the bridge digest and the jar rewrite that removed every
+    foreign native. A release with no receipt for a distributed GPL native is blocked — the default
+    "old library, no receipt" case stays closed.
+
+    Receipt files are named `<key>.json` (e.g. `backend-0.9.8.json`) or carry a `"key"` field; a
+    bare `backend-<version>.json` is what `rebuild_native_backend.py --receipt` writes.
+    """
+    directory = Path(receipts_dir) if receipts_dir is not None else RECEIPTS_DIR
+    receipts: dict[str, dict] = {}
+    if not directory.is_dir():
+        return receipts
+    for path in sorted(directory.glob("*.json")):
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        key = receipt.get("key") or path.stem
+        receipts[key] = receipt
+    return receipts
+
+
+def receipt_problems(receipt: dict) -> list[str]:
+    """The real per-native evidence a receipt must carry to close a GPL source obligation.
+
+    This is deliberately the same evidence `rebuild_native_backend.verify_receipt` produces, read
+    back for the gate: a recorded output library hash, the engine source-archive hash, the bridge
+    source digest and the jar integration that keeps exactly this RID's rebuilt native. A receipt
+    that records only a status or a version string does not close anything.
+    """
+    problems: list[str] = []
+    backend = receipt.get("backend") or {}
+    library = backend.get("output_library") or {}
+    if not library.get("sha256"):
+        problems.append("no rebuilt output library sha256")
+    engine = backend.get("engine") or {}
+    if not engine.get("source_archive_sha256"):
+        problems.append("no engine source-archive sha256 (the corresponding source is not pinned)")
+    bridge = backend.get("bridge") or {}
+    if not bridge.get("source_digest_sha256"):
+        problems.append("no bridge source digest")
+    jar = backend.get("jar_integration") or {}
+    entries = jar.get("jar_native_entries") or []
+    if len(entries) != 1 or entries != [jar.get("native_entry")]:
+        problems.append(
+            f"the package would still carry foreign natives ({entries}); only the rebuilt native "
+            f"may be distributed")
+    unicorn1 = receipt.get("unicorn1")
+    if unicorn1 is None:
+        problems.append("no unicorn:1.0.14 quarantine record (its GPL native must be withheld)")
+    else:
+        if unicorn1.get("kept_dependency") is not True:
+            problems.append("unicorn:1.0.14 must stay (parent types) with only its native withheld")
+        if not (unicorn1.get("source_evidence") or {}).get("archive_sha256"):
+            problems.append("unicorn:1.0.14 has no pinned source archive hash")
+    return problems
+
+
+def published_input_problems(receipt: dict, deps: Path) -> list[str]:
+    """Cross-check a receipt against the *actual* staged package input (`deps/*.jar`).
+
+    A receipt is only evidence about the binaries a release distributes if it agrees with the jars
+    the release would package. This re-derives the backend jar's `natives/` entries and the
+    quarantined `unicorn:1.0.14` jar from disk and compares them to what the receipt records — so a
+    receipt that describes a jar the release is not actually shipping is caught, and a stale jar
+    whose native changed after the rebuild is caught too. Returns the list of problems (empty is
+    good). When `deps` carries no staged jar for this component, nothing is claimed and nothing is
+    reported: absence of the input is not evidence either way (the caller decides that separately).
+    """
+    problems: list[str] = []
+    backend = receipt.get("backend") or {}
+
+    def native_entries(jar: Path) -> list[str]:
+        with zipfile.ZipFile(jar) as archive:
+            return sorted(n for n in archive.namelist()
+                          if n.startswith("natives/") and not n.endswith("/"))
+
+    backend_jars = sorted(Path(deps).glob(_backend_jar_glob()))
+    # A receipt records at most one RID's rebuilt native; compare against the single matching jar.
+    for jar in backend_jars:
+        integration = backend.get("jar_integration") or {}
+        recorded = integration.get("jar_native_entries") or []
+        if recorded and native_entries(jar) != recorded:
+            problems.append(f"{jar.name}: packaged natives/ {native_entries(jar)} do not match the "
+                            f"receipt's {recorded}")
+        if integration.get("post_rewrite_jar_sha256") and \
+                sha256_file(jar) != integration["post_rewrite_jar_sha256"]:
+            problems.append(f"{jar.name}: staged jar hash does not match the receipt (input changed "
+                            f"after the rebuild)")
+
+    unicorn1 = receipt.get("unicorn1")
+    if unicorn1 is not None:
+        for jar in sorted(Path(deps).glob("unicorn-1.0.14.jar")):
+            leftover = [n for n in zipfile.ZipFile(jar).namelist() if n.startswith("natives/")]
+            if leftover:
+                problems.append(f"{jar.name}: packaged jar still carries GPL native {leftover}; the "
+                                f"receipt says it was withheld")
+    return problems
+
+
+def _notice_files(entry: dict, obligation: dict) -> list[Path]:
+    """The retained notice files for a notice-only component, resolved to real paths.
+
+    Two sources are consulted, both read as evidence rather than trusted strings:
+
+      * the component's `notice_dir` under `dependency-notices/` — its real license files;
+      * the manifest's `license_facts.<evidence>` list where present (unidbg-android records the
+        exact retained texts). Each record is "<description> - <path>", the path being relative to
+        that component's notice directory.
+    """
+    resolved: list[Path] = []
+    notice_dir = obligation.get("notice_dir")
+    if notice_dir:
+        root = DEPENDENCY_NOTICES / notice_dir
+        for name in NOTICE_FILE_NAMES:
+            for candidate in (root / "upstream" / name, root / "jar-metadata/META-INF" / name):
+                if candidate.is_file():
+                    resolved.append(candidate)
+    evidence_field = obligation.get("evidence")
+    if evidence_field:
+        facts = entry.get("license_facts") or {}
+        base = DEPENDENCY_NOTICES / obligation.get("evidence_base", obligation.get("notice_dir", ""))
+        for item in facts.get(evidence_field) or []:
+            # "<description> - <path>"; take the trailing path token after the last " - ".
+            candidate = item.rsplit(" - ", 1)[-1].strip()
+            resolved.extend(_expand_braces(base / candidate))
+    return resolved
+
+
+def _expand_braces(path: Path) -> list[Path]:
+    """Expand a `{a,b}` shorthand in a recorded notice path into the real sibling paths.
+
+    The manifest records e.g. `libc-NOTICE.android-{6.0.1_r1,4.4_r1}.txt`; both expanded files are
+    real retained notices, so the shorthand must resolve to them rather than being taken literally
+    (which would look like a missing file and wrongly keep the obligation open).
+    """
+    text = str(path)
+    start = text.find("{")
+    end = text.find("}", start + 1)
+    if start == -1 or end == -1:
+        return [path]
+    prefix, body, suffix = text[:start], text[start + 1:end], text[end + 1:]
+    return [Path(prefix + option + suffix) for option in body.split(",")]
+
+
+def _component_verdict(coordinate: str, entry: dict | None, receipts: dict[str, dict],
+                      deps: Path | None = None) -> tuple[bool, list[str], str]:
+    """Decide whether one distributed native component's obligation is discharged, from real evidence.
+
+    Returns (closed, problems, obligation_class). A component absent from the manifest is *not*
+    closed: every distributed native must carry a recorded obligation, so an unlisted one fails
+    closed rather than riding on the summary.
+    """
+    obligation = NATIVE_COMPONENT_OBLIGATIONS.get(coordinate)
+    if obligation is None:
+        return False, [f"no obligation is recorded for distributed native {coordinate}"], "unclassified"
+    kind = obligation["class"]
+    if entry is None:
+        return False, [f"no manifest entry for {coordinate}"], kind
+
+    if kind == "gpl-corresponding-source":
+        problems: list[str] = []
+        matched = False
+        for key in obligation.get("receipts", ()):
+            receipt = receipts.get(key)
+            if receipt is None:
+                continue
+            # A receipt proves the source of the native it rewrote; the coordinate must be the one
+            # the receipt wrote, or the evidence belongs to a different component.
+            if receipt.get("backend", {}).get("coordinate") != coordinate and \
+                    (receipt.get("unicorn1") or {}).get("coordinate") != coordinate:
+                continue
+            matched = True
+            for problem in receipt_problems(receipt):
+                problems.append(f"{key}: {problem}")
+            if deps is not None:
+                for problem in published_input_problems(receipt, deps):
+                    problems.append(f"{key}: {problem}")
+        if not matched:
+            # The default blocked case: a distributed GPL native with no executed-rebuild receipt.
+            problems.append(
+                f"no rebuild receipt closes the corresponding-source obligation for {coordinate}; "
+                f"retaining an upstream prebuilt native does not discharge it")
+        return (not problems), problems, kind
+
+    # permissive-notice-only: closed by the retained license/notice files actually being on disk.
+    files = _notice_files(entry, obligation)
+    if not files:
+        return False, [f"{coordinate}: no retained license notice is on disk "
+                       f"(dependency-notices/{obligation.get('notice_dir', '?')})"], kind
+    missing = [path for path in files if not path.is_file()]
+    if missing:
+        return False, [f"{coordinate}: recorded notice not retained: {path}" for path in missing], kind
+    return True, [], kind
+
+
+def source_closure_state(receipts_dir: Path | None = None, deps: Path | None = None) -> dict:
+    """The *source/license* closure verdict for every distributed native, from real evidence.
 
     This answers a different question than `closure_state`: not "which RIDs have a native library",
-    but "is the corresponding-source obligation for the distributed natives discharged?". The
-    obligation is per artifact, so a verdict is assembled as:
+    but "is the redistribution obligation for the distributed natives actually discharged?". The
+    verdict is assembled **per component** from evidence, never from the manifest's summary flag or
+    a status token:
 
-      * the manifest's own `corresponding_source_complete` summary flag must be true;
-      * every artifact in `DISTRIBUTED_SOURCE_ARTIFACTS` must have exactly one manifest entry;
-      * that entry's per-case `corresponding_source_complete` must be true;
-      * and the entry's `status` must be a closed token (see `SOURCE_STATUS_CLOSED`).
+      * a **GPL corresponding-source** native is closed only by an executed from-pinned-source
+        rebuild receipt (`rebuild_native_backend.py`), re-verified here to record the rebuilt
+        library hash, the engine source-archive hash, the bridge digest and a jar rewrite that
+        keeps exactly the rebuilt native. No receipt ⇒ blocked (the "old library without receipt"
+        default). A receipt whose evidence does not actually cover the component does not close it.
+      * a **permissive notice-only** native is closed by its retained upstream license/notice files
+        being physically present (the guest-license facts). It carries *no* source obligation, so a
+        retained notice is the whole obligation — recorded as satisfied, not hard-coded false.
+      * a native with no recorded obligation, or no manifest entry, fails closed.
 
-    A pending `status` (e.g. `pending-engine-source-commit`, `pending-embedded-native-provenance`)
-    keeps the closure open even where the summary flag was hand-edited, because the summary is
-    *derived* — the per-artifact status carries the actual evidence state. This is the strict,
-    fail-closed reading: no single string can be flipped to "complete" while an artifact still has a
-    pending reason. An artifact missing entirely from the manifest is `unclassified` and also keeps
-    the closure open.
+    The manifest's `corresponding_source_complete` is still reported (`summary_complete`) so a
+    partial/hand-edited summary is visible, but `complete` is derived from the per-component
+    evidence alone: flipping the summary does not close anything.
+
+    When `deps` is supplied (a staged `JavaHost/deps` directory), each closing receipt is also
+    cross-checked against the *actual* package input on disk — the backend jar's `natives/` tree and
+    the quarantined `unicorn:1.0.14` jar — so a receipt for a jar the release is not shipping (or a
+    jar that changed after the rebuild) does not close the obligation.
 
     Returns {'complete': bool, 'summary_complete': bool, 'pending': [...], 'unclassified': [...],
-             'artifacts': {coordinate: status}}.
+             'artifacts': {coordinate: status}, 'obligations': {coordinate: class},
+             'problems': {coordinate: [reasons]}, 'receipts': [...keys]}.
     """
     manifest = _source_manifest()
     summary_complete = bool(manifest.get(SOURCE_MANIFEST_COMPLETE_FIELD, False))
     entries = _manifest_artifacts(manifest)
+    receipts = load_receipts(receipts_dir)
     artifacts: dict[str, str] = {}
+    obligations: dict[str, str] = {}
+    problems: dict[str, list[str]] = {}
     pending: list[str] = []
     unclassified: list[str] = []
     for coordinate in DISTRIBUTED_SOURCE_ARTIFACTS:
         entry = entries.get(coordinate)
-        if entry is None:
+        artifacts[coordinate] = str((entry or {}).get("status", "no-manifest-entry"))
+        closed, reasons, kind = _component_verdict(coordinate, entry, receipts, deps)
+        obligations[coordinate] = kind
+        if kind == "unclassified":
             unclassified.append(coordinate)
-            continue
-        status = str(entry.get("status", "unknown"))
-        artifacts[coordinate] = status
-        if not bool(entry.get("corresponding_source_complete", False)) or status not in SOURCE_STATUS_CLOSED:
+        if reasons:
+            problems[coordinate] = reasons
+        if not closed:
             pending.append(coordinate)
     return {
-        "complete": summary_complete and not pending and not unclassified,
+        # The verdict is derived from the per-component evidence, never from the summary flag.
+        "complete": not pending and not unclassified,
         "summary_complete": summary_complete,
         "pending": pending,
         "unclassified": unclassified,
         "artifacts": artifacts,
+        "obligations": obligations,
+        "problems": problems,
+        "receipts": sorted(receipts),
     }
 
 
-def require_source_closure() -> dict:
-    """Raise unless the corresponding-source obligation for the distributed natives is discharged.
+def require_source_closure(receipts_dir: Path | None = None, deps: Path | None = None) -> dict:
+    """Raise unless the redistribution obligation for the distributed natives is discharged.
 
-    This is the gate that must stop a *real* release while the source manifest is still
-    `pending-with-rebuild-path`. It is independent of the binary-closure gate: a release can be
-    binary-complete and still blocked here, and a host can decline to distribute an artifact and
-    still pass here. It reads the manifest's own evidence state (`status` + per-artifact flag), never
-    a hand-written summary, so editing `corresponding_source_complete` to `true` while an artifact
-    still reads `pending-...` fails closed instead of shipping.
+    This is the gate that must stop a *real* release while a distributed GPL native has no executed
+    from-pinned-source rebuild receipt, or while a recorded notice is not actually retained. It is
+    independent of the binary-closure gate: a release can be binary-complete and still blocked here,
+    and a host can decline to distribute an artifact and still pass here. The verdict is re-derived
+    from the per-component evidence (`source_closure_state`), never from a hand-written summary, so
+    editing `corresponding_source_complete` to `true` fails closed instead of shipping.
     """
-    state = source_closure_state()
+    state = source_closure_state(receipts_dir, deps)
     if state["unclassified"]:
         raise NativeCoverageError(
-            "source closure cannot be established: no manifest entry for "
+            "source closure cannot be established: no recorded obligation for "
             + ", ".join(state["unclassified"])
-            + " — a distributed native artifact must have a recorded corresponding-source verdict.")
+            + " — a distributed native artifact must have a recorded obligation verdict.")
     if state["pending"]:
+        detail = "; ".join(
+            f"{coordinate}: {', '.join(state['problems'].get(coordinate, ['open']))}"
+            for coordinate in state["pending"])
         raise NativeCoverageError(
-            "source closure is incomplete: the corresponding source for " + ", ".join(state["pending"])
-            + " is still pending (manifest status pending-*, not an executed rebuild or a matched "
-              "release source). A release distributing these natives has an open corresponding-source "
-              "obligation.")
+            "source closure is incomplete — the redistribution obligation for the distributed "
+            "natives is not discharged. " + detail)
     if not state["summary_complete"]:
+        # Every component's evidence is closed, but the manifest's own summary still reads false: the
+        # summary is derived and must be reconciled before a real publication, so stay fail-closed.
         raise NativeCoverageError(
-            f"source closure is incomplete: the manifest's {SOURCE_MANIFEST_COMPLETE_FIELD} is false; "
-            f"the overall corresponding-source obligation is not discharged.")
+            f"source closure is inconsistent: every distributed native's obligation is discharged "
+            f"but the manifest's {SOURCE_MANIFEST_COMPLETE_FIELD} is still false; the summary is "
+            f"derived and must be reconciled with the per-component evidence before publishing.")
     return state
 
 
@@ -394,22 +701,30 @@ def _command_closure(args: argparse.Namespace) -> int:
 
 
 def _command_source_closure(args: argparse.Namespace) -> int:
-    """Source-eligibility gate: exit non-zero unless the corresponding-source obligation is closed."""
-    state = source_closure_state()
-    print(f"source closure (from {SOURCE_MANIFEST.relative_to(ROOT)}): "
+    """Redistribution-obligation gate: exit non-zero unless every distributed native is discharged."""
+    receipts_dir = Path(args.receipts_dir) if getattr(args, "receipts_dir", "") else None
+    deps = Path(args.deps) if getattr(args, "deps", "") else None
+    state = source_closure_state(receipts_dir, deps)
+    print(f"source/license closure (manifest {SOURCE_MANIFEST.relative_to(ROOT)}): "
           f"{'complete' if state['complete'] else 'INCOMPLETE'}")
-    print(f"  manifest {SOURCE_MANIFEST_COMPLETE_FIELD}: {state['summary_complete']}")
+    print(f"  manifest {SOURCE_MANIFEST_COMPLETE_FIELD}: {state['summary_complete']} "
+          f"(reported, not the verdict; the verdict is per-component evidence)")
+    print(f"  receipts on disk: {', '.join(state['receipts']) or '(none)'}")
     for coordinate, status in state["artifacts"].items():
-        print(f"  {coordinate}: {status}")
+        kind = state["obligations"].get(coordinate, "unclassified")
+        verdict = "closed" if coordinate not in state["pending"] else "OPEN"
+        print(f"  [{verdict}] {coordinate} ({kind}): {status}")
+        for problem in state["problems"].get(coordinate, []):
+            print(f"      - {problem}")
     if state["unclassified"]:
-        print(f"  no manifest entry: {', '.join(state['unclassified'])}")
+        print(f"  no recorded obligation: {', '.join(state['unclassified'])}")
     if args.require:
         try:
-            require_source_closure()
+            require_source_closure(receipts_dir, deps)
         except NativeCoverageError as error:
             print(f"FAIL source closure incomplete: {error}", file=sys.stderr)
             return 1
-        print("OK source closure complete for every distributed native artifact")
+        print("OK redistribution obligation discharged for every distributed native artifact")
     return 0
 
 
@@ -426,9 +741,13 @@ def main() -> int:
     closure.add_argument("--require", action="store_true", help="覆盖不完整时以退出码 1 失败")
     closure.set_defaults(func=_command_closure)
     source = subparsers.add_parser(
-        "source-closure", help="打印/校验分布式原生制品的 corresponding-source 义务（独立于 RID 覆盖）")
+        "source-closure", help="打印/校验分布式原生制品的再分发义务（逐组件证据，独立于 RID 覆盖）")
     source.add_argument("--require", action="store_true",
-                        help="源码义务未结清时以退出码 1 失败（正式发布 gate）")
+                        help="义务未结清时以退出码 1 失败（正式发布 gate）")
+    source.add_argument("--receipts-dir", default="",
+                        help="rebuild_native_backend 回执目录（默认 dependency-sources/rebuild-receipts）")
+    source.add_argument("--deps", default="",
+                        help="已 stage 的 JavaHost/deps：用实际打包输入交叉核验回执（可选）")
     source.set_defaults(func=_command_source_closure)
     args = parser.parse_args()
     return args.func(args)

@@ -33,11 +33,14 @@
     "hookzz": {
       "repo": "jmpews/HookZz",
       "commit": null,
-      "commit_source": "UNRESOLVED. Retained evidence (upstream-evidence/native-provenance/hookzz-*.json) does not pin the historical HookZz revision, and the packaged libhookzz.so is byte-distinct from libdobby.so.",
+      "commit_source": "SOURCE REVISION UNRESOLVED. Retained evidence (upstream-evidence/native-provenance/hookzz-*.json) does not pin the historical HookZz revision, and the packaged libhookzz.so is byte-distinct from libdobby.so.",
+      "license": "Apache-2.0",
+      "license_source": "jmpews/HookZz was renamed to jmpews/Dobby; the project LICENSE (present from the current-master root commit 400ad4f2384c, 2018-10-10) and every mirror fork (zzscc/killvxk/panhongwei/loveezu/3kyo0) are byte-identical 11356-byte Apache-2.0 (SHA-256 43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1). Retained at dependency-notices/unidbg-android-0.9.8/upstream-reference/hookzz/LICENSE (see upstream-reference/NOTICE-SOURCES.md).",
       "abinames": ["libhookzz.so"],
       "disposition": "rebuild-or-drop",
+      "disposition_basis": "source-revision-only (the LICENSE is known Apache-2.0 / notice-only; only the exact historical source revision is unresolved)",
       "fail_closed": "No pinned source => libhookzz.so is not built and must be dropped from distribution. It must NEVER be satisfied by copying libdobby.so into its place; that would ship an unverified ABI under a name the emulator loads by that name.",
-      "why_not_dobby": "Dobby is HookZz's successor but is not ABI-identical to the packaged libhookzz.so; compatibility is not assumed (rebuild-lock.json abi_compat_check_required)."
+      "why_not_dobby": "Dobby is HookZz's successor but is not ABI-identical to the packaged libhookzz.so; compatibility is not assumed (rebuild-lock.json abi_compat_check_required). Note: Dobby and HookZz share the same Apache-2.0 LICENSE, but the BINARIES are distinct."
     },
     "xhook": {
       "repo": "iqiyi/xHook",

@@ -105,10 +105,17 @@ This is where a version/name assumption would be wrong. The retained binaries sh
   (The retained text is the current HEAD; historical binary source is not proven, but the
   project license is Apache-2.0.)
 - `libdobby.so` → **jmpews/Dobby, Apache-2.0.** Retained at `upstream-reference/dobby/LICENSE`.
-- `libhookzz.so` → **HookZz — license NOT established.** HookZz is the predecessor of
-  Dobby; no HookZz license text is retained and the historical revision is unresolved.
-  **This one is a genuine open item** and is the only hook file whose license is unknown.
-  (Dobby must NOT be assumed to be its license or its ABI — they are different binaries.)
+- `libhookzz.so` → **HookZz — Apache-2.0 (license now established; name correspondence
+  verified, not assumed).** The repository `jmpews/HookZz` was **renamed to
+  `jmpews/Dobby`** (README commit `6e44803096cf`, 2019-12-21, "[dobby] hookzz => dobby").
+  The original project's `LICENSE` (present from its master root commit `400ad4f2384c`,
+  2018-10-10) and every mirror fork (zzscc/killvxk/panhongwei/loveezu/3kyo0) are
+  **Apache-2.0**, byte-identical (11356 bytes; SHA-256 `43070e2d…`). Retained at
+  `upstream-reference/hookzz/LICENSE`. The packaged `libhookzz.so` is NDK-r18 built and
+  byte-distinct from `libdobby.so` (which carries `DobbyHook`/`DobbyInstrument`). **Dobby
+  must NOT be assumed to be HookZz's license or its ABI** — they are different binaries —
+  but HookZz's own license is Apache-2.0. Exact historical HookZz *source revision* remains
+  unpinned (a provenance/source question, not a license question).
 
 ### 2.6 `unidbg-unicorn2` engine (`libunicorn.so/dylib`, `unicorn.dll`)
 **License: GPL-2.0.** The Unicorn engine (both the 1.0.14 line and the `unicorn2` line)
@@ -146,49 +153,73 @@ exact source from the publisher, **or** replace with a VodBox-built engine and s
 source (`rebuild/backend-unicorn2/`). Retaining a version string or a guessed commit does
 **not** close it.
 
-### 3.3 Reserved: `libhookzz.so`
-License unknown ⇒ cannot be satisfied by notice ⇒ **rebuild-or-drop**, as the existing pin
-already says. Do not ship it on an assumed license.
+### 3.3 `libhookzz.so`
+License is **Apache-2.0** (established above; text retained at
+`upstream-reference/hookzz/LICENSE`), so it *is* satisfiable by notice — reproduce the
+Apache-2.0 text (+ any upstream `NOTICE`) and attribute HookZz. The **binary**
+nevertheless stays on the rebuild-or-drop provenance path, because the exact historical
+HookZz *source revision* that built the packaged `.so` is not pinned. That is a
+source/provenance question, not a license question, and does not change the notice
+obligation. Do **not** satisfy the binary by copying `libdobby.so` into its place.
 
 ---
 
-## 4. Is the license text physically present? (what is retainable today)
+## 4. Is the license text physically present? (what is retained today)
 
 Already retained under `dependency-notices/`:
 - `unidbg-android-0.9.8/upstream-reference/{xhook,whale,dobby}/LICENSE(+LICENSE-docs)` ✅
+- `unidbg-android-0.9.8/upstream-reference/{bionic,libcxx,zlib,openssl-1.0.1e,boringssl,hookzz}/`
+  — the six texts below ✅ (added; upstream original text + pinned source + SHA-256, see
+  `upstream-reference/NOTICE-SOURCES.md`)
 - `unidbg-unicorn2-0.9.8/upstream/LICENSE` (Apache bridge) ✅
 - `unicorn-1.0.14/upstream/COPYING{,LGPL2}` (GPL engine) ✅
 
-**NOT yet retained** (must be added before these components can carry a real notice):
-- bionic BSD `NOTICE` text (libc/libdl/libm/liblog).
-- libc++ `LICENSE.TXT` (libstdcpp/libcpp).
-- zlib license text.
-- OpenSSL 1.0.1e dual OpenSSL+SSLeay `LICENSE` text.
-- BoringSSL `LICENSE` text.
-- HookZz license (unknown until the source is resolved).
+**NOW retained** (previously the six open items):
+- bionic BSD `NOTICE` text (libc/libdl/libm/liblog), per SDK era —
+  `upstream-reference/bionic/libc-NOTICE.android-6.0.1_r1.txt` (sdk23) and
+  `…android-4.4_r1.txt` (sdk19); source aosp-mirror `platform_bionic` tags.
+- libc++ `LICENSE.TXT` (libstdcpp/libcpp) — `upstream-reference/libcxx/LICENSE.TXT`
+  (dual MIT / Illinois-BSD); source upstream libc++ `llvmorg-3.5.0`.
+- zlib license text — `upstream-reference/zlib/zlib-license.txt` (verbatim from `zlib.h` 1.2.8).
+- OpenSSL 1.0.1e dual OpenSSL+SSLeay `LICENSE` text —
+  `upstream-reference/openssl-1.0.1e/LICENSE` (from the openssl.org 1.0.1e release tarball).
+- BoringSSL `LICENSE` text — `upstream-reference/boringssl/LICENSE`
+  (AOSP `platform/external/boringssl` tag `android-6.0.1_r1`, `src/LICENSE`: the
+  OpenSSL+SSLeay+Google-ISC era text that actually governs the sdk23 binary; the current
+  BoringSSL HEAD text, now Apache-2.0, is intentionally NOT substituted).
+- HookZz license — `upstream-reference/hookzz/LICENSE` = **Apache-2.0**. The historical
+  "license unknown" is **resolved**: `jmpews/HookZz` renamed to `jmpews/Dobby`; the
+  original project's `LICENSE` (present from its master root commit `400ad4f2384c`,
+  2018-10-10) and every mirror fork are Apache-2.0, byte-identical (11356 bytes). The
+  packaged `libhookzz.so` is NDK-r18 built and byte-distinct from `libdobby.so`. Exact
+  historical source revision remains unpinned, but the license is established.
 
-These six texts are the *actual remaining material* to close the permissive-notice side.
-They are small, stable, and directly available from AOSP (`platform/bionic`, `platform/
-libcxx`), openssl.org (1.0.1 archive), and boringssl googlesource. This is the concrete
-"licensing material" ask — **not** a per-file AOSP tag/module guess and not 26 templates.
+Every permissive guest/hook component therefore now has its upstream notice text on disk
+with a pinned source and SHA-256 (`upstream-reference/NOTICE-SOURCES.md`). This is the
+concrete "licensing material" — **not** a per-file AOSP tag/module guess and not 26 templates.
 
 ---
 
 ## 5. What this does and does not change
 
 - It **does not** stamp anything as complete. `native-source-manifest.json` keeps
-  `corresponding_source_complete=false` for the GPL engine (unresolved source) and for
-  `libhookzz.so` (unknown license).
+  `corresponding_source_complete=false` for the GPL engine (unresolved source) and the
+  rebuild-or-drop provenance for `libhookzz.so` (historical source revision unresolved).
 - It **does** correct the *license facts* the manifest records for the guest SDK: sdk19
-  crypto/ssl is **OpenSSL 1.0.1e**, not BoringSSL; and the permissive-notice class is
-  separated from the GPL-engine source class.
+  crypto/ssl is **OpenSSL 1.0.1e**, not BoringSSL; the permissive-notice class is
+  separated from the GPL-engine source class; and `libhookzz.so` was **Apache-2.0**, not
+  "unknown".
 - It **does** convert the "26-library AOSP template" into a **notice-text checklist** that
-  can actually be closed, while leaving the GPL engine / HookZz as the real blockers.
+  can actually be closed, and the six texts on that checklist are now retained
+  (`upstream-reference/NOTICE-SOURCES.md`), leaving the GPL engine as the real blocker.
 
 ### Open items (genuine, not hand-waved)
 1. Unicorn engine exact corresponding source → GPL closure (blocks; see `REPORT.md`).
-2. HookZz historical license/revision → `libhookzz.so` rebuild-or-drop.
-3. Obtain + retain the six permissive license texts listed in §4.
-4. Historical-vs-current revision of xHook/whale/Dobby remains unproven (notice class known,
-   exact revision not) — record the retained reference revision and the fact it is a
-   reference, not a proof.
+2. HookZz exact historical **source revision** → `libhookzz.so` rebuild-or-drop. (Its
+   **license** is now established as Apache-2.0; only the source revision is unresolved.)
+3. ~~Obtain + retain the six permissive license texts listed in §4.~~ **DONE** — all six
+   retained in `upstream-reference/{bionic,libcxx,zlib,openssl-1.0.1e,boringssl,hookzz}/`
+   with pinned source + SHA-256 in `upstream-reference/NOTICE-SOURCES.md`.
+4. Historical-vs-current revision of xHook/whale/Dobby/HookZz remains unproven (notice
+   class known, exact revision not) — record the retained reference revision and the fact
+   it is a reference, not a proof.

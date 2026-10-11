@@ -10,4 +10,4 @@ demumble Maven GPL V2 与源仓库 Apache/LLVM 声明存在差异，资料并存
 
 SHA256SUMS 排除自身，列出本目录所有已保存文件的 SHA-256。
 
-新增 `unidbg-android-0.9.8/NATIVE-LICENSE-STATUS.md` 与 `upstream-reference/`：xHook 历史候选 MIT/BSD 文本、Dobby/Whale 当前参考 Apache 文本。仅为研究参考，不代表嵌入历史二进制许可/版本闭合，不能覆盖 SDK/HookZz 或静态 runtime。
+新增 `unidbg-android-0.9.8/NATIVE-LICENSE-STATUS.md` 与 `upstream-reference/`：xHook 历史候选 MIT/BSD 文本、Dobby/Whale 当前参考 Apache 文本，以及六份此前缺失的宽松许可证原文（bionic、libc++、zlib、OpenSSL 1.0.1e、BoringSSL、HookZz）。六份原文均为上游原始文本，附固定来源与 SHA-256（见 `unidbg-android-0.9.8/upstream-reference/NOTICE-SOURCES.md`）：bionic 用 AOSP `platform_bionic` 的 `android-6.0.1_r1`/`android-4.4_r1` 标签；libc++ 用上游 `llvmorg-3.5.0` 的双 MIT/Illinois-BSD 文本；zlib 取自 `zlib.h` 1.2.8 的许可块；OpenSSL 取自 openssl.org 1.0.1e 发行 tarball；BoringSSL 用 AOSP `external/boringssl` 的 `android-6.0.1_r1` 期 `src/LICENSE`（OpenSSL+SSLeay+Google-ISC，对应 sdk23 二进制，不替换为当前 HEAD 的 Apache-2.0）；HookZz 由“未知”更正为 Apache-2.0（`jmpews/HookZz` 已改名 `jmpews/Dobby`，项目 LICENSE 与本仓库各镜像分叉字节一致）。仅为研究/通知用途，不代表嵌入历史二进制源码/版本闭合，也不改变 rebuild-or-drop 处置、GPL 引擎源码义务或发布门；未更改项目许可。

@@ -524,9 +524,14 @@ public sealed partial class LiveViewModel : ObservableObject
 
     private async Task<bool> LoadConfigurationAsync(string? url, bool persistOnSuccess)
     {
-        await RestoreProgrammeCacheAsync();
-        _loadRequest?.Cancel();
+        // 代次必须在任何 await 之前同步认领：RestoreProgrammeCacheAsync 会做文件读，
+        // 两个并发 LoadAsync 若都在 await 之后才 ++_loadGeneration，先发的旧请求可能拿到更大的代次，
+        // 于是迟到的旧结果反而通过代次校验覆盖新结果（Linux CI 上负载不同即偶发失败）。
         var generation = ++_loadGeneration;
+        _loadRequest?.Cancel();
+        _loadRequest = null;
+        await RestoreProgrammeCacheAsync();
+        if (generation != _loadGeneration) return false;
         if (string.IsNullOrWhiteSpace(url))
         {
             _loadRequest = null;
