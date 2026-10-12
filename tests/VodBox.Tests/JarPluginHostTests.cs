@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using VodBox.Core;
 using VodBox.Infrastructure;
@@ -245,9 +246,14 @@ public sealed class JarPluginHostTests
         public JarPluginEnvelope Ready { get; init; } = new() { Ready = true };
         public Func<IReadOnlyDictionary<string, string>, CancellationToken, Task<JarPluginEnvelope>> OnSend { get; set; } =
             (_, _) => Task.FromResult(new JarPluginEnvelope { Result = "{}" });
+        public Func<CancellationToken, Task<JarPluginEnvelope>>? OnStart { get; init; }
         public bool Disposed { get; private set; }
         public bool IsRunning { get; private set; }
-        public Task<JarPluginEnvelope> StartAsync(CancellationToken ct) { IsRunning = true; return Task.FromResult(Ready); }
+        public Task<JarPluginEnvelope> StartAsync(CancellationToken ct)
+        {
+            IsRunning = true;
+            return OnStart?.Invoke(ct) ?? Task.FromResult(Ready);
+        }
         public Task<JarPluginEnvelope> SendAsync(IReadOnlyDictionary<string, string> parameters, CancellationToken ct) => OnSend(parameters, ct);
         public ValueTask DisposeAsync() { Disposed = true; IsRunning = false; return ValueTask.CompletedTask; }
     }
@@ -260,6 +266,281 @@ public sealed class JarPluginHostTests
             Created.Add(descriptor);
             return channel;
         }
+    }
+
+    private sealed class SequenceFactory(params FakeChannel[] channels) : IJarPluginHostChannelFactory
+    {
+        public int CreatedCount { get; private set; }
+        public IJarPluginHostChannel Create(JarPluginSessionDescriptor descriptor) => channels[CreatedCount++];
+    }
+
+    [Theory]
+    [InlineData(JarPluginErrors.HostLaunchFailed)]
+    [InlineData(JarPluginErrors.HostExited)]
+    [InlineData(JarPluginErrors.HostTimeout)]
+    public async Task StartupExceptionDisposesChannelAndAllowsRetry(string code)
+    {
+        var failure = new JarPluginException(JarPluginErrors.Classify(code));
+        var failed = new FakeChannel
+        {
+            OnStart = _ => Task.FromException<JarPluginEnvelope>(failure),
+            OnSend = (_, _) => throw new InvalidOperationException("Failed startup must not send a request."),
+        };
+        var replacement = new FakeChannel
+        {
+            OnSend = (_, _) => Task.FromResult(new JarPluginEnvelope { Result = "retried" }),
+        };
+        var factory = new SequenceFactory(failed, replacement);
+        await using var session = new JarPluginSession(
+            new JarPluginSessionDescriptor("rj", Layout(), "/tmp/plugin.jar", Path.GetTempPath()), factory, Settings());
+
+        var error = await Assert.ThrowsAsync<JarPluginException>(() =>
+            session.RequestAsync(new Dictionary<string, string>(), TestContext.Current.CancellationToken));
+        Assert.Same(failure, error);
+        Assert.True(failed.Disposed);
+        Assert.False(session.IsRunning);
+        Assert.False(session.IsBusy);
+
+        var envelope = await session.RequestAsync(new Dictionary<string, string>(), TestContext.Current.CancellationToken);
+        Assert.Equal("retried", envelope.Result);
+        Assert.Equal(2, factory.CreatedCount);
+        Assert.True(session.IsRunning);
+        Assert.False(replacement.Disposed);
+    }
+
+    [Fact]
+    public async Task CancellationDuringStartupDisposesChannelAndAllowsRetry()
+    {
+        var starting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelled = new FakeChannel
+        {
+            OnStart = async ct =>
+            {
+                starting.SetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+                return new JarPluginEnvelope { Ready = true };
+            },
+            OnSend = (_, _) => throw new InvalidOperationException("Cancelled startup must not send a request."),
+        };
+        var replacement = new FakeChannel
+        {
+            OnSend = (_, _) => Task.FromResult(new JarPluginEnvelope { Result = "retried" }),
+        };
+        var factory = new SequenceFactory(cancelled, replacement);
+        await using var session = new JarPluginSession(
+            new JarPluginSessionDescriptor("rj", Layout(), "/tmp/plugin.jar", Path.GetTempPath()), factory, Settings());
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        var pending = session.RequestAsync(new Dictionary<string, string>(), cancellation.Token);
+        await starting.Task.WaitAsync(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.True(cancelled.Disposed);
+        Assert.False(session.IsRunning);
+        Assert.False(session.IsBusy);
+
+        var envelope = await session.RequestAsync(new Dictionary<string, string>(), TestContext.Current.CancellationToken);
+        Assert.Equal("retried", envelope.Result);
+        Assert.Equal(2, factory.CreatedCount);
+        Assert.True(session.IsRunning);
+        Assert.False(replacement.Disposed);
+    }
+
+    [Theory]
+    [InlineData("{\"ready\":true}")]
+    [InlineData("{\"errorCode\":\"unsupported_dex\",\"error\":\"previous launch\"}")]
+    public async Task ProcessStartupDeletesPreviousReadyBeforeLaunching(string previousReady)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "vodbox-jarhost-ready-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var readyPath = Path.Combine(directory, JarPluginProtocol.ReadyFile);
+            await File.WriteAllTextAsync(readyPath, previousReady, TestContext.Current.CancellationToken);
+            Assert.True(File.Exists(readyPath));
+            var settings = Settings() with
+            {
+                JavaExecutable = Path.Combine(directory, "missing-java"),
+                HostJarPath = Path.Combine(directory, "host.jar"),
+                WorkRoot = directory,
+            };
+            await using var channel = new JarPluginProcessChannel(
+                new JarPluginSessionDescriptor("rj", Layout(), "/tmp/plugin.jar", directory), settings);
+
+            var error = await Assert.ThrowsAsync<JarPluginException>(() => channel.StartAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(JarPluginErrors.HostLaunchFailed, error.Failure.Code);
+            Assert.False(File.Exists(readyPath));
+            Assert.True(File.Exists(Path.Combine(directory, "request.json")));
+            Assert.False(channel.IsRunning);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, "dex", false)]
+    [InlineData(true, "dex", true)]
+    [InlineData(false, "dex", true)]
+    [InlineData(true, "database", true)]
+    [InlineData(true, "unknown-archive", true)]
+    [InlineData(true, "invalid-dex", true)]
+    [InlineData(true, "unmarked-dex", false)]
+    [InlineData(true, "unmarked-dex", true)]
+    [InlineData(false, "unmarked-dex", true)]
+    [InlineData(true, "missing-manifest", true)]
+    [InlineData(true, "other-marker", true)]
+    public async Task ProcessStartupPreparesOnlyUpstreamLoaderArchive(bool upstream, string content, bool readOnly)
+    {
+        var directory = Path.Combine(CodeCacheTestTempRoot(), "vodbox-code-cache-" + Guid.NewGuid().ToString("N"));
+        var cache = Path.Combine(directory, "profile", "code_cache", "sharedb", "config.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+        try
+        {
+            if (upstream) await File.WriteAllTextAsync(Path.Combine(directory, "upstream-runtime.json"), "{}", TestContext.Current.CancellationToken);
+            if (content == "database") await File.WriteAllTextAsync(cache, "SQLite format 3\0user data", TestContext.Current.CancellationToken);
+            else
+            {
+                using var archive = ZipFile.Open(cache, ZipArchiveMode.Create);
+                archive.Comment = content is "unmarked-dex" or "missing-manifest" ? "" : content == "other-marker" ? "userZIPDEX" : "generatedZIPDEX";
+                if (content != "missing-manifest")
+                {
+                    using var manifest = new StreamWriter(archive.CreateEntry("META-INF/MANIFEST.MF").Open());
+                    manifest.Write("Manifest-Version: 1.0\r\n\r\n");
+                }
+                using var writer = new StreamWriter(archive.CreateEntry(content == "unknown-archive" ? "user.txt" : "classes.dex").Open());
+                writer.Write(content is "dex" or "unmarked-dex" or "other-marker" or "missing-manifest" ? "dex\n035\0payload" : "user data");
+            }
+            var original = await File.ReadAllBytesAsync(cache, TestContext.Current.CancellationToken);
+            if (readOnly)
+            {
+                if (OperatingSystem.IsWindows()) File.SetAttributes(cache, FileAttributes.ReadOnly);
+                else File.SetUnixFileMode(cache, UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+            }
+            var preserved = new[]
+            {
+                Path.Combine(directory, "profile", "shared_prefs", "settings.xml"),
+                Path.Combine(directory, "profile", "databases", "config.db"),
+                Path.Combine(directory, "profile", "code_cache", "other.db"),
+                Path.Combine(directory, "profile", "code_cache", "sharedb", "other.db"),
+            };
+            foreach (var path in preserved)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                await File.WriteAllTextAsync(path, "user data", TestContext.Current.CancellationToken);
+            }
+            await AssertCachePreparationBeforeLaunchAsync(directory);
+            if (upstream && content is "dex" or "unmarked-dex") Assert.False(File.Exists(cache));
+            else
+            {
+                Assert.Equal(original, await File.ReadAllBytesAsync(cache, TestContext.Current.CancellationToken));
+                if (readOnly && !OperatingSystem.IsWindows())
+                    Assert.Equal(UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead, File.GetUnixFileMode(cache));
+            }
+            foreach (var path in preserved) Assert.Equal("user data", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            if (File.Exists(cache) && OperatingSystem.IsWindows()) File.SetAttributes(cache, FileAttributes.Normal);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("WorkRoot")]
+    [InlineData("sessions")]
+    [InlineData("workingdir")]
+    [InlineData("profile")]
+    [InlineData("code_cache")]
+    [InlineData("sharedb")]
+    [InlineData("config.db")]
+    public async Task ProcessStartupDoesNotFollowCodeCacheLinks(string linkedComponent)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var directory = Path.Combine(CodeCacheTestTempRoot(), "vodbox-code-cache-link-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var target = Path.Combine(directory, "external");
+        Directory.CreateDirectory(target);
+        var externalCache = Path.Combine(target, "config.db");
+        var workingDirectory = Path.Combine(directory, "WorkRoot", "sessions", "workingdir");
+        string? link = null;
+        try
+        {
+            using (var archive = ZipFile.Open(externalCache, ZipArchiveMode.Create))
+            {
+                using (var manifest = new StreamWriter(archive.CreateEntry("META-INF/MANIFEST.MF").Open()))
+                    manifest.Write("Manifest-Version: 1.0\r\n\r\n");
+                using var writer = new StreamWriter(archive.CreateEntry("classes.dex").Open());
+                writer.Write("dex\n035\0payload");
+            }
+            var original = await File.ReadAllBytesAsync(externalCache, TestContext.Current.CancellationToken);
+            var path = directory;
+            var components = new[] { "WorkRoot", "sessions", "workingdir", "profile", "code_cache", "sharedb", "config.db" };
+            for (var i = 0; i < components.Length; i++)
+            {
+                path = Path.Combine(path, components[i]);
+                if (components[i] == linkedComponent)
+                {
+                    link = path;
+                    if (linkedComponent == "config.db") File.CreateSymbolicLink(path, externalCache);
+                    else
+                    {
+                        var remaining = target;
+                        for (var j = i + 1; j < components.Length - 1; j++) remaining = Path.Combine(remaining, components[j]);
+                        Directory.CreateDirectory(remaining);
+                        if (remaining != target) File.Copy(externalCache, Path.Combine(remaining, "config.db"));
+                        Directory.CreateSymbolicLink(path, target);
+                    }
+                    break;
+                }
+                Directory.CreateDirectory(path);
+            }
+            await File.WriteAllTextAsync(Path.Combine(workingDirectory, "upstream-runtime.json"), "{}", TestContext.Current.CancellationToken);
+            await AssertCachePreparationBeforeLaunchAsync(workingDirectory, Path.Combine(directory, "WorkRoot"));
+            Assert.Equal(original, await File.ReadAllBytesAsync(Path.Combine(workingDirectory, "profile", "code_cache", "sharedb", "config.db"), TestContext.Current.CancellationToken));
+            Assert.Equal(original, await File.ReadAllBytesAsync(externalCache, TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            if (link is not null)
+            {
+                if (linkedComponent == "config.db") File.Delete(link);
+                else Directory.Delete(link);
+            }
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static string CodeCacheTestTempRoot()
+    {
+        // macOS /var and /tmp may themselves be links; ordinary fixtures need real ancestors.
+        var temporary = Path.GetFullPath(Path.GetTempPath());
+        var resolved = Path.GetPathRoot(temporary)!;
+        foreach (var component in temporary[resolved.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var directory = new DirectoryInfo(Path.Combine(resolved, component));
+            resolved = directory.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? directory.FullName;
+        }
+        return resolved;
+    }
+
+    private static async Task AssertCachePreparationBeforeLaunchAsync(string directory, string? workRoot = null)
+    {
+        var jar = Path.Combine(directory, "plugin.jar");
+        using (ZipFile.Open(jar, ZipArchiveMode.Create)) { }
+        var settings = Settings() with
+        {
+            JavaExecutable = Path.Combine(directory, "missing-java"),
+            HostJarPath = Path.Combine(directory, "host.jar"),
+            WorkRoot = workRoot ?? directory,
+        };
+        await using var channel = new JarPluginProcessChannel(
+            new JarPluginSessionDescriptor("rj", Layout(), jar, directory), settings);
+        var error = await Assert.ThrowsAsync<JarPluginException>(() => channel.StartAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(JarPluginErrors.HostLaunchFailed, error.Failure.Code);
+        Assert.True(File.Exists(Path.Combine(directory, "request.json")));
+        Assert.False(channel.IsRunning);
     }
 
     private sealed class FakeArtifacts : IJarPluginArtifactStore

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
@@ -40,6 +41,9 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
                 NativeBackendCapability.UnsupportedReason());
         Directory.CreateDirectory(_cacheDirectory);
         Directory.CreateDirectory(Path.Combine(_cacheDirectory, JarPluginProtocol.ResponsesDirectory));
+        // Readiness belongs to this launch; a previous failure must be re-evaluated by the current runtime.
+        var readyPath = Path.Combine(_cacheDirectory, JarPluginProtocol.ReadyFile);
+        File.Delete(readyPath);
         var request = new JarPluginLaunchRequest
         {
             Jar = _descriptor.JarPath,
@@ -53,6 +57,7 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
             Origin = _descriptor.Layout.Origin ?? "",
             Site = _descriptor.Layout.SiteJson,
         };
+        if (_settings.UsesUpstreamRuntime) PrepareUpstreamCodeCache(_cacheDirectory);
         var requestPath = Path.Combine(_cacheDirectory, "request.json");
         await File.WriteAllTextAsync(requestPath, JarPluginJson.Serialize(request), Encoding.UTF8, ct).ConfigureAwait(false);
 
@@ -84,7 +89,6 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
         _ = DrainAsync(_process.StandardOutput);
         _ = DrainAsync(_process.StandardError);
 
-        var readyPath = Path.Combine(_cacheDirectory, JarPluginProtocol.ReadyFile);
         var deadline = DateTime.UtcNow + _settings.StartupTimeout;
         while (true)
         {
@@ -127,6 +131,75 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
             if (!IsRunning) throw new JarPluginException(JarPluginErrors.HostExited, JarPluginFailureKind.Temporary, "插件宿主在响应前退出。");
             await Task.Delay(_pollInterval, ct).ConfigureAwait(false);
         }
+    }
+
+    private static void PrepareUpstreamCodeCache(string cacheDirectory)
+    {
+        // FTY extracts a DEX archive here on every launch. Upstream may leave it
+        // read-only after loading; discard only this identified, rebuildable artifact.
+        var path = Path.GetFullPath(Path.Combine(cacheDirectory, "profile", "code_cache", "sharedb", "config.db"));
+        if (!HasUnlinkedAncestors(path)) return;
+        var original = new FileInfo(path);
+        if (!original.Exists || (original.Attributes & FileAttributes.Directory) != 0) return;
+        var attributes = original.Attributes;
+        var length = original.Length;
+        var created = original.CreationTimeUtc;
+        var modified = original.LastWriteTimeUtc;
+        try
+        {
+            using var file = File.OpenRead(path);
+            Span<byte> zipHeader = stackalloc byte[4];
+            if (file.ReadAtLeast(zipHeader, zipHeader.Length, throwOnEndOfStream: false) != zipHeader.Length
+                || zipHeader[0] != 'P' || zipHeader[1] != 'K' || zipHeader[2] != 3 || zipHeader[3] != 4)
+                return;
+            file.Position = 0;
+            using var archive = new ZipArchive(file, ZipArchiveMode.Read);
+            // Real upstream archives have no comment; preserve unknown nonempty comments.
+            if (archive.Comment.Length != 0 && archive.Comment != "generatedZIPDEX") return;
+            if (archive.GetEntry("META-INF/MANIFEST.MF") is null) return;
+            var dex = archive.GetEntry("classes.dex");
+            if (dex is null) return;
+            using var stream = dex.Open();
+            Span<byte> header = stackalloc byte[8];
+            if (stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false) != header.Length
+                || header[0] != 'd' || header[1] != 'e' || header[2] != 'x' || header[3] != '\n'
+                || header[4] != '0' || header[5] != '3' || header[6] < '0' || header[6] > '9' || header[7] != 0)
+                return;
+        }
+        catch (InvalidDataException)
+        {
+            // A database or unknown file at this path is not ours to remove.
+            return;
+        }
+        // Recheck immediately before mutation. Metadata detects some replacements,
+        // but is not a file identity guarantee and cannot eliminate TOCTOU.
+        if (!HasUnlinkedAncestors(path)) return;
+        var current = new FileInfo(path);
+        if (!current.Exists || current.Attributes != attributes || current.Length != length
+            || current.CreationTimeUtc != created || current.LastWriteTimeUtc != modified) return;
+        if (OperatingSystem.IsWindows())
+            File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+        if (!HasUnlinkedAncestors(path)) return;
+        current.Refresh();
+        var expectedAttributes = OperatingSystem.IsWindows() ? attributes & ~FileAttributes.ReadOnly : attributes;
+        if (!current.Exists || current.Attributes != expectedAttributes || current.Length != length
+            || current.CreationTimeUtc != created || current.LastWriteTimeUtc != modified) return;
+        File.Delete(path);
+    }
+
+    private static bool HasUnlinkedAncestors(string path)
+    {
+        // Include WorkRoot, sessions, workingdir and every ancestor up to the volume root.
+        for (string? current = path; current is not null; current = Path.GetDirectoryName(current))
+        {
+            try
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return false;
+            }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
+        }
+        return true;
     }
 
     private static async Task<JarPluginEnvelope> ReadEnvelopeAsync(string path, CancellationToken ct)

@@ -77,6 +77,12 @@ public sealed class JarPluginSession : IAsyncDisposable
                 throw;
             }
         }
+        catch
+        {
+            // Startup can also fail or be cancelled before a readiness envelope is returned.
+            await KillAsync().ConfigureAwait(false);
+            throw;
+        }
         finally
         {
             _lastUse = DateTimeOffset.UtcNow;
