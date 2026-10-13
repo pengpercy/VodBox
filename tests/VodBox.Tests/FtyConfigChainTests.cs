@@ -62,7 +62,7 @@ public class FtyConfigChainTests
         var sources = ConfigLoader.ToSources(config);
 
         // 已有 C# 原生实现的饭太硬 csp_ 入口（新增原生爬虫时在此登记）+ 3 个按 key 适配的 .js 入口。
-        string[] implemented = ["csp_BiliGuard", "csp_BttwooGuard", "csp_Dm84Guard", "csp_FirstAidGuard", "csp_YGPGuard"];
+        string[] implemented = ["csp_BiliGuard", "csp_BttwooGuard", "csp_Dm84Guard", "csp_FirstAidGuard", "csp_KanqiuGuard", "csp_YGPGuard"];
         var native = sources.Where(s => s.Runtime == SourceRuntime.NativeSpider).ToList();
         var nativeCsp = native.Where(s => s.Api?.StartsWith("csp_", StringComparison.Ordinal) == true).ToList();
         Assert.Equal(implemented, nativeCsp.Select(s => s.Api).Distinct().Order(StringComparer.Ordinal));

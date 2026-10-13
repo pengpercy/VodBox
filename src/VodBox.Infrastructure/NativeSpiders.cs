@@ -39,6 +39,8 @@ public static class NativeSpiders
             ["csp_BttwooGuard"] = info => new BttwooSource(info),
             ["csp_Dm84"] = info => new Dm84Source(info),
             ["csp_Dm84Guard"] = info => new Dm84Source(info),
+            ["csp_Kanqiu"] = info => new KanqiuSource(info),
+            ["csp_KanqiuGuard"] = info => new KanqiuSource(info),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>
