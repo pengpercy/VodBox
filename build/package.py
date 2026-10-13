@@ -140,8 +140,9 @@ def package_macos(rid, source: Path, output: Path, version: str):
         stage = Path(directory)
         shutil.copytree(app, stage / "VodBox.app", symlinks=True)
         (stage / "Applications").symlink_to("/Applications")
+        # ULMO (LZMA) needs macOS 10.15+; the app already requires 12.0.
         run("hdiutil", "create", "-volname", "VodBox", "-srcfolder", stage,
-            "-format", "UDZO", "-ov", output / (stem + ".dmg"))
+            "-format", "ULMO", "-ov", output / (stem + ".dmg"))
 
 
 def package_linux(rid, source: Path, output: Path, version: str):
@@ -168,10 +169,10 @@ def package_linux(rid, source: Path, output: Path, version: str):
                          icons / "vodbox.png")
         output.mkdir(parents=True, exist_ok=True)
         run("fpm", "-t", "deb", "-s", "dir", "-C", stage, "-n", "vodbox", "-v", version,
-            "--architecture", ("amd64" if rid == "linux-x64" else "arm64"),
+            "--architecture", ("amd64" if rid == "linux-x64" else "arm64"), "--deb-compression", "xz",
             "-p", output / f"{stem}.deb", "--description", "VodBox 跨平台影音应用")
         run("fpm", "-t", "rpm", "-s", "dir", "-C", stage, "-n", "vodbox", "-v", version,
-            "--architecture", ("x86_64" if rid == "linux-x64" else "aarch64"),
+            "--architecture", ("x86_64" if rid == "linux-x64" else "aarch64"), "--rpm-compression", "xz",
             "-p", output / f"{stem}.rpm", "--description", "VodBox 跨平台影音应用")
 
 

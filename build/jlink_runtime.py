@@ -85,10 +85,12 @@ def link_runtime(rid: str, destination: Path, jdk_home=None) -> dict:
     # Build beside the destination, so a failed link never leaves a partly populated JRE.
     with tempfile.TemporaryDirectory(prefix="jlink-", dir=destination.parent) as temporary:
         image = Path(temporary) / "jre"
+        # zip-0 leaves lib/modules uncompressed: installers compress it far better
+        # (xz 11MB vs 24MB, deflate 17MB vs 24MB) and the JVM skips decompressing at startup.
         subprocess.run([str(home / "bin" / ("jlink" + suffix)),
                         "--module-path", str(home / "jmods"),
                         "--add-modules", ",".join(MODULES), "--strip-debug",
-                        "--no-header-files", "--no-man-pages", "--compress=2",
+                        "--no-header-files", "--no-man-pages", "--compress=zip-0",
                         "--output", str(image)], check=True)
         architecture = verify_jre(image, rid)
         listing = subprocess.run([str(image / "bin" / ("java" + suffix)), "--list-modules"],

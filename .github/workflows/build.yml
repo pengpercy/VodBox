@@ -54,6 +54,11 @@ jobs:
       DOTNET_NOLOGO: '1'
       PYTHONUTF8: '1'
     steps:
+      # Windows runners default to autocrlf=true. CRLF checkouts change the matching source
+      # closure bytes and publish a second, otherwise identical ~290MB source asset.
+      - name: Check out with repository line endings
+        shell: bash
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
