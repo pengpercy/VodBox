@@ -181,7 +181,9 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
             File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
         if (!HasUnlinkedAncestors(path)) return;
         current.Refresh();
+        // Windows reports a file with no remaining attributes as Normal.
         var expectedAttributes = OperatingSystem.IsWindows() ? attributes & ~FileAttributes.ReadOnly : attributes;
+        if (expectedAttributes == 0) expectedAttributes = FileAttributes.Normal;
         if (!current.Exists || current.Attributes != expectedAttributes || current.Length != length
             || current.CreationTimeUtc != created || current.LastWriteTimeUtc != modified) return;
         File.Delete(path);
