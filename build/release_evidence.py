@@ -36,6 +36,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import zipfile
 from collections import deque
 from pathlib import Path, PurePosixPath
@@ -262,8 +263,16 @@ def _extract_package(archive: Path, root: Path) -> None:
             raise ReleaseEvidenceError(f"{archive.name}: DMG requires a macOS package evidence receipt")
         mount = root.parent / "mount"
         mount.mkdir()
-        _command(["hdiutil", "attach", str(archive), "-readonly", "-nobrowse",
-                  "-mountpoint", str(mount)])
+        attach = ["hdiutil", "attach", str(archive), "-readonly", "-nobrowse", "-mountpoint", str(mount)]
+        # hosted macOS runners intermittently report EAGAIN right after a DMG is created.
+        for attempt in range(5):
+            try:
+                _command(attach)
+                break
+            except ReleaseEvidenceError as error:
+                if attempt == 4 or "Resource temporarily unavailable" not in str(error):
+                    raise
+                time.sleep(5 * (attempt + 1))
         try:
             for path in mount.rglob("*"):
                 if path.is_symlink():
