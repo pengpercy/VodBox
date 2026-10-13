@@ -280,7 +280,9 @@ public sealed class LocalControlServer : IAsyncDisposable
     {
         var address = Address ?? await EnsureMediaProxyAsync(ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
-        return address + Proxy.Register(url, headers);
+        var handle = Proxy.Register(url, headers);
+        // 只有清单需要扩展名（让 FFmpeg 按 HLS/DASH 探测）；直链保持无扩展名句柄。
+        return address + (Path.GetExtension(new Uri(url).AbsolutePath).ToLowerInvariant() is ".m3u8" or ".mpd" ? MediaProxy.WithMediaExtension(handle, url) : handle);
     }
 
     public async ValueTask DisposeAsync()

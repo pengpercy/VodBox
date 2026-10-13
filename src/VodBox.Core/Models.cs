@@ -191,6 +191,11 @@ public sealed record PlaybackRequest
     /// </summary>
     public string? Jx { get; init; }
     public Dictionary<string, string> Headers { get; init; } = [];
+    /// <summary>
+    /// 源站已知媒体必须经本机代理改写才能播放（如 TS 片段伪装成图片）。与请求头无关，
+    /// 置位后即使只有 UA/Referer 也走代理。
+    /// </summary>
+    public bool ProxyMedia { get; init; }
     public long StartPositionMs { get; init; }
     public string SourceKey { get; init; } = "local";
     /// <summary>来源显示名（写历史用）。本地文件为「本地」，点播为站点名。</summary>

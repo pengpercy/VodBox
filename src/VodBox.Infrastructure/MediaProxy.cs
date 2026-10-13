@@ -80,7 +80,7 @@ public sealed class MediaProxy : IDisposable
 
     public async Task ServeCachedAsync(HttpContext context)
     {
-        var id=context.Request.RouteValues["id"]?.ToString()??"";
+        var id=HandleId(context);
         if(_cache is null||!_entries.TryGetValue(id,out var entry)||entry.Expires<=DateTimeOffset.UtcNow){context.Response.StatusCode=404;return;}
         // 清单保持实时重写，不缓存直播清单；Range走原始流式代理。
         if(context.Request.Headers.ContainsKey("Range")||entry.Uri.AbsolutePath.EndsWith(".m3u8",StringComparison.OrdinalIgnoreCase)||entry.Uri.AbsolutePath.EndsWith(".mpd",StringComparison.OrdinalIgnoreCase))
@@ -92,11 +92,13 @@ public sealed class MediaProxy : IDisposable
 
     public async Task ServeAsync(HttpContext context)
     {
-        var id = context.Request.RouteValues["id"]?.ToString() ?? "";
+        var id = HandleId(context);
         if (!_entries.TryGetValue(id, out var entry) || entry.Expires <= DateTimeOffset.UtcNow) { context.Response.StatusCode = 404; return; }
         if(context.Request.Headers.TryGetValue("Range",out var requestedRange)&&!System.Net.Http.Headers.RangeHeaderValue.TryParse(requestedRange.ToString(),out _))
         {context.Response.StatusCode=400;return;}
-        using var response = await FetchAsync(entry, context);
+        // FFmpeg 默认带 "Range: bytes=0-" 打开片段；这等同整段请求，按整段取回才能检查伪装前缀。
+        var whole = !context.Request.Headers.TryGetValue("Range", out var rangeHeader) || rangeHeader.ToString().Trim() == "bytes=0-";
+        using var response = await FetchAsync(entry, context, forwardRange: !whole);
         if ((int)response.StatusCode is >= 300 and < 400) { context.Response.StatusCode = 502; return; }
         context.Response.StatusCode = (int)response.StatusCode;
         if (!response.IsSuccessStatusCode) return;
@@ -127,6 +129,19 @@ public sealed class MediaProxy : IDisposable
             await context.Response.WriteAsync(rewritten, context.RequestAborted);
             return;
         }
+        if (response.StatusCode == HttpStatusCode.OK && whole)
+        {
+            // 部分站点把 TS 片段伪装成图片（前置一张极小 PNG 等）；只在确认后面紧跟 TS 同步字节时才剥离前缀。
+            await using var body = await response.Content.ReadAsStreamAsync(context.RequestAborted);
+            var head = new byte[DisguiseScanLimit];
+            var read = await body.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false, context.RequestAborted);
+            var skip = DisguisedPrefixLength(head.AsSpan(0, read));
+            context.Response.ContentType = skip > 0 ? "video/mp2t" : type;
+            if (response.Content.Headers.ContentLength is { } total) context.Response.ContentLength = total - skip;
+            await context.Response.Body.WriteAsync(head.AsMemory(skip, read - skip), context.RequestAborted);
+            await body.CopyToAsync(context.Response.Body, context.RequestAborted);
+            return;
+        }
         context.Response.ContentType = type;
         if (response.Content.Headers.ContentLength is { } length) context.Response.ContentLength = length;
         if (response.Content.Headers.ContentRange is { } contentRange) context.Response.Headers.ContentRange = contentRange.ToString();
@@ -134,7 +149,41 @@ public sealed class MediaProxy : IDisposable
         await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
     }
 
-    private async Task<HttpResponseMessage> FetchAsync(Entry entry,HttpContext context)
+    private const int DisguiseScanLimit = 16 * 1024;
+
+    /// <summary>句柄可带媒体扩展名（<c>/proxy/{id}.ts</c>），查表只用扩展名前的随机部分。</summary>
+    private static string HandleId(HttpContext context)
+    {
+        var id = context.Request.RouteValues["id"]?.ToString() ?? "";
+        var dot = id.IndexOf('.');
+        return dot < 0 ? id : id[..dot];
+    }
+
+    /// <summary>
+    /// 伪装成图片的 TS 片段：以 PNG/JPEG/GIF/BMP 签名开头，且其后出现连续三个间隔 188 字节的 TS 同步字节。
+    /// 返回需要跳过的前缀长度；不是这种形态（含真正的图片）返回 0，原样转发。
+    /// </summary>
+    internal static int DisguisedPrefixLength(ReadOnlySpan<byte> head)
+    {
+        var image = head.StartsWith((ReadOnlySpan<byte>)[0x89, (byte)'P', (byte)'N', (byte)'G']) ||
+            head.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]) || head.StartsWith("GIF8"u8) || head.StartsWith("BM"u8);
+        if (!image) return 0;
+        for (var offset = 1; offset + 376 < head.Length; offset++)
+            if (head[offset] == 0x47 && head[offset + 188] == 0x47 && head[offset + 376] == 0x47) return offset;
+        return 0;
+    }
+
+    /// <summary>
+    /// 给代理句柄补上 FFmpeg 认可的媒体扩展名：新版 HLS 解复用器（extension_picky）拒绝无扩展名或
+    /// 图片扩展名的片段地址。原地址是清单则用 .m3u8/.mpd，常见媒体扩展名原样保留，其余一律按 TS。
+    /// </summary>
+    public static string WithMediaExtension(string handle, string originalUrl)
+    {
+        var extension = Uri.TryCreate(originalUrl, UriKind.Absolute, out var uri) ? Path.GetExtension(uri.AbsolutePath).ToLowerInvariant() : "";
+        return handle + (extension is ".m3u8" or ".mpd" or ".ts" or ".m4s" or ".mp4" or ".m4a" or ".m4v" or ".aac" or ".mp3" or ".vtt" or ".webvtt" ? extension : ".ts");
+    }
+
+    private async Task<HttpResponseMessage> FetchAsync(Entry entry,HttpContext context,bool forwardRange=true)
     {
         var target=entry.Uri;
         for(var attempt=0;attempt<=5;attempt++)
@@ -143,7 +192,7 @@ public sealed class MediaProxy : IDisposable
             // 重定向到别的源站时只带 UA：Cookie/Authorization/Referer 等凭据不跟随跨源跳转。
             foreach(var (key,value) in SameOrigin(target,entry.Uri)?entry.Headers:CrossOriginHeaders(entry.Headers))
                 request.Headers.TryAddWithoutValidation(key,value);
-            if(context.Request.Headers.TryGetValue("Range",out var range))
+            if(forwardRange&&context.Request.Headers.TryGetValue("Range",out var range))
             {
                 if(!System.Net.Http.Headers.RangeHeaderValue.TryParse(range.ToString(),out var parsed))throw new InvalidDataException("Range请求无效。");
                 request.Headers.Range=parsed;
@@ -167,7 +216,11 @@ public sealed class MediaProxy : IDisposable
         foreach (var raw in playlist.Split('\n'))
         {
             var line = raw.TrimEnd('\r');
-            if (!line.StartsWith('#') && !string.IsNullOrWhiteSpace(line)) line = register(new Uri(baseUri, line.Trim()).AbsoluteUri);
+            if (!line.StartsWith('#') && !string.IsNullOrWhiteSpace(line))
+            {
+                var target = new Uri(baseUri, line.Trim()).AbsoluteUri;
+                line = WithMediaExtension(register(target), target);
+            }
             else
             {
                 var cursor = 0;

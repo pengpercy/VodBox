@@ -378,7 +378,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     /// 引擎只能全局设置 UA/Referer；Cookie/Authorization 等其余媒体头必须经受控代理转发，
     /// 不落全局状态，也不放宽引擎的拒绝条件。
     /// </summary>
-    private static bool RequiresMediaProxy(PlaybackRequest request) =>
+    private static bool RequiresMediaProxy(PlaybackRequest request) => request.ProxyMedia ||
         request.Headers.Keys.Any(key => !key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
             && !key.Equals("Referer", StringComparison.OrdinalIgnoreCase));
 

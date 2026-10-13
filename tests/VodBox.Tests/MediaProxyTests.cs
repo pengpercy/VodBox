@@ -50,6 +50,57 @@ public sealed class MediaProxyTests
     }
 
     [Fact]
+    public void DisguisedPrefixIsOnlyStrippedBeforeTransportStream()
+    {
+        var png = new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3 };
+        var ts = new byte[188 * 3]; ts[0] = ts[188] = ts[376] = 0x47;
+        Assert.Equal(png.Length, MediaProxy.DisguisedPrefixLength([.. png, .. ts]));
+        Assert.Equal(0, MediaProxy.DisguisedPrefixLength(ts));
+        Assert.Equal(0, MediaProxy.DisguisedPrefixLength([.. png, .. new byte[600]]));
+    }
+
+    [Fact]
+    public void RewrittenSegmentsCarryExtensionsFfmpegAccepts()
+    {
+        var text = MediaProxy.RewriteHls("#EXTM3U\nhttps://cdn.example/a.png\nb.ts\nvariant.m3u8\nc", new Uri("https://example.com/main.m3u8"), _ => "/proxy/x");
+        Assert.Equal(["#EXTM3U", "/proxy/x.ts", "/proxy/x.ts", "/proxy/x.m3u8", "/proxy/x.ts"], text.Split('\n'));
+    }
+
+    [Fact]
+    public async Task PlaybackProxyStripsImageDisguisedSegments()
+    {
+        var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders();
+        builder.WebHost.UseKestrel(options => options.Listen(System.Net.IPAddress.Loopback, 0));
+        await using var upstream = builder.Build();
+        var ts = new byte[188 * 4]; for (var index = 0; index < ts.Length; index += 188) ts[index] = 0x47;
+        byte[] disguised = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, .. ts];
+        upstream.MapGet("/live/main.m3u8", async context =>
+        {
+            context.Response.ContentType = "application/vnd.apple.mpegurl";
+            await context.Response.WriteAsync("#EXTM3U\n#EXTINF:5,\nseg1.png\n#EXT-X-ENDLIST");
+        });
+        upstream.MapGet("/live/seg1.png", async context => { context.Response.ContentType = "image/png"; context.Response.ContentLength = disguised.Length; await context.Response.Body.WriteAsync(disguised); });
+        await upstream.StartAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            await using var server = new LocalControlServer();
+            var url = await server.RegisterPlaybackMediaAsync(upstream.Urls.Single() + "/live/main.m3u8", ct: TestContext.Current.CancellationToken);
+            Assert.EndsWith(".m3u8", url);
+            using var client = new HttpClient();
+            var playlist = await client.GetStringAsync(url, TestContext.Current.CancellationToken);
+            var segment = playlist.Split('\n').Single(line => line.StartsWith("/proxy/"));
+            Assert.EndsWith(".ts", segment);
+            using var ranged = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(url), segment));
+            ranged.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, null); // FFmpeg 的默认打开方式
+            using var response = await client.SendAsync(ranged, TestContext.Current.CancellationToken);
+            Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("video/mp2t", response.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(ts, await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        }
+        finally { await upstream.StopAsync(TestContext.Current.CancellationToken); }
+    }
+
+    [Fact]
     public async Task CrossOriginPlaylistDoesNotForwardSourceReferer()
     {
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders();
