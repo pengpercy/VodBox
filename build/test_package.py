@@ -1,5 +1,6 @@
 """Verify generated native launchers without invoking platform package tools."""
 import importlib.util
+import os
 import pathlib
 import plistlib
 import tempfile
@@ -117,6 +118,7 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(b'old seal', (jre / 'Contents/_CodeSignature/CodeResources').read_bytes())
                 self.assertEqual(metadata, (jre / 'Contents/Info.plist').read_bytes())
 
+    @unittest.skipIf(os.name == 'nt', 'macOS jlink links need POSIX symlink semantics')
     def test_macos_jlink_license_links_materialized_only_in_copy(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
             root = pathlib.Path(temp)
@@ -144,6 +146,7 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(pathlib.Path('../java.base/LICENSE'), link.readlink())
             self.assertEqual(content, original.read_bytes())
 
+    @unittest.skipIf(os.name == 'nt', 'macOS jlink links need POSIX symlink semantics')
     def test_macos_rejects_invalid_jlink_license_links(self):
         for case in ('missing', 'outside', 'directory', 'empty', 'whitespace', 'loop'):
             with self.subTest(case=case), tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
