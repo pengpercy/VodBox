@@ -13,15 +13,16 @@ public sealed class SourceManagementTests
                 Path.Combine(AppContext.BaseDirectory, "fixtures", "fty-in.bmp"), ct))
             ?? throw new InvalidDataException("饭太硬测试配置解析失败"));
         await registry.LoadConfigAsync("https://example.com/fty", TestContext.Current.CancellationToken);
-        Assert.Equal(12, registry.SelectableSources.Count);
+        Assert.Equal(13, registry.SelectableSources.Count);
         Assert.All(registry.SelectableSources, site =>
         {
-            Assert.False(site.Changeable);
             Assert.Equal(VodBox.Core.SourceRuntime.NativeSpider, site.Runtime);
             Assert.NotNull(registry.Get(site.Key));
         });
-        Assert.Empty(registry.ChangeableSources);
-        Assert.Equal(36, registry.ImportWarnings.Count);
+        // changeable=0 的 12 个站点仍可手动选择；只有配置里 changeable=1 的比特进入换源列表。
+        Assert.Equal(12, registry.SelectableSources.Count(site => !site.Changeable));
+        Assert.Equal("比特", Assert.Single(registry.ChangeableSources).Key);
+        Assert.Equal(35, registry.ImportWarnings.Count);
         Assert.Equal("YGP", registry.Default()!.Key);
     }
 
