@@ -61,32 +61,21 @@ public class FtyConfigChainTests
 
         var sources = ConfigLoader.ToSources(config);
 
-        // 13 个源已有 C# 原生实现 → 存活为 NativeSpider：
-        //   10 个按 api（7 BiliGuard + FirstAidGuard + YGPGuard + BttwooGuard）+ 3 个按 key（虎牙js、dr_兔小贝、斗鱼js，配置里是 .js 入口）
+        // 已有 C# 原生实现的饭太硬 csp_ 入口（新增原生爬虫时在此登记）+ 3 个按 key 适配的 .js 入口。
+        string[] implemented = ["csp_BiliGuard", "csp_BttwooGuard", "csp_Dm84Guard", "csp_FirstAidGuard", "csp_YGPGuard"];
         var native = sources.Where(s => s.Runtime == SourceRuntime.NativeSpider).ToList();
-        Assert.Equal(13, native.Count);
-        Assert.Equal(1, native.Count(s => s.Api == "csp_BttwooGuard"));
+        var nativeCsp = native.Where(s => s.Api?.StartsWith("csp_", StringComparison.Ordinal) == true).ToList();
+        Assert.Equal(implemented, nativeCsp.Select(s => s.Api).Distinct().Order(StringComparer.Ordinal));
         Assert.Equal(7, native.Count(s => s.Api == "csp_BiliGuard"));
-        Assert.Equal(1, native.Count(s => s.Api == "csp_FirstAidGuard"));
-        Assert.Equal(1, native.Count(s => s.Api == "csp_YGPGuard"));
-        Assert.Equal(1, native.Count(s => s.Key == "虎牙js"));
-        Assert.Equal(1, native.Count(s => s.Key == "dr_兔小贝"));
-        Assert.Equal(1, native.Count(s => s.Key == "斗鱼js"));
+        Assert.Equal(["dr_兔小贝", "斗鱼js", "虎牙js"], native.Except(nativeCsp).Select(s => s.Key).Order(StringComparer.Ordinal));
 
-        // 全部 .js 入口已有原生实现（虎牙js、dr_兔小贝、斗鱼js 均走 NativeSpider）；
-        // 暂无 QuickJs 存活源（其余 .js 若有则待 S3a JS 宿主）
-        var scripts = sources.Where(s => s.Runtime == SourceRuntime.QuickJs).ToList();
-        Assert.Empty(scripts);
+        // 全部 .js 入口已有原生实现；暂无 QuickJs 存活源
+        Assert.DoesNotContain(sources, s => s.Runtime == SourceRuntime.QuickJs);
 
-        // 35 个未实现的 csp_ 仍被过滤：45 - 10 存活
-        Assert.Equal(45 - native.Count, csp.Count - native.Count);
+        // 未实现的 csp_ 全部被过滤，存活源全是原生实现；站点总数 48 = 过滤 + 存活
         Assert.DoesNotContain(sources, s => s.Runtime == SourceRuntime.Node);
-
-        // 总存活 = 10 csp_原生 + 3 key 原生（虎牙js、dr_兔小贝、斗鱼js）+ 0 脚本 = 13；
-        // csp_ 过滤数 = 45 - 10 = 35；站点总数 48 = 35 过滤 + 13 存活
-        Assert.Equal(13, sources.Count);
-        Assert.Equal(35, csp.Count - 10);
-        Assert.Equal(48, sources.Count + 35);
+        Assert.Equal(native.Count, sources.Count);
+        Assert.Equal(48, sources.Count + (csp.Count - nativeCsp.Count));
     }
 
     /// <summary>独立解析饭太硬形态：最后一个 "**" 之后即纯 base64 载荷。</summary>
