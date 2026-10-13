@@ -1,7 +1,9 @@
 name: CI
 on:
+  # Every branch push builds, so release dispatches reuse a green build of the same tree
+  # and platform-specific test failures surface before a release is attempted.
   push:
-    branches: [main]
+    branches: ['**']
     paths-ignore:
       - '**.md'
       - 'docs/**'
