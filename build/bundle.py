@@ -171,6 +171,20 @@ def unpack_tar(archive: Path, destination: Path):
         source.extractall(destination, filter="data")
 
 
+# CMake names Visual Studio generators by major version; runner images move between them.
+VS_GENERATORS = {"17": "Visual Studio 17 2022", "18": "Visual Studio 18 2026"}
+
+
+def visual_studio_generator() -> str:
+    vswhere = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft Visual Studio/Installer/vswhere.exe"
+    version = subprocess.run([str(vswhere), "-latest", "-products", "*", "-property", "installationVersion"],
+                             check=True, capture_output=True, text=True).stdout.strip()
+    generator = VS_GENERATORS.get(version.split(".")[0])
+    if generator is None:
+        raise RuntimeError(f"no CMake generator known for Visual Studio {version or '(none)'}")
+    return generator
+
+
 def build_windows_vulkan(rid: str) -> Path:
     if os.name != "nt":
         raise RuntimeError("Vulkan loader must be built on the matching Windows runner")
@@ -190,11 +204,12 @@ def build_windows_vulkan(rid: str) -> Path:
     headers = next((directory / "headers").iterdir())
     loader = next((directory / "loader").iterdir())
     arch = "ARM64" if rid == "win-arm64" else "x64"
+    generator = visual_studio_generator()
     headers_install = directory / "headers-install"
-    run("cmake", "-S", headers, "-B", directory / "headers-build", "-G", "Visual Studio 17 2022", "-A", arch,
+    run("cmake", "-S", headers, "-B", directory / "headers-build", "-G", generator, "-A", arch,
         f"-DCMAKE_INSTALL_PREFIX={headers_install}")
     run("cmake", "--install", directory / "headers-build", "--config", "Release")
-    run("cmake", "-S", loader, "-B", directory / "loader-build", "-G", "Visual Studio 17 2022", "-A", arch,
+    run("cmake", "-S", loader, "-B", directory / "loader-build", "-G", generator, "-A", arch,
         f"-DCMAKE_PREFIX_PATH={headers_install}", f"-DCMAKE_INSTALL_PREFIX={installed}",
         "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded", "-DBUILD_TESTS=OFF", "-DLOADER_CODEGEN=OFF")
     run("cmake", "--build", directory / "loader-build", "--config", "Release", "--parallel", "2")
