@@ -182,7 +182,7 @@ REA 作为分析工具使用，不作为产品依赖。已阅读[官方 README](
 - 阶段 3：AppSx 匿名 v119 已实现，两个真实 ext 均按配置门控接管；原插件九种播放组合对照及本地 Postman mock HTTP 链路通过。剧圈在线 6 分类、140 首页条目、30 列表条目、搜索 20 条和 8 线路；咕咕分类请求失败，之前捕获为 HTTP 526。其他版本/RSA/session 尚未验收。
 - 阶段 4：LiveGz 已实现加密赛程、详情、直播地址刷新；Oracle 对照和 Postman simulation HTTP 链路通过。吃瓜在线 4 分类、20 首页条目、3 线路均能刷新并解析，尚无新增成功解码证据。其他独立入口仍待推进。
 - 阶段 5：需要网盘账号的能力继续按用户要求跳过；无需账号的公开能力仍待分项核查。
-- 阶段 6、7：特殊运行时链路和默认运行/构建/打包去 Java 均未完成，Java 宿主仍保留。
+- 阶段 6、7：特殊运行时链路尚未收口；默认运行/构建/打包去 Java 当时未完成，Java 宿主仍保留。（见下方第四轮：Java 宿主已在后续提交中移除。）
 - 本轮重新运行主测试 **689/689**、预览测试 **259/259**；Release / TreatWarningsAsErrors=true。可复用探针 Release 构建零警告、零错误。
 - 新增探针位于 `tools/native-spiders/Probe`，支持固定样本在线模式和本地 fixture 模式。解码须指定可用的 `VODBOX_MPV_LIB`；一次并发解码复核进程以 137 退出，不能将其记录为站点播放失败或成功。本轮 NativeAOT 发布仍在执行，未提前记为通过。
 
@@ -195,8 +195,19 @@ REA 作为分析工具使用，不作为产品依赖。已阅读[官方 README](
 - 阶段 4：`AueteSource`、`LibvioSource`、`NewCzSource`、`YCyzSource`、`JPJSource`、`JpysSource`（`csp_Jpys`/`csp_JpysGuard`）、`AllliveSource`、`MusicSource` 全部按真实 ext 形态门控并注册；`Nmyswv`、`Doubao`、`Appgz` 一并注册。
 - 阶段 6：`SixVSource` + `TorrentStreamServer`（MonoTorrent 3.0.2 / Mono.Nat 3.0.4，loopback Kestrel Range 串流）已实现并按 ext 门控注册；`AiDj` 加密/签名/CENC/本地代理链路已实现并注册。导航与提醒入口 `csp_DouDouGuard`、`csp_XPathGuard` 以信息源登记。
 - 阶段 5：需要网盘账号的入口（MyDrive、WoGG、Seedhub、S_zps、YpanSo、BpanSo、KkSs、UuSs、PushGuard）继续按用户要求跳过，未计入已实播通过。
-- 阶段 7（部分）：`AppServices` 默认改为纯 C# 原生路由，不再默认启动 JVM；`SourceRegistry` 对未迁移的 csp_ 入口逐项给出「该 Java/JAR 插件尚未迁移为 C# 原生实现，已跳过」的提示。`JavaHost` 与 JAR 宿主源码仍保留在树内，等待能力验收后统一移除——本轮未删除，避免用“已移除依赖”掩盖尚未在线验收的 SixV 播放与网盘缺口。
+- 阶段 7（部分）：`AppServices` 默认改为纯 C# 原生路由，不再默认启动 JVM；`SourceRegistry` 对未迁移的 csp_ 入口逐项给出「该 Java/JAR 插件尚未迁移为 C# 原生实现，已跳过」的提示。本轮的实现/离线验收范围不变，网盘缺口与 SixV 在线播放在线验收仍未收口。
 
 映射覆盖：固定 FTY 样本 48 条目中，38 个条目提升为原生源（27 个不同 csp_ api + 3 个 .js 键映射），其余 10 个条目为网盘/推送入口。
 
 验证：主测试 739/739、预览测试 259/259 通过（Release / TreatWarningsAsErrors=true）；本机 osx-x64 NativeAOT 发布编译通过（含 MonoTorrent 与 Kestrel）。仍属“有实现/离线通过”，SixV 与新增入口的在线媒体验收、以及六平台安装包验收未完成。
+
+## 第四轮：移除 JavaHost/JAR/DEX，落地纯原生模式（2026-10-18）
+
+提交 `856a4fa` 把阶段 7 的“打包/运行去 Java”收口为事实，而不是开关：
+
+- 删除 `src/VodBox.PluginHost/{JarPlugin,JavaHost}` 全部源码、JAR 宿主协议与随包内容；`SourceRuntime` 去掉 `Jar`，`Models` 去掉 `Spider`/`Jar`/`SiteJson`，`ConfigLoader` 去掉 `includeJarPlugins`。
+- `SourceRegistry` 去掉 JAR 宿主分支与 `JarPluginWarnings`；`AppServices` 默认只组合原生 provider。
+- 打包与 CI：`bundle.py`/`package.py`/`release_evidence.py`/`release_publish.py`/`ci_lint.py` 不再 stage JRE、`host.jar` 或 DEX 转换器，并新增 `verify_no_java_payload` 守卫——`JavaHost`/`JRE`/`JDK` 路径、`.jar`/`.dex`/`.class`/`.jmod`/`.war` 载荷以及 `java` 启动器一律拒绝发布。
+- 随宿主一并删除已孤立的 Java 构建/发布工具链（`build/{jlink_runtime,fetch-dex-deps,dex-deps.json,dex_fixture,tvbox-host,verify_java_host,rebuild_native_backend,native_coverage,release_preflight,source_assets}.py`、`build/dex-acceptance.sh` 及其测试）、`tests/VodBox.Tests/fixtures/dex/`，以及 `docs/{JAR-PLUGIN-HOST,JAR-PLUGIN-DEPS,DEX-ACCEPTANCE}.md`。`third_party/tvbox-silicon/` 作为上游/REA 参考材料保留在树内，不再被任何产品/发布脚本引用。
+
+验证：`dotnet build VodBox.slnx` 0 error / 0 warning；`VodBox.Tests` 570/570、`PreviewTests` 259/259（Release / TreatWarningsAsErrors=true）；CI 相关 Python 打包测试全部通过、`ci_lint` 通过；`osx-x64` NativeAOT 干净发布产物扫描无 `JavaHost`/Java 载荷；隔离数据目录启动冒烟经日志确认“界面初始化完成”，全程无 JVM。
