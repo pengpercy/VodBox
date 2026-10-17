@@ -61,3 +61,17 @@
 - 端口映射（UPnP/NAT-PMP）依赖网络环境；不可用时仅影响可达性，不影响本机串流。DHT/bootstrap 路由可用性、tracker 连通、无公网 IP 场景下的 peer 获取速度未验证。
 - `LocalStream` 并发 Range 交错时会频繁 seek；极端并发下可能增加分片重排开销，未做压测。
 - 未实现在线验证，不把「引擎可加载」当作「已可播验收」。
+
+## 在线验收（2026-10-18，主 Agent）
+
+本轮用通用化后的 `tools/native-spiders/Probe`（`sixv` 模式）在真实站点 `https://www.xb6v.com/` 上完成抓取与串流验收，并新增受控 swarm 自检证明 loopback Range → libmpv 解码/seek 路径。
+
+- 抓取修复：目录页必须带结尾斜杠（`/dianshiju/guoju/`）；无斜杠时站点回 301，而未授权重定向会被 `ReadAsync` 拒绝。修复后 `LIST` 返回 18 条目。
+- 搜索修复：站点已把搜索入口从 `POST /e/search/11index.php` 迁到 `POST /e/search/so.php`；POST 后 302 到 `/e/search/result/?searchid=…`，结果页是普通 `post_hover` 列表（`searchid` 在地址中，无需 Cookie）。修复后 `SEARCH` 正常。
+- 在线抓取实测：`CATEGORIES 12`（固定磁力目录）、`HOME 0`（与 Java 一致，只回分类）、`LIST 18`、`SEARCH` 命中、`LINES 1`（磁力单线路）、`RESOLVED` 返回本机回环串流地址；解析时会话状态含 `trackers=1`，元数据经 tracker/DHT 取得。
+- 受控 swarm 自检（`Probe torrent --decode --seek`）：用 `build/media-fixtures/h264-aac.mp4` 现场生成磁力并本机播种（Local Peer Discovery），经 `TorrentStreamServer.RegisterAsync` → loopback Range → libmpv；结果 `DECODE_OK position=1.1 duration=6.0`、`SEEK_OK position=3.2 duration=6.0`。这证明「磁力元数据 → 文件选择 → 可 seek HTTP Range → 播放器解码」整条路径，不依赖外部 peer 可用性。
+- 依赖外部 swarms 的真实磁力实播仍受 peer 可用性影响；本环境多次真实磁力会话能取到元数据，但内容分片下载速率取决于 swarm，故以受控 swarm 作为确定性播放/seek 证据。
+
+工具命令：`dotnet build tools/native-spiders/Probe/Probe.csproj -c Release`，随后
+`VODBOX_MPV_LIB=<libmpv.dylib> dotnet run --project tools/native-spiders/Probe -c Release -- sixv --decode --seek` 或
+`… -- torrent --decode --seek`。

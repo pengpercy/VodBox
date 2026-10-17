@@ -131,8 +131,11 @@ public sealed class JPJSource : IResolvingContentSource
         var lines=new List<PlaybackLine>();
         foreach(var group in Array(value,"source_list_source").EnumerateArray())
         {
+            // 备用 CDN 分组只有 name/source_key（如 {"name":"极速蓝光","source_key":"back_source_list_cdn"}），
+            // 没有 source_list，不是可播放线路；跳过而不是当成缺失数组报错。
+            if(!group.TryGetProperty("source_list",out var sourceList)||sourceList.ValueKind!=JsonValueKind.Array)continue;
             string flag=Field(group,"name");if(flag.Length==0||flag.Contains('\u0001'))throw new InvalidDataException("JPJ 线路名无效。");
-            var episodes=Array(group,"source_list").EnumerateArray().Select(v=>new Episode(flag+'\u0001'+Field(v,"url").Replace("ftp","tvbox-xg:ftp",StringComparison.Ordinal),Field(v,"source_name"))).ToArray();
+            var episodes=sourceList.EnumerateArray().Select(v=>new Episode(flag+'\u0001'+Field(v,"url").Replace("ftp","tvbox-xg:ftp",StringComparison.Ordinal),Field(v,"source_name"))).ToArray();
             if(episodes.Length>0)lines.Add(new(flag,flag,episodes));
         }
         return new() {Item=Item(value) with {Id=mediaId},Description=Field(value,"description").Replace("　","",StringComparison.Ordinal),Actor=Names(value,"actors"),Director=Names(value,"directors"),Lines=lines};

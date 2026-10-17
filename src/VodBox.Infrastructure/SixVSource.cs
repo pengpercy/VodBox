@@ -71,7 +71,8 @@ public sealed partial class SixVSource : IResolvingContentSource
     public async Task<MediaPage> GetItemsAsync(string categoryId, int page, IReadOnlyDictionary<string, string>? filters, CancellationToken ct = default)
     {
         RequireCategory(categoryId); RequirePage(page);
-        string path = "/" + categoryId + (page > 1 ? "/index_" + page.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".html" : "");
+        // 目录页必须带结尾斜杠：站点对 /dianshiju/guoju 返回 301，未授权重定向会被 ReadAsync 拒绝。
+        string path = "/" + categoryId + "/" + (page > 1 ? "index_" + page.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".html" : "");
         var html = await ReadAsync(new(_origin, path), ct).ConfigureAwait(false);
         var items = ParseCards(html);
         // 原 Java 固定 pagecount=999；这里仅在确有条目时沿用，空页不再无限翻页。
@@ -89,7 +90,9 @@ public sealed partial class SixVSource : IResolvingContentSource
             ["show"] = "title", ["tempid"] = "1", ["tbname"] = "article", ["mid"] = "1",
             ["dopost"] = "search", ["submit"] = "", ["keyboard"] = query.Trim(),
         });
-        var html = await PostAsync(new(_origin, "/e/search/11index.php"), form, ct).ConfigureAwait(false);
+        // 站点已把搜索入口从 /e/search/11index.php 迁到 /e/search/so.php：POST 后 302 到 result/?searchid=，
+        // 结果是普通 post_hover 列表。searchid 在地址里，无需 Cookie 会话。
+        var html = await PostSearchAsync(new(_origin, "/e/search/so.php"), form, ct).ConfigureAwait(false);
         return new(ParseSearchCards(html), 1, 1);
     }
 
@@ -205,7 +208,7 @@ public sealed partial class SixVSource : IResolvingContentSource
         return await BodyAsync(response, uri, deadline.Token).ConfigureAwait(false);
     }
 
-    private async Task<string> PostAsync(Uri uri, HttpContent content, CancellationToken ct)
+    private async Task<string> PostSearchAsync(Uri uri, HttpContent content, CancellationToken ct)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct); deadline.CancelAfter(TimeSpan.FromSeconds(25));
         using var request = new HttpRequestMessage(HttpMethod.Post, uri) { Content = content };
@@ -213,7 +216,12 @@ public sealed partial class SixVSource : IResolvingContentSource
         request.Headers.TryAddWithoutValidation("Origin", _base);
         request.Headers.TryAddWithoutValidation("Referer", _base + "/");
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
-        return await BodyAsync(response, uri, deadline.Token).ConfigureAwait(false);
+        // 关闭了自动重定向：按 302 的 Location 取结果页，而不是把重定向当成未授权跳转拒绝。
+        if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is { } location)
+            return await ReadAsync(new Uri(uri, location), deadline.Token).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
+        return Encoding.UTF8.GetString(await BoundedContent.ReadAsync(stream, 4 * 1024 * 1024, deadline.Token).ConfigureAwait(false));
     }
 
     private static async Task<string> BodyAsync(HttpResponseMessage response, Uri uri, CancellationToken ct)

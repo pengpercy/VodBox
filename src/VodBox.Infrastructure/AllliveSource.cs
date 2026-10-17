@@ -90,7 +90,10 @@ public sealed class AllliveSource : IResolvingContentSource
         foreach(var platform in new[]{"huya","douyu"})
         {
             using var doc=await Request(platform,"searchRooms?page="+page.ToString(CultureInfo.InvariantCulture)+"&kw="+Uri.EscapeDataString(query),ct);
-            var array=doc.RootElement.GetProperty("data").GetProperty("list");more|=array.GetArrayLength()>0;result.AddRange(Rooms(array,platform));
+            // 任一平台限流/报错时其响应可能缺少 data.list；跳过该平台而不是让整次搜索抛出 KeyNotFoundException。
+            if(doc.RootElement.ValueKind!=JsonValueKind.Object||!doc.RootElement.TryGetProperty("data",out var data)||data.ValueKind!=JsonValueKind.Object||
+               !data.TryGetProperty("list",out var array)||array.ValueKind!=JsonValueKind.Array) continue;
+            more|=array.GetArrayLength()>0;result.AddRange(Rooms(array,platform));
         }
         return new(result,page,more?page+1:page);
     }
@@ -121,7 +124,9 @@ public sealed class AllliveSource : IResolvingContentSource
         static string StreamIdentity(string url)=>Uri.TryCreate(url.StartsWith("//",StringComparison.Ordinal)?"https:"+url:url,UriKind.Absolute,out var uri)?uri.GetLeftPart(UriPartial.Path):url.Split('?')[0];
         var candidates=lines.SelectMany((line,i)=>line.Episodes.Select((episode,j)=>(line,episode,i,j))).Where(v=>v.line.Id==originalLine).ToArray();
         var matches=candidates.Where(v=>StreamIdentity(v.episode.Uri??"")==StreamIdentity(originalUrl)).ToArray();
-        var selected=matches.Length==1?matches[0]:candidates.Length==1?candidates[0]:default;
+        // 同一分组内多档清晰度会复用完全相同的 CDN 地址（如虎牙 线路3/13、5/15、14/24），path 命中数常为 2；
+        // 重复地址播放结果一致，命中任意一条即以其索引回取新地址，而不是判定为选集不存在。
+        var selected=matches.Length>0?matches[0]:candidates.Length>0?candidates[0]:default;
         if(selected.episode is null)throw new InvalidDataException("Alllive 选集不存在。");
         var url=Text(data.GetProperty("stream")[selected.i].GetProperty("lines")[selected.j],"url");
         if(data.TryGetProperty("info",out var info)&&info.ValueKind==JsonValueKind.Object)url+=HuyaSuffix(info,await _uid(ct),_clock());

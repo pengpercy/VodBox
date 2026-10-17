@@ -57,7 +57,7 @@ public sealed class AueteSource : IResolvingContentSource
     {
         _site = site;
         if (!Supports(site.Ext)) throw new NotSupportedException("Auete ext 配置不受支持。");
-        string host = "https://auete.cc/";
+        string host = "https://www.aeete.com/";
         if (!string.IsNullOrWhiteSpace(site.Ext))
         {
             using var config = JsonDocument.Parse(FtyExtCodec.JsonConfig(site.Ext));
@@ -85,10 +85,18 @@ public sealed class AueteSource : IResolvingContentSource
     private string Absolute(string path) => new Uri(_host, path).AbsoluteUri;
     private async Task<string> Fetch(string url, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, HttpUri(url));
+        var uri = HttpUri(url);
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.TryAddWithoutValidation("User-Agent", Agent);
         request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.8,en-US;q=0.3");
         request.Headers.TryAddWithoutValidation("DNT", "1");
+        // 站点内容只挂在 www.aeete.com vhost，而该主机名在当前网络会被 TLS SNI 重置；
+        // aeete.com 与它在同一证书 SAN 内且可正常握手，因此用 aeete.com 建连、以 Host 头指向 www。
+        if (uri.Host.Equals("www.aeete.com", StringComparison.OrdinalIgnoreCase))
+        {
+            request.RequestUri = new UriBuilder(uri) { Host = "aeete.com" }.Uri;
+            request.Headers.Host = "www.aeete.com";
+        }
         using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
@@ -202,7 +210,8 @@ public sealed class AueteSource : IResolvingContentSource
         var detail=await GetDetailAsync(mediaId,ct).ConfigureAwait(false);
         var line=detail.Lines.FirstOrDefault(l=>l.Episodes.Any(e=>e.Id==episodeId)) ?? throw new InvalidDataException("Auete 选集已失效，请刷新详情。");
         string html=await Page(episodeId[(episodeId.IndexOf('\u0001')+1)..],ct).ConfigureAwait(false);
-        var now=Pattern("\\bvar\\s+now\\s*=\\s*(?:base64\\s*\\(\\s*([\"'])(.*?)\\1\\s*\\)|([\"'])(.*?)\\3)").Match(html);
+        // 站点从 base64("…") 改成了 base64decode("…")，两种编码调用都要接受。
+        var now=Pattern("\\bvar\\s+now\\s*=\\s*(?:base64(?:decode)?\\s*\\(\\s*([\"'])(.*?)\\1\\s*\\)|([\"'])(.*?)\\3)").Match(html);
         if (!now.Success) throw new InvalidDataException("Auete 播放页缺少 now 地址。");
         string url=now.Groups[3].Success ? now.Groups[4].Value : DecodeBase64(now.Groups[2].Value);
         if (!url.StartsWith("http",StringComparison.OrdinalIgnoreCase) && url.Contains("m3u8",StringComparison.OrdinalIgnoreCase)) url="https://datas-s8pwfqdu9yystn90fb----------------cache.haozhansou.com/"+url;

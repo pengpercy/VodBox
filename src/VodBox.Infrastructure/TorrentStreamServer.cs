@@ -120,6 +120,27 @@ public sealed class TorrentStreamServer : IAsyncDisposable
         finally { _lifecycle.Release(); }
     }
 
+    /// <summary>单个磁力会话的连接、tracker 与进度快照（在线验收证据，不参与播放路径）。</summary>
+    public readonly record struct TorrentSessionStatus(
+        string Id, string State, int OpenConnections, int Seeds, int Leeches,
+        int KnownPeers, int Trackers);
+
+    /// <summary>诊断当前串流会话的 peer/tracker 状态，供在线验收记录证据。</summary>
+    public IReadOnlyList<TorrentSessionStatus> DescribeSessions()
+    {
+        return _sessions.Select(pair =>
+        {
+            var manager = pair.Value.Manager;
+            var peers = manager.Peers;
+            int trackers;
+            try { trackers = manager.TrackerManager.Tiers.Count; }
+            catch (Exception error) when (error is InvalidOperationException or NullReferenceException) { trackers = 0; }
+            return new TorrentSessionStatus(
+                pair.Key, manager.State.ToString(), manager.OpenConnections,
+                peers.Seeds, peers.Leechs, peers.Available + peers.Seeds + peers.Leechs, trackers);
+        }).ToArray();
+    }
+
     private async Task<ClientEngine> EnsureEngineAsync(CancellationToken ct)
     {
         await _lifecycle.WaitAsync(ct).ConfigureAwait(false);

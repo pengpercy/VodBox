@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -10,7 +11,26 @@ namespace VodBox.Infrastructure;
 public sealed class LibvioSource : IResolvingContentSource
 {
     private const string Agent="Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
-    private static readonly HttpClient Http=new(new HttpClientHandler { AutomaticDecompression=DecompressionMethods.All }) { Timeout=TimeSpan.FromSeconds(20) };
+    // 站点前置 CDN 会对匿名请求下发 x-cdn-challenge（PoW 挑战）；挑战通过后 CDN 以 __cdn_verified Cookie 记忆会话，
+    // 故共享一个带 CookieContainer 的客户端，让 __cdn_pow/__cdn_verified 在后续请求中自动复用。
+    private static readonly CookieContainer Cookies=new();
+    private static readonly HttpClient Http=new(new HttpClientHandler { AutomaticDecompression=DecompressionMethods.All, CookieContainer=Cookies, AllowAutoRedirect=false }) { Timeout=TimeSpan.FromSeconds(20) };
+    // Java G4() 的浏览器导航头。缺失 sec-fetch-*/accept 时 CDN 只回 44 字节 "browser verification required"，
+    // 带齐后才下发真正的 js-pow 挑战页（含 TS/SIG/DIFF）。
+    private static readonly (string Name,string Value)[] NavHeaders=
+    {
+        ("accept","text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"),
+        ("accept-language","zh-CN,zh;q=0.9,en;q=0.8"),
+        ("priority","u=0, i"),
+        ("sec-ch-ua","\"Not=A?Brand\";v=\"99\", \"Google Chrome\";v=\"151\", \"Chromium\";v=\"151\""),
+        ("sec-ch-ua-mobile","?0"),
+        ("sec-ch-ua-platform","\"Windows\""),
+        ("sec-fetch-dest","document"),
+        ("sec-fetch-mode","navigate"),
+        ("sec-fetch-site","none"),
+        ("sec-fetch-user","?1"),
+        ("upgrade-insecure-requests","1"),
+    };
     private readonly SourceInfo _site;
     private readonly Uri _host;
     private readonly Func<string,CancellationToken,Task<string>> _fetch;
@@ -74,17 +94,63 @@ public sealed class LibvioSource : IResolvingContentSource
     private string Url(string value)=>new Uri(_host,value).AbsoluteUri;
     private async Task<string> Fetch(string url,CancellationToken ct)
     {
-        using var request=new HttpRequestMessage(HttpMethod.Get,HttpUri(url));request.Headers.TryAddWithoutValidation("User-Agent",Agent);request.Headers.TryAddWithoutValidation("Referer",_host.AbsoluteUri);
-        using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct).ConfigureAwait(false);response.EnsureSuccessStatusCode();
+        var uri=HttpUri(url);
+        // 最多 4 跳：一次 CDN 挑战（403→加 __cdn_pow→302→带 __cdn_verified→200）外加少量重定向余量。
+        for(int attempt=0;attempt<4;attempt++)
+        {
+            var (code,body,challenge,location)=await FetchOnce(uri,ct).ConfigureAwait(false);
+            if(code is >=200 and <300)return body;
+            if(code is >=300 and <400 && location is not null){uri=new Uri(uri,location);continue;}
+            if(code==403&&challenge&&TryChallenge(body,out var parsed))
+            {
+                string nonce=await Task.Run(()=>SolvePow(parsed.Sig,parsed.Diff),ct).ConfigureAwait(false);
+                Cookies.Add(uri,new Cookie("__cdn_pow",parsed.Ts+"_"+parsed.Mode+"_"+nonce+"_"+parsed.Sig){Path="/"});
+                continue;
+            }
+            throw new InvalidDataException($"Libvio HTTP {code}。");
+        }
+        throw new InvalidDataException("Libvio CDN 浏览器验证未通过。");
+    }
+    private static async Task<(int Code,string Body,bool Challenge,Uri? Location)> FetchOnce(Uri uri,CancellationToken ct)
+    {
+        using var request=new HttpRequestMessage(HttpMethod.Get,uri);
+        foreach(var (name,value) in NavHeaders)request.Headers.TryAddWithoutValidation(name,value);
+        request.Headers.TryAddWithoutValidation("User-Agent",Agent);
+        using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct).ConfigureAwait(false);
         await using var stream=await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        return Encoding.UTF8.GetString(await BoundedContent.ReadAsync(stream,4*1024*1024,ct).ConfigureAwait(false));
+        string body=Encoding.UTF8.GetString(await BoundedContent.ReadAsync(stream,4*1024*1024,ct).ConfigureAwait(false));
+        bool challenge=response.Headers.TryGetValues("x-cdn-challenge",out _)||body.Contains("正在验证您的浏览器",StringComparison.Ordinal)||body.Contains("__cdn_pow",StringComparison.Ordinal);
+        return ((int)response.StatusCode,body,challenge,response.Headers.Location);
+    }
+    private readonly record struct Challenge(string Ts,string Sig,string Diff,string Mode);
+    private static bool TryChallenge(string body,out Challenge challenge)
+    {
+        challenge=default;
+        var ts=Rx("\\bTS\\s*=\\s*[\"']([^\"']*)[\"']").Match(body);
+        var sig=Rx("\\bSIG\\s*=\\s*[\"']([^\"']*)[\"']").Match(body);
+        var diff=Rx("\\bDIFF\\s*=\\s*[\"']([^\"']*)[\"']").Match(body);
+        if(!ts.Success||!sig.Success||!diff.Success)return false;
+        var mode=Rx("\\bMODE\\s*=\\s*[\"']([^\"']*)[\"']").Match(body);
+        challenge=new(ts.Groups[1].Value,sig.Groups[1].Value,diff.Groups[1].Value,mode.Success&&mode.Groups[1].Value.Length>0?mode.Groups[1].Value:"auto");
+        return true;
+    }
+    private static string SolvePow(string sig,string diff)
+    {
+        // 与 Java F5()/solvePow 相同：找最小 i 使 hex(SHA-256(SIG||i)) 以 DIFF 前缀开头。
+        for(int i=0;i<1_000_000;i++)
+        {
+            string hex=Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(sig+i.ToString(System.Globalization.CultureInfo.InvariantCulture)))).ToLowerInvariant();
+            if(hex.StartsWith(diff,StringComparison.Ordinal))return i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        throw new InvalidDataException("Libvio CDN 工作量证明无解。");
     }
     private Task<string> Page(string value,CancellationToken ct)=>_fetch(Url(value),ct);
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct=default)
     {
         string html=await Page("",ct).ConfigureAwait(false);
+        // 首页导航实际为 电影/剧集/番剧/日韩/欧美，与 Java homeContent 白名单一致（旧名 电视剧/动漫 已不再出现）。
         return Rx("<a\\b[^>]*href=[\"']/type/(\\d+)\\.html[\"'][^>]*>(.*?)</a>").Matches(html)
-            .Select(m=>new Category(m.Groups[1].Value,Text(m.Groups[2].Value))).Where(c=>c.Name is "电影" or "电视剧" or "综艺" or "动漫").DistinctBy(c=>c.Id).ToArray();
+            .Select(m=>new Category(m.Groups[1].Value,Text(m.Groups[2].Value))).Where(c=>c.Name is "电影" or "剧集" or "番剧" or "日韩" or "欧美").DistinctBy(c=>c.Id).ToArray();
     }
     public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)
     {
@@ -110,12 +176,8 @@ public sealed class LibvioSource : IResolvingContentSource
     {
         ValidatePage(page);if(page>1 || string.IsNullOrWhiteSpace(query)) return new([],page,page);
         if(query.Length>256) throw new ArgumentException("搜索词过长。",nameof(query));
-        using var json=JsonDocument.Parse(await Page("index.php/ajax/suggest?mid=1&wd="+Uri.EscapeDataString(query)+"&limit=10&timestamp="+DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),ct).ConfigureAwait(false));
-        var list=json.RootElement.GetProperty("list");
-        using var nested=list.ValueKind==JsonValueKind.String ? JsonDocument.Parse(list.GetString()!):null;
-        var array=nested?.RootElement??list;
-        if(array.ValueKind!=JsonValueKind.Array) throw new InvalidDataException("Libvio 搜索响应不是数组。");
-        return new(array.EnumerateArray().Select(v=>new MediaItem {Id=Url("detail/"+Field(v,"id")+".html"),Title=Field(v,"name"),Poster=Url(Field(v,"pic"))}).ToArray(),1,1);
+        // index.php/ajax/suggest 已被站点 WAF 永久拦截（403 "Blocked by WAF rule"），改用首页表单指向的 HTML 搜索页。
+        return Cards(await Page("search/-------------.html?wd="+Uri.EscapeDataString(query),ct).ConfigureAwait(false),1);
     }
     private MediaPage Cards(string html,int page)
     {

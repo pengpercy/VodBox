@@ -8,8 +8,26 @@ namespace VodBox.Infrastructure;
 /// <summary>NewCz anonymous HTML and dncry AES playback. Account and LAN parser branches are intentionally excluded.</summary>
 public sealed class NewCzSource : IResolvingContentSource
 {
-    private const string Agent="Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
-    private static readonly HttpClient Http=new(new HttpClientHandler {AutomaticDecompression=DecompressionMethods.All}) {Timeout=TimeSpan.FromSeconds(20)};
+    // Java yq() 的实际取值：Android Chromecast(CrKey) UA + Accept-language，而非通用桌面 UA。
+    private const string Agent="Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 CrKey/1.54.248666";
+    // Java 播放头单独使用桌面 UA（见 playerContent 的 user-agent）。
+    private const string PlayerAgent="Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
+    // 站点前置雷池(SafeLine) WAF：403 响应会下发 sl-session Cookie，Java 插件将其持久化为 czCookie 复用，
+    // 故这里共用带 CookieContainer 的客户端，让 WAF 会话 Cookie 跨请求保留。
+    private static readonly CookieContainer Cookies=new();
+    private static readonly HttpClient Http=new(new HttpClientHandler {AutomaticDecompression=DecompressionMethods.All,CookieContainer=Cookies}) {Timeout=TimeSpan.FromSeconds(20)};
+    // 与 Java yq() 返回的请求头一一对应（省略 Accept-Encoding/deflate，交给 AutomaticDecompression）。
+    private static readonly (string Name,string Value)[] NavHeaders=
+    {
+        ("accept","text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"),
+        ("accept-language","zh-CN,zh;q=0.9"),
+        ("sec-fetch-dest","document"),
+        ("sec-fetch-mode","navigate"),
+        ("upgrade-insecure-requests","1"),
+        ("cache-control","no-cache"),
+        ("pragma","no-cache"),
+        ("X-Requested-With","XMLHttpRequset"),
+    };
     private readonly SourceInfo _site;
     private readonly Uri _host;
     private readonly Func<string,CancellationToken,Task<string>> _fetch;
@@ -62,7 +80,10 @@ public sealed class NewCzSource : IResolvingContentSource
     private string Url(string path)=>new Uri(_host,path).AbsoluteUri;
     private async Task<string> Fetch(string url,CancellationToken ct)
     {
-        using var request=new HttpRequestMessage(HttpMethod.Get,HttpUri(url));request.Headers.TryAddWithoutValidation("User-Agent",Agent);
+        using var request=new HttpRequestMessage(HttpMethod.Get,HttpUri(url));
+        foreach(var (name,value) in NavHeaders)request.Headers.TryAddWithoutValidation(name,value);
+        request.Headers.TryAddWithoutValidation("User-Agent",Agent);
+        request.Headers.TryAddWithoutValidation("Referer",_host.AbsoluteUri);
         using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct).ConfigureAwait(false);response.EnsureSuccessStatusCode();
         await using var stream=await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         return Encoding.UTF8.GetString(await BoundedContent.ReadAsync(stream,4*1024*1024,ct).ConfigureAwait(false));
@@ -135,7 +156,7 @@ public sealed class NewCzSource : IResolvingContentSource
         var media=Rx("video:\\s*\\{url:\\s*\"([^\"]+)\"").Match(script);
         string resolved=media.Success?media.Groups[1].Value:await ResolveFrame(html,ct).ConfigureAwait(false);
         string url=HttpUri(resolved).AbsoluteUri;
-        return new() {Uri=url,Title=detail.Item.Title,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="专线",Headers=new Dictionary<string,string>{{"Origin",_host.GetLeftPart(UriPartial.Authority)},{"User-Agent",Agent}}};
+        return new() {Uri=url,Title=detail.Item.Title,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="专线",Headers=new Dictionary<string,string>{{"Origin",_host.GetLeftPart(UriPartial.Authority)},{"User-Agent",PlayerAgent}}};
     }
     private async Task<string> ResolveFrame(string html,CancellationToken ct)
     {

@@ -12,7 +12,7 @@ namespace VodBox.Infrastructure;
 public sealed class YCyzSource : IResolvingContentSource
 {
     private const string Agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
-    private static readonly HttpClient Http=new(new HttpClientHandler {AutomaticDecompression=DecompressionMethods.All}) {Timeout=TimeSpan.FromSeconds(20)};
+    private static readonly HttpClient Http=new(new HttpClientHandler {AutomaticDecompression=DecompressionMethods.All}) {Timeout=TimeSpan.FromSeconds(60)};
     private readonly SourceInfo _site;
     private readonly Uri _host;
     private readonly Func<string,CancellationToken,Task<string>> _fetch;
@@ -24,7 +24,7 @@ public sealed class YCyzSource : IResolvingContentSource
     internal YCyzSource(SourceInfo site,Func<string,CancellationToken,Task<string>>? fetch,Func<long>? clock=null)
     {
         if(!Supports(site.Ext))throw new NotSupportedException("YCyz ext 配置不受支持。");
-        _site=site;_host=new("https://v.xl01.eu.cc/");_fetch=fetch??Fetch;_clock=clock??(()=>DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        _site=site;_host=new("https://v.xl01.cc.ua/");_fetch=fetch??Fetch;_clock=clock??(()=>DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     }
     internal static bool Supports(string? ext)
     {
@@ -76,7 +76,8 @@ public sealed class YCyzSource : IResolvingContentSource
             if(pair.Value.Length>128||pair.Value.Any(char.IsControl))throw new InvalidDataException("YCyz 筛选无效。");
             switch(pair.Key){case "s":subtype=pair.Value.Length>0?pair.Value:"all";break;case "area":area=pair.Value;break;case "year":year=pair.Value;break;case "order":order=pair.Value;break;default:throw new InvalidDataException("YCyz 筛选无效。");}
         }
-        string path="s/"+Uri.EscapeDataString(subtype)+"/"+page.ToString(CultureInfo.InvariantCulture)+"?&type="+type+(area.Length>0?"&area="+Uri.EscapeDataString(area):"")+(year.Length>0?"&year="+Uri.EscapeDataString(year):"")+"&order="+Uri.EscapeDataString(order);
+        // 站点现在的列表地址是 /s/{s}[/{page}]?type=…（第 1 页不带页码），并且不再使用多余的 “?&” 前缀。
+        string path="s/"+Uri.EscapeDataString(subtype)+(page>1?"/"+page.ToString(CultureInfo.InvariantCulture):"")+"?type="+type+(area.Length>0?"&area="+Uri.EscapeDataString(area):"")+(year.Length>0?"&year="+Uri.EscapeDataString(year):"")+(order.Length>0&&order!="0"?"&order="+Uri.EscapeDataString(order):"");
         var cards=ParseCards(await _fetch(Url(path),ct).ConfigureAwait(false));return new(cards,page,cards.Count>0?page+1:page);
     }
     private static IReadOnlyList<MediaItem> ParseCards(string html)

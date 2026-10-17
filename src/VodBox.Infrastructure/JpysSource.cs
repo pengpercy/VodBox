@@ -9,7 +9,9 @@ namespace VodBox.Infrastructure;
 /// <summary>精品影视 mw-movie 协议，按 Java Spider 的参数顺序及双摘要签名重写。</summary>
 public sealed class JpysSource : IResolvingContentSource
 {
-    private const string DefaultOrigin = "https://www.ghw9zwp5.com";
+    // 站点在轮换域名：www.ghw9zwp5.com 已被前置 WAF 直接 403，而非 www 的裸域会 302 到当前可用域名
+    // （实测 https://ghw9zwp5.com/ -> https://0bv77aw.com/）。用裸域作基地址并跟随重定向，避免硬编码失效镜像。
+    private const string DefaultOrigin = "https://ghw9zwp5.com";
     private const string Api = "/api/mw-movie/anonymous/";
     private const string Secret = "cb808529bae6b6be45ecfab29a4889bc";
     private const string Agent = "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
@@ -46,7 +48,8 @@ public sealed class JpysSource : IResolvingContentSource
     }
     private static async Task<string> Fetch(string url,IReadOnlyDictionary<string,string> headers,CancellationToken ct)
     {
-        using var http=new DefaultHttp(false);
+        // 裸域会 302 到轮换后的当前域名，必须允许跟随重定向，否则拿到的是空的 302 响应体。
+        using var http=new DefaultHttp(true);
         return DefaultHttp.Decode(await http.GetBoundedAsync(url,8*1024*1024,ct,headers));
     }
     internal static string Sign(string canonical,long timestamp)
@@ -109,6 +112,7 @@ public sealed class JpysSource : IResolvingContentSource
         using var doc=await Request("v2/video/episode/url","clientType=3&id="+Uri.EscapeDataString(mediaId)+"&nid="+Uri.EscapeDataString(parts[1]),canonical,ct,player:true);
         var url=Text(doc.RootElement.GetProperty("data").GetProperty("list")[0],"url");
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo.Length>0)throw new InvalidDataException("Jpys 播放地址无效。");
-        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="爱电影",Title=Name,Headers=new(){{"User-Agent",Agent},{"Origin",DefaultOrigin},{"Referer",DefaultOrigin}}};
+        // Origin/Referer 必须与实际使用的基础地址一致：ext 覆盖过域名时不能退回硬编码默认镜像。
+        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="爱电影",Title=Name,Headers=new(){{"User-Agent",Agent},{"Origin",_origin},{"Referer",_origin}}};
     }
 }

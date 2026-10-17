@@ -98,14 +98,14 @@ public sealed class NativeCodecSourceTests
         var source = new YCyzSource(SyntheticSourceHelpers.Site("ycyz", "csp_YCyzGuard"), (url, ct) => rec.Fetch(url, ct), () => 1792260000000L);
         var page = await source.GetItemsAsync("1#中国大陆", 2, null, TestContext.Current.CancellationToken);
         Assert.Equal("movie/7.html", Assert.Single(page.Items).Id);
-        Assert.Contains("/s/all/2?&type=1&area=%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86&order=0", rec.Urls[^1]);
+        Assert.Contains("/s/all/2?type=1&area=%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86", rec.Urls[^1]);
         Assert.Equal("中文电影", Assert.Single((await source.SearchAsync("中文", 1, TestContext.Current.CancellationToken)).Items).Title);
         var detailResult = await source.GetDetailAsync("movie/7.html", TestContext.Current.CancellationToken);
         Assert.Equal("动作/剧情", detailResult.Item.TypeName);
         Assert.Equal("自动", detailResult.Lines[0].Id);
         Assert.Equal("自动\u0001movie/7/1-1.html", detailResult.Lines[0].Episodes[0].Id);
         var playback = await source.ResolvePlaybackAsync("movie/7.html", "自动\u0001movie/7/1-1.html", TestContext.Current.CancellationToken);
-        Assert.Equal("https://v.xl01.eu.cc/hls/a.m3u8", playback.Uri);
+        Assert.Equal("https://v.xl01.cc.ua/hls/a.m3u8", playback.Uri);
         Assert.True(playback.ProxyMedia);
         Assert.Equal("自动", playback.LineId);
         Assert.Contains("pid=pid123", rec.Urls[^1]);

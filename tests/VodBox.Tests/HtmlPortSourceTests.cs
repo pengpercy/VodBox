@@ -91,7 +91,7 @@ public sealed class HtmlPortSourceTests
     public async Task LibvioCardsDetailPlaybackAndSearchMatchTheAnonymousSubset()
     {
         const string root = """
-            <a href="/type/1.html">电影</a><a href="/type/2.html">电视剧</a>
+            <a href="/type/1.html">电影</a><a href="/type/2.html">剧集</a>
             <div class="stui-vodlist__box">
               <a href="/detail/7.html" title="中文电影" data-original="/cover.jpg"><span class="pic-text">更新</span></a>
             </div>
@@ -117,14 +117,16 @@ public sealed class HtmlPortSourceTests
         const string play = """
             <script>var player_data={"url":"https://cdn.example/7-1-1.m3u8","from":"direct","nid":"1","id":"7"};</script>
             """;
-        const string search = """{"list":[{"id":7,"name":"中文电影","pic":"/s.jpg"}]}""";
+        const string search = """
+            <div class="stui-vodlist__box"><a href="/detail/7.html" title="中文电影" data-original="/s.jpg"></a></div>
+            """;
         var rec = new SyntheticSourceHelpers.Recorder((url, _) => Task.FromResult(
-            url.Contains("ajax/suggest", StringComparison.Ordinal) ? search :
+            url.Contains("/search/", StringComparison.Ordinal) ? search :
             url.Contains("/play/7-1-1.html", StringComparison.Ordinal) ? play :
             url.EndsWith("/detail/7.html", StringComparison.Ordinal) ? detail :
             url.Contains("/show/", StringComparison.Ordinal) ? list : root));
         var source = new LibvioSource(SyntheticSourceHelpers.Site("lib", "csp_LibvioGuard", """{"siteUrl":"https://lib.example","Cloud-drive":"https://cloud.example"}"""), (url, ct) => rec.Fetch(url, ct));
-        Assert.Equal(new[] { "电影", "电视剧" }, (await source.GetCategoriesAsync(TestContext.Current.CancellationToken)).Select(c => c.Name));
+        Assert.Equal(new[] { "电影", "剧集" }, (await source.GetCategoriesAsync(TestContext.Current.CancellationToken)).Select(c => c.Name));
         var home = await source.GetHomeAsync(TestContext.Current.CancellationToken);
         Assert.Equal("https://lib.example/detail/7.html", Assert.Single(home.Items).Id);
         Assert.Equal(2, home.PageCount);
@@ -132,7 +134,7 @@ public sealed class HtmlPortSourceTests
         Assert.Equal("列表电影", Assert.Single(filtered.Items).Title);
         Assert.Contains(rec.Urls, url => url.Contains("/show/1---%E5%8A%A8%E4%BD%9C-----2---.html", StringComparison.Ordinal));
         Assert.Equal("中文电影", Assert.Single((await source.SearchAsync("中文", 1, TestContext.Current.CancellationToken)).Items).Title);
-        Assert.Contains("limit=10", rec.Urls[^1]);
+        Assert.Contains("/search/-------------.html?wd=%E4%B8%AD%E6%96%87", rec.Urls[^1]);
         var detailResult = await source.GetDetailAsync("https://lib.example/detail/7.html", TestContext.Current.CancellationToken);
         Assert.Single(detailResult.Lines);
         Assert.Equal("直连线路", detailResult.Lines[0].Id);

@@ -211,3 +211,20 @@ REA 作为分析工具使用，不作为产品依赖。已阅读[官方 README](
 - 随宿主一并删除已孤立的 Java 构建/发布工具链（`build/{jlink_runtime,fetch-dex-deps,dex-deps.json,dex_fixture,tvbox-host,verify_java_host,rebuild_native_backend,native_coverage,release_preflight,source_assets}.py`、`build/dex-acceptance.sh` 及其测试）、`tests/VodBox.Tests/fixtures/dex/`，以及 `docs/{JAR-PLUGIN-HOST,JAR-PLUGIN-DEPS,DEX-ACCEPTANCE}.md`。`third_party/tvbox-silicon/` 作为上游/REA 参考材料保留在树内，不再被任何产品/发布脚本引用。
 
 验证：`dotnet build VodBox.slnx` 0 error / 0 warning；`VodBox.Tests` 570/570、`PreviewTests` 259/259（Release / TreatWarningsAsErrors=true）；CI 相关 Python 打包测试全部通过、`ci_lint` 通过；`osx-x64` NativeAOT 干净发布产物扫描无 `JavaHost`/Java 载荷；隔离数据目录启动冒烟经日志确认“界面初始化完成”，全程无 JVM。
+
+## 第五轮：SixV 与阶段 4 入口在线验收（2026-10-18）
+
+`tools/native-spiders/Probe` 通用化：可直接传任意已登记的 `csp_*` api 名（外加 `sixv`），跑
+分类/首页/列表/搜索/详情/解析，`--decode` 经 libmpv 实播、`--seek` 验证 seek。新增受控 swarm 自检
+（`Probe torrent --decode --seek`）：本机现场生成合成磁力并播种，确定性验证「磁力元数据 → 文件选择 →
+loopback Range → 解码/seek」路径。
+
+- 阶段 6 - SixV（新6V，`https://www.xb6v.com/`）：目录页补结尾斜杠、搜索入口改 `/e/search/so.php`
+  （POST→302→result 页）；在线抓取/搜索/详情/磁力解析全部通过，真实磁力会话拿到元数据（trackers=1）；
+  loopback Range → libmpv 解码/seek 由受控 swarm 自检证明（`DECODE_OK 1.1s`、`SEEK_OK 3.2s`）。
+- 阶段 4 - 8 个入口在线验收：`Auete`、`JPJ`、`Music` 实播通过（libmpv 解码成功）；`Alllive` 解析通过；
+  `Libvio`、`NewCz`、`Jpys`、`YCyz` 因出口 IP 地理限制 / SafeLine WAF / Cloudflare 522 受阻，抓取逻辑已按
+  Java 语义与在线观察实现，记为“实现完成、环境受阻”。逐站点结论见
+  `docs/native-spiders/STAGE4-ONLINE-VALIDATION.md`。
+
+验证：主测试 570/570、预览测试 259/259（Release / TreatWarningsAsErrors=true）。
