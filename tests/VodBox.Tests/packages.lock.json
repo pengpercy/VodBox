@@ -117,6 +117,11 @@
         "resolved": "13.0.1",
         "contentHash": "ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A=="
       },
+      "ReusableTasks": {
+        "type": "Transitive",
+        "resolved": "4.0.0",
+        "contentHash": "6EKzscjq+Q+uxD0N5GWUBO2N34cuDiJ08ZxRs1lqS0Hwvnjp6AgimUIX/8dqIxRZbPOG4gcikTMo+PM4D9CfaQ=="
+      },
       "SQLite": {
         "type": "Transitive",
         "resolved": "3.53.4",
@@ -217,22 +222,24 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.0, )",
+          "Mono.Nat": "[3.0.4, )",
+          "MonoTorrent": "[3.0.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.2.9, )",
-          "VodBox.PluginHost": "[0.2.9, )"
+          "VodBox.Core": "[0.2.10, )",
+          "VodBox.PluginHost": "[0.2.10, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.2.9, )"
+          "VodBox.Core": "[0.2.10, )"
         }
       },
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.2.9, )"
+          "VodBox.Core": "[0.2.10, )"
         }
       },
       "Avalonia": {
@@ -253,6 +260,22 @@
         "contentHash": "wPKG/Ym6tSMCo06UOZXzVfeFGzawnOZrTba/R3PfK+RhNuNELZ9I7nFns4WGTtv2kKlrlmmErgJ+kgTXHaNdHg==",
         "dependencies": {
           "SQLitePCLRaw.core": "2.1.11"
+        }
+      },
+      "Mono.Nat": {
+        "type": "CentralTransitive",
+        "requested": "[3.0.4, )",
+        "resolved": "3.0.4",
+        "contentHash": "oodXnwdcML4qUaZ+J44gaC/hn0n3uZHkvxScdt8NOcBbmbNmA7z1t5FEvUvn8cOnYSha8F4ZS57FJuXSKYhqdw=="
+      },
+      "MonoTorrent": {
+        "type": "CentralTransitive",
+        "requested": "[3.0.2, )",
+        "resolved": "3.0.2",
+        "contentHash": "kWy0mLj2MKX9uUGe3lnNYfyQhthjUK4IAMNJO8llXP9yB3ZYfGaAy9ag20wMcjTz2YfhKOW/uZ5FR//BYZGeYA==",
+        "dependencies": {
+          "Mono.Nat": "3.0.0",
+          "ReusableTasks": "4.0.0"
         }
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {

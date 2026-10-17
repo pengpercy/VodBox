@@ -1,0 +1,5 @@
+simulation: fty-livegz
+routing: path
+mocks:
+  - routeKey: gz
+    path: ../mocks/fty-livegz/config.yaml

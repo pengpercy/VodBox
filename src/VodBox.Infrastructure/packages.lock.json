@@ -17,6 +17,22 @@
         "resolved": "10.0.11",
         "contentHash": "IBf7lbovvjGWVWXZX5cJ/cO0WXbId0Zq4BuSeT94mGZuOAP66oMeH9PTBZ9Jpp3Jb6jtK0qm/NyUbPRo1gC/wQ=="
       },
+      "Mono.Nat": {
+        "type": "Direct",
+        "requested": "[3.0.4, )",
+        "resolved": "3.0.4",
+        "contentHash": "oodXnwdcML4qUaZ+J44gaC/hn0n3uZHkvxScdt8NOcBbmbNmA7z1t5FEvUvn8cOnYSha8F4ZS57FJuXSKYhqdw=="
+      },
+      "MonoTorrent": {
+        "type": "Direct",
+        "requested": "[3.0.2, )",
+        "resolved": "3.0.2",
+        "contentHash": "kWy0mLj2MKX9uUGe3lnNYfyQhthjUK4IAMNJO8llXP9yB3ZYfGaAy9ag20wMcjTz2YfhKOW/uZ5FR//BYZGeYA==",
+        "dependencies": {
+          "Mono.Nat": "3.0.0",
+          "ReusableTasks": "4.0.0"
+        }
+      },
       "SQLitePCLRaw.bundle_e_sqlite3": {
         "type": "Direct",
         "requested": "[3.0.5, )",
@@ -26,6 +42,11 @@
           "SQLite": "3.53.4",
           "SQLitePCLRaw.config.e_sqlite3": "3.0.5"
         }
+      },
+      "ReusableTasks": {
+        "type": "Transitive",
+        "resolved": "4.0.0",
+        "contentHash": "6EKzscjq+Q+uxD0N5GWUBO2N34cuDiJ08ZxRs1lqS0Hwvnjp6AgimUIX/8dqIxRZbPOG4gcikTMo+PM4D9CfaQ=="
       },
       "SQLite": {
         "type": "Transitive",
@@ -59,7 +80,7 @@
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.2.9, )"
+          "VodBox.Core": "[0.2.10, )"
         }
       }
     }

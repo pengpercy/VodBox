@@ -45,7 +45,7 @@ public class FtyConfigChainTests
 
     /// <summary>
     /// csp_ 站点的桌面端可用性锚点：45 个 csp_ 入口中已用 C# 原生重写的
-    /// （当前为 csp_BiliGuard ×7）提升为 <see cref="SourceRuntime.NativeSpider"/> 并存活，
+    /// 提升为 <see cref="SourceRuntime.NativeSpider"/> 并存活，
     /// 其余仍为 Node 并被过滤（桌面端无 JVM）；3 个 .js drpy 站点归 QuickJs。
     /// S3b 每新增一个原生爬虫，此处的存活数应相应增长——数字必须精确。
     /// </summary>
@@ -62,11 +62,14 @@ public class FtyConfigChainTests
         var sources = ConfigLoader.ToSources(config);
 
         // 已有 C# 原生实现的饭太硬 csp_ 入口（新增原生爬虫时在此登记）+ 3 个按 key 适配的 .js 入口。
-        string[] implemented = ["csp_BiliGuard", "csp_BttwooGuard", "csp_Dm84Guard", "csp_FirstAidGuard", "csp_KanqiuGuard", "csp_YGPGuard"];
+        string[] implemented = ["csp_AiDjGuard", "csp_AllliveGuard", "csp_App99Guard", "csp_AppSxGuard", "csp_AppTTGuard", "csp_AppgzGuard", "csp_AueteGuard", "csp_BiliGuard", "csp_BttwooGuard", "csp_Dm84Guard", "csp_DouDouGuard", "csp_DoubaoGuard", "csp_FirstAidGuard", "csp_JPJGuard", "csp_JpysGuard", "csp_KanqiuGuard", "csp_LibvioGuard", "csp_LiveGzGuard", "csp_MusicGuard", "csp_NewCzGuard", "csp_NmyswvGuard", "csp_SixVGuard", "csp_T4Guard", "csp_Tingshu275Guard", "csp_XPathGuard", "csp_YCyzGuard", "csp_YGPGuard"];
         var native = sources.Where(s => s.Runtime == SourceRuntime.NativeSpider).ToList();
         var nativeCsp = native.Where(s => s.Api?.StartsWith("csp_", StringComparison.Ordinal) == true).ToList();
         Assert.Equal(implemented, nativeCsp.Select(s => s.Api).Distinct().Order(StringComparer.Ordinal));
         Assert.Equal(7, native.Count(s => s.Api == "csp_BiliGuard"));
+        Assert.Equal(38, native.Count);
+        Assert.Equal(2, native.Count(s => s.Api == "csp_AppSxGuard"));
+        Assert.Equal(2, native.Count(s => s.Api == "csp_T4Guard"));
         Assert.Equal(["dr_兔小贝", "斗鱼js", "虎牙js"], native.Except(nativeCsp).Select(s => s.Key).Order(StringComparer.Ordinal));
 
         // 全部 .js 入口已有原生实现；暂无 QuickJs 存活源

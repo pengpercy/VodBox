@@ -1,0 +1,10 @@
+version: 1
+name: FTY Tingshu275 protocol fixture
+slug: fty-tingshu
+protocol: http
+port: 4914
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

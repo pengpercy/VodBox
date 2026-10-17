@@ -1,0 +1,26 @@
+{
+  "evidence_id": "ev_dd324bd5389d73b027c1259ad291c1b3bc3bdf1448af04432918c8841825edca",
+  "subject": {
+    "name": "ftyguard_v8.so",
+    "digest": {
+      "sha256": "fac9e3937d9928e437ebff79bc5164df418a6adb212494ef21c273579b045dcb"
+    },
+    "format": "elf",
+    "architecture": "arm64",
+    "local_path": "/private/tmp/claude-501/-Users-percy-RiderProjects-VodBox/1f597b25-20cb-4d1a-ab4f-7004793e89e1/scratchpad/so/ftyguard_v8.so"
+  },
+  "provider": {
+    "id": "ghidra",
+    "name": "Ghidra",
+    "version": "12.1.4"
+  },
+  "operation": "procedure_pseudo_code",
+  "parameters": {
+    "procedure": "0x10fe6c"
+  },
+  "confidence": "observed",
+  "registrationTable": "0x119008",
+  "saltAddress": "0x1191b0",
+  "saltXor": "0xa6",
+  "algorithm": "lowerhex(MD5(lowerhex(MD5(input + salt)) + salt))"
+}

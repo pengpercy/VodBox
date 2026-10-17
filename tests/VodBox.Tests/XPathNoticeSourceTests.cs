@@ -25,11 +25,20 @@ public sealed class XPathNoticeSourceTests
     }
 
     [Fact]
-    public void ScrapingXPathAndGuardRemainUnsupportedRatherThanBecomingNotices()
+    public async Task ScrapingXPathRemainsUnsupportedAndGuardBecomesAnInformationalNotice()
     {
         var config = ConfigLoader.Parse("""{"sites":[{"key":"rules","name":"规则","api":"csp_XPath","ext":{"homeUrl":"https://example.invalid"}},{"key":"guard","name":"提醒","api":"csp_XPathGuard"}]}""")!;
-        Assert.Empty(ConfigLoader.ToSources(config));
+        // 带抓取规则的 csp_XPath 不是空规则，固定插件里也没有对应 XPath 实现——保持不支持。
         Assert.False(NativeSpiders.IsSupported("csp_XPath"));
-        Assert.False(NativeSpiders.IsSupported("csp_XPathGuard"));
+        // csp_XPathGuard 是配置里的提醒项：作为信息源登记，不伪造内容，也不冒充 XPath 抓取。
+        Assert.True(NativeSpiders.IsSupported("csp_XPathGuard"));
+        var sources = ConfigLoader.ToSources(config);
+        var guard = Assert.Single(sources);
+        Assert.Equal("guard", guard.Key);
+        var source = Assert.IsType<XPathGuardNoticeSource>(NativeSpiders.Create(guard));
+        Assert.Contains("提醒", source.Notice);
+        Assert.Empty(await source.GetCategoriesAsync(TestContext.Current.CancellationToken));
+        Assert.Empty((await source.GetHomeAsync(TestContext.Current.CancellationToken)).Items);
+        await Assert.ThrowsAsync<NotSupportedException>(() => source.GetDetailAsync("anything", TestContext.Current.CancellationToken));
     }
 }

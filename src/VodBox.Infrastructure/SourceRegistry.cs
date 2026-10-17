@@ -117,7 +117,14 @@ public sealed class SourceRegistry : IDisposable
         var supported=ConfigLoader.ToSources(config,_subscriptionOrigin,_jarHostEnabled);
         var warnings=new List<string>();
         foreach(var site in config.Sites)
-            if(!supported.Any(source=>source.Key==site.Key))warnings.Add($"{site.Name}：未注册（缺少桌面运行时或站点定义无效）");
+            if(!supported.Any(source=>source.Key==site.Key))
+            {
+                // 未迁移的 csp_ 入口（Java/JAR 插件）单独说明，避免和真正无效的站点定义混在一起。
+                var reason=site.Runtime==SourceRuntime.Node
+                    ?"该 Java/JAR 插件尚未迁移为 C# 原生实现，已跳过"
+                    :"未注册（缺少桌面运行时或站点定义无效）";
+                warnings.Add($"{site.Name}：{reason}");
+            }
         if(_jarHostEnabled) warnings.AddRange(JarPluginWarnings(supported));
         var duplicate=supported.GroupBy(source=>source.Key).Where(group=>group.Count()>1).ToArray();
         foreach(var group in duplicate)warnings.Add($"站点键 {group.Key} 重复，只保留第一项");
@@ -220,7 +227,11 @@ public sealed class SourceRegistry : IDisposable
     public IContentSource? Default()
     {
         var runnable = VisibleSources.Where(source => Get(source.Key) is not null).ToArray();
-        return (runnable.FirstOrDefault(source => source.Runtime != SourceRuntime.Jar) ?? runnable.FirstOrDefault()) is { } info ? Get(info.Key) : null;
+        // 首页默认源优先选能出内容的站点：跳过需要 JVM 的 JAR 源与只给导航提示的信息源，
+        // 避免订阅里排在最前的“点我切源/导航”提醒项成为默认首页。找不到再逐级回退。
+        return (runnable.FirstOrDefault(source => source.Runtime != SourceRuntime.Jar && Get(source.Key) is not IInformationalContentSource)
+            ?? runnable.FirstOrDefault(source => source.Runtime != SourceRuntime.Jar)
+            ?? runnable.FirstOrDefault()) is { } info ? Get(info.Key) : null;
     }
 
     /// <summary>参与聚合搜索的源：可见（未被隐藏）、已开启搜索、且确实注册了桌面运行时实现。</summary>

@@ -1,0 +1,149 @@
+{"results": [
+  {
+    "request": {},
+    "response": {
+      "class": [
+        {
+          "type_flag": "",
+          "type_id": "6",
+          "type_name": "玄幻奇幻"
+        },
+        {
+          "type_flag": "",
+          "type_id": "7",
+          "type_name": "都市言情"
+        },
+        {
+          "type_flag": "",
+          "type_id": "8",
+          "type_name": "宫斗女频"
+        },
+        {
+          "type_flag": "",
+          "type_id": "9",
+          "type_name": "官场商战"
+        },
+        {
+          "type_flag": "",
+          "type_id": "10",
+          "type_name": "武侠仙侠"
+        },
+        {
+          "type_flag": "",
+          "type_id": "11",
+          "type_name": "刑侦推理"
+        },
+        {
+          "type_flag": "",
+          "type_id": "12",
+          "type_name": "探险科幻"
+        },
+        {
+          "type_flag": "",
+          "type_id": "13",
+          "type_name": "重生穿越"
+        },
+        {
+          "type_flag": "",
+          "type_id": "14",
+          "type_name": "恐怖惊悚"
+        },
+        {
+          "type_flag": "",
+          "type_id": "15",
+          "type_name": "文学历史"
+        },
+        {
+          "type_flag": "",
+          "type_id": "49",
+          "type_name": "两性情感"
+        }
+      ],
+      "filters": {},
+      "jx": 0,
+      "parse": 0
+    }
+  },
+  {
+    "request": {
+      "pg": "1",
+      "t": "6"
+    },
+    "response": {
+      "jx": 0,
+      "limit": 10,
+      "list": [{
+        "vod_id": "7",
+        "vod_name": "中文小说",
+        "vod_pic": "https://cdn.example/book.jpg",
+        "vod_remarks": "播音"
+      }],
+      "page": 1,
+      "pagecount": 1,
+      "parse": 0,
+      "total": 2147483647
+    }
+  },
+  {
+    "request": {
+      "pg": "2",
+      "t": "6"
+    },
+    "response": {
+      "jx": 0,
+      "limit": 10,
+      "list": [],
+      "page": 2,
+      "pagecount": 2,
+      "parse": 0,
+      "total": 2147483647
+    }
+  },
+  {
+    "request": {
+      "pg": "1",
+      "wd": "中文"
+    },
+    "response": {
+      "jx": 0,
+      "list": [{
+        "vod_id": "7",
+        "vod_name": "中文小说",
+        "vod_pic": "https://cdn.example/book.jpg",
+        "vod_remarks": "播音"
+      }],
+      "parse": 0
+    }
+  },
+  {
+    "request": {"ids": "7"},
+    "response": {
+      "jx": 0,
+      "list": [{
+        "type_name": "玄幻奇幻",
+        "vod_actor": "播音",
+        "vod_content": "简介",
+        "vod_director": "播音",
+        "vod_id": "7",
+        "vod_name": "中文小说",
+        "vod_pic": "https://cdn.example/book.jpg",
+        "vod_play_from": "直链",
+        "vod_play_url": "第一章$42|||7#第二章$43|||7"
+      }],
+      "parse": 0
+    }
+  },
+  {
+    "request": {
+      "detailID": "7",
+      "flag": "直链",
+      "play": "42|||7"
+    },
+    "response": {
+      "header": "{\"User-Agent\":\"listen/1.8.9 (Linux;Android 12) ExoPlayerLib/2.8.4\"}",
+      "jx": 0,
+      "parse": 0,
+      "url": "https://media.example/chapter.mp3"
+    }
+  }
+]}

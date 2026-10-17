@@ -1,0 +1,303 @@
+{
+  "results": [
+    {
+      "request": {},
+      "response": {
+        "class": [
+          {
+            "type_id": "1",
+            "type_name": "电影"
+          }
+        ],
+        "filters": {
+          "1": [
+            {
+              "key": "class",
+              "name": "类型",
+              "value": [
+                {
+                  "n": "动作",
+                  "v": "动作"
+                },
+                {
+                  "n": "喜剧",
+                  "v": "喜剧"
+                }
+              ]
+            },
+            {
+              "key": "area",
+              "name": "地区",
+              "value": [
+                {
+                  "n": "大陆",
+                  "v": "大陆"
+                },
+                {
+                  "n": "香港",
+                  "v": "香港"
+                }
+              ]
+            },
+            {
+              "key": "lang",
+              "name": "语言",
+              "value": [
+                {
+                  "n": "国语",
+                  "v": "国语"
+                }
+              ]
+            },
+            {
+              "key": "year",
+              "name": "年份",
+              "value": [
+                {
+                  "n": "2026",
+                  "v": "2026"
+                },
+                {
+                  "n": "2025",
+                  "v": "2025"
+                }
+              ]
+            },
+            {
+              "key": "sort",
+              "name": "排序",
+              "value": [
+                {
+                  "n": "最新",
+                  "v": "最新"
+                },
+                {
+                  "n": "最热",
+                  "v": "最热"
+                },
+                {
+                  "n": "最赞",
+                  "v": "最赞"
+                }
+              ]
+            }
+          ]
+        },
+        "list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "http://127.0.0.1:4905/cover.jpg",
+            "vod_remarks": "全集"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "pg": "1",
+        "t": "1"
+      },
+      "response": {
+        "limit": 30,
+        "list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "http://127.0.0.1:4905/cover.jpg",
+            "vod_remarks": "全集"
+          }
+        ],
+        "page": 1,
+        "pagecount": 1,
+        "total": 1
+      }
+    },
+    {
+      "request": {
+        "pg": "1",
+        "wd": "中文"
+      },
+      "response": {
+        "list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "http://127.0.0.1:4905/cover.jpg",
+            "vod_remarks": "全集"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "ids": "7"
+      },
+      "response": {
+        "list": [
+          {
+            "vod_actor": "演员",
+            "vod_area": "大陆",
+            "vod_class": "动作",
+            "vod_content": "剧情",
+            "vod_director": "导演",
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "http://127.0.0.1:4905/cover.jpg",
+            "vod_play_from": "type0-parse0$$$type0-parse1$$$type0-parse2$$$type1-parse0$$$type1-parse1$$$type1-parse2$$$type2-parse0$$$type2-parse1$$$type2-parse2",
+            "vod_play_url": "第一集$https://media.example/direct.mp4@http://127.0.0.1:4905/parse?url=@0@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@0$$$第一集$https://media.example/direct.mp4@http://127.0.0.1:4905/parse?url=@0@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@1$$$第一集$https://media.example/direct.mp4@http://127.0.0.1:4905/parse?url=@0@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@2$$$第一集$https://watch.example/7@http://127.0.0.1:4905/parse?url=@1@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@0$$$第一集$https://watch.example/7@http://127.0.0.1:4905/parse?url=@1@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@1$$$第一集$https://watch.example/7@http://127.0.0.1:4905/parse?url=@1@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@2$$$第一集$https://watch.example/7@http://127.0.0.1:4905/parse?url=@2@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@0$$$第一集$https://watch.example/7@http://127.0.0.1:4905/parse?url=@2@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@1$$$第一集$https://watch.example/7@http://127.0.0.1:4905/parse?url=@2@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@2",
+            "vod_remarks": "全集",
+            "vod_year": "2026"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type0-parse0",
+        "play": "https://media.example/direct.mp4@http://127.0.0.1:4905/parse?url=@0@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@0"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/direct.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type0-parse1",
+        "play": "https://media.example/direct.mp4@http://127.0.0.1:4905/parse?url=@0@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@1"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/internal.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type0-parse2",
+        "play": "https://media.example/direct.mp4@http://127.0.0.1:4905/parse?url=@0@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@2"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 1,
+        "playUrl": "",
+        "url": "http://127.0.0.1:4905/parse?url=https%3A%2F%2Fmedia.example%2Fdirect.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type1-parse0",
+        "play": "https://watch.example/7@http://127.0.0.1:4905/parse?url=@1@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@0"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/internal.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type1-parse1",
+        "play": "https://watch.example/7@http://127.0.0.1:4905/parse?url=@1@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@1"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/internal.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type1-parse2",
+        "play": "https://watch.example/7@http://127.0.0.1:4905/parse?url=@1@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@2"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 1,
+        "playUrl": "",
+        "url": "http://127.0.0.1:4905/parse?url=https%3A%2F%2Fwatch.example%2F7"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type2-parse0",
+        "play": "https://watch.example/7@http://127.0.0.1:4905/parse?url=@2@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@0"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/external.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type2-parse1",
+        "play": "https://watch.example/7@http://127.0.0.1:4905/parse?url=@2@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@1"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/external.mp4"
+      }
+    },
+    {
+      "request": {
+        "detailID": "7",
+        "flag": "type2-parse2",
+        "play": "https://watch.example/7@http://127.0.0.1:4905/parse?url=@2@media-agent@fixture-token@eyJSZWZlcmVyIjoiaHR0cHM6Ly93YXRjaC5leGFtcGxlLyJ9@2"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://watch.example/",
+          "User-Agent": "media-agent"
+        },
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/external.mp4"
+      }
+    }
+  ],
+  "pluginSha256": "218fb47aa2b48411702a7cfafa09353c71612302d4069da9f4d1f6222e7558e7",
+  "fixture": "postman/mocks/fty-appsx/default.js",
+  "note": "Controlled anonymous v119 original-plugin oracle. Synthetic key; volatile danmaku proxy URLs omitted. Nine player_parse_type/parse_type combinations."
+}

@@ -1,0 +1,5 @@
+simulation: fty-apptt
+routing: path
+mocks:
+  - routeKey: v3
+    path: ../mocks/fty-apptt/config.yaml

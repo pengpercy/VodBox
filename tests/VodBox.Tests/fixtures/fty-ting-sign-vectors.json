@@ -1,0 +1,30 @@
+[
+  {
+    "input": "",
+    "output": "8fb3a1ba5d413b8e7dd82dda7c3814d6"
+  },
+  {
+    "input": "0",
+    "output": "c353a763af62b90f9aa8780dd48ca224"
+  },
+  {
+    "input": "1000",
+    "output": "708bc42ec371affc1edeee3569e7d014"
+  },
+  {
+    "input": "1792260000000",
+    "output": "84dfa22e30a5a120d85af642374054ec"
+  },
+  {
+    "input": "1792260000001",
+    "output": "e75546e768c3e533bc3a7e2b16285aca"
+  },
+  {
+    "input": "tvbox-runtime-probe",
+    "output": "084e25b91203d0d72bc1ff0fbed5fe8a"
+  },
+  {
+    "input": "中文",
+    "output": "0e1146d02cff3bcf8b35055eeaf286c3"
+  }
+]

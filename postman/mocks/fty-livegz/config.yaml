@@ -1,0 +1,10 @@
+version: 1
+name: FTY LiveGz protocol fixture
+slug: fty-livegz
+protocol: http
+port: 4906
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

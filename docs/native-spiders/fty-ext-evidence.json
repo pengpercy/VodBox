@@ -1,0 +1,75 @@
+{
+  "observedOn": "2026-10-18",
+  "codec": "fty-v8-rc4-utf16plus2",
+  "keyAddress": "0x119198",
+  "keyBytes": 13,
+  "registrationTable": "0x119008",
+  "methods": [
+    {
+      "role": "encrypt",
+      "evidenceId": "ev_970ac582b1b6742709dcb943a39806983b285a2e076ef34284ec20d39dbc0e84",
+      "operation": "procedure_pseudo_code",
+      "parameters": {
+        "procedure": "0x10d4c8"
+      },
+      "subject": {
+        "name": "ftyguard_v8.so",
+        "digest": {
+          "sha256": "fac9e3937d9928e437ebff79bc5164df418a6adb212494ef21c273579b045dcb"
+        },
+        "format": "elf",
+        "architecture": "arm64"
+      },
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "confidence": "observed"
+    },
+    {
+      "role": "decrypt",
+      "evidenceId": "ev_94a65a9b3337f19150bca7cd47799252c7f2e9b4674b1ec421f79a6e2f0d6bc9",
+      "operation": "procedure_pseudo_code",
+      "parameters": {
+        "procedure": "0x10dd9c"
+      },
+      "subject": {
+        "name": "ftyguard_v8.so",
+        "digest": {
+          "sha256": "fac9e3937d9928e437ebff79bc5164df418a6adb212494ef21c273579b045dcb"
+        },
+        "format": "elf",
+        "architecture": "arm64"
+      },
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "confidence": "observed"
+    },
+    {
+      "role": "rc4",
+      "evidenceId": "ev_1d2910a3730d5f6658be9493f42532e956701b442d9e7981a446e40a9f2eae11",
+      "operation": "procedure_pseudo_code",
+      "parameters": {
+        "procedure": "0x101b98"
+      },
+      "subject": {
+        "name": "ftyguard_v8.so",
+        "digest": {
+          "sha256": "fac9e3937d9928e437ebff79bc5164df418a6adb212494ef21c273579b045dcb"
+        },
+        "format": "elf",
+        "architecture": "arm64"
+      },
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "confidence": "observed"
+    }
+  ]
+}

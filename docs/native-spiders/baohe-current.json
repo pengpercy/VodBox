@@ -1,0 +1,409 @@
+{
+  "capturedOn": "2026-10-18",
+  "kind": "baohe-current",
+  "carrierSha256": "ede90a4f96802f7352fa4480120924806461e4eedd764fb024e8266302186799",
+  "globalSpider": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+  "siteCount": 50,
+  "sites": [
+    {
+      "key": "豆瓣",
+      "api": "csp_Douban",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://gitee.com/KYSY1/dyy/raw/master/bh2601251.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "天天",
+      "api": "csp_AppRJ",
+      "extSha256": "82a17e02cdd6e5806b69c101602697a1ec05e1537469f4131be62529936b542f",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Wwys",
+      "api": "csp_Wwys",
+      "extSha256": "cc2c225e6143408380c35b99786c45d2a66e5bb72736c5e22dd5b16544580307",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Gz360",
+      "api": "csp_Gz360",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_PianKu8",
+      "api": "csp_PianKu8",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "新首发",
+      "api": "csp_AppGet",
+      "extSha256": "9be0aa4e43dcc6d5b0b6059c8d09d003a9091fd33254245b024cbf546ee35708",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "枫叶影视",
+      "api": "csp_FengYe",
+      "extSha256": "e110d7d995e328d2a2ce74c1db97665a2cb08c2b758c94aef395e4d6f70d3d2b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "双星99",
+      "api": "csp_App99",
+      "extSha256": "366d672a83e2a4088933969f2b706d2877808b4285fb0c323730afee326bb653",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "咕咕动漫",
+      "api": "csp_AppGet",
+      "extSha256": "50f5b28d695e3633bd3635d62ffa76b0ce5cda9b82044b2c7e2b22b3d00ef5c7",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_duanju",
+      "api": "csp_HeMa",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_XY",
+      "api": "csp_AppXY",
+      "extSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "88看球",
+      "api": "csp_Kanqiu",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "瓜子",
+      "api": "csp_GuaziTY",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_SaoHuo",
+      "api": "csp_SaoHuo",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Czsapp",
+      "api": "csp_Czsapp",
+      "extSha256": "b2077ac26b47d8c6e158fbb8d8b5f4768d122f1870274ebc7f387f16e69d8f7c",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "麦田",
+      "api": "csp_AppV6",
+      "extSha256": "03ed56de6c77cc226a558c6409e848e035a130530d517f8c867e8d1b598403b8",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "feiyu_video",
+      "api": "csp_Feiyu",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "剧圈99",
+      "api": "csp_App99",
+      "extSha256": "560b46b56c062f785beba304c5b0737f966c11431ebe6a7982bb7611b7f406c6",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "天堂",
+      "api": "csp_AppDrama",
+      "extSha256": "36e8742fced7c71a8f10e99195863505b989ed58f91c6368c5723e26d6d84415",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "橘汁",
+      "api": "csp_AppDrama",
+      "extSha256": "84885d9968223a6754720de86e169cf2b8d2ba2f7778efbc9ca625a9ef44c5d1",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "荐片",
+      "api": "csp_Jianpian",
+      "extSha256": "1b1ebf3d0257c7874fe859fd4a97e0daf31589a6941a8601d253744185e95afa",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_APPTe",
+      "api": "csp_AppTe",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Jpys",
+      "api": "csp_Jpys",
+      "extSha256": "c4bf233d9572188928ea7e47677e8c6f77f0b7f209e175b7509113fe1626d88d",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "YunZhenXiang",
+      "api": "csp_YunZhenXiang",
+      "extSha256": "5ad5f94d6c9c7f2bf43a0690b6c7301693e1159f50e494dd1a6d480094ac5b22",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Osstexll",
+      "api": "csp_Tounimabi",
+      "extSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "布布影视APP",
+      "api": "csp_AppYd",
+      "extSha256": "780a1c551138637902f15b019e247a4b03f2d1663e8d94d9e360d95c35d27e21",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "云朵影视APP",
+      "api": "csp_AppYd",
+      "extSha256": "fd12fc9b83cbe419d4242617d7a5b54f2f65ea32b4452d4a2510e7291efbe26d",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "一碗",
+      "api": "csp_AppGet",
+      "extSha256": "22fd7b3fdc5fa621f8dbfe71825422ddb873423cec4a02e18b46995635544b5f",
+      "effectiveJar": "https://img2.gelonghui.com/library/f7c90-40d96eab-56f3-4c13-a248-8d80bcb9b83a.png;md5;f7c90ebd0a6632f3347eeeb8d9bd555e",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "蔬菜",
+      "api": "csp_AppGet",
+      "extSha256": "6419fc47828b15271fb3e48fa312778cc97d5da48f09c5a018dfff9f54726759",
+      "effectiveJar": "https://img2.gelonghui.com/library/f7c90-40d96eab-56f3-4c13-a248-8d80bcb9b83a.png;md5;f7c90ebd0a6632f3347eeeb8d9bd555e",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "六月有声",
+      "api": "csp_TingBook",
+      "extSha256": "909309951b2f2705b91e566ae2b68ccf804ba2041e14da80ff49c2880b579958",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "酷酷",
+      "api": "csp_KuKuMusic",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "相声",
+      "api": "csp_XBPQ",
+      "extSha256": "36fbb0e42810d30ad7201a2418bcb1ea0b3e381f665ed4a712209d7f7906b407",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "definition-gated-existing-adapter",
+      "online": "not-claimed"
+    },
+    {
+      "key": "评书",
+      "api": "csp_XBPQ",
+      "extSha256": "efe02e6a41ebadd4af4e084ce7e61c4c787592906a37124bda767e6a1f558a6e",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "definition-gated-existing-adapter",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Live",
+      "api": "csp_YXZB",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Aid",
+      "api": "csp_FirstAid",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Bili",
+      "api": "csp_Bili",
+      "extSha256": "22cb3ee856959cea46638a6cce8fa178c11e09eba0c9069d6eda21fc7b24c45d",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Bili",
+      "api": "csp_Bili",
+      "extSha256": "6f4cec275a431b6e2bd7cec820267495e8e2cf9e7a3d1c59cb25a5e23dd46dbe",
+      "effectiveJar": "https://img2.gelonghui.com/library/caa22-82cdc278-148a-46bf-9aaf-c6aee2b5d124.png;md5;caa22b5d283ec2bdc63f65b9310ea232",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Bili短剧",
+      "api": "csp_Bili",
+      "extSha256": "2decdb4f57a818d257b2578526c570107f0848399fa49bb309ef1e0ad4025597",
+      "effectiveJar": "http://mzrjk.top/唱戏/bhxq.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "影视解说",
+      "api": "csp_Bili",
+      "extSha256": "fb3be8508b9a93af8f434a6e591b7a685d558387163f7ce5d5c027ad9d70054f",
+      "effectiveJar": "http://mzrjk.top/唱戏/bhxq.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Djuu",
+      "api": "csp_Djuu",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/taoyong1/jk/raw/master/custom_spider.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_Kugou",
+      "api": "csp_Kugou",
+      "extSha256": "dab794e91dff3cb1ae62ec0e652f827265ccbcd130b53e377d4e47f95bf447f0",
+      "effectiveJar": "https://gitee.com/tianwikeji/jar/raw/master/Yoursmile.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "小灯塔国学",
+      "api": "csp_Bili",
+      "extSha256": "e1899196806e80d60a8d28fb93623d2a49a83716e9908dfdf3714a8d98c8d62a",
+      "effectiveJar": "https://jihulab.com/bhjk1/vip/-/raw/main/BHQX.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "儿童",
+      "api": "https://gh-proxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "extSha256": "50125a78c2dbf587506c7da429240ba5f7795634bd01e4bc530707895c0145e8",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_少儿",
+      "api": "csp_Bili",
+      "extSha256": "56780d4b4f3d7c5404f9c59b279f7333b1231fc5d5a4a993626e9b8c3e4f13ac",
+      "effectiveJar": "https://raw.giteeusercontent.com/taoyong1/jk/raw/master/xuexi1.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_小学",
+      "api": "csp_Bili",
+      "extSha256": "b6cb8f89d9a0d2df6f791f0c51086e14b01bc897daf61682352bbda2590718d8",
+      "effectiveJar": "https://raw.giteeusercontent.com/taoyong1/jk/raw/master/xuexi1.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_初中",
+      "api": "csp_Bili",
+      "extSha256": "950c9312e83e084494d3471ad2f74aae1dc7f0e1da4a4757633a5d6b01ea168f",
+      "effectiveJar": "https://raw.giteeusercontent.com/taoyong1/jk/raw/master/xuexi1.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "csp_高中",
+      "api": "csp_Bili",
+      "extSha256": "0fd013a7bc6ae9d2415d603b68a240b2d2e96e368c80dad7acd12753d5865017",
+      "effectiveJar": "https://raw.giteeusercontent.com/taoyong1/jk/raw/master/xuexi1.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "push_agent",
+      "api": "csp_Push",
+      "extSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "ext_live_protocol",
+      "api": "csp_XPath",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "definition-gated-existing-adapter",
+      "online": "not-claimed"
+    },
+    {
+      "key": "cc",
+      "api": "csp_XPath",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://raw.giteeusercontent.com/KYSY1/dyy/raw/master/bh0822.jar",
+      "status": "definition-gated-existing-adapter",
+      "online": "not-claimed"
+    }
+  ]
+}

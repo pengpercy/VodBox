@@ -1,0 +1,166 @@
+{
+  "observedOn": "2026-10-18",
+  "nativeMappingCount": 18,
+  "scope": "saved-fty-fixture; network results are time-specific",
+  "sites": [
+    {
+      "key": "光影",
+      "api": "csp_T4Guard",
+      "provider": "FtyT4Source",
+      "errorType": "HttpRequestException",
+      "error": "Response status code does not indicate success: 503 (Service Unavailable).",
+      "stage": "categories"
+    },
+    {
+      "key": "奶酪",
+      "api": "csp_T4Guard",
+      "provider": "FtyT4Source",
+      "categories": 22,
+      "home": 20,
+      "items": 20,
+      "lines": 1,
+      "resolution": "Direct",
+      "mediaHost": "vip.dytt-tvs.com",
+      "mediaStatus": 403,
+      "errorType": "HttpRequestException",
+      "error": "Response status code does not indicate success: 403 (Forbidden).",
+      "stage": "media",
+      "mpv": {
+        "mode": "headless-existing-media-proxy",
+        "result": "timeout",
+        "guiVerified": false
+      }
+    },
+    {
+      "key": "视界",
+      "api": "csp_App99Guard",
+      "provider": "App99Source",
+      "categories": 18,
+      "home": 21,
+      "items": 21,
+      "lines": 3,
+      "resolution": "Direct",
+      "mediaHost": "vod.ffzy-bofang.com",
+      "mediaStatus": 206,
+      "mediaBytes": 97,
+      "mediaPrefix": "234558544D33550A",
+      "mediaKind": "hls-manifest",
+      "stage": "complete",
+      "mpv": {
+        "mode": "headless-existing-media-proxy",
+        "result": "decoded",
+        "positionSeconds": 1.1,
+        "durationSeconds": 6440.3,
+        "guiVerified": false
+      }
+    }
+  ],
+  "t4HeaderComparisons": [
+    {
+      "case": "t4-original-pool-ua",
+      "status": 403,
+      "error": null
+    },
+    {
+      "case": "t4-no-custom-headers",
+      "status": 403,
+      "error": null
+    },
+    {
+      "case": "t4-api-referer",
+      "status": 403,
+      "error": null
+    },
+    {
+      "case": "api-original-pool-ua",
+      "status": 503,
+      "error": null
+    }
+  ],
+  "offlineVerification": {
+    "releaseTests": {
+      "passed": 674,
+      "failed": 0,
+      "warningsAsErrors": true
+    },
+    "previewTests": {
+      "passed": 259,
+      "failed": 0,
+      "warningsAsErrors": true
+    },
+    "nativeOracleVectors": 20,
+    "nativeAot": {
+      "rid": "osx-x64",
+      "status": "passed",
+      "quickJsRebuilt": false,
+      "sixPlatformPackageAcceptance": false,
+      "warningsAsErrors": true,
+      "artifactSha256": "13489f36ad3c98095056edef81090e9f9d10403e84dcd0506a0fb8d9508058f1",
+      "artifactBytes": 36507000,
+      "guiLaunchVerified": false
+    }
+  },
+  "sourceSha256": {
+    "src/VodBox.Infrastructure/FtyExtCodec.cs": "ec12cb647e1c8c5f7657122a11b81150c09b44c0fe85fbd04726e84cd9e91d90",
+    "src/VodBox.Infrastructure/FtyT4Source.cs": "06852edbad4022e60edc378ac87fe6133d2b079b3ee86611932fe28dbb12adc0",
+    "src/VodBox.Infrastructure/App99Source.cs": "a9492ae6669dd040b7e4285c8382073a2435157015825710adbf8b195d25bc58",
+    "src/VodBox.Infrastructure/NativeSpiders.cs": "1b13903336aa0e5e6e752417b4f4488338b59cef3f459fe64f57fdd01829d1fb"
+  },
+  "networkExitRetry": {
+    "reason": "User changed network egress and requested a fresh retry",
+    "observedOn": "2026-10-18",
+    "sites": [
+      {
+        "key": "光影",
+        "api": "csp_T4Guard",
+        "provider": "FtyT4Source",
+        "errorType": "HttpRequestException",
+        "error": "Response status code does not indicate success: 503 (Service Unavailable).",
+        "stage": "categories"
+      },
+      {
+        "key": "奶酪",
+        "api": "csp_T4Guard",
+        "provider": "FtyT4Source",
+        "categories": 22,
+        "home": 20,
+        "items": 20,
+        "searchItems": 1,
+        "lines": 1,
+        "resolution": "Direct",
+        "mediaHost": "vip.dytt-tvs.com",
+        "mediaStatus": 403,
+        "errorType": "HttpRequestException",
+        "error": "Response status code does not indicate success: 403 (Forbidden).",
+        "stage": "media"
+      }
+    ],
+    "headerComparisons": [
+      {
+        "case": "t4-original-pool-ua",
+        "status": 403,
+        "error": null
+      },
+      {
+        "case": "t4-no-custom-headers",
+        "status": 403,
+        "error": null
+      },
+      {
+        "case": "t4-api-referer",
+        "status": 403,
+        "error": null
+      },
+      {
+        "case": "api-original-pool-ua",
+        "status": 503,
+        "error": null
+      }
+    ],
+    "mpv": {
+      "sourceKey": "奶酪",
+      "mode": "headless-existing-media-proxy",
+      "result": "timeout"
+    }
+  }
+}

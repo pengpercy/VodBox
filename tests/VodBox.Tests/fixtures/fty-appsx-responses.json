@@ -1,0 +1,249 @@
+{
+  "initV119": {
+    "type_list": [
+      {
+        "type_id": 1,
+        "type_name": "电影",
+        "type_extend": "{\"class\":\"动作,喜剧\",\"area\":\"大陆,香港\",\"year\":\"2026,2025\",\"lang\":\"国语\"}",
+        "recommend_list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "cover.jpg",
+            "vod_class": "动作",
+            "vod_year": "2026",
+            "vod_area": "大陆",
+            "vod_remarks": "全集",
+            "vod_actor": "演员",
+            "vod_director": "导演",
+            "vod_blurb": "剧情"
+          }
+        ],
+        "filter_type_list": []
+      }
+    ]
+  },
+  "typeFilterVodList": {
+    "recommend_list": [
+      {
+        "vod_id": "7",
+        "vod_name": "中文电影",
+        "vod_pic": "cover.jpg",
+        "vod_class": "动作",
+        "vod_year": "2026",
+        "vod_area": "大陆",
+        "vod_remarks": "全集",
+        "vod_actor": "演员",
+        "vod_director": "导演",
+        "vod_blurb": "剧情"
+      }
+    ]
+  },
+  "searchList": {
+    "search_list": [
+      {
+        "vod_id": "7",
+        "vod_name": "中文电影",
+        "vod_pic": "cover.jpg",
+        "vod_class": "动作",
+        "vod_year": "2026",
+        "vod_area": "大陆",
+        "vod_remarks": "全集",
+        "vod_actor": "演员",
+        "vod_director": "导演",
+        "vod_blurb": "剧情"
+      }
+    ]
+  },
+  "vodDetail": {
+    "vod": {
+      "vod_id": "7",
+      "vod_name": "中文电影",
+      "vod_pic": "cover.jpg",
+      "vod_class": "动作",
+      "vod_year": "2026",
+      "vod_area": "大陆",
+      "vod_remarks": "全集",
+      "vod_actor": "演员",
+      "vod_director": "导演",
+      "vod_blurb": "剧情"
+    },
+    "vod_play_list": [
+      {
+        "player_info": {
+          "show": "type0-parse0",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "0",
+          "parse_type": "0",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://media.example/direct.mp4",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type0-parse1",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "0",
+          "parse_type": "1",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://media.example/direct.mp4",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type0-parse2",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "0",
+          "parse_type": "2",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://media.example/direct.mp4",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type1-parse0",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "1",
+          "parse_type": "0",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://watch.example/7",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type1-parse1",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "1",
+          "parse_type": "1",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://watch.example/7",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type1-parse2",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "1",
+          "parse_type": "2",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://watch.example/7",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type2-parse0",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "2",
+          "parse_type": "0",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://watch.example/7",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type2-parse1",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "2",
+          "parse_type": "1",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://watch.example/7",
+            "token": "fixture-token"
+          }
+        ]
+      },
+      {
+        "player_info": {
+          "show": "type2-parse2",
+          "parse": "http://127.0.0.1:4905/parse?url=",
+          "player_parse_type": "2",
+          "parse_type": "2",
+          "user_agent": "media-agent",
+          "headers": {
+            "Referer": "https://watch.example/"
+          }
+        },
+        "urls": [
+          {
+            "name": "第一集",
+            "url": "https://watch.example/7",
+            "token": "fixture-token"
+          }
+        ]
+      }
+    ]
+  },
+  "vodParse": {
+    "play_url": "https://media.example/internal.mp4",
+    "url": "https://media.example/internal.mp4"
+  }
+}

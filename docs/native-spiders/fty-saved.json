@@ -1,0 +1,393 @@
+{
+  "capturedOn": "2026-10-18",
+  "kind": "fty-saved",
+  "carrierSha256": "aa410c48c279996f3be79bb26a0bb096c9096c4367e3a1b1ae05458beb6f3426",
+  "globalSpider": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+  "siteCount": 48,
+  "sites": [
+    {
+      "key": "点我切源",
+      "api": "csp_DouDouGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "MDrive",
+      "api": "csp_MyDriveGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "玩偶",
+      "api": "csp_WoGGGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "YGP",
+      "api": "csp_YGPGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "MTV1",
+      "api": "csp_MusicGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "seed",
+      "api": "csp_SeedhubGuard",
+      "extSha256": "57e6ed1a23c2cbbf1b5e6474104c27fd7ae1b23b2f8bb7836435f16b1fccab88",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "光影",
+      "api": "csp_T4Guard",
+      "extSha256": "8e2c0ed4f71f3e913bdafdced51552611a50ca2272c79c77946828630d30b98a",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "native-implemented-offline-tested",
+      "online": "catalog-http-503"
+    },
+    {
+      "key": "原创",
+      "api": "csp_YCyzGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "厂长",
+      "api": "csp_NewCzGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "立播",
+      "api": "csp_LibvioGuard",
+      "extSha256": "44b5e50efc7142d9ac6a8dff6082568555e78f74168a4de0db83af72219fb803",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "瓜子",
+      "api": "csp_AppgzGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "比特",
+      "api": "csp_BttwooGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "糯米",
+      "api": "csp_NmyswvGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "文采",
+      "api": "csp_JpysGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "奶酪",
+      "api": "csp_T4Guard",
+      "extSha256": "54eb8b3162c5daa628180fbc1a1ec46c75f3518b69592943f9a185b1bc0d2e5e",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "native-implemented-offline-tested",
+      "online": "catalog-passed-media-403-decode-timeout"
+    },
+    {
+      "key": "热播",
+      "api": "csp_AppTTGuard",
+      "extSha256": "d8fdcd1c9745a87fdae0c270f86434838a3bb1bbeeed6c439cec51de92901260",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "视界",
+      "api": "csp_App99Guard",
+      "extSha256": "571c21062f82b3344699717010b4a1e41779fb6b764545060c76d2c9086e597d",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "native-implemented-offline-tested",
+      "online": "headless-mpv-decode-passed"
+    },
+    {
+      "key": "剧圈",
+      "api": "csp_AppSxGuard",
+      "extSha256": "d799be7d1c5cfbec1b8e2562f68d3a3c9a27e019fab66d08b115ebde3ec2e63c",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "荐片",
+      "api": "csp_JPJGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "奥特",
+      "api": "csp_AueteGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "新6V",
+      "api": "csp_SixVGuard",
+      "extSha256": "9c82aea53cdac772391f41ecdb88f92c7dbef1186bfd60998101068ce05c367f",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "AiDj",
+      "api": "csp_AiDjGuard",
+      "extSha256": "d28de21476bb06732325a4afb8273a3f94005896da6aa1050058d831272ac3aa",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "咕咕",
+      "api": "csp_AppSxGuard",
+      "extSha256": "80094203fdec2a521a85f0a0052f46e49b532f38a5e31a2c75e0f3ba80c0202c",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Dm84",
+      "api": "csp_Dm84Guard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "看球",
+      "api": "csp_KanqiuGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "多多",
+      "api": "csp_DoubaoGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "吃瓜",
+      "api": "csp_LiveGzGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "alllive",
+      "api": "csp_AllliveGuard",
+      "extSha256": "bb501c3162905a676583c572a150049a8c55dc696140833e85477677b2babd98",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "MTV",
+      "api": "csp_BiliGuard",
+      "extSha256": "a4416f4b2890dc7487f5464c0d4d0070f196539f21c585450981b269b205af22",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "有声小说",
+      "api": "csp_Tingshu275Guard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Aid",
+      "api": "csp_FirstAidGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "虎牙js",
+      "api": "https://git.yylx.win/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "extSha256": "443a722da52fef9490aa0d757c97f60c90c754cfeeb679165f78afbf270cb915",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "斗鱼js",
+      "api": "https://git.yylx.win/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "extSha256": "b8f74fc65355c4e1664e127554dc79aa59f5bed5c2dc4de22fa2f79ff638c008",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "ZPan",
+      "api": "csp_S_zpsGuard",
+      "extSha256": "f7bfff2a1605eaf2c1f34166d8c58843de8a7b44b8c0ed6db53067d068716bf9",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "JPan",
+      "api": "csp_S_zpsGuard",
+      "extSha256": "9ff6e6bd65684e72557a32696e1e272e65ff5623f69e8101fa8e820017ed3934",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "YpanSo",
+      "api": "csp_YpanSoGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "BpanSo",
+      "api": "csp_BpanSoGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "抠搜",
+      "api": "csp_KkSsGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "UC",
+      "api": "csp_UuSsGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Bili",
+      "api": "csp_BiliGuard",
+      "extSha256": "f80c68cbfa014a933bc7882561f61c58ac134110c2942b7af708932663d566cf",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "Biliych",
+      "api": "csp_BiliGuard",
+      "extSha256": "a99469b61fd228e822bf3c2368cc81cfad699e4a9b42e5fa6842609538acc871",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "dr_兔小贝",
+      "api": "https://git.yylx.win/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "extSha256": "399e094f777d4f440f73ea1df75bfb1aa52e8a5d7bc2beec604593e61efbef75",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "少儿教育",
+      "api": "csp_BiliGuard",
+      "extSha256": "2d8523d9b0f752c8c1e70fc6d354eacd763953a1a933f2bcdaa49bec3b0ca836",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "小学课堂",
+      "api": "csp_BiliGuard",
+      "extSha256": "86b350cb930bd461d193b841227866c397e0276da88ad92adbf786eda9895dbb",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "初中课堂",
+      "api": "csp_BiliGuard",
+      "extSha256": "dbfa6e6c29c022ea55113bd8c26df0226c35aed20a8ab93702742ee5222163a9",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "高中教育",
+      "api": "csp_BiliGuard",
+      "extSha256": "d1aea4129edf105879187eefc3b29b0efeb27a09487b055a419a00b71f12ad72",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "existing-native-mapping",
+      "online": "not-claimed"
+    },
+    {
+      "key": "push_agent",
+      "api": "csp_PushGuard",
+      "extSha256": "362706e1f35f71ab77203cf47768aa00848616ab5d764b1c4f34b60df4cab00b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    },
+    {
+      "key": "cc",
+      "api": "csp_XPathGuard",
+      "extSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "effectiveJar": "https://xiuxiu-pro-new.meitudata.com/posters/df6450a1cc03f3139b659338e9f15278.jpg;md5;f782cdee81118405176fd260be9ca5cd",
+      "status": "unimplemented-or-other-runtime",
+      "online": "not-claimed"
+    }
+  ]
+}

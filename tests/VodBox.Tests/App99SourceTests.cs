@@ -60,6 +60,54 @@ public sealed class App99SourceTests
         Assert.Throws<InvalidDataException>(() => new App99Source(bad with { Ext = ext }, new HttpClient(new DummyHandler())));
     }
 
+    [Fact]
+    public void RealGuardExtIsDecodedWithoutChangingTheStoredDefinition()
+    {
+        var config = ConfigLoader.ParseBytes(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "fty-in.bmp")))!;
+        var site = Assert.Single(config.Sites, value => value.Api == "csp_App99Guard");
+        string encrypted = site.Ext!.Value.GetString()!;
+        var parsed = App99Source.ParseExt(encrypted, ftyGuard: true);
+        Assert.Equal("http://124.221.3.182:19987/app/bn", parsed.Host);
+        Assert.Equal("1.2.0", parsed.VersionName);
+        Assert.Equal(App99Source.GuardUserAgent, parsed.UserAgent);
+        Assert.True(NativeSpiders.IsSupported(site));
+        var info = Assert.Single(ConfigLoader.ToSources(config), value => value.Api == "csp_App99Guard");
+        Assert.Equal(encrypted, info.Ext);
+        using var source = Assert.IsType<App99Source>(NativeSpiders.Create(info));
+        using var trimmed = Assert.IsType<App99Source>(NativeSpiders.Create(info with { Api = "csp_App99Guard " }));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GuardUsesBnV2WithItsOwnUaAndVersionFieldNames(bool compressed)
+    {
+        var routes = new Routes { Compressed = compressed, ExpectedUserAgent = "guard-fixture", ExpectedVersion = "guard-version" };
+        using var http = new HttpClient(routes);
+        string ext = Source().Ext![..^1] + ",\"ua\":\"guard-fixture\",\"version\":\"guard-version\"}";
+        using var source = new App99Source(Source() with { Api = "csp_App99Guard", Ext = ext }, http);
+        Assert.Single(await source.GetCategoriesAsync(TestContext.Current.CancellationToken));
+        Assert.Single((await source.SearchAsync("C# & 中文", 1, TestContext.Current.CancellationToken)).Items);
+        var detail = await source.GetDetailAsync("7", TestContext.Current.CancellationToken);
+        var play = await source.ResolvePlaybackAsync("7", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken);
+        Assert.Equal("https://cdn.example/movie.m3u8", play.Uri);
+        Assert.Equal("guard-fixture", play.Headers["User-Agent"]);
+        Assert.Equal("guard-version", App99Source.ParseExt(ext, ftyGuard: true).ApiVersion);
+    }
+
+    [Fact]
+    public void GuardRejectsUnknownEncryptionAndAuthenticatedVariants()
+    {
+        Assert.False(App99Source.SupportsGuard("not a wire config!"));
+        Assert.False(App99Source.SupportsGuard(Source().Ext![..^1] + ",\"token\":\"requires-login\"}"));
+        Assert.False(App99Source.SupportsGuard(Source().Ext![..^1] + ",\"token\":true}"));
+        Assert.False(App99Source.SupportsGuard(Source().Ext![..^1] + ",\"LoginPath\":123}"));
+        Assert.False(App99Source.SupportsGuard(Source().Ext!.Replace(Uuid, "bad")));
+        Assert.Throws<NotSupportedException>(() => App99Source.ParseExt(Source().Ext![..^1] + ",\"token\":\"requires-login\"}", ftyGuard: true));
+        // An ordinary App99 definition must not be guessed to use this Guard codec.
+        Assert.Throws<NotSupportedException>(() => App99Source.ParseExt("rfOX1voDIQhH8epBwpmIsuS87CY="));
+    }
+
     private sealed class DummyHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
@@ -174,6 +222,7 @@ public sealed class App99SourceTests
     private sealed class Routes : HttpMessageHandler
     {
         public bool Compressed, Bomb, Wait, Redirect;
+        public string? ExpectedUserAgent, ExpectedVersion;
         public string? Raw;
         public int Initializations, Details, Parses, Active;
         public ConcurrentQueue<string> Paths { get; } = new();
@@ -193,6 +242,8 @@ public sealed class App99SourceTests
             Assert.Equal("api.example", request.RequestUri.Host);
             Assert.StartsWith("/app/bn/", request.RequestUri.AbsolutePath);
             Assert.Equal(HttpMethod.Post, request.Method);
+            if (ExpectedUserAgent is not null) Assert.Equal(ExpectedUserAgent, Assert.Single(request.Headers.GetValues("User-Agent")));
+            if (ExpectedVersion is not null) Assert.Equal(ExpectedVersion, Assert.Single(request.Headers.GetValues("version")));
             Assert.Equal(Uuid, Assert.Single(request.Headers.GetValues("uuid")));
             string body = await request.Content!.ReadAsStringAsync(token);
             string timestamp = Assert.Single(request.Headers.GetValues("timestamp"));

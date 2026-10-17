@@ -10,7 +10,7 @@ using VodBox.Core;
 namespace VodBox.Infrastructure;
 
 /// <summary>
-/// csp_App99 原生适配（BN v2 协议：AES-256-CBC 随机 IV + SHA256 签名 + zlib/去填充响应）。
+/// csp_App99 / FTY csp_App99Guard 匿名原生适配（BN v2：AES-256-CBC + SHA256 + zlib）。
 /// 无账号登录、不执行 JAR/脚本。
 ///
 /// TVBox ext 为 JSON 对象（真实宝盒「双星99」「剧圈圈99」实测形态）：
@@ -49,7 +49,7 @@ public sealed class App99Source : IResolvingContentSource, IDisposable
         _http = http;
         _sourceKey = info.Key;
         _sourceName = info.Name;
-        var root = ParseExt(info.Ext);
+        var root = ParseExt(info.Ext, ftyGuard: info.Api?.Trim() == "csp_App99Guard");
         var uri = HttpUri(root.Host);
         if (uri.Query.Length != 0 || uri.Fragment.Length != 0)
             throw new InvalidDataException("App99 entry 不允许查询或片段。");
@@ -74,14 +74,22 @@ public sealed class App99Source : IResolvingContentSource, IDisposable
     internal sealed record ExtConfig(string Host, string AppKey, string Name, string VersionName,
         string BuildSignature, string? Uuid, string? UserAgent, string? ApiVersion);
 
-    /// <summary>解析 JSON ext（宝盒真实形态：host/appkey/name/versionName/buildSignature[...]）。</summary>
-    internal static ExtConfig ParseExt(string? ext)
+    /// <summary>普通入口读取 JSON；FTY Guard 入口显式启用已验证的 ext codec、ua/version 字段。</summary>
+    internal static ExtConfig ParseExt(string? ext, bool ftyGuard = false)
     {
-        var text = (ext ?? "").Trim();
+        var text = ftyGuard ? FtyExtCodec.JsonConfig(ext) : (ext ?? "").Trim();
         if (text.Length == 0 || !text.StartsWith('{'))
             throw new NotSupportedException("csp_App99 需要 JSON ext（host/appkey/name/versionName/buildSignature）。");
         using var doc = JsonDocument.Parse(text);
         var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("App99 ext 必须是 JSON 对象。");
+        // This adapter implements anonymous BN v2. A token changes both the body and signature.
+        if (ftyGuard && (
+            root.TryGetProperty("token", out var token) && token.ValueKind != JsonValueKind.Null &&
+                (token.ValueKind != JsonValueKind.String || token.GetString() != "") ||
+            root.TryGetProperty("LoginPath", out var login) && login.ValueKind != JsonValueKind.Null &&
+                (login.ValueKind != JsonValueKind.String || login.GetString() is not ("" or "/app/userInfo"))))
+            throw new NotSupportedException("App99Guard 的登录/token 变体尚未适配。");
         string host = Text(root, "host");
         if (host.Length == 0) host = Text(root, "entry");
         string appKey = Text(root, "appkey");
@@ -94,8 +102,25 @@ public sealed class App99Source : IResolvingContentSource, IDisposable
         return new ExtConfig(host, appKey, Text(root, "name"), Text(root, "versionName"),
             Text(root, "buildSignature"),
             Text(root, "uuid") is { Length: > 0 } u ? u : null,
-            Text(root, "userAgent") is { Length: > 0 } ua ? ua : null,
-            Text(root, "apiVersion") is { Length: > 0 } av ? av : null);
+            Text(root, ftyGuard ? "ua" : "userAgent") is { Length: > 0 } ua ? ua : ftyGuard ? GuardUserAgent : null,
+            Text(root, ftyGuard ? "version" : "apiVersion") is { Length: > 0 } av ? av : null);
+    }
+
+    internal const string GuardUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6299.95 Safari/537.36";
+
+    internal static bool SupportsGuard(string? ext)
+    {
+        try
+        {
+            var config = ParseExt(ext, ftyGuard: true);
+            var uri = HttpUri(config.Host);
+            return uri.Query.Length == 0 && uri.Fragment.Length == 0 &&
+                new[] { config.Name, config.VersionName, config.BuildSignature }.All(value => value.Length is > 0 and <= 2048) &&
+                (config.Uuid is null || config.Uuid.Length is 32 or 36 && Guid.TryParse(config.Uuid, out _)) &&
+                Header(config.AppKey).Length > 0 && Header(config.UserAgent ?? "").Length > 0 &&
+                Header(config.ApiVersion ?? "0b4328287a5d953e").Length > 0;
+        }
+        catch (Exception error) when (error is InvalidDataException or JsonException or NotSupportedException) { return false; }
     }
 
     // ---------- IContentSource ----------

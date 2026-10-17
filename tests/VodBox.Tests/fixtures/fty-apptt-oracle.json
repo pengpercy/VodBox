@@ -1,0 +1,111 @@
+{
+  "results": [
+    {
+      "request": {},
+      "response": {
+        "class": [
+          {
+            "type_id": "1",
+            "type_name": "电影"
+          }
+        ],
+        "list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "https://cdn.example/cover.jpg",
+            "vod_remarks": "全集"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "pg": "2",
+        "t": "1"
+      },
+      "response": {
+        "limit": 20,
+        "list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "https://cdn.example/cover.jpg",
+            "vod_remarks": "全集"
+          }
+        ],
+        "page": 2,
+        "pagecount": 999,
+        "total": 2147483647
+      }
+    },
+    {
+      "request": {
+        "pg": "1",
+        "wd": "中文"
+      },
+      "response": {
+        "list": [
+          {
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "https://cdn.example/cover.jpg",
+            "vod_remarks": "全集"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "ids": "7"
+      },
+      "response": {
+        "list": [
+          {
+            "vod_actor": "演员",
+            "vod_area": "大陆",
+            "vod_content": "剧情",
+            "vod_director": "导演",
+            "vod_id": "7",
+            "vod_name": "中文电影",
+            "vod_pic": "https://cdn.example/cover.jpg",
+            "vod_play_from": "免费分享 仅供测试$$$json",
+            "vod_play_url": "第一集$https://media.example/direct.mp4$$$正片$https://web.example/watch/7",
+            "vod_remarks": "全集",
+            "vod_year": "2026"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "flag": "direct",
+        "ids": "7",
+        "play": "https://media.example/direct.mp4"
+      },
+      "response": {
+        "parse": 0,
+        "playUrl": "",
+        "url": "https://media.example/direct.mp4"
+      }
+    },
+    {
+      "request": {
+        "flag": "json",
+        "ids": "7",
+        "play": "https://web.example/watch/7"
+      },
+      "response": {
+        "header": {
+          "Referer": "https://web.example/"
+        },
+        "url": "https://media.example/parsed.mp4"
+      }
+    }
+  ],
+  "sign": "fd567853aea2bf33a2deb8c4d000b284",
+  "pluginSha256": "218fb47aa2b48411702a7cfafa09353c71612302d4069da9f4d1f6222e7558e7",
+  "fixture": "postman/mocks/fty-apptt/default.js",
+  "signInput": "1000",
+  "note": "Original AppTTGuard via NativeProbe on a controlled local synthetic API. Volatile danmaku proxy URLs omitted. Category pagination sentinel 999 is not copied to the UI."
+}

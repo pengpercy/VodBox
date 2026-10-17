@@ -26,9 +26,10 @@ public sealed class AppServices : IDisposable
         Directory.CreateDirectory(DataDir);
         LocalControl=new LocalControlServer(Path.Combine(DataDir,"media-inbox"));
         Store = new LibraryStore(Path.Combine(DataDir, "library.db"));
-        // 本分支随包携带 JRE 与 JavaHost：启用 JAR 插件宿主，csp_ 爬虫站点才会注册（否则饭太硬一类配置只剩几个原生站点）。
-        // 宿主不可用（缺 Java/host.jar）时 SourceRegistry 会把 JAR 站点列为禁用并给出提示，不会伪装可用。
-        Registry = new SourceRegistry(Store, enableJarPluginHost: true, configCacheDirectory: Path.Combine(DataDir, "config-cache"));
+        // 默认产品路由只使用 C# 原生 provider：不再启动 JVM。尚未迁移的 csp_ 入口会被过滤，
+        // 并由 SourceRegistry 逐项给出「尚未迁移为 C# 原生实现」的明确提示——包括按用户要求跳过的网盘入口。
+        // JavaHost 仍保留在源码中供显式原生验证对照，但默认路径不再依赖它。
+        Registry = new SourceRegistry(Store, configCacheDirectory: Path.Combine(DataDir, "config-cache"));
         // GUI 模式 + 等渲染面：loadfile 不早于 render-context 创建，消除静默丢画面竞态。
         Player = new MpvEngine(waitForVideoSurface: true);
     }

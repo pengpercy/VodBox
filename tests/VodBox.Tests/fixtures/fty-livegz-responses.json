@@ -1,0 +1,86 @@
+{
+  "sports": [
+    {
+      "mid": 100,
+      "match_id": 200,
+      "ball_type": 1,
+      "m_status": 1,
+      "event_name": "测试联赛",
+      "stage": "第一轮",
+      "match_time": 1792250000,
+      "home": {
+        "name": "主队",
+        "logo": "https://media.example/home.png",
+        "score": "2"
+      },
+      "visiting": {
+        "name": "客队",
+        "score": "1"
+      }
+    },
+    {
+      "mid": 101,
+      "match_id": 200,
+      "ball_type": 1,
+      "m_status": 0,
+      "event_name": "测试联赛",
+      "stage": "第一轮",
+      "match_time": 1792250000,
+      "home": {
+        "name": "主队",
+        "logo": "https://media.example/home.png",
+        "score": "2"
+      },
+      "visiting": {
+        "name": "客队",
+        "score": "1"
+      }
+    },
+    {
+      "mid": 102,
+      "match_id": 200,
+      "ball_type": 1,
+      "m_status": 2,
+      "event_name": "测试联赛",
+      "stage": "第一轮",
+      "match_time": 1792250000,
+      "home": {
+        "name": "主队",
+        "logo": "https://media.example/home.png",
+        "score": "2"
+      },
+      "visiting": {
+        "name": "客队",
+        "score": "1"
+      }
+    }
+  ],
+  "detail": {
+    "mid": 100,
+    "match_id": 200,
+    "ball_type": 1,
+    "m_status": 1,
+    "event_name": "测试联赛",
+    "stage": "第一轮",
+    "match_time": 1792250000,
+    "home": {
+      "name": "主队",
+      "logo": "https://media.example/home.png",
+      "score": "2"
+    },
+    "visiting": {
+      "name": "客队",
+      "score": "1"
+    },
+    "live_line": [
+      {
+        "name": "线路一",
+        "m3u8": "https://media.example/live.m3u8"
+      },
+      {
+        "name": "线路二",
+        "m3u8": "https://media.example/live2.m3u8"
+      }
+    ]
+  }
+}

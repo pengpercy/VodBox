@@ -5,8 +5,11 @@
     <ProjectReference Include="..\VodBox.PluginHost\VodBox.PluginHost.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="MonoTorrent" />
+    <PackageReference Include="Mono.Nat" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="VodBox.Tests" />
+    <InternalsVisibleTo Include="VodBox.ProtocolProbe" />
   </ItemGroup>
 </Project>

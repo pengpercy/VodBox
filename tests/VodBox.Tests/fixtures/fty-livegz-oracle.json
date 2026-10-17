@@ -1,0 +1,119 @@
+{
+  "results": [
+    {
+      "request": {},
+      "response": {
+        "class": [
+          {
+            "type_flag": "",
+            "type_id": "1-0-0",
+            "type_name": "热播"
+          },
+          {
+            "type_flag": "",
+            "type_id": "0-37-0",
+            "type_name": "NBA"
+          },
+          {
+            "type_flag": "",
+            "type_id": "0-0-1",
+            "type_name": "足球"
+          },
+          {
+            "type_flag": "",
+            "type_id": "0-0-2",
+            "type_name": "篮球"
+          }
+        ],
+        "jx": 0,
+        "list": [
+          {
+            "vod_id": "100-200-1",
+            "vod_name": "主队 vs 客队",
+            "vod_pic": "https://media.example/home.png",
+            "vod_remarks": "直播中 测试联赛 第一轮 比分2:1"
+          },
+          {
+            "vod_id": "101-200-1",
+            "vod_name": "主队 vs 客队",
+            "vod_pic": "https://media.example/home.png",
+            "vod_remarks": "未开赛 10-17 23:13 测试联赛 第一轮"
+          }
+        ],
+        "parse": 0
+      }
+    },
+    {
+      "request": {
+        "pg": "1",
+        "t": "1-0-0"
+      },
+      "response": {
+        "jx": 0,
+        "list": [
+          {
+            "vod_id": "100-200-1",
+            "vod_name": "主队 vs 客队",
+            "vod_pic": "https://media.example/home.png",
+            "vod_remarks": "直播中 测试联赛 第一轮 比分2:1"
+          },
+          {
+            "vod_id": "101-200-1",
+            "vod_name": "主队 vs 客队",
+            "vod_pic": "https://media.example/home.png",
+            "vod_remarks": "未开赛 10-17 23:13 测试联赛 第一轮"
+          }
+        ],
+        "parse": 0
+      }
+    },
+    {
+      "request": {
+        "ids": "100-200-1"
+      },
+      "response": {
+        "jx": 0,
+        "list": [
+          {
+            "type_name": "",
+            "vod_content": "请勿相信视频中任何广告",
+            "vod_id": "100-200-1",
+            "vod_name": "主队 vs 客队",
+            "vod_pic": "https://media.example/home.png",
+            "vod_play_from": "线路一$$$线路二",
+            "vod_play_url": "1$https://media.example/live.m3u8$$$2$https://media.example/live2.m3u8",
+            "vod_remarks": "直播中 测试联赛 第一轮 比分2:1"
+          }
+        ],
+        "parse": 0
+      }
+    },
+    {
+      "request": {
+        "detailID": "100-200-1",
+        "flag": "线路一",
+        "play": "https://media.example/live.m3u8"
+      },
+      "response": {
+        "parse": "0",
+        "playUrl": "",
+        "url": "https://media.example/live.m3u8"
+      }
+    },
+    {
+      "request": {
+        "detailID": "100-200-1",
+        "flag": "线路二",
+        "play": "https://media.example/live2.m3u8"
+      },
+      "response": {
+        "parse": "0",
+        "playUrl": "",
+        "url": "https://media.example/live2.m3u8"
+      }
+    }
+  ],
+  "pluginSha256": "218fb47aa2b48411702a7cfafa09353c71612302d4069da9f4d1f6222e7558e7",
+  "fixture": "postman/mocks/fty-livegz/default.js",
+  "note": "Original LiveGzGuard against a controlled synthetic API. Timestamp display depends on the local timezone; media lines and encrypted request vectors are deterministic."
+}
