@@ -9,9 +9,11 @@ namespace VodBox.Desktop.Views;
 internal sealed class PosterCache : IDisposable
 {
     internal static readonly PosterCache Shared = new(LoadBitmapAsync);
+    // 台标解码为 200px 宽，单张可达 ~160KB：预算要装得下一份常见直播源（百余频道）的全部台标，
+    // 否则来回滚动会不断淘汰、再解码。M3U 里的坏台标地址（常见整份列表共用一个）记 10 分钟，不在每次停下滚动时重试。
     internal static readonly PosterCache ChannelLogos = new(LoadLogoBitmapAsync,
-        maxBytes: 8 * 1024 * 1024, maxImages: 128, maxConcurrentLoads: 2,
-        abandonDelay: TimeSpan.FromMilliseconds(100));
+        maxBytes: 32 * 1024 * 1024, maxImages: 256, maxConcurrentLoads: 2,
+        abandonDelay: TimeSpan.FromMilliseconds(100), failureMemory: TimeSpan.FromMinutes(10));
     private static readonly VodBox.Infrastructure.PosterDiskCache Disk=new(
         Path.Combine(VodBox.Infrastructure.AppPaths.DataDirectory,"posters"),FetchPosterBytesAsync);
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
@@ -23,13 +25,15 @@ internal sealed class PosterCache : IDisposable
     private readonly long _maxBytes;
     private readonly int _maxImages;
     private readonly TimeSpan _abandonDelay;
+    private readonly TimeSpan _failureMemory;
+    private readonly Dictionary<Uri, long> _failures = new();
     private long _bytes;
     private int _images;
     private bool _disposed;
 
     internal PosterCache(Func<Uri, CancellationToken, Task<Bitmap>> loader,
         long maxBytes = 64 * 1024 * 1024, int maxImages = 128, int maxConcurrentLoads = 4,
-        TimeSpan? abandonDelay = null)
+        TimeSpan? abandonDelay = null, TimeSpan? failureMemory = null)
     {
         ArgumentNullException.ThrowIfNull(loader);
         ArgumentOutOfRangeException.ThrowIfNegative(maxBytes);
@@ -41,6 +45,22 @@ internal sealed class PosterCache : IDisposable
         _downloads = new(maxConcurrentLoads);
         _abandonDelay = abandonDelay ?? TimeSpan.FromSeconds(2);
         ArgumentOutOfRangeException.ThrowIfLessThan(_abandonDelay, TimeSpan.Zero);
+        _failureMemory = failureMemory ?? TimeSpan.Zero;
+        ArgumentOutOfRangeException.ThrowIfLessThan(_failureMemory, TimeSpan.Zero);
+    }
+
+    /// <summary>该地址在失败记忆期内加载失败过（下载出错、超时或解码失败；主动取消不算）。</summary>
+    internal bool HasRecentlyFailed(Uri uri)
+    {
+        lock (_gate) return RecentlyFailed(uri);
+    }
+
+    private bool RecentlyFailed(Uri uri)
+    {
+        if (!_failures.TryGetValue(uri, out var failedAt)) return false;
+        if (System.Diagnostics.Stopwatch.GetElapsedTime(failedAt) < _failureMemory) return true;
+        _failures.Remove(uri);
+        return false;
     }
 
     /// <summary>已经解码的图像直接租用，不排后台任务、不重复解码。</summary>
@@ -76,6 +96,7 @@ internal sealed class PosterCache : IDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            if (RecentlyFailed(uri)) throw new IOException($"Image recently failed to load: {uri}");
             start = !_entries.TryGetValue(uri, out entry!);
             if (start) _entries.Add(uri, entry = new Entry(uri));
             entry.Consumers++;
@@ -139,6 +160,9 @@ internal sealed class PosterCache : IDisposable
             {
                 Retire(entry);
                 entry.Loading = false;
+                // HttpClient 超时也抛 TaskCanceledException，但不是本条目被取消：按失败记忆。
+                var cancelled = error is OperationCanceledException && entry.Cancellation.IsCancellationRequested;
+                if (!cancelled && _failureMemory > TimeSpan.Zero) _failures[entry.Uri] = System.Diagnostics.Stopwatch.GetTimestamp();
                 if (error is OperationCanceledException) entry.Completion.TrySetCanceled();
                 else
                 {

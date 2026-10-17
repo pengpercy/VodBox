@@ -69,7 +69,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <StackPanel Width="150" Height="244" Margin="0,0,16,16" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
-                <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="190" Background="#274064" ClipToBounds="True">
+                <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="190" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
                   <Panel>
                     <Panel IsVisible="{Binding #RecentPoster.HasImage, Converter={x:Static views:BoolConverters.Not}}">
                       <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Converter={x:Static views:HistoryConverters.IsNotLive}}" />
@@ -88,7 +88,7 @@
                            TextTrimming="CharacterEllipsis" />
                 <!-- 直播=黄条（全程），点播=蓝条按比例 -->
                 <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" Margin="0,6,0,0">
-                  <Border Background="#4CC2FF" Height="3" CornerRadius="2"
+                  <Border Background="{DynamicResource AccentBrush}" Height="3" CornerRadius="2"
                           Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}}" />
                 </Border>
               </StackPanel>
@@ -109,7 +109,7 @@
             <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                     Padding="12" Margin="0,0,12,12" Cursor="Hand" PointerPressed="OnResume" Tag="{Binding}">
               <Grid ColumnDefinitions="104,*,Auto" RowDefinitions="Auto,Auto">
-                <Border Grid.Column="0" Grid.RowSpan="2" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="144" Width="96" Background="#274064"
+                <Border Grid.Column="0" Grid.RowSpan="2" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="144" Width="96" Background="{DynamicResource CardHoverBrush}"
                         VerticalAlignment="Top" ClipToBounds="True">
                   <Panel>
                     <Panel IsVisible="{Binding #EarlierPoster.HasImage, Converter={x:Static views:BoolConverters.Not}}">
@@ -121,12 +121,12 @@
                 </Border>
                 <StackPanel Grid.Column="1" Margin="10,0,8,0" Spacing="6" VerticalAlignment="Center">
                   <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding SourceName}" FontSize="12" Foreground="#4CC2FF" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding SourceName}" FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                   <TextBlock FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}">
                     <Run Text="看到 " /><Run Text="{Binding PositionMs, Converter={x:Static views:MillisecondConverters.ToTime}, Mode=OneWay}" /><Run Text=" / " /><Run Text="{Binding DurationMs, Converter={x:Static views:MillisecondConverters.ToTime}, Mode=OneWay}" />
                   </TextBlock>
                   <Border Height="3" CornerRadius="2" Background="#1FFFFFFF" HorizontalAlignment="Stretch" Margin="0,4,0,0">
-                    <Border Background="#4CC2FF" Height="3" CornerRadius="2"
+                    <Border Background="{DynamicResource AccentBrush}" Height="3" CornerRadius="2"
                             Width="{Binding PositionMs, ConverterParameter={Binding DurationMs}, Converter={x:Static views:ProgressConverters.Ratio}, Mode=OneWay}" />
                   </Border>
                 </StackPanel>

@@ -89,6 +89,29 @@ jobs:
           distribution: temurin
           java-version: '21'
           architecture: ${{ endsWith(matrix.rid, '-arm64') && 'aarch64' || 'x64' }}
+      # Restored before the Java and native steps that read them: placed after the source rebuild,
+      # the engine cache was only ever saved, never used.
+      - uses: actions/cache@v6
+        if: steps.reuse.outputs.skip != 'true'
+        with:
+          path: |
+            .packages
+            .cache/downloads
+            .cache/vulkan
+            .cache/native-rebuild-engine
+          key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json', 'third_party/tvbox-silicon/rebuild/backend-unicorn2/engine-pin.json') }}
+      # Maven and the corresponding-source archives (~270MB) are architecture independent: one shared entry
+      # instead of six fresh downloads. tvbox-host.py still checks every archive's sha256 after restore.
+      - uses: actions/cache@v6
+        if: steps.reuse.outputs.skip != 'true'
+        with:
+          path: |
+            .cache/maven
+            .cache/maven-repository
+            third_party/tvbox-silicon/dependency-sources/archives
+          key: java-host-${{ hashFiles('third_party/tvbox-silicon/dependency-sources/download-archives.json', 'third_party/tvbox-silicon/Runtime/JavaHost/pom.xml') }}
+          restore-keys: java-host-
+          enableCrossOsArchive: true
       - name: Build upstream Java plugin component
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
@@ -134,18 +157,10 @@ jobs:
           python3 build/rebuild_native_backend.py verify \
             --receipt src/VodBox.PluginHost/JavaHost/native-backend-receipt.json \
             --deps src/VodBox.PluginHost/JavaHost/deps
-      - uses: actions/cache@v6
-        if: steps.reuse.outputs.skip != 'true'
-        with:
-          path: |
-            .packages
-            .cache/downloads
-            .cache/vulkan
-            .cache/native-rebuild-engine
-          key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json', 'third_party/tvbox-silicon/rebuild/backend-unicorn2/engine-pin.json') }}
       - name: Restore and test
-        # Managed tests do not depend on CPU architecture; the arm64 legs stay on native verification only.
-        if: steps.reuse.outputs.skip != 'true' && !endsWith(matrix.rid, '-arm64')
+        # Managed tests do not depend on CPU architecture: run them once per OS, on the faster runner.
+        # macOS uses the Apple Silicon leg; the Intel runner is the slowest one and sets the critical path.
+        if: steps.reuse.outputs.skip != 'true' && contains(fromJSON('["win-x64","linux-x64","osx-arm64"]'), matrix.rid)
         shell: bash
         run: |
           python3 build/test_bundle.py

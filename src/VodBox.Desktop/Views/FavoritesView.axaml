@@ -4,6 +4,22 @@
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.FavoritesView" x:DataType="vm:MainViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.favTab">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
+      <Setter Property="Padding" Value="14,7" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.favTab.selected">
+      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </UserControl.Styles>
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
@@ -14,25 +30,14 @@
       <Grid ColumnDefinitions="Auto,Auto,*,Auto">
         <TextBlock Grid.Column="0" Text="收藏" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="18,10,0,0" VerticalAlignment="Center">
-          <Button Click="OnTabVod" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,7" FontSize="12.5" Cursor="Hand">
-            <Button.Background>
-              <Binding Path="Tab" Converter="{x:Static views:TabConverters.VodBackground}">
-                <Binding.ConverterParameter>#264CC2FF</Binding.ConverterParameter>
-              </Binding>
-            </Button.Background>
-            <Button.Foreground>
-              <Binding Path="Tab" Converter="{x:Static views:TabConverters.VodForeground}">
-                <Binding.ConverterParameter>#4CC2FF</Binding.ConverterParameter>
-              </Binding>
-            </Button.Foreground>
-            <Button.BorderThickness>0</Button.BorderThickness>
+          <!-- 点播/直播切换：选中项浅中性底 + 主文字色加粗，未选中弱文字色（不再用浅天蓝填充）。 -->
+          <Button Classes="favTab" Classes.selected="{Binding Tab, Converter={x:Static views:TabConverters.IsVod}}" Click="OnTabVod">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.Movie}" Width="18" Height="18" VerticalAlignment="Center" />
               <TextBlock Text="点播" VerticalAlignment="Center" /><TextBlock Text="{Binding Vod.Count}" FontSize="11.5" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Click="OnTabLive" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,7" FontSize="12.5" Cursor="Hand"
-                  Background="Transparent" Foreground="{DynamicResource TextTertiaryBrush}" BorderThickness="0">
+          <Button Classes="favTab" Classes.selected="{Binding Tab, Converter={x:Static views:TabConverters.IsLive}}" Click="OnTabLive">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.Television}" Width="18" Height="18" VerticalAlignment="Center" />
               <TextBlock Text="直播频道" VerticalAlignment="Center" /><TextBlock Text="{Binding Live.Count}" FontSize="11.5" VerticalAlignment="Center" />
@@ -56,7 +61,7 @@
             </StackPanel>
           </Button>
           <Button Command="{Binding ToggleManageCommand}" Background="{DynamicResource CardHoverBrush}"
-                  Foreground="#4CC2FF" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,6" FontSize="12" Cursor="Hand">
+                  Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,6" FontSize="12" Cursor="Hand">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource Icon.CheckboxMarked}" Width="18" Height="18" VerticalAlignment="Center" />
               <TextBlock Text="管理" VerticalAlignment="Center" />
@@ -92,7 +97,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <StackPanel Width="158" Margin="0,0,18,18" Cursor="Hand" PointerPressed="OnOpenFavorite" Tag="{Binding}">
-              <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="225" Background="#274064" ClipToBounds="True">
+              <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="225" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
                 <Panel>
                   <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   <views:RemotePoster Url="{Binding Poster}" />

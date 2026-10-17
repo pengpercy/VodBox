@@ -23,6 +23,13 @@ public partial class HomeView : UserControl
         _heroTimer.Tick += (_, _) => RotateHero();
     }
 
+    /// <summary>内容开始从标题栏下方穿过（越过顶部几像素）即通知主窗口渐显标题栏毛玻璃。</summary>
+    private void OnHomeScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel main && sender is ScrollViewer scroller)
+            main.Home.ScrolledUnderTitleBar = scroller.Offset.Y > 4;
+    }
+
     internal void RotateHero()
     {
         if (!_heroHovered && IsEffectivelyVisible && DataContext is MainViewModel { Home.Loading: false } main)

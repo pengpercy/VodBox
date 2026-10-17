@@ -189,7 +189,7 @@
               Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
               IsVisible="{Binding Content.Message, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}">
         <TextBlock Text="{Binding Content.Message}" FontSize="12.5"
-                   Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" />
+                   Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
       </Border>
 
       <!-- 分隔线：贯穿整个客户区（含 44px 标题条） -->
@@ -241,10 +241,10 @@
                       <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,8" Background="#0AFFFFFF">
                         <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"
                                    MaxWidth="300" HorizontalAlignment="Left" VerticalAlignment="Center" />
-                        <Border Grid.Column="1" CornerRadius="5" BorderBrush="#4CC2FF" BorderThickness="1"
+                        <Border Grid.Column="1" CornerRadius="5" Background="{DynamicResource CardHoverBrush}"
                                 Padding="7,1" VerticalAlignment="Center" Margin="0,0,8,0"
                                 IsVisible="{Binding Current}">
-                          <TextBlock Text="使用中" FontSize="10" Foreground="#4CC2FF" />
+                          <TextBlock Text="使用中" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
                         </Border>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                           <Button Content="切换" Command="{Binding $parent[views:SettingsWindow].((vm:SettingsWindowViewModel)DataContext).Content.SwitchConfigCommand}"

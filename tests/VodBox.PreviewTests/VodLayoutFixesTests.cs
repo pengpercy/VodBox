@@ -91,6 +91,59 @@ public sealed class VodLayoutFixesTests
         }
     }
 
+    /// <summary>
+    /// 站点下拉：按钮用中性底色（不再是整块主题蓝）；弹层与按钮同宽、最高 360 超出滚动（站点多时不撑满整屏）；
+    /// 当前站点加粗，长站名省略号且悬停可看全名。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Vod_SourceMenuIsCappedMatchesButtonWidthAndUsesNeutralColors()
+    {
+        var directory = TempDataDirectory.Create("vod-source-menu");
+        using var services = new AppServices(directory);
+        var main = new MainViewModel(services, true);
+        main.AttachDispatcher(Dispatcher.UIThread);
+        var path = Path.Combine(directory, "config.json");
+        var sites = string.Join(",", Enumerable.Range(1, 40).Select(i =>
+            $$"""{"key":"s{{i}}","name":"{{(i == 3 ? "一个名字特别特别长的站点用来测试省略号显示" : "站点" + i)}}","api":"csp_Push","type":3}"""));
+        await File.WriteAllTextAsync(path, "{\"sites\":[" + sites + "]}", TestContext.Current.CancellationToken);
+        var view = new VodView { DataContext = main };
+        var window = new Window { Width = 1280, Height = 900, Content = view };
+        try
+        {
+            await services.Registry.LoadConfigAsync(path, TestContext.Current.CancellationToken);
+            await main.Vod.LoadAsync();
+            window.Show();
+            Pump(window);
+            var selector = view.FindControl<Button>("SourceSelector")!;
+            var accent = Color.Parse("#4CC2FF");
+            Assert.False(selector.Background is ISolidColorBrush { Color: var fill } && fill.R == accent.R && fill.G == accent.G && fill.B == accent.B);
+            Assert.False(selector.BorderBrush is ISolidColorBrush { Color: var edge } && edge == accent);
+
+            selector.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Pump(window);
+            var menu = Assert.IsType<ContextMenu>(selector.ContextMenu);
+            Assert.True(menu.IsOpen);
+            Assert.Equal(40, menu.Items.Count);
+            Assert.Equal(selector.Bounds.Width, menu.Bounds.Width, 1);
+            Assert.InRange(menu.Bounds.Height, 1, 360);
+            var current = menu.Items.OfType<MenuItem>().Single(item => item.Classes.Contains("current"));
+            Assert.Equal(main.Vod.SourceName, current.Header);
+            var longItem = menu.Items.OfType<MenuItem>().ElementAt(2);
+            Assert.Equal("一个名字特别特别长的站点用来测试省略号显示", ToolTip.GetTip(longItem));
+            // 标题由 AccessText（TextBlock 子类）绘制：省略号样式必须真的落到它上面，否则长站名会被硬裁半个字。
+            var header = longItem.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text?.StartsWith("一个名字") == true);
+            Assert.Equal(TextTrimming.CharacterEllipsis, header.TextTrimming);
+            Assert.InRange(header.Bounds.Width, 1, menu.Bounds.Width - 40);
+            menu.Close();
+        }
+        finally
+        {
+            window.Close();
+            services.Dispose();
+            TempDataDirectory.TryDelete(directory);
+        }
+    }
+
     [AvaloniaFact]
     public void Vod_PosterRowsFillAvailableWidthInsteadOfLeavingRightGap()
     {

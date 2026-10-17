@@ -15,7 +15,6 @@ public static class PageConverters
     public static readonly IValueConverter IsLive = new PageConverter(AppPage.Live);
     public static readonly IValueConverter IsFavorites = new PageConverter(AppPage.Favorites);
     public static readonly IValueConverter IsHistory = new PageConverter(AppPage.History);
-    public static readonly IValueConverter IsFiles = new PageConverter(AppPage.Files);
     public static readonly IValueConverter IsSettings = new PageConverter(AppPage.Settings);
     public static readonly IValueConverter IsDetail = new PageConverter(AppPage.Detail);
 
@@ -161,45 +160,20 @@ public static class BoolConverters
     private sealed class ToSelectedRowConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => value is true ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x264CC2FF)) : Avalonia.Media.Brushes.Transparent;
+            => value is true ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0xFF0078D4)) : Avalonia.Media.Brushes.Transparent;
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();
     }
 }
 
-/// <summary>收藏页 Tab（0=点播/1=直播）→ 样式。</summary>
+/// <summary>收藏页点播/直播切换：当前 Tab 是否为该项（选中样式由 favTab.selected 提供，颜色跟随主题）。</summary>
 public static class TabConverters
 {
-    public static readonly IValueConverter VodBackground = new TabBackgroundConverter(0);
-    public static readonly IValueConverter LiveBackground = new TabBackgroundConverter(1);
-    public static readonly IValueConverter VodForeground = new TabForegroundConverter(0);
-    public static readonly IValueConverter LiveForeground = new TabForegroundConverter(1);
-
-    private sealed class TabBackgroundConverter(int tab) : IValueConverter
-    {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => value is int i && i == tab && parameter is string hex
-                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.TryParse(hex, out var c) ? c : Avalonia.Media.Color.FromUInt32(0x264CC2FF))
-                : Avalonia.Media.Brushes.Transparent;
-
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => throw new NotSupportedException();
-    }
-
-    private sealed class TabForegroundConverter(int tab) : IValueConverter
-    {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => value is int i && i == tab && parameter is string hex
-                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.TryParse(hex, out var c) ? c : Avalonia.Media.Color.FromUInt32(0xFF4CC2FF))
-                : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x85FFFFFF));
-
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => throw new NotSupportedException();
-    }
+    public static readonly IValueConverter IsVod = new FuncValueConverter<int, bool>(tab => tab == 0);
+    public static readonly IValueConverter IsLive = new FuncValueConverter<int, bool>(tab => tab == 1);
 }
 
-/// <summary>时间戳 → N 天前 / 上周 / N 周前 / N 个月前。</summary>
 public static class TimeAgoConverters
 {
     public static readonly IValueConverter ToAgo = new ToAgoConverter();
@@ -237,7 +211,7 @@ public static class SectionConverters
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
             => value is int section && int.TryParse(parameter?.ToString(), out var p) && section == p
-                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x264CC2FF))
+                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x1F808080))
                 : Avalonia.Media.Brushes.Transparent;
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -247,11 +221,23 @@ public static class SectionConverters
     private sealed class NavForegroundConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-            => value is int section && int.TryParse(parameter?.ToString(), out var p) && section == p
-                ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0xFF4CC2FF))
-                : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromUInt32(0x99FFFFFF));
+            // 文字色跟随主题（不再用浅天蓝区分选中），选中态只由浅中性底色表达。
+            => Avalonia.AvaloniaProperty.UnsetValue;
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();
     }
+}
+
+/// <summary>媒体卡片的次要信息行：年份 · 地区 · 类型，只拼非空项，缺项时不留孤立的「·」。</summary>
+public static class MediaConverters
+{
+    public static readonly IValueConverter Meta = new FuncValueConverter<VodBox.Core.MediaItem?, string>(item =>
+        item is null ? "" : string.Join(" · ", new[] { item.Year, item.Area, item.TypeName }.Where(value => !string.IsNullOrWhiteSpace(value))));
+}
+
+/// <summary>数值 → 是否大于 0（例如尺寸为 0 时直接隐藏元素）。</summary>
+public static class NumberConverters
+{
+    public static readonly IValueConverter IsPositive = new FuncValueConverter<double, bool>(value => value > 0);
 }

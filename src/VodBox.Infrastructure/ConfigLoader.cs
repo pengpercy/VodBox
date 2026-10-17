@@ -49,7 +49,7 @@ public sealed class ConfigLoader(DefaultHttp http)
         }
         return config is null
             ? throw new InvalidDataException($"配置解析失败：{url}")
-            : new LoadedConfig(config, finalUri.AbsoluteUri);
+            : new LoadedConfig(config, finalUri.AbsoluteUri, bytes);
     }
 
     private static readonly Dictionary<string, string> TvBoxHeaders = new()
@@ -193,5 +193,5 @@ public sealed class ConfigLoader(DefaultHttp http)
     }
 }
 
-/// <summary>已加载的订阅：配置 + 最终 origin。</summary>
-public sealed record LoadedConfig(TvBoxConfig Config, string? Origin);
+/// <summary>已加载的订阅：配置 + 最终 origin + 原始响应字节（远程订阅才有，用于本地副本）。</summary>
+public sealed record LoadedConfig(TvBoxConfig Config, string? Origin, byte[]? Raw = null);

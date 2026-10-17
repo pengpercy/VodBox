@@ -42,14 +42,14 @@
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.0, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.2.6, )",
-          "VodBox.PluginHost": "[0.2.6, )"
+          "VodBox.Core": "[0.2.9, )",
+          "VodBox.PluginHost": "[0.2.9, )"
         }
       },
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.2.6, )"
+          "VodBox.Core": "[0.2.9, )"
         }
       },
       "Microsoft.Data.Sqlite.Core": {

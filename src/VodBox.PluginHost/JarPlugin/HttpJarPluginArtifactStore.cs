@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -13,6 +14,10 @@ public sealed class HttpJarPluginArtifactStore : IJarPluginArtifactStore, IDispo
 
     private readonly HttpClient _client;
     private readonly string _cacheRoot;
+    // 同一份配置里很多站点共用一个爬虫 JAR：并发搜索会同时请求同一地址。按落地路径单飞，
+    // 后来者等同一个下载，而不是各自打开同一个临时文件（"The process cannot access the file"）。
+    // 静态：每个站点各有自己的存储实例，但落地目录是共享的。
+    private static readonly ConcurrentDictionary<string, Lazy<Task<string>>> InFlight = new(StringComparer.Ordinal);
 
     public HttpJarPluginArtifactStore(string? cacheRoot = null, HttpClient? client = null)
     {
@@ -33,7 +38,38 @@ public sealed class HttpJarPluginArtifactStore : IJarPluginArtifactStore, IDispo
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(address.AbsoluteUri)));
         var target = Path.Combine(_cacheRoot, hash + ".jar");
         if (File.Exists(target)) return target;
-        var temporary = target + ".tmp";
+        var download = InFlight.GetOrAdd(target, _ => new Lazy<Task<string>>(() => DownloadAsync(address, target)));
+        try
+        {
+            // 调用方取消只放弃等待；共享下载不随某一个调用方取消（受 HttpClient 超时约束）。
+            return await download.Value.WaitAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (download.Value.IsCompleted) InFlight.TryRemove(new KeyValuePair<string, Lazy<Task<string>>>(target, download));
+        }
+    }
+
+    private async Task<string> DownloadAsync(Uri address, string target)
+    {
+        await Task.Yield();
+        var ct = CancellationToken.None;
+        // 临时文件名唯一：另一个进程（或残留的旧 .tmp）不会与本次写入冲突；落地用原子替换。
+        var temporary = $"{target}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await WriteAsync(address, temporary, ct).ConfigureAwait(false);
+            File.Move(temporary, target, overwrite: true);
+            return target;
+        }
+        finally
+        {
+            try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    private async Task WriteAsync(Uri address, string temporary, CancellationToken ct)
+    {
         using (var response = await _client.GetAsync(address, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
         {
             response.EnsureSuccessStatusCode();
@@ -50,8 +86,6 @@ public sealed class HttpJarPluginArtifactStore : IJarPluginArtifactStore, IDispo
                 await output.WriteAsync(buffer.AsMemory(0, count), ct).ConfigureAwait(false);
             }
         }
-        File.Move(temporary, target, overwrite: true);
-        return target;
     }
 
     public void Dispose() => _client.Dispose();

@@ -91,9 +91,13 @@ public partial class VodView : UserControl
         var menu = button.ContextMenu ?? this.FindControl<ContextMenu>("SourceMenu");
         if (menu is null) return;
         menu.Items.Clear();
+        // 与按钮同宽：弹层不比下拉框宽；高度上限在 XAML（MaxHeight），站点多时内部滚动。
+        menu.Width = button.Bounds.Width;
         foreach (var source in VM.AvailableSources)
         {
             var item = new MenuItem { Header = source.Name };
+            ToolTip.SetTip(item, source.Name);
+            if (source.Key == VM.LoadedSourceKey) item.Classes.Add("current");
             item.Click += async (_, _) => await VM.SwitchSourceAsync(source.Key);
             menu.Items.Add(item);
         }

@@ -11,6 +11,11 @@ public sealed partial class SearchViewModel : ObservableObject
 {
     private readonly Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> _search;
     private Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>>? _detailedSearch;
+    /// <summary>流式聚合：每个站点完成即回填（JAR 站点首次搜索可达数十秒，不能让快站点的结果陪它们一起等）。</summary>
+    private Func<string,CancellationToken,IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>>? _streamSearch;
+    private Func<int> _targetCount = () => 0;
+    /// <summary>结果总数上限（卡片网格与归属映射共用）。</summary>
+    private const int ResultLimit = 500;
     private readonly Dictionary<MediaItem, string> _sourceKeys = new(ReferenceEqualityComparer.Instance);
     private CancellationTokenSource? _request;
     private long _generation;
@@ -24,6 +29,9 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>搜索历史胶囊（点击回搜、× 删除）。</summary>
     public ObservableCollection<string> SearchHistory { get; } = [];
 
+    /// <summary>未返回结果的站点（失败/超时/插件不受支持），侧栏单独一组列出，不再塞进汇总文案。</summary>
+    public ObservableCollection<SearchFailure> Failures { get; } = [];
+
     /// <summary>结果行集合：按可用宽度分块（虚拟化网格的数据源，行容器数 = 可见行数）。</summary>
     public ObservableCollection<ResultRow> ResultRows { get; } = [];
 
@@ -33,8 +41,30 @@ public sealed partial class SearchViewModel : ObservableObject
     [ObservableProperty] private bool _showSuggestions;
     /// <summary>结果区空态/错误态文案（非空时覆盖网格位置，避免白屏）。</summary>
     [ObservableProperty] private string _hint = "";
+    /// <summary>
+    /// 搜索窗口里打开的影片详情：在本窗口内展示（返回即回到原结果与滚动位置），不再把主窗口切到详情页。
+    /// 独立实例，主窗口同时开着详情页也互不影响。
+    /// </summary>
+    public DetailViewModel Detail => _detail ??= _main.CreateDetachedDetail();
+    private DetailViewModel? _detail;
+    internal DetailViewModel? DetailIfCreated => _detail;
+    /// <summary>当前在看详情（true）还是结果网格（false）。</summary>
+    [ObservableProperty] private bool _showingDetail;
+
     /// <summary>当前选中的站点结果组（右侧网格随它切换）；null = 全部结果。</summary>
     [ObservableProperty] private SearchSiteResult? _selectedSite;
+    /// <summary>界面上的简短状态行：搜索中为进度，结束为站点数与条数（失败明细在侧栏）。</summary>
+    [ObservableProperty] private string _status = "";
+    /// <summary>已完成站点占比（0~1），搜索中的细进度条用。</summary>
+    [ObservableProperty] private double _progress;
+
+    /// <summary>侧栏「全部」是否为当前选择。</summary>
+    public bool IsAllSelected => SelectedSite is null;
+    public bool HasFailures => Failures.Count > 0;
+    /// <summary>站点栏只在有东西可列时出现（搜索中、有结果或有失败站点）；首次打开/空态让空态居中。</summary>
+    public bool ShowSidebar => Searching || SiteResults.Count > 0 || Failures.Count > 0;
+    /// <summary>空态（尚未搜索或没有结果）且有历史时展示最近搜索，结果页本身不再挂历史条。</summary>
+    public bool ShowHistory => !Searching && ResultRows.Count == 0 && SearchHistory.Count > 0;
 
     /// <summary>搜索中且尚无任何结果 → 结果区骨架（清空旧结果后不留白屏）。</summary>
     public bool ShowSkeleton => Searching && ResultRows.Count == 0;
@@ -48,31 +78,69 @@ public sealed partial class SearchViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowSkeleton));
         OnPropertyChanged(nameof(ShowEmpty));
+        OnPropertyChanged(nameof(ShowHistory));
+        OnPropertyChanged(nameof(ShowSidebar));
     }
 
     public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main, services.Prefs)
-    { _detailedSearch=services.Registry.SearchWithFailuresAsync; }
-    internal void SetDetailedSearch(Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>> search)=>_detailedSearch=search;
+    {
+        _detailedSearch=services.Registry.SearchWithFailuresAsync;
+        _streamSearch=services.Registry.SearchStreamAsync;
+        _targetCount=()=>services.Registry.SearchTargets.Count;
+    }
+    /// <summary>注入一次性返回的聚合搜索（测试用）；会关闭流式路径。</summary>
+    internal void SetDetailedSearch(Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>> search){_detailedSearch=search;_streamSearch=null;}
+    /// <summary>注入流式聚合搜索与站点总数（测试用）。</summary>
+    internal void SetSearchStream(Func<string,CancellationToken,IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>> search,int targets){_streamSearch=search;_targetCount=()=>targets;}
 
     internal SearchViewModel(Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> search, MainViewModel main, IPreferences? preferences = null)
     {
         _search = search;
         _main = main;
         _preferences = preferences;
+        SearchHistory.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowHistory));
+        Failures.CollectionChanged += (_, _) => { OnPropertyChanged(nameof(HasFailures)); OnPropertyChanged(nameof(ShowSidebar)); };
+        SiteResults.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowSidebar));
         try
         {
             var values = System.Text.Json.JsonSerializer.Deserialize(preferences?.GetString("search.history", "[]") ?? "[]", Json.TypeInfo<List<string>>()) ?? [];
-            foreach (var query in values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().Take(8)) SearchHistory.Add(query);
+            foreach (var query in values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().Take(HistoryLimit)) SearchHistory.Add(query);
         }
         catch (System.Text.Json.JsonException) { }
     }
 
+    /// <summary>搜索历史保留条数（持久化到偏好，跨启动保留；最近的在前）。</summary>
+    internal const int HistoryLimit = 20;
+    /// <summary>下拉当前是否列出全部历史（聚焦打开）；输入后改为按关键词过滤。</summary>
+    private bool _suggestAll;
+
     partial void OnKeywordChanged(string value)
     {
+        _suggestAll = false;
+        RefreshSuggestions();
+    }
+
+    /// <summary>
+    /// 搜索框获得焦点：像 FongMi/TV 一样下拉列出全部搜索历史（最近的在前），选一条即回搜。
+    /// </summary>
+    public void OpenHistoryDropdown()
+    {
+        _suggestAll = true;
+        RefreshSuggestions();
+    }
+
+    public void CloseSuggestions() => ShowSuggestions = false;
+
+    /// <summary>输入时按关键词过滤历史；与输入完全相同的词不算联想（点了也只是原样再搜一次）。</summary>
+    private void RefreshSuggestions()
+    {
         Suggestions.Clear();
-        foreach (var query in SearchHistory.Where(query => query.Contains(value, StringComparison.OrdinalIgnoreCase)).Take(8))
-            Suggestions.Add(new SuggestItem { Text = query });
-        ShowSuggestions = value.Length > 0 && Suggestions.Count > 0;
+        var typed = Keyword.Trim();
+        var matches = _suggestAll
+            ? SearchHistory
+            : SearchHistory.Where(query => typed.Length > 0 && query.Contains(typed, StringComparison.OrdinalIgnoreCase) && !string.Equals(query, typed, StringComparison.OrdinalIgnoreCase));
+        foreach (var query in matches.Take(HistoryLimit)) Suggestions.Add(new SuggestItem { Text = query, IsHistory = true });
+        ShowSuggestions = Suggestions.Count > 0;
     }
 
     private void SaveSearchHistory()
@@ -84,6 +152,15 @@ public sealed partial class SearchViewModel : ObservableObject
     public void CancelPending()
     {
         ++_generation;_request?.Cancel();_request=null;Searching=false;
+        CloseDetail();
+    }
+
+    /// <summary>从详情回到结果网格（返回按钮 / Esc）；取消详情在途请求。</summary>
+    [RelayCommand]
+    public void CloseDetail()
+    {
+        ShowingDetail = false;
+        _detail?.CancelPending();
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -102,8 +179,14 @@ public sealed partial class SearchViewModel : ObservableObject
             generation = ++_generation;
             Searching = true;
             Summary = $"「{query}」搜索中…";
+            Status = "正在搜索…";
+            // 一发起搜索就收起联想，不遮挡状态行与结果；在看详情时回到结果（如详情里的「跨站搜索」）。
+            ShowSuggestions = false;
+            CloseDetail();
+            Progress = 0;
             Hint = "";
             SelectedSite = null;
+            Failures.Clear();
             SiteResults.Clear();
             AllResults.Clear();
             _sourceKeys.Clear();
@@ -113,38 +196,43 @@ public sealed partial class SearchViewModel : ObservableObject
         var ct = scope.Token;
         try
         {
+            if (_streamSearch is { } stream)
+            {
+                var failures = new List<(SourceInfo Site, string Error)>();
+                var total = _targetCount();
+                var done = 0;
+                await foreach (var batch in stream(query, ct))
+                {
+                    await _main.RunOnUiAsync(() =>
+                    {
+                        if (generation != _generation || ct.IsCancellationRequested) return;
+                        done++;
+                        if (batch.Error is { } error) { failures.Add((batch.Site, error)); Failures.Add(new SearchFailure(batch.Site.Name, error)); }
+                        else if (AddSiteResults(batch.Site, batch.Items)) RebuildResultRows();
+                        var all = Math.Max(done, total);
+                        Summary = $"「{query}」已搜索 {done}/{all} 个站点，{SiteResults.Count} 个站点找到 {AllResults.Count} 条结果…";
+                        Status = $"已搜索 {done}/{all} 个站点 · {AllResults.Count} 条结果";
+                        Progress = (double)done / all;
+                    });
+                }
+                ct.ThrowIfCancellationRequested();
+                await _main.RunOnUiAsync(() =>
+                {
+                    if (generation != _generation || ct.IsCancellationRequested) return;
+                    FinishSearch(query, failures);
+                });
+                return;
+            }
             var aggregate=_detailedSearch is null?null:await _detailedSearch(query,ct);
             var results = aggregate?.Results??await _search(query, ct);
             ct.ThrowIfCancellationRequested();
             await _main.RunOnUiAsync(() =>
             {
                 if (generation != _generation || ct.IsCancellationRequested) return;
-                // 单一结果集合用于卡片、站点过滤及归属映射，避免展示可见却打不开的卡片。
-                // 入集合前给每条结果打上来源站点名（卡片、站点过滤、归属映射共用同一批实例）。
-                var retained = results.Take(500)
-                    .Select(result => (result.Site, Item: result.Item with { SourceName = result.Site.Name }))
-                    .ToArray();
-                foreach (var (site, item) in retained)
-                {
-                    AllResults.Add(item);
-                    _sourceKeys[item] = site.Key;
-                }
-                foreach (var group in retained.GroupBy(r => r.Site.Key))
-                {
-                    var first = group.First().Site;
-                    var site = new SearchSiteResult(first.Name, first.Key);
-                    foreach (var (_, item) in group) site.Items.Add(item);
-                    SiteResults.Add(site);
-                }
+                foreach (var group in results.GroupBy(r => r.Site.Key))
+                    AddSiteResults(group.First().Site, group.Select(r => r.Item));
                 RebuildResultRows();
-                Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {retained.Length} 条结果";
-                if(aggregate?.Failures.Count>0)Summary+=$"；{aggregate.Failures.Count} 个站点失败："+string.Join("；",aggregate.Failures.Take(5).Select(failure=>failure.Site.Name+"："+failure.Error));
-                Hint = retained.Length == 0 ? "没有找到匹配的结果，换个关键词或站点试试" : "";
-                ShowSuggestions = false;
-                SearchHistory.Remove(query);
-                SearchHistory.Insert(0, query);
-                if (SearchHistory.Count > 8) SearchHistory.RemoveAt(SearchHistory.Count - 1);
-                SaveSearchHistory();
+                FinishSearch(query, aggregate?.Failures ?? []);
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -154,6 +242,7 @@ public sealed partial class SearchViewModel : ObservableObject
             {
                 if (generation == _generation && !ct.IsCancellationRequested)
                 {
+                    Status = "搜索失败";
                     Summary = $"搜索失败：{error.Message}";
                     Hint = $"搜索失败：{error.Message}";
                 }
@@ -171,10 +260,51 @@ public sealed partial class SearchViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 把一个站点的结果并入：卡片、站点过滤与归属映射共用同一批实例，避免展示可见却打不开的卡片；
+    /// 入集合前给每条结果打上来源站点名。返回是否有新增。
+    /// </summary>
+    private bool AddSiteResults(SourceInfo site, IEnumerable<MediaItem> items)
+    {
+        var room = ResultLimit - AllResults.Count;
+        if (room <= 0) return false;
+        var tagged = items.Take(room).Select(item => item with { SourceName = site.Name }).ToArray();
+        if (tagged.Length == 0) return false;
+        var group = SiteResults.FirstOrDefault(result => result.SourceKey == site.Key);
+        if (group is null) SiteResults.Add(group = new SearchSiteResult(site.Name, site.Key));
+        foreach (var item in tagged)
+        {
+            AllResults.Add(item);
+            _sourceKeys[item] = site.Key;
+            group.Items.Add(item);
+        }
+        return true;
+    }
+
+    private void FinishSearch(string query, IReadOnlyList<(SourceInfo Site, string Error)> failures)
+    {
+        // 流式路径边到边加；一次性路径在这里补齐。
+        if (Failures.Count != failures.Count)
+        {
+            Failures.Clear();
+            foreach (var (site, error) in failures) Failures.Add(new SearchFailure(site.Name, error));
+        }
+        Progress = 1;
+        Status = AllResults.Count == 0 ? "没有找到结果" : $"{SiteResults.Count} 个站点 · {AllResults.Count} 条结果";
+        Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {AllResults.Count} 条结果";
+        if (failures.Count > 0) Summary += $"；{failures.Count} 个站点失败：" + string.Join("；", failures.Take(5).Select(failure => failure.Site.Name + "：" + failure.Error));
+        Hint = AllResults.Count == 0 ? "没有找到匹配的结果，换个关键词或站点试试" : "";
+        ShowSuggestions = false;
+        SearchHistory.Remove(query);
+        SearchHistory.Insert(0, query);
+        while (SearchHistory.Count > HistoryLimit) SearchHistory.RemoveAt(SearchHistory.Count - 1);
+        SaveSearchHistory();
+    }
+
     [RelayCommand]
     private void DeleteSearchHistory(string word)
     {
-        SearchHistory.Remove(word);SaveSearchHistory();OnKeywordChanged(Keyword);
+        SearchHistory.Remove(word);SaveSearchHistory();RefreshSuggestions();
     }
 
     [RelayCommand]
@@ -188,7 +318,9 @@ public sealed partial class SearchViewModel : ObservableObject
     {
         if (!_sourceKeys.TryGetValue(item, out var key))
             key = SiteResults.FirstOrDefault(s => s.Items.Contains(item))?.SourceKey;
-        if (key is not null) _main.Detail.Open(key, item);
+        if (key is null) return;
+        ShowingDetail = true;
+        Detail.Open(key, item);
     }
 
     private int _columns = 5;
@@ -196,17 +328,36 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>当前结果列数；骨架屏按同一列数铺占位卡，避免加载完成时跳列。</summary>
     public int Columns => _columns;
 
+    /// <summary>卡片间距（右、下），与网格外沿对齐。</summary>
+    public const double CardGap = 18;
+    private double _cardWidth = 170;
+    /// <summary>卡片宽度：按列数平分可用宽度，网格铺满、右侧不留大块空白。</summary>
+    public double CardWidth => _cardWidth;
+    /// <summary>海报高度保持 2:3 竖版比例。</summary>
+    public double PosterHeight => Math.Round(_cardWidth * 1.4);
+
     public void SetResultWidth(double width)
     {
         if (width <= 0) return; // 隐藏时布局宽度为 0，忽略以免把列数压成 1
         var columns = Math.Max(1, (int)Math.Floor(Math.Max(0, width - 16) / 188));
+        var cardWidth = Math.Max(120, Math.Floor((width - 4) / columns - CardGap));
+        if (cardWidth != _cardWidth)
+        {
+            _cardWidth = cardWidth;
+            OnPropertyChanged(nameof(CardWidth));
+            OnPropertyChanged(nameof(PosterHeight));
+        }
         if (columns == _columns) return;
         _columns = columns;
         OnPropertyChanged(nameof(Columns));
         RebuildResultRows();
     }
 
-    partial void OnSelectedSiteChanged(SearchSiteResult? value) => RebuildResultRows();
+    partial void OnSelectedSiteChanged(SearchSiteResult? value)
+    {
+        OnPropertyChanged(nameof(IsAllSelected));
+        RebuildResultRows();
+    }
 
     private void RebuildResultRows()
     {
@@ -238,9 +389,14 @@ public sealed partial class SearchSiteResult : ObservableObject
     }
 }
 
+/// <summary>未返回结果的站点及原因（侧栏「未返回结果」分组，原因放悬停提示）。</summary>
+public sealed record SearchFailure(string SiteName, string Error);
+
 /// <summary>搜索联想行（热词/历史）。</summary>
 public sealed class SuggestItem
 {
+    /// <summary>来自本机搜索历史（下拉里可单条删除）。</summary>
+    public bool IsHistory { get; init; }
     public string Text { get; init; } = "";
     public bool Hot { get; init; }
 }

@@ -130,6 +130,9 @@ public sealed class RemotePoster : Image
             return;
         }
         var cache = isLogo && _useSharedLogoCache ? PosterCache.ChannelLogos : _cache;
+        // M3U 台标近期已失败时按没有台标处理：直接用内置索引（已解码则同步上屏，滚动中也不闪占位），
+        // 不再每次停下滚动都先请求一遍坏地址。
+        if (isLogo && primary is not null && cache.HasRecentlyFailed(primary)) primary = null;
         var cached = primary is not null ? cache.TryAcquireCached(primary) : null;
         // 没有 M3U 台标时，索引读取也保持后台执行；已初始化的索引可直接匹配缓存。
         if (cached is null && isLogo && Services.BuiltInChannelLogos.IsReady)

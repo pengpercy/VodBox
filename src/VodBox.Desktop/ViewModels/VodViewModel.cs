@@ -69,7 +69,8 @@ public sealed partial class VodViewModel : ObservableObject
     public IReadOnlyList<SourceInfo> AvailableSources => _services.Registry.SelectableSources;
     public string SourceCountLabel => $"共 {AvailableSources.Count} 个站点";
     public string SourceSelectionHint => AvailableSources.Count > 0 ? ""
-        : _services.Registry.Sources.Count > 0 ? "没有可选站点，请到设置中检查站点显示状态"
+        // 只有「能运行但被隐藏」时才提示显示状态；列出了但没有一个能运行，是桌面运行时边界。
+        : _services.Registry.Sources.Any(source => _services.Registry.Get(source.Key) is not null) ? "没有可选站点，请到设置中检查站点显示状态"
         : _services.Registry.ImportWarnings.Count > 0 ? "订阅中的站点暂无桌面运行时支持，请到设置中查看导入警告"
         : "尚未配置内容源，请到设置中添加 TVBox 配置地址";
 

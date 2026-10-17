@@ -184,6 +184,38 @@ public sealed class RemotePosterTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// 整份 M3U 共用一个坏台标地址时：首次失败被记住，之后的卡片直接用已解码的内置台标同步上屏，
+    /// 即使正在滚动也不显示占位，也不再请求坏地址。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task KnownBrokenM3uLogoShowsCachedBuiltInLogoImmediatelyEvenWhileScrolling()
+    {
+        var attempted = new List<Uri>();
+        using var cache = new PosterCache((uri, _) =>
+        {
+            lock (attempted) attempted.Add(uri);
+            return uri.Host == "logos.invalid"
+                ? Task.FromException<Bitmap>(new IOException("404"))
+                : Task.FromResult(PosterCacheTests.Image());
+        }, failureMemory: TimeSpan.FromMinutes(10));
+        var first = new RemotePoster(cache) { Url = "https://logos.invalid/icon/.png", ChannelName = "CCTV-1 综合高清" };
+        var window = new Window { Content = first };
+        try
+        {
+            window.Show();
+            await Done(first.LoadingTask);
+            Assert.True(first.HasImage);
+            var calls = attempted.Count;
+            var second = new RemotePoster(cache) { Url = "https://logos.invalid/icon/.png", ChannelName = "CCTV-1 综合高清", ChannelIsScrolling = true };
+            window.Content = second;
+            Assert.True(second.HasImage);
+            Assert.True(second.LoadingTask.IsCompleted);
+            Assert.Equal(calls, attempted.Count);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public async Task SuccessfulM3uLogoTakesPriorityOverBuiltInImage()
     {

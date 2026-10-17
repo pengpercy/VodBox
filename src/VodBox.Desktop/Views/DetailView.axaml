@@ -3,15 +3,16 @@
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
-             x:Class="VodBox.Desktop.Views.DetailView" x:DataType="vm:MainViewModel">
+             x:Class="VodBox.Desktop.Views.DetailView" x:DataType="vm:DetailViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
 
-  <ScrollViewer Padding="0" HorizontalScrollBarVisibility="Disabled">
+  <!-- 根元素的 DataContext 由代码按宿主设置：主窗口给 MainViewModel（取其 Detail），搜索窗口直接给自己的 DetailViewModel。 -->
+  <ScrollViewer x:Name="DetailRoot" Padding="0" HorizontalScrollBarVisibility="Disabled">
     <Panel Margin="28,12,28,28">
     <!-- 详情骨架：加载中占位（海报 + 元信息 + 线路 + 选集），避免整页白屏 -->
-    <StackPanel Spacing="22" IsVisible="{Binding Detail.ShowSkeleton}">
+    <StackPanel Spacing="22" IsVisible="{Binding ShowSkeleton}">
       <Grid ColumnDefinitions="200,36,*,28,280">
         <Border Grid.Column="0" Classes="skeleton poster" Height="300" />
         <StackPanel Grid.Column="2" Spacing="12">
@@ -58,12 +59,11 @@
     </StackPanel>
 
     <!-- 详情内容：拿到数据后显示（加载中为 null，由上面的骨架接管） -->
-    <StackPanel Spacing="22" DataContext="{Binding Detail}"
-                IsVisible="{Binding $parent[views:DetailView].((vm:MainViewModel)DataContext).Detail.ShowContent}">
+    <StackPanel Spacing="22" IsVisible="{Binding ShowContent}">
 
       <Grid ColumnDefinitions="200,36,*,28,280">
         <!-- 海报 -->
-        <Border Grid.Column="0" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="300" Background="#274064" ClipToBounds="True">
+        <Border Grid.Column="0" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="300" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
           <Panel>
             <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
             <views:RemotePoster Url="{Binding Detail.Item.Poster}" />
@@ -73,7 +73,7 @@
         <!-- 元信息 -->
         <StackPanel Grid.Column="2" Spacing="12" VerticalAlignment="Top">
           <TextBlock Text="{Binding Detail.Item.Title}" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="13" Foreground="#4CC2FF" />
+          <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
           <!-- 元信息行：站源 + 年份 + 地区 + 类型 + 时长（对齐设计稿 p-detail） -->
           <WrapPanel Orientation="Horizontal">
             <TextBlock FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}">
@@ -151,7 +151,7 @@
               </Border>
               <!-- 右上清晰度标 -->
               <Border CornerRadius="4" Background="#66000000" Padding="7,3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
-                <TextBlock Text="1080P" FontSize="10" Foreground="#4CC2FF" FontWeight="SemiBold" />
+                <TextBlock Text="1080P" FontSize="10" Foreground="#E6FFFFFF" FontWeight="SemiBold" />
               </Border>
               <!-- 左下试看提示 -->
               <Border Background="#66000000" Padding="10,5" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,10" CornerRadius="0,8,8,0">
@@ -233,14 +233,14 @@
     </StackPanel>
 
     <!-- 失败/不可用文案：非空时覆盖内容位置，不留白屏 -->
-    <TextBlock Text="{Binding Detail.Hint}" FontSize="12.5" TextWrapping="Wrap" MaxWidth="420"
+    <TextBlock Text="{Binding Hint}" FontSize="12.5" TextWrapping="Wrap" MaxWidth="420"
                HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="0,40,0,0"
                Foreground="{DynamicResource TextTertiaryBrush}"
-               IsVisible="{Binding Detail.Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+               IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
     <!-- 空态：加载结束仍没有可展示的详情 -->
     <TextBlock Text="没有可展示的详情内容" FontSize="12.5"
                HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,0"
-               Foreground="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding Detail.ShowEmpty}" />
+               Foreground="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding ShowEmpty}" />
     </Panel>
   </ScrollViewer>
 </UserControl>

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using VodBox.Core;
 using VodBox.Infrastructure;
 using VodBox.Desktop.Services;
@@ -58,6 +59,115 @@ public sealed class SearchWindowTests
             _services.Dispose();
             Directory.Delete(_directory, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// 搜索框放在标题栏那一行、紧跟 macOS 交通灯（约 0–78px）：左侧与主窗口/设置窗口同样让出 90px；
+    /// 不再有单独的「搜索」标题，窗口第一行下面直接是站点栏与结果。
+    /// </summary>
+    [AvaloniaFact]
+    public void SearchFieldSitsInTitleRowClearOfMacTrafficLights()
+    {
+        using var fixture = new Fixture();
+        var window = new SearchWindow { DataContext = fixture.Main };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var field = window.GetVisualDescendants().OfType<Grid>().Single(grid => grid.Name == "SearchField");
+            var origin = Avalonia.VisualExtensions.TranslatePoint(field, default, window)!.Value;
+            Assert.Equal(OperatingSystem.IsMacOS() ? 90 : 20, origin.X, 1);
+            Assert.True(origin.Y + field.Bounds.Height <= 52, "搜索框应在标题栏那一行内");
+            Assert.Equal(380, field.Bounds.Width);
+            // 只剩搜索框里内嵌按钮上的「搜索」两字，没有独立的标题文字。
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(),
+                text => text.Text == "搜索" && text.IsEffectivelyVisible && !text.GetVisualAncestors().OfType<Button>().Any());
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// 搜索历史下拉（对齐 FongMi/TV）：聚焦即列出全部历史；输入按关键词过滤；单条删除不收起；Esc 收起；选一条即回搜。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task FocusingSearchFieldDropsDownHistoryThatCanBeFilteredDeletedAndPicked()
+    {
+        using var fixture = new Fixture();
+        var search = fixture.Main.Search;
+        var searched = new List<string>();
+        search.SetDetailedSearch((query, _) => { searched.Add(query); return Task.FromResult(Result("source", "站点", query)); });
+        foreach (var word in new[] { "庆余年", "繁花", "三体", "庆余年第二季" }) search.SearchHistory.Add(word);
+        var window = new SearchWindow { DataContext = fixture.Main };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var box = window.GetVisualDescendants().OfType<TextBox>().Single(text => text.Name == "ResultSearch");
+            var dropdown = window.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "SuggestionDropdown");
+            box.Focus();
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.True(dropdown.IsEffectivelyVisible);
+            Assert.Equal(["庆余年", "繁花", "三体", "庆余年第二季"], search.Suggestions.Select(item => item.Text));
+
+            search.Keyword = "庆余";
+            Assert.Equal(["庆余年", "庆余年第二季"], search.Suggestions.Select(item => item.Text));
+
+            search.OpenHistoryDropdown();
+            search.DeleteSearchHistoryCommand.Execute("繁花");
+            Assert.True(search.ShowSuggestions);
+            Assert.DoesNotContain("繁花", search.Suggestions.Select(item => item.Text));
+            Assert.DoesNotContain("繁花", search.SearchHistory);
+
+            box.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
+            Assert.False(search.ShowSuggestions);
+
+            search.OpenHistoryDropdown();
+            window.UpdateLayout();
+            var row = dropdown.GetVisualDescendants().OfType<Border>().First(border => border.Tag is SuggestItem { Text: "三体" });
+            var center = Avalonia.VisualExtensions.TranslatePoint(row, new Avalonia.Point(40, row.Bounds.Height / 2), window)!.Value;
+            Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, center, Avalonia.Input.MouseButton.Left);
+            Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, center, Avalonia.Input.MouseButton.Left);
+            await Until(() => searched.Contains("三体"));
+            Assert.Equal("三体", search.Keyword);
+            Assert.False(search.ShowSuggestions);
+            Assert.Equal("三体", search.SearchHistory[0]);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// 详情页两种宿主（主窗口给 MainViewModel、搜索窗口给独立 DetailViewModel）都不能让绑定强转失败：
+    /// Avalonia 会吞掉这类异常，但调试器会在第一次抛出时中断，表现为页面「打不开」。
+    /// </summary>
+    [AvaloniaFact]
+    public void DetailViewBindsCleanlyInBothHosts()
+    {
+        using var fixture = new Fixture();
+        var seen = new List<string>();
+        void Handler(object? s, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            if (e.Exception is InvalidCastException or NullReferenceException) seen.Add(e.Exception.Message);
+        }
+        AppDomain.CurrentDomain.FirstChanceException += Handler;
+        try
+        {
+            foreach (object context in new object[] { fixture.Main, fixture.Main.Search.Detail })
+            {
+                // 先上屏、再给 DataContext：这是最容易让宿主 DataContext 先流进子元素的顺序。
+                var view = new DetailView();
+                var window = new Window { Width = 1000, Height = 700, Content = view };
+                window.Show();
+                window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+                view.DataContext = context;
+                window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+                Assert.Same(context is MainViewModel main ? main.Detail : context,
+                    view.GetVisualDescendants().OfType<ScrollViewer>().First(scroller => scroller.Name == "DetailRoot").DataContext);
+                window.Close();
+            }
+        }
+        finally { AppDomain.CurrentDomain.FirstChanceException -= Handler; }
+        Assert.Empty(seen);
+        Assert.NotSame(fixture.Main.Detail, fixture.Main.Search.Detail);
     }
 
     [AvaloniaFact]

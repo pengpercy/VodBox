@@ -39,6 +39,12 @@ public class App : Application
             var main=new MainViewModel(Services);
             var window=new MainWindow{DataContext=main};
             desktop.MainWindow=window;
+            // macOS 菜单栏：应用菜单（关于/检查更新/设置）+ 主窗口的文件/显示/播放/帮助菜单；其他窗口在创建时各自挂上。
+            if(OperatingSystem.IsMacOS())
+            {
+                MacMenus.InstallApplicationMenu(this,main);
+                MacMenus.Attach(window,main);
+            }
             if (desktop.Args?.Contains("--ui-smoke") != true)
             {
                 window.Opened += async (_, _) =>
@@ -55,7 +61,7 @@ public class App : Application
                 {
                     try
                     {
-                        foreach(var page in new[]{AppPage.Home,AppPage.Vod,AppPage.Live,AppPage.Favorites,AppPage.History,AppPage.Files})
+                        foreach(var page in new[]{AppPage.Home,AppPage.Vod,AppPage.Live,AppPage.Favorites,AppPage.History})
                         {
                             main.Navigate(page);window.UpdateLayout();await Task.Delay(100);
                         }
@@ -180,7 +186,7 @@ public class App : Application
                             Console.WriteLine($"Native main player: OK | frames={renderedFrames}, independent single-window/main bounds/pause/seek/fullscreen/compact restore/resume/automatic-next/history");
                         }
                         await main.ShutdownAsync();
-                        Console.WriteLine("Native desktop UI: OK | 8 pages, 9 settings sections, light/dark, graceful shutdown");
+                        Console.WriteLine("Native desktop UI: OK | 7 pages, 9 settings sections, light/dark, graceful shutdown");
                         window.Close();
                     }
                     catch(Exception error){Console.Error.WriteLine(error);desktop.Shutdown(1);}

@@ -12,6 +12,8 @@ public sealed partial class DetailViewModel : ObservableObject
     private readonly Func<string, IContentSource?> _getSource;
     private readonly ILibraryStore _store;
     private readonly MainViewModel _main;
+    /// <summary>主窗口的详情页打开时切到详情页；搜索窗口里的详情是独立实例，不动主窗口。</summary>
+    private readonly bool _navigateMainWindow;
 
     public ObservableCollection<PlaybackLine> Lines { get; } = [];
 
@@ -67,11 +69,12 @@ public sealed partial class DetailViewModel : ObservableObject
     {
     }
 
-    internal DetailViewModel(Func<string, IContentSource?> getSource, ILibraryStore store, MainViewModel main)
+    internal DetailViewModel(Func<string, IContentSource?> getSource, ILibraryStore store, MainViewModel main, bool navigateMainWindow = true)
     {
         _getSource = getSource;
         _store = store;
         _main = main;
+        _navigateMainWindow = navigateMainWindow;
     }
 
     partial void OnSelectedLineChanged(PlaybackLine? value)
@@ -157,7 +160,7 @@ public sealed partial class DetailViewModel : ObservableObject
             scope = new CancellationTokenSource();
             _request = scope;
             Loading = true;
-            _main.Navigate(AppPage.Detail);
+            if (_navigateMainWindow) _main.Navigate(AppPage.Detail);
         });
         if (scope is null || source is null) return;
         var ct = scope.Token;

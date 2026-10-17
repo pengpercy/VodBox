@@ -69,6 +69,8 @@ public sealed partial class HomeViewModel : ObservableObject
     internal const int RecentLimit = 20;
 
     [ObservableProperty] private bool _loading;
+    /// <summary>首页已滚动、内容正从标题栏下方穿过：主窗口据此在标题栏处渐显毛玻璃。</summary>
+    [ObservableProperty] private bool _scrolledUnderTitleBar;
     [ObservableProperty] private bool _recentLoading;
     [ObservableProperty] private string _recentHint = "";
     /// <summary>推荐区空态/错误态文案（非空时显示在网格位置，避免白屏）。</summary>
@@ -103,6 +105,23 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowRecentSkeleton));
         OnPropertyChanged(nameof(ShowRecentEmpty));
+    }
+
+    /// <summary>
+    /// 冷启动时配置还在路上就先进入加载态（骨架屏），不让首页空白等待网络；
+    /// 随后的 <see cref="LoadAsync"/> 会接管这两个标志，配置失败时由 <see cref="CancelStartupLoading"/> 收回。
+    /// </summary>
+    public void BeginStartupLoading()
+    {
+        Loading = true;
+        RecentLoading = true;
+    }
+
+    public void CancelStartupLoading()
+    {
+        if (_request is not null) return;
+        Loading = false;
+        RecentLoading = false;
     }
 
     public async Task LoadAsync()

@@ -28,6 +28,111 @@ public sealed class MainWindowPreviewTests
         return (WindowDecorationsElementRole?)method.Invoke(inputRoot, [point]);
     }
 
+    /// <summary>
+    /// 首页沉浸式标题栏：首页内容伸到标题栏下方，标题栏处仍是拖拽区；未滚动时标题栏完全透明，
+    /// 向下滚动后渐显毛玻璃，切到其他页面即收起。macOS 直播页上移进标题栏行的工具栏必须仍可点。
+    /// </summary>
+    [AvaloniaFact]
+    public void HomeScrollsUnderTransparentTitleBarThatFrostsOnceScrolled()
+    {
+        var main = DesignData.Main;
+        var previousPage = main.Page;
+        var previousPlayerVisible = main.Player.Visible;
+        var window = new MainWindow { DataContext = main, Width = 1280, Height = 800 };
+        void Layout() { for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); } }
+        try
+        {
+            main.Page = AppPage.Home;
+            main.Player.Visible = false;
+            window.Show();
+            Layout();
+            var scrim = window.FindControl<Panel>("TitleScrim")!;
+            var home = window.GetVisualDescendants().OfType<HomeView>().Single();
+            var scroller = home.FindControl<ScrollViewer>("HomeScroller")!;
+            scroller.Offset = default;
+            Layout();
+            Assert.DoesNotContain("shown", scrim.Classes);
+            Assert.False(scrim.IsHitTestVisible);
+            // 首页内容在标题栏下方（横幅从窗口顶边开始），但标题栏那一行依然能拖动窗口。
+            Assert.Equal(WindowDecorationsElementRole.TitleBar, HitTestChrome(window, new Point(640, 20)));
+
+            scroller.Offset = new Vector(0, 200);
+            Layout();
+            Assert.True(main.Home.ScrolledUnderTitleBar);
+            Assert.Contains("shown", scrim.Classes);
+
+            main.Page = AppPage.Vod;
+            Layout();
+            Assert.DoesNotContain("shown", scrim.Classes);
+            // 点播页的补充拖拽区只到页头顶边，不压页头控件。
+            var strip = window.FindControl<Border>("PageTitleBar")!;
+            Assert.True(strip.IsVisible);
+            Assert.Equal(MainViewModel.PageHeaderTop(OperatingSystem.IsMacOS()), strip.Bounds.Height, 1);
+            if (OperatingSystem.IsMacOS())
+            {
+                // 直播页工具栏在 macOS 上上移 24 进入标题栏行：不补拖拽区，频道搜索框照常接收点击。
+                main.Page = AppPage.Live;
+                Layout();
+                Assert.False(strip.IsVisible);
+                var search = window.GetVisualDescendants().OfType<TextBox>().Single(box => box.Name == "ChannelSearch");
+                var point = search.TranslatePoint(new Point(search.Bounds.Width / 2, 8), window)!.Value;
+                Assert.True(point.Y < MainViewModel.TitleBarHeight);
+                Assert.NotEqual(WindowDecorationsElementRole.TitleBar, HitTestChrome(window, point));
+            }
+        }
+        finally
+        {
+            main.Home.ScrolledUnderTitleBar = false;
+            main.Page = previousPage;
+            main.Player.Visible = previousPlayerVisible;
+            window.Close();
+        }
+    }
+
+    /// <summary>
+    /// 点播/收藏/历史整体上移进标题栏行：macOS 页头与直播工具栏齐平；Windows/Linux 的窗口按钮在右上角、高 32，
+    /// 页头落在按钮下方，不会压到按钮。上移后标题栏行的空白处仍须能拖动窗口。
+    /// </summary>
+    [AvaloniaFact]
+    public void VodFavoritesAndHistoryMoveUpIntoTitleRowWithoutCoveringWindowButtons()
+    {
+        foreach (var page in new[] { AppPage.Vod, AppPage.Favorites, AppPage.History })
+        {
+            // Windows/Linux：页头顶边（页面上移后 + 页面自带 12 顶边距）必须在 32 高的窗口按钮下方。
+            var nonMacTop = MainViewModel.TitleBarHeight + MainViewModel.GetPageContentMargin(page, isMacOS: false).Top + 12;
+            Assert.True(nonMacTop >= MainViewModel.CaptionButtonsHeight + 4, $"{page} 页头会压到 Windows/Linux 窗口按钮");
+            Assert.True(nonMacTop < MainViewModel.TitleBarHeight, $"{page} 在 Windows/Linux 上没有上移");
+            var macTop = MainViewModel.TitleBarHeight + MainViewModel.GetPageContentMargin(page, isMacOS: true).Top + 12;
+            Assert.Equal(MainViewModel.TitleBarHeight - 24, macTop);
+        }
+
+        var main = DesignData.Main;
+        var previousPage = main.Page;
+        var previousPlayerVisible = main.Player.Visible;
+        var window = new MainWindow { DataContext = main, Width = 1280, Height = 800 };
+        try
+        {
+            main.Player.Visible = false;
+            window.Show();
+            foreach (var (page, type) in new[] { (AppPage.Vod, typeof(VodView)), (AppPage.Favorites, typeof(FavoritesView)), (AppPage.History, typeof(HistoryView)) })
+            {
+                main.Page = page;
+                for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+                var view = (Control)window.GetVisualDescendants().Single(visual => visual.GetType() == type);
+                var headerTop = view.TranslatePoint(default, window)!.Value.Y + 12;
+                Assert.Equal(MainViewModel.PageHeaderTop(OperatingSystem.IsMacOS()), headerTop, 1);
+                // 页头右侧之外的标题栏空白仍是拖拽区（页面不能把标题栏那一行整片吃掉）。
+                Assert.Equal(WindowDecorationsElementRole.TitleBar, HitTestChrome(window, new Point(1000, 14)));
+            }
+        }
+        finally
+        {
+            main.Page = previousPage;
+            main.Player.Visible = previousPlayerVisible;
+            window.Close();
+        }
+    }
+
     [AvaloniaFact]
     public void Shell_RendersWithContinuousDividerAndInteractiveNavigationAndSearch()
     {

@@ -33,6 +33,7 @@ public sealed class SearchWindowService
     {
         if (_window is { } existing) return existing;
         var window = new SearchWindow { DataContext = _main };
+        MacMenus.Attach(window, _main);
         _window = window;
         window.Closed += (_, _) => { if (ReferenceEquals(_window, window)) _window = null; };
         // 非模态、不设 Owner：与设置/播放窗口一致，主窗口仍可独立操作；主窗口关闭时由此服务主动关闭。
