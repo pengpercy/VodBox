@@ -218,10 +218,19 @@ public sealed partial class Type4Source : IResolvingContentSource
         {
             if (property.Value.ValueKind is not (JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False)) continue;
             var value = property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() ?? "" : property.Value.ToString();
-            if (property.Name.Length == 0 || property.Name.IndexOfAny(['\r', '\n', '\0']) >= 0 || value.IndexOfAny(['\r', '\n', '\0']) >= 0)
+            if (!IsHeaderName(property.Name) || value.IndexOfAny(['\r', '\n', '\0']) >= 0)
                 throw new InvalidDataException("type4 播放头含非法字符。");
             headers[property.Name] = value;
         }
+    }
+
+    /// <summary>RFC 7230 token 字符；拒绝空格、冒号等不能原样交给 HTTP 的头名。</summary>
+    private static bool IsHeaderName(string name)
+    {
+        if (name.Length == 0) return false;
+        foreach (var c in name)
+            if (!char.IsAsciiLetterOrDigit(c) && !"!#$%&'*+-.^_`|~".Contains(c)) return false;
+        return true;
     }
 
     private sealed record PlayEntry(string Flag, string Address, string Title, string LineId);

@@ -15,17 +15,8 @@ build/native/
 # Local acceptance logs, synthetic media, publish copies and private checkpoints
 .alma/
 
-# Generated upstream JVM build and staged runtime component
+# Generated upstream JVM analysis/build output; never product content
 third_party/tvbox-silicon/Runtime/JavaHost/target/
-src/VodBox.PluginHost/JavaHost/host.jar
-src/VodBox.PluginHost/JavaHost/deps/
-src/VodBox.PluginHost/JavaHost/dex-tools/
-src/VodBox.PluginHost/JavaHost/runtime/
-src/VodBox.PluginHost/JavaHost/sqlite-jdbc/
-src/VodBox.PluginHost/JavaHost/corresponding-source/
-src/VodBox.PluginHost/JavaHost/upstream-runtime.json
-src/VodBox.PluginHost/JavaHost/LICENSE-tvbox-silicon
-src/VodBox.PluginHost/JavaHost/native-backend-receipt.json
 
 # Source archives fetched with fixed URLs and hashes before component packaging
 third_party/tvbox-silicon/dependency-sources/archives/

@@ -68,35 +68,17 @@ def job_steps(document: dict, job: str) -> list[dict]:
 
 
 def check_release(document: dict, name: str) -> list[str]:
-    """The release gate must stay manifest-derived and must never be bypassed."""
+    """The release gate must verify package bytes without reintroducing Java payloads."""
     problems: list[str] = []
     steps = job_steps(document, "preflight") + job_steps(document, "release")
     runs = [str(step.get("run", "")) for step in steps if isinstance(step, dict)]
-    closure_calls = [run for run in runs if "release_preflight.py" in run]
-    if not closure_calls:
-        problems.append(f"{name}: no job runs the native-closure preflight")
-    # --allow-incomplete turns both closure gates into warnings; a real release must never pass it,
-    # or an open corresponding-source obligation would ship.
-    for run in closure_calls:
-        if "--allow-incomplete" in run:
-            problems.append(f"{name}: release preflight passes --allow-incomplete, disabling the gate")
-    # The source obligation is a separate gate and must be reachable from the release path, so that a
-    # five/six RID coverage table can never stand in for it.
-    source_calls = [run for run in runs if "source-closure" in run]
-    if not source_calls:
-        problems.append(f"{name}: no job runs the corresponding-source closure gate")
-    for run in source_calls:
-        if "--allow-incomplete" in run:
-            problems.append(f"{name}: source closure is invoked with --allow-incomplete, disabling it")
-    # The preflight job must gate the packaging chain, or an incomplete closure still ships.
-    jobs = document.get("jobs") or {}
-    for consumer in ("build", "package", "release"):
-        job = jobs.get(consumer) or {}
-        condition = str(job.get("if", ""))
-        needs = job.get("needs") or []
-        needs = [needs] if isinstance(needs, str) else needs
-        if "preflight" not in condition and "preflight" not in needs:
-            problems.append(f"{name}: job {consumer!r} does not depend on the preflight gate")
+    evidence_calls = [run for run in runs if "release_evidence.py" in run]
+    if not evidence_calls:
+        problems.append(f"{name}: no job verifies downloaded package bytes")
+    for run in evidence_calls:
+        for forbidden in ("--sources", "--receipts", "source-closure", "release_preflight.py"):
+            if forbidden in run:
+                problems.append(f"{name}: Java/source gate {forbidden!r} remains in release evidence")
     return problems
 
 

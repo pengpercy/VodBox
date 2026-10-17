@@ -164,4 +164,20 @@ public sealed class Type4SourceTests
         var request = await source.ResolvePlaybackAsync("m1", await FirstEpisodeIdAsync(source), TestContext.Current.CancellationToken);
         Assert.Equal("https://source.example/", request.Headers["Referer"]);
     }
+
+    [Fact]
+    public async Task ResponseHeadersKeepCredentialsAndRejectInvalidNames()
+    {
+        var source = new Type4Source(Site(), (url, _, _) => Task.FromResult(IsDetail(url) ? Detail :
+            "{\"url\":\"https://media.example/a.m3u8\",\"header\":{\"Cookie\":\"sid=abc\",\"Authorization\":\"Bearer t\",\"X-Token\":\"v\"}}"));
+        var request = await source.ResolvePlaybackAsync("m1", await FirstEpisodeIdAsync(source), TestContext.Current.CancellationToken);
+        Assert.Equal("sid=abc", request.Headers["Cookie"]);
+        Assert.Equal("Bearer t", request.Headers["Authorization"]);
+        Assert.Equal("v", request.Headers["X-Token"]);
+
+        var invalid = new Type4Source(Site(), (url, _, _) => Task.FromResult(IsDetail(url) ? Detail :
+            "{\"url\":\"https://media.example/a.m3u8\",\"header\":{\"Bad Header\":\"x\"}}"));
+        await Assert.ThrowsAsync<InvalidDataException>(
+            async () => await invalid.ResolvePlaybackAsync("m1", await FirstEpisodeIdAsync(invalid), TestContext.Current.CancellationToken));
+    }
 }

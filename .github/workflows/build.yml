@@ -83,14 +83,7 @@ jobs:
         if: steps.reuse.outputs.skip != 'true'
         with:
           python-version: '3.12'
-      - uses: actions/setup-java@v5
-        if: steps.reuse.outputs.skip != 'true'
-        with:
-          distribution: temurin
-          java-version: '21'
-          architecture: ${{ endsWith(matrix.rid, '-arm64') && 'aarch64' || 'x64' }}
-      # Restored before the Java and native steps that read them: placed after the source rebuild,
-      # the engine cache was only ever saved, never used.
+      # Restored before the native steps that read them.
       - uses: actions/cache@v6
         if: steps.reuse.outputs.skip != 'true'
         with:
@@ -99,23 +92,7 @@ jobs:
             .cache/downloads
             .cache/vulkan
             .cache/native-rebuild-engine
-          key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json', 'third_party/tvbox-silicon/rebuild/backend-unicorn2/engine-pin.json') }}
-      # Maven and the corresponding-source archives (~270MB) are architecture independent: one shared entry
-      # instead of six fresh downloads. tvbox-host.py still checks every archive's sha256 after restore.
-      - uses: actions/cache@v6
-        if: steps.reuse.outputs.skip != 'true'
-        with:
-          path: |
-            .cache/maven
-            .cache/maven-repository
-            third_party/tvbox-silicon/dependency-sources/archives
-          key: java-host-${{ hashFiles('third_party/tvbox-silicon/dependency-sources/download-archives.json', 'third_party/tvbox-silicon/Runtime/JavaHost/pom.xml') }}
-          restore-keys: java-host-
-          enableCrossOsArchive: true
-      - name: Build upstream Java plugin component
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        run: python3 build/tvbox-host.py
+          key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json') }}
       - name: Install Windows MinGW toolchain
         if: steps.reuse.outputs.skip != 'true' && matrix.rid == 'win-x64'
         uses: msys2/setup-msys2@v2
@@ -142,31 +119,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev libicu-dev libmpv2 libpipewire-0.3-0 libmujs3 libdisplay-info1 liblua5.2-0 patchelf zstd
-      - name: Source rebuild of the ARM64 backend for this RID
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        env:
-          # The linked static engine must share the bridge's macOS floor; without this the engine's
-          # own CMake default (the runner SDK) raises the shipped library's minimum OS above 11.6.
-          VODBOX_ENGINE_CMAKE_FLAGS: ${{ startsWith(matrix.rid, 'osx') && '-DCMAKE_OSX_DEPLOYMENT_TARGET=11.6' || '' }}
-        run: |
-          python3 build/rebuild_native_backend.py build \
-            --rid ${{ matrix.rid }} \
-            --deps src/VodBox.PluginHost/JavaHost/deps \
-            --engine-cache .cache/native-rebuild-engine
-          python3 build/rebuild_native_backend.py verify \
-            --receipt src/VodBox.PluginHost/JavaHost/native-backend-receipt.json \
-            --deps src/VodBox.PluginHost/JavaHost/deps
       - name: Restore and test
         # Managed tests do not depend on CPU architecture: run them once per OS, on the faster runner.
         # macOS uses the Apple Silicon leg; the Intel runner is the slowest one and sets the critical path.
         if: steps.reuse.outputs.skip != 'true' && contains(fromJSON('["win-x64","linux-x64","osx-arm64"]'), matrix.rid)
         shell: bash
         run: |
-          python3 build/test_bundle.py
           python3 build/test_nativeverify.py
-          python3 build/test_native_coverage.py
-          python3 build/test_release_preflight.py
           python3 build/test_package.py
           python3 build/test_archive.py
           python3 build/test_ci_reuse.py
@@ -184,31 +143,7 @@ jobs:
       - name: Bundle pinned libmpv
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
-        run: |
-          python3 build/bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }} \
-            --java-host-jar src/VodBox.PluginHost/JavaHost/host.jar
-      - name: Verify native backend coverage matches the bundled host
-        # The published backend jar carries exactly this RID's source-rebuilt native (all foreign
-        # natives were removed by the rebuild), so the check is per-RID, not the five-RID upstream
-        # table. bundle.py already fails the bundle on a mismatch; this re-derives it from the
-        # published tree so a green log carries the verdict explicitly.
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        run: |
-          python3 build/native_coverage.py verify --deps artifacts/publish/${{ matrix.rid }}/JavaHost/deps --rid ${{ matrix.rid }}
-          python3 build/native_coverage.py list
-      - name: Verify the packaged source-rebuild receipt travels with the bundle
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        run: |
-          test -f artifacts/publish/${{ matrix.rid }}/JavaHost/native-backend-receipt.json
-          python3 build/rebuild_native_backend.py verify \
-            --receipt artifacts/publish/${{ matrix.rid }}/JavaHost/native-backend-receipt.json \
-            --deps artifacts/publish/${{ matrix.rid }}/JavaHost/deps
-      - name: Verify delivered Java runtime and adapter
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        run: python3 build/verify_java_host.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}/JavaHost
+        run: python3 build/bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
       - name: Verify bundled libmpv decoding
         if: steps.reuse.outputs.skip != 'true'
         shell: bash

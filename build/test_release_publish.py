@@ -10,7 +10,6 @@ from urllib.parse import unquote
 from zipfile import ZipFile
 
 import release_publish as publish
-from test_source_assets import source_host, split_fixture
 
 
 def publication_fixture():
@@ -19,12 +18,10 @@ def publication_fixture():
     for rid in publish.RIDS:
         with ZipFile(runtime / f"VodBox_1.0.0.{rid}.zip", "w") as archive:
             archive.writestr("VodBox/README.txt", f"Offline installer fixture for {rid}\n")
-    with tempfile.TemporaryDirectory() as directory:
-        split_fixture(source_host(directory), Path("artifacts/sources"))
 
 
 def remote_fixture(uploaded=None):
-    files = sorted(Path("artifacts/release").iterdir()) + sorted(Path("artifacts/sources").iterdir())
+    files = sorted(Path("artifacts/release").iterdir())
     if uploaded is not None:
         names = {unquote(url.rsplit("name=", 1)[1]) for url in uploaded}
         files = [path for path in files if path.name in names]
@@ -247,7 +244,7 @@ class ReleasePublishTests(unittest.TestCase):
                     return "{}"
                 with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
                     self.assertEqual(0, publish.main())
-                self.assertEqual(len(publish.RIDS) + 2, len(uploaded))
+                self.assertEqual(len(publish.RIDS), len(uploaded))
                 self.assertEqual({url.rsplit("name=", 1)[1] for url in uploaded},
                                  {item["name"] for item in remote_fixture()})
                 self.assertTrue(any("releases/99/assets?name=VodBox_1.0.0.linux-x64.zip" in url
@@ -281,48 +278,6 @@ class ReleasePublishTests(unittest.TestCase):
                 self.assertFalse(any(args[0] == "release" for args in calls))
             finally:
                 os.chdir(old)
-
-    def test_source_remote_size_digest_and_presence_gate_publication(self):
-        for suffix in (".json", ".tar.gz"):
-            for mode in ("size", "digest", "missing-digest", "missing"):
-                with self.subTest(asset=suffix, mode=mode), tempfile.TemporaryDirectory() as directory:
-                    old = os.getcwd()
-                    try:
-                        os.chdir(directory)
-                        publication_fixture()
-                        records = remote_fixture()
-                        selected = next(item for item in records
-                                        if "-source-" in item["name"] and item["name"].endswith(suffix))
-                        if mode == "missing":
-                            records.remove(selected)
-                        elif mode == "missing-digest":
-                            selected.pop("digest")
-                        elif mode == "size":
-                            selected["size"] += 1
-                        else:
-                            selected["digest"] = "sha256:wrong"
-                        calls = []
-
-                        def gh(*args):
-                            calls.append(args)
-                            if "matching-refs" in " ".join(args):
-                                return json.dumps([{"ref": "refs/tags/v1.0.0",
-                                                    "object": {"type": "commit", "sha": "abc"}}])
-                            if args[-1] == "repos/owner/repo/releases?per_page=100":
-                                return json.dumps([[{"tag_name": "v1.0.0", "id": 7, "draft": True}]])
-                            if args[-1] == "repos/owner/repo/releases/7":
-                                return json.dumps({"id": 7, "draft": True})
-                            if args[-1] == "repos/owner/repo/releases/7/assets?per_page=100":
-                                return json.dumps([records])
-                            return "{}"
-
-                        with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo", VERSION="1.0.0", SOURCE_SHA="abc"), patch.object(publish, "gh", gh):
-                            with self.assertRaises(ValueError):
-                                publish.main()
-                        self.assertFalse(any(args[:2] == ("release", "edit") for args in calls))
-                    finally:
-                        os.chdir(old)
-
 
 if __name__ == "__main__":
     unittest.main()

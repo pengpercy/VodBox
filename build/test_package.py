@@ -51,130 +51,34 @@ class PackageTests(unittest.TestCase):
             self.assertFalse((app / 'MacOS/VodBox.Desktop.dSYM').exists())
             self.assertFalse((app / 'MacOS/VodBox.Desktop.pdb').exists())
 
-    def test_macos_nested_jre_signature_order_and_source_preservation(self):
-        for identity in ('-', 'Developer ID Application: fixture'):
-            with self.subTest(identity=identity), tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
-                root = pathlib.Path(temp)
-                source = root / 'source'; source.mkdir()
-                macho = b'\xcf\xfa\xed\xfe' + b'runtime fixture'
-                (source / 'VodBox.Desktop').write_bytes(macho)
-                jre = source / 'JavaHost/jre'
-                (jre / 'Contents/Home/bin').mkdir(parents=True)
-                (jre / 'Contents/Home/bin/java').write_bytes(macho)
-                (jre / 'Contents/Home/lib/server').mkdir(parents=True)
-                (jre / 'Contents/Home/lib/server/libjvm.dylib').write_bytes(macho)
-                (jre / 'Contents/Home/lib/Fixture.class').write_bytes(b'\xca\xfe\xba\xbe\x00\x00\x00\x3d')
-                (jre / 'Contents/Home/lib/libjvm.dylib').symlink_to('server/libjvm.dylib')
-                (jre / 'Contents/Home/legal/java.base').mkdir(parents=True)
-                (jre / 'Contents/Home/legal/java.base/LICENSE').write_text('JRE license')
-                metadata = plistlib.dumps({'CFBundleExecutable': 'libjli.dylib',
-                                          'CFBundlePackageType': 'BNDL'})
-                (jre / 'Contents/MacOS').mkdir(parents=True)
-                (jre / 'Contents/MacOS/libjli.dylib').write_bytes(macho)
-                (jre / 'Contents/Info.plist').write_bytes(metadata)
-                (jre / 'Contents/_CodeSignature').mkdir()
-                (jre / 'Contents/_CodeSignature/CodeResources').write_bytes(b'old seal')
-                corresponding = source / 'JavaHost/corresponding-source'
-                (corresponding / 'native').mkdir(parents=True)
-                (corresponding / 'native/historical.dylib').write_bytes(macho)
-                (corresponding / 'LICENSE').write_text('source license')
-                (corresponding / '.source-metadata').write_text('source metadata')
-                output = root / 'output'; output.mkdir()
-                app = output / 'osx-arm64/VodBox.app'
-                copied_jre = app / 'Contents/Resources/JavaHost/jre'
-                commands = []
-                def capture(*args, **kwargs):
-                    commands.append(args)
-                    if args[0] == 'codesign' and '--sign' in args:
-                        self.assertFalse((copied_jre / 'Contents/_CodeSignature').exists())
-                        self.assertEqual(metadata, (copied_jre / 'Contents/Info.plist').read_bytes())
-                with patch.dict(package.os.environ, {'CODESIGN_IDENTITY': identity}), \
-                        patch.object(package, 'run', side_effect=capture):
-                    package.package_macos('osx-arm64', source, output, '0.2.1')
-                signing = [args for args in commands if args[0] == 'codesign' and '--sign' in args]
-                targets = [args[-1] for args in signing]
-                self.assertEqual(4, len(targets))
-                for relative in ('Contents/Home/bin/java', 'Contents/Home/lib/server/libjvm.dylib'):
-                    self.assertLess(targets.index(copied_jre / relative), targets.index(copied_jre))
-                desktop = app / 'Contents/MacOS/VodBox.Desktop'
-                self.assertNotIn(desktop, targets)
-                self.assertNotIn(copied_jre / 'Contents/MacOS/libjli.dylib', targets)
-                self.assertNotIn(copied_jre / 'Contents/Home/lib/Fixture.class', targets)
-                self.assertFalse((app / 'Contents/MacOS/JavaHost').exists())
-                self.assertLess(targets.index(copied_jre), targets.index(app))
-                self.assertEqual(app, targets[-1])
-                for args in signing:
-                    self.assertEqual(identity, args[args.index('--sign') + 1])
-                    self.assertEqual(identity != '-', '--timestamp' in args)
-                    self.assertEqual(identity != '-', '--options' in args)
-                verify = ('codesign', '--verify', '--deep', '--strict', app)
-                self.assertEqual(verify, commands[len(signing)])
-                copied_source = app / 'Contents/Resources/JavaHost/corresponding-source'
-                for relative in ('native/historical.dylib', 'LICENSE', '.source-metadata'):
-                    self.assertEqual((corresponding / relative).read_bytes(),
-                                     (copied_source / relative).read_bytes())
-                self.assertEqual('JRE license',
-                                 (copied_jre / 'Contents/Home/legal/java.base/LICENSE').read_text())
-                self.assertEqual(b'old seal', (jre / 'Contents/_CodeSignature/CodeResources').read_bytes())
-                self.assertEqual(metadata, (jre / 'Contents/Info.plist').read_bytes())
-
-    @unittest.skipIf(os.name == 'nt', 'macOS jlink links need POSIX symlink semantics')
-    def test_macos_jlink_license_links_materialized_only_in_copy(self):
+    def test_macos_rejects_a_stale_java_payload_before_packaging(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
             root = pathlib.Path(temp)
             source = root / 'source'; source.mkdir()
-            jre = source / 'JavaHost/jre'
-            (jre / 'legal/java.base').mkdir(parents=True)
-            (jre / 'legal/java.logging').mkdir()
-            content = b'JRE license\n'
-            original = jre / 'legal/java.base/LICENSE'
-            original.write_bytes(content)
-            link = jre / 'legal/java.logging/LICENSE'
-            link.symlink_to('../java.base/LICENSE')
-            (jre / 'lib').mkdir()
-            (jre / 'lib/runtime').write_bytes(b'runtime')
-            (jre / 'lib/runtime-link').symlink_to('runtime')
+            (source / 'VodBox.Desktop').write_bytes(b'fixture')
+            payload = source / 'JavaHost/host.jar'
+            payload.parent.mkdir(parents=True)
+            payload.write_bytes(b'stale')
             output = root / 'output'; output.mkdir()
-            with patch.object(package, 'run'):
-                package.package_macos('osx-arm64', source, output, '0.2.1')
-            copied = output / 'osx-arm64/VodBox.app/Contents/Resources/JavaHost/jre'
-            self.assertFalse((copied / 'legal/java.logging/LICENSE').is_symlink())
-            self.assertEqual(content, (copied / 'legal/java.logging/LICENSE').read_bytes())
-            self.assertEqual(content, (copied / 'legal/java.base/LICENSE').read_bytes())
-            self.assertTrue((copied / 'lib/runtime-link').is_symlink())
-            self.assertTrue(link.is_symlink())
-            self.assertEqual(pathlib.Path('../java.base/LICENSE'), link.readlink())
-            self.assertEqual(content, original.read_bytes())
+            with patch.object(package, 'run') as run, patch('sys.argv', [
+                    'package.py', 'osx-arm64', str(source), str(output), '--version', '0.2.1']):
+                with self.assertRaisesRegex(ValueError, 'forbidden Java payload'):
+                    package.main()
+            run.assert_not_called()
 
-    @unittest.skipIf(os.name == 'nt', 'macOS jlink links need POSIX symlink semantics')
-    def test_macos_rejects_invalid_jlink_license_links(self):
-        for case in ('missing', 'outside', 'directory', 'empty', 'whitespace', 'loop'):
-            with self.subTest(case=case), tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
-                root = pathlib.Path(temp)
-                source = root / 'source'; source.mkdir()
-                jre = source / 'JavaHost/jre'
-                legal = jre / 'legal/java.base'; legal.mkdir(parents=True)
-                link = legal / 'LICENSE'
-                target = legal / 'target'
-                if case == 'outside':
-                    target = root / 'outside-license'
-                    target.write_text('external license')
-                elif case == 'directory':
-                    target.mkdir()
-                elif case in ('empty', 'whitespace'):
-                    target.write_bytes(b'' if case == 'empty' else b' \n\t')
-                elif case == 'loop':
-                    target.symlink_to('LICENSE')
-                link.symlink_to(target if case == 'outside' else 'target')
-                output = root / 'output'; output.mkdir()
-                with patch.object(package, 'run') as run:
-                    with self.assertRaises(ValueError):
-                        package.package_macos('osx-arm64', source, output, '0.2.1')
-                run.assert_not_called()
-                copied = output / 'osx-arm64/VodBox.app/Contents/Resources/JavaHost/jre/legal/java.base/LICENSE'
-                self.assertTrue(copied.is_symlink())
-                self.assertTrue(link.is_symlink())
-                self.assertEqual(target if case == 'outside' else pathlib.Path('target'), link.readlink())
+    def test_main_accepts_a_java_free_payload(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
+            root = pathlib.Path(temp)
+            source = root / 'source'; source.mkdir()
+            (source / 'VodBox.Desktop').write_bytes(b'fixture')
+            output = root / 'output'
+            with patch.object(package, 'package_macos') as package_macos, \
+                    patch.object(package, 'verify_no_java_payload') as verify, \
+                    patch('sys.argv', [
+                        'package.py', 'osx-arm64', str(source), str(output), '--version', '0.2.1']):
+                package.main()
+            package_macos.assert_called_once()
+            self.assertEqual(verify.call_count, 2)
 
     def test_linux_launcher_and_package_architecture(self):
         for rid, deb, rpm in [('linux-x64', 'amd64', 'x86_64'), ('linux-arm64', 'arm64', 'aarch64')]:

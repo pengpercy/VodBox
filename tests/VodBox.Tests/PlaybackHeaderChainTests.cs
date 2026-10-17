@@ -4,27 +4,43 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using VodBox.Core;
 using VodBox.Infrastructure;
-using VodBox.PluginHost.JarPlugin;
 using Xunit;
 
 namespace VodBox.Tests;
 
 /// <summary>
-/// 播放协议数据闭环（离线，不触外网、不启 JVM）：JAR/CatVod 与 JSON 解析出的合法播放头
+/// 播放协议数据闭环（离线）：type4 与 JSON 解析出的合法播放头
 /// （UA/Cookie/Authorization/Referer…）、parse/jx/playUrl 与多地址必须被完整保留，并交给现有受控媒体代理
 /// 转发——绝不在数据链上丢弃，也不靠放宽引擎的拒绝条件来「凑合能播」。
 /// </summary>
 public sealed class PlaybackHeaderChainTests
 {
+    private const string Detail =
+        "{\"list\":[{\"vod_id\":\"100\",\"vod_name\":\"示例\",\"vod_play_from\":\"线路A\",\"vod_play_url\":\"ep$https://episode.example/x\"}]}";
+
+    private static SourceInfo Site() => new()
+    {
+        Key = "t4", Name = "示例站", Runtime = SourceRuntime.Type4,
+        Api = "https://api.example/play",
+    };
+
+    private static bool IsDetail(string url) => url.Contains("ac=detail", StringComparison.Ordinal);
+    private static bool IsPlay(string url) => url.Contains("play=", StringComparison.Ordinal);
+
+    private static Type4Source Source(Func<string, string> response) =>
+        new(Site(), (url, _, _) => Task.FromResult(IsDetail(url) ? Detail : response(url)));
+
     [Fact]
-    public void JarPlayerContentPreservesMultiAddressHeadersAndParseFlags()
+    public async Task PlaybackResponsePreservesMultiAddressHeadersAndParseFlags()
     {
         const string play = """
             {"parse":1,"jx":"2","playUrl":"https://jx.example/?url=",
              "url":["高清","https://cdn.example/a.m3u8","备用","https://cdn.example/b.m3u8"],
              "header":{"User-Agent":"catvod","Referer":"https://source.example/","Cookie":"sid=abc","Authorization":"Bearer t"}}
             """;
-        var request = CatVodCatalog.ParsePlayback(play, "https://cdn.example/a.m3u8", "示例", "rj", "RJ", "100", "线路A", "ep", null, null);
+        var source = Source(_ => play);
+        var detail = await source.GetDetailAsync("100", TestContext.Current.CancellationToken);
+        var request = await source.ResolvePlaybackAsync("100", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken);
 
         // 多地址完整保留，首选地址仍是其中之一。
         Assert.Equal("https://cdn.example/a.m3u8", request.Uri);
@@ -43,10 +59,12 @@ public sealed class PlaybackHeaderChainTests
     }
 
     [Fact]
-    public void JarPlayerContentKeepsCookieAuthorizationFromJsonStringHeader()
+    public async Task PlaybackResponseKeepsCookieAuthorizationFromJsonStringHeader()
     {
         const string play = """{"parse":0,"url":"https://cdn.example/x.mp4","header":"{\"Cookie\":\"sid=1\",\"Authorization\":\"Bearer z\",\"X-Token\":\"v\"}"}""";
-        var request = CatVodCatalog.ParsePlayback(play, "", "t", "rj", "RJ", "1", "f", "e", null, null);
+        var source = Source(_ => play);
+        var detail = await source.GetDetailAsync("100", TestContext.Current.CancellationToken);
+        var request = await source.ResolvePlaybackAsync("100", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(ResolutionKind.Direct, request.Resolution);
         Assert.Null(request.ParseEndpoint);
@@ -56,10 +74,11 @@ public sealed class PlaybackHeaderChainTests
     }
 
     [Fact]
-    public void JarPlayerContentSingleStringUrlKeepsPrimaryAddress()
+    public async Task PlaybackResponseSingleStringUrlKeepsPrimaryAddress()
     {
-        var request = CatVodCatalog.ParsePlayback(
-            """{"url":"https://cdn.example/only.mp4"}""", "", "t", "rj", "RJ", "1", "线路A", "e", null, null);
+        var source = Source(_ => """{"url":"https://cdn.example/only.mp4"}""");
+        var detail = await source.GetDetailAsync("100", TestContext.Current.CancellationToken);
+        var request = await source.ResolvePlaybackAsync("100", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken);
         Assert.Equal("https://cdn.example/only.mp4", request.Uri);
         Assert.Single(request.Choices);
         Assert.Equal("https://cdn.example/only.mp4", request.Choices[0].Uri);
@@ -70,9 +89,13 @@ public sealed class PlaybackHeaderChainTests
     [InlineData("""{"url":"https://user:pass@cdn.example/x.mp4"}""")]
     [InlineData("""{"header":{"Bad Header":"x"},"url":"https://cdn.example/x.mp4"}""")]
     [InlineData("""{"header":{"X-Test":"line\r\nbreak"},"url":"https://cdn.example/x.mp4"}""")]
-    public void JarPlayerContentRejectsIllegalAddressOrHeader(string play) =>
-        Assert.Throws<InvalidDataException>(() =>
-            CatVodCatalog.ParsePlayback(play, "https://episode.example/x", "t", "rj", "RJ", "1", "f", "e", null, null));
+    public async Task PlaybackResponseRejectsIllegalAddressOrHeader(string play)
+    {
+        var source = Source(_ => play);
+        var detail = await source.GetDetailAsync("100", TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => source.ResolvePlaybackAsync("100", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken));
+    }
 
     [Fact]
     public async Task JsonParserPreservesCookieAuthorizationFromParseResponse()
@@ -131,7 +154,9 @@ public sealed class PlaybackHeaderChainTests
             // 1) 解析出的播放请求：Cookie/Authorization 完整保留（引擎直传不了的头）。
             var play = """{"parse":0,"url":"UPSTREAM/media","header":{"User-Agent":"TV","Referer":"https://source.example/","Cookie":"sid=abc","Authorization":"Bearer t"}}"""
                 .Replace("UPSTREAM", upstream.Urls.Single(), StringComparison.Ordinal);
-            var request = CatVodCatalog.ParsePlayback(play, "", "t", "rj", "RJ", "1", "f", "e", null, null);
+            var source = Source(_ => play);
+            var detail = await source.GetDetailAsync("100", TestContext.Current.CancellationToken);
+            var request = await source.ResolvePlaybackAsync("100", detail.Lines[0].Episodes[0].Id, TestContext.Current.CancellationToken);
             Assert.Equal("sid=abc", request.Headers["Cookie"]);
             Assert.Equal("Bearer t", request.Headers["Authorization"]);
 

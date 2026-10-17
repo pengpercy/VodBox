@@ -18,6 +18,7 @@ public sealed class SourceRegistryRaceTests
         await registry.LoadConfigAsync("test",TestContext.Current.CancellationToken);
         Assert.Equal("首项",Assert.Single(registry.Sources).Name);
         Assert.Contains(registry.ImportWarnings,warning=>warning.Contains("未知Java"));
+        Assert.Contains(registry.ImportWarnings,warning=>warning.Contains("尚未迁移为 C# 原生实现"));
         Assert.Contains(registry.ImportWarnings,warning=>warning.Contains("重复"));
     }
 

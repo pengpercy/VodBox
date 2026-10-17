@@ -5,10 +5,7 @@ macOS: mpv.app 主二进制重写为 libmpv.dylib（install_name_tool 把 @execu
 Windows: 静态媒体库 libmpv-2.dll + Vulkan loader，一起随包分发。
 Linux: 固定 libmpv/FFmpeg 构建 + 完整非 glibc 动态依赖闭包，随包分发。
 
-另把 JVM 插件宿主打进 `<output>/JavaHost/`：`host.jar`（架构无关的 Java 字节码，本机 JDK 编译即可）
-+ `deps/`（固定上游 Maven 依赖闭包） + **该 RID 自己的** jlink Java 21 runtime。
-JRE 由目标 native runner 上经过版本与机器类型校验的 JDK 21 裁剪生成，跨架构立即失败。
-`verify_jre` 按 RID 校验 PE/ELF/Mach-O 机器类型。`--skip-java-host` 只打媒体内核。
+产品不再打包 JVM 插件宿主、JAR/DEX 转换器或裁剪 JRE；此脚本只准备媒体内核。
 """
 import argparse
 import hashlib
@@ -25,12 +22,35 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from nativeverify import verify_linux_closure, verify_windows_dll, pe_imports, verify_jre, NativeVerifyError, LINUX_BASE
-from jlink_runtime import METADATA as JLINK_METADATA
-from native_coverage import backend_supports, describe, verify_deps, NativeCoverageError
+from nativeverify import verify_linux_closure, verify_windows_dll, pe_imports, NativeVerifyError, LINUX_BASE
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = json.loads((ROOT / "build" / "native-assets.json").read_text(encoding="utf-8"))
+FORBIDDEN_PRODUCT_PARTS = frozenset(("javahost", "jre", "jdk"))
+FORBIDDEN_PRODUCT_SUFFIXES = (".jar", ".dex", ".class", ".jmod", ".war")
+FORBIDDEN_PRODUCT_NAMES = frozenset((
+    "java-host.json", "upstream-runtime.json", "native-backend-receipt.json",
+    "license-tvbox-silicon",
+    "java", "javaw", "javac", "java.exe", "javaw.exe", "javac.exe",
+))
+
+
+def verify_no_java_payload(output: Path) -> None:
+    """Fail when a stale publish tree reintroduces a Java runtime or plugin payload."""
+    rejected = []
+    for path in output.rglob("*"):
+        if not path.is_file() and not path.is_symlink():
+            continue
+        relative = path.relative_to(output)
+        parts = tuple(part.lower() for part in relative.parts)
+        name = relative.name.lower()
+        if any(part in FORBIDDEN_PRODUCT_PARTS for part in parts):
+            rejected.append(str(relative))
+        elif name in FORBIDDEN_PRODUCT_NAMES or name.endswith(FORBIDDEN_PRODUCT_SUFFIXES):
+            rejected.append(str(relative))
+    if rejected:
+        preview = ", ".join(sorted(rejected)[:12])
+        raise ValueError(f"publish tree contains forbidden Java payload: {preview}")
 
 
 def download(rid: str) -> Path:
@@ -319,162 +339,28 @@ def copy_media_notices(rid: str, output: Path):
     (notices / "asset.json").write_text(json.dumps(ASSETS["runtimes"][rid], indent=2) + "\n")
 
 
-JAVA_HOST_DIRECTORY = "JavaHost"
-
-# `deps/` is the upstream Maven closure (host.jar's runtime classpath, staged by tvbox-host.py).
-# The dex-deps.json groups are the *legacy* lock table: the new default host does not stage them,
-# and the native coverage question is about the upstream closure, so `deps/` must be present.
-JAVA_HOST_REQUIRED_COMPONENT = "deps"
-JAVA_HOST_REQUIRED_FILES = ("upstream-runtime.json", "LICENSE-tvbox-silicon")
-# The per-RID source-rebuild receipt, written by `rebuild_native_backend.py` and shipped inside the
-# package (it is the evidence that the distributed native was built from the pinned source).
-RECEIPT_NAME = "native-backend-receipt.json"
-
-def java_host_source() -> Path:
-    return ROOT / "src" / "VodBox.PluginHost" / "JavaHost"
-
-
-def stage_prebuilt_host(source: Path, destination: Path) -> Path:
-    component = source.parent
-    if not source.is_file() or not (component / "upstream-runtime.json").is_file():
-        raise ValueError("prebuilt upstream host requires its provenance, dependencies and corresponding source")
-    for name in (JAVA_HOST_REQUIRED_COMPONENT, "corresponding-source"):
-        if not (component / name).is_dir():
-            raise ValueError(f"prebuilt upstream component is missing {name}")
-    if not any((component / JAVA_HOST_REQUIRED_COMPONENT).glob("*.jar")):
-        # A component whose deps/ is empty links nothing: the host starts and then fails to find
-        # the upstream classes. Reject it here rather than shipping a host that cannot load a plugin.
-        raise ValueError(f"prebuilt upstream component has an empty {JAVA_HOST_REQUIRED_COMPONENT}/")
-    # The source-rebuild receipt must exist beside the staged host: it is the evidence the package
-    # distributes a native rebuilt from pinned source, and it has to travel with the package.
-    if not (component / RECEIPT_NAME).is_file():
-        raise ValueError(
-            f"prebuilt upstream component is missing {RECEIPT_NAME}; the per-RID source-native "
-            f"rebuild (build/rebuild_native_backend.py) must run before staging the host")
-    if source.resolve() != destination.resolve():
-        shutil.copy2(source, destination)
-    if component.resolve() != destination.parent.resolve():
-        for name in (JAVA_HOST_REQUIRED_COMPONENT, "corresponding-source"):
-            shutil.copytree(component / name, destination.parent / name, dirs_exist_ok=True)
-        for name in JAVA_HOST_REQUIRED_FILES + (RECEIPT_NAME,):
-            shutil.copy2(component / name, destination.parent / name)
-    return destination
-
-
-def build_host_jar(destination: Path, rid: str) -> Path:
-    """Produce `host.jar` for the bundle.
-
-    Java bytecode is architecture-independent, so compiling with the build host's JDK is correct:
-    only the *runtime* has to match the target RID. A prebuilt jar (VODBOX_JAR_HOST) wins over
-    compiling, which lets CI build the host once on one runner and reuse it on every RID.
-
-    In the in-repo (non-prebuilt) path the per-RID source rebuild runs here too, so the staged host
-    carries this RID's rebuilt backend native and its receipt; a prebuilt host is expected to have
-    been rebuilt already, and `stage_prebuilt_host` enforces the receipt is present.
-    """
-    prebuilt = os.environ.get("VODBOX_JAR_HOST")
-    if prebuilt:
-        source = Path(prebuilt)
-        if not source.is_file():
-            raise ValueError(f"VODBOX_JAR_HOST does not exist: {source}")
-        return stage_prebuilt_host(source, destination)
-    run(sys.executable, ROOT / "build" / "tvbox-host.py", "--output", destination.parent)
-    run(sys.executable, ROOT / "build" / "rebuild_native_backend.py", "build",
-        "--rid", rid, "--deps", destination.parent / "deps")
-    return destination
-
-
-def bundle_java_host(rid: str, output: Path, host_jar=None):
-    """Stage the JVM plugin host next to the published app: host.jar + deps + the RID's JRE.
-
-    The runtime is linked using the native target runner's verified JDK 21 and upstream module
-    baseline. Cross-architecture runners and incomplete JDKs fail without a full-JRE fallback.
-    `verify_jre` proves the resulting launcher matches the target RID.
-    """
-    host = output / JAVA_HOST_DIRECTORY
-    host.mkdir(parents=True, exist_ok=True)
-    jar = host / "host.jar"
-    if host_jar is not None:
-        source = Path(host_jar)
-        if not source.is_file():
-            raise ValueError(f"--java-host-jar does not exist: {source}")
-        stage_prebuilt_host(source, jar)
+def prepare_media(rid: str, output: Path) -> None:
+    """Download and bundle the pinned media kernel, then assert the product payload is Java-free."""
+    output.mkdir(parents=True, exist_ok=True)
+    archive = download(rid)
+    if rid.startswith("osx"):
+        bundle_macos(archive, output)
+    elif rid.startswith("win"):
+        bundle_windows(archive, output, rid)
     else:
-        build_host_jar(jar, rid)
-    stage = ROOT / "build" / "fetch-dex-deps.py"
-    run(sys.executable, stage, "jre", "--rid", rid, "--extract", host / "jre")
-    architecture = verify_jre(host / "jre", rid)
-    runtime = json.loads((host / "jre" / JLINK_METADATA).read_text(encoding="utf-8"))
-    if runtime.get("rid") != rid or runtime.get("kind") != "jlink" or runtime.get("architecture") != architecture:
-        raise ValueError(f"{rid}: linked runtime metadata does not match the bundled JRE")
-    # The full upstream host is staged first (host.jar + original Maven deps + corresponding source);
-    # the per-RID source rebuild then rewrites the backend jar inside that staged host, and this is
-    # where the *result* is verified. After a source rebuild the backend jar deliberately carries
-    # only this RID's native (every foreign one was removed), so the check is per-RID: `verify_deps`
-    # is asked to confirm this RID's rebuilt native is present and no foreign native rode along,
-    # rather than demanding the five upstream RIDs the rebuild intentionally dropped.
-    try:
-        coverage = verify_deps(host / "deps", rid)
-    except NativeCoverageError as error:
-        # The lock table and the shipped jars disagree: treat it as a broken build, not a warning.
-        raise ValueError(f"{rid}: native coverage table does not match the bundled deps: {error}") from error
-    # The receipt is the evidence that ties the packaged native to its pinned source. It is written
-    # by `rebuild_native_backend.py` next to the staged host and must travel *inside* the package,
-    # so a later release gate can read it from the archive rather than only from the build tree.
-    receipt_path = host / RECEIPT_NAME
-    if not receipt_path.is_file():
-        raise ValueError(
-            f"{rid}: {RECEIPT_NAME} is missing from the staged Java host; the source-native rebuild "
-            f"step must run before bundling so the package carries its rebuild receipt")
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    if receipt.get("rid") != rid:
-        raise ValueError(f"{rid}: staged receipt is for {receipt.get('rid')!r}, not {rid}")
-    native = {
-        "backend": "unidbg-unicorn2",
-        "supported": backend_supports(rid),
-        "verdict": describe(rid),
-        "bundledJar": coverage["jar"],
-        "sourceRebuilt": bool(coverage.get("sourceRebuilt")),
-        "receipt": RECEIPT_NAME,
-        "receiptRid": receipt.get("rid"),
-        "excluded": bool(receipt.get("backend", {}).get("excluded")),
-    }
-    with jar.open("rb") as handle:
-        digest = hashlib.file_digest(handle, "sha256").hexdigest()
-    (host / "java-host.json").write_text(json.dumps({
-        "hostJar": {"name": jar.name, "sha256": digest},
-        "backend": "tvbox-silicon",
-        "dependencies": ["deps"],
-        "jre": runtime,
-        "nativeBackend": native,
-    }, indent=2) + "\n")
-    if not native["supported"]:
-        print(f"  {rid}: native ARM64 backend unavailable -> plugins needing it fail as unsupported_native_library")
-    print(f"{rid}: bundled JVM plugin host (upstream host.jar + original Maven deps and corresponding source + JRE {architecture})")
+        bundle_linux(archive, output, rid)
+    copy_media_notices(rid, output)
+    verify_no_java_payload(output)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("rid")
     parser.add_argument("output", type=Path)
-    parser.add_argument("--java-host-jar", type=Path, default=None,
-                        help="use a prebuilt host.jar instead of compiling the in-repo Java host")
-    parser.add_argument("--skip-java-host", action="store_true",
-                        help="bundle only the media kernel, not the JVM plugin host")
     args = parser.parse_args()
     valid={"osx-x64","osx-arm64","win-x64","win-arm64","linux-x64","linux-arm64"}
     if args.rid not in valid: parser.error("unsupported runtime identifier")
-    args.output.mkdir(parents=True, exist_ok=True)
-    if not args.skip_java_host:
-        bundle_java_host(args.rid, args.output, args.java_host_jar)
-    archive = download(args.rid)
-    if args.rid.startswith("osx"):
-        bundle_macos(archive, args.output)
-    elif args.rid.startswith("win"):
-        bundle_windows(archive, args.output, args.rid)
-    else:
-        bundle_linux(archive, args.output, args.rid)
-    copy_media_notices(args.rid, args.output)
+    prepare_media(args.rid, args.output)
     print(f"bundled complete media kernel for {args.rid}")
 
 

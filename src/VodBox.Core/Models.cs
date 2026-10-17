@@ -8,7 +8,6 @@ namespace VodBox.Core;
 /// <summary>TVBox 订阅配置根（site.json）。</summary>
 public sealed class TvBoxConfig
 {
-    [JsonPropertyName("spider")] public string? Spider { get; set; }
     [JsonPropertyName("sites")] public List<TvBoxSite> Sites { get; set; } = [];
     [JsonPropertyName("lives")] public List<TvBoxLive> Lives { get; set; } = [];
     [JsonPropertyName("parses")] public List<TvBoxParse> Parses { get; set; } = [];
@@ -38,8 +37,6 @@ public sealed class TvBoxSite
     [JsonConverter(typeof(LenientStringConverter))] public string Name { get; set; } = "";
     public string Api { get; set; } = "";
     [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
-    /// <summary>站点自带 JAR 地址（相对订阅 origin 解析）；空则回退到配置级 spider。</summary>
-    public string? Jar { get; set; }
     public string? PlayUrl { get; set; }
     public int Type { get; set; }
     public int Searchable { get; set; } = 1;
@@ -49,8 +46,7 @@ public sealed class TvBoxSite
     public int Timeout { get; set; }
     public JsonElement? Style { get; set; }
     /// <summary>
-    /// 站点在配置里的原始字段（未建模的键，如 <c>jar</c>/<c>logo</c>/<c>playerType</c> 等）。
-    /// JAR 插件宿主需要「raw 上下文」时从这里取，避免为了兼容个别站点反复扩模型。
+    /// 站点在配置里的原始字段（未建模的键，如 <c>logo</c>/<c>playerType</c> 等）。
     /// </summary>
     [JsonExtensionData] public Dictionary<string, JsonElement>? Raw { get; set; }
 
@@ -92,19 +88,13 @@ public sealed record SourceInfo
     public bool Searchable { get; init; } = true;
     public bool Changeable { get; init; } = true;
     public List<string> Categories { get; init; } = [];
-    /// <summary>配置级全局 spider JAR（<c>config.spider</c> 原值，含 <c>;md5;</c> 段）。JAR 宿主用。</summary>
-    public string? Spider { get; init; }
-    /// <summary>站点自带 JAR（<c>site.jar</c> 原值，含 <c>;md5;</c> 段）。JAR 宿主用。</summary>
-    public string? Jar { get; init; }
-    /// <summary>订阅的最终 origin（跟随重定向后的地址），相对 jar/ext 以此为基准解析。</summary>
+    /// <summary>订阅的最终 origin（跟随重定向后的地址），相对 ext 以此为基准解析。</summary>
     public string? Origin { get; init; }
     /// <summary>
     /// 站点级请求头（<c>site.header</c> 原值原样保留）。type4 等原生 HTTP 站点靠它带 Cookie/UA/Referer
     /// 访问接口与上游媒体；不臆造缺失字段，也不把它改成全局会话。
     /// </summary>
     public IReadOnlyDictionary<string, string>? Header { get; init; }
-    /// <summary>站点在配置里的原始 JSON（raw 上下文），JAR 宿主按需透传，不臆造缺失字段。</summary>
-    public string? SiteJson { get; init; }
 }
 
 /// <summary>分类（Class）。</summary>

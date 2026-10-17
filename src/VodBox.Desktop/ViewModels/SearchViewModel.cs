@@ -11,7 +11,7 @@ public sealed partial class SearchViewModel : ObservableObject
 {
     private readonly Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> _search;
     private Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>>? _detailedSearch;
-    /// <summary>流式聚合：每个站点完成即回填（JAR 站点首次搜索可达数十秒，不能让快站点的结果陪它们一起等）。</summary>
+/// <summary>流式聚合：每个站点完成即回填，慢站点不阻塞快站点。</summary>
     private Func<string,CancellationToken,IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>>? _streamSearch;
     private Func<int> _targetCount = () => 0;
     /// <summary>结果总数上限（卡片网格与归属映射共用）。</summary>

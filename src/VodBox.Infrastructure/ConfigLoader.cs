@@ -35,7 +35,7 @@ public sealed class ConfigLoader(DefaultHttp http)
 
     /// <summary>
     /// 与 <see cref="LoadAnyAsync"/> 相同，并返回订阅**最终 origin**（跟随重定向后的地址）。
-    /// 相对 jar/ext 的解析、以及 JAR 宿主上下文都依赖它。
+    /// 相对 ext 的解析依赖它。
     /// </summary>
     public async Task<LoadedConfig> LoadAnyWithOriginAsync(string url, CancellationToken ct = default)
     {
@@ -124,16 +124,14 @@ public sealed class ConfigLoader(DefaultHttp http)
         return Regex.Replace(json, @"^[ \t]*//.*$", "", RegexOptions.Multiline);
     }
 
-    /// <summary>把 TvBoxConfig 转为可用的内容源列表（过滤桌面端不支持的 csp_ 站点）。</summary>
-    public static List<SourceInfo> ToSources(TvBoxConfig config) => ToSources(config, origin: null, includeJarPlugins: false);
+    /// <summary>把 TvBoxConfig 转为可用的原生内容源列表（过滤尚未迁移的 csp_ 站点）。</summary>
+    public static List<SourceInfo> ToSources(TvBoxConfig config) => ToSources(config, origin: null);
 
     /// <summary>
-    /// 把 TvBoxConfig 转为内容源列表。
-    /// <paramref name="includeJarPlugins"/> 为 true 时，未用 C# 原生实现的 csp_ JAR 站点不再被丢弃，
-    /// 而是标为 <see cref="SourceRuntime.Jar"/> 并携带全局 spider / 站点 jar / 最终 origin / 原始站点 JSON，
-    /// 交由外部 JAR 宿主执行（宿主不可用时由注册表保持未创建并提示）。默认 false 保持既有过滤行为。
+    /// 把 TvBoxConfig 转为原生内容源列表。未迁移的 csp_ 入口不进入运行时列表，
+    /// 由 <see cref="SourceRegistry"/> 按原配置逐项报告。
     /// </summary>
-    public static List<SourceInfo> ToSources(TvBoxConfig config, string? origin, bool includeJarPlugins)
+    public static List<SourceInfo> ToSources(TvBoxConfig config, string? origin)
     {
         var sources = new List<SourceInfo>();
         foreach (var site in config.Sites)
@@ -144,10 +142,7 @@ public sealed class ConfigLoader(DefaultHttp http)
             if (runtime == SourceRuntime.Node && NativeSpiders.IsSupported(site))
                 runtime = SourceRuntime.NativeSpider;
             if (runtime == SourceRuntime.Node)
-            {
-                if (!includeJarPlugins) continue;
-                runtime = SourceRuntime.Jar;
-            }
+                continue;
             // .js 入口：按站点 key 有原生实现的提升为 NativeSpider（如 虎牙js→虎牙直播）；
             // 其余 .js 保持 QuickJs 待 S3a 的 JS 宿主
             if (runtime == SourceRuntime.QuickJs && NativeSpiders.IsSupportedKey(site.Key))
@@ -164,11 +159,8 @@ public sealed class ConfigLoader(DefaultHttp http)
                 Searchable = site.Searchable != 0,
                 Changeable = site.Changeable != 0,
                 Categories = site.Categories,
-                Spider = config.Spider,
-                Jar = site.Jar,
                 Origin = origin,
                 Header = ReadSiteHeader(site.Raw),
-                SiteJson = runtime == SourceRuntime.Jar ? JsonSerializer.Serialize(site, Json.TypeInfo<TvBoxSite>()) : null,
             });
         }
         return sources;

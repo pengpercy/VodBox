@@ -29,18 +29,16 @@ SOURCE_PATHS = (
 # Keep SOURCE_PATHS/source_hash unchanged: existing metadata uses that exact key.
 # Native compilation, bundled dependencies and verification/receipt inputs only.
 NATIVE_BUILD_PATHS = (
-    "src", "tests", "third_party", "Directory.Build.*", "Directory.Packages.*",
+    "src", "tests", "third_party/tvbox-silicon", "Directory.Build.*", "Directory.Packages.*",
     "global.json", "VodBox.slnx", "NuGet.Config", "VERSION", "**/packages*.lock.json",
     ".github/workflows/build.yml",
-    "build/tvbox-host.py", "build/rebuild_native_backend.py", "build/quickjs",
+    "build/quickjs",
     "build/bundle.py", "build/native-assets.json", "build/nativeverify.py",
-    "build/native_coverage.py", "build/verify_java_host.py", "build/verify_mpv_bundle.py",
+    "build/verify_mpv_bundle.py",
     "build/archive.py", "build/licenses", "build/publish-aot.sh", "build/dev-natives.sh",
-    "build/smoke.py", "build/dex-acceptance.sh", "build/dex_fixture.py",
-    "build/dex-deps.json", "build/fetch-dex-deps.py", "build/jlink_runtime.py", "build/test_jlink_runtime.py", "build/test-desktop-smoke.sh",
+    "build/smoke.py", "build/test-desktop-smoke.sh",
     "build/media-fixtures", "build/generate-icons.py",
-    "build/test_bundle.py", "build/test_nativeverify.py", "build/test_native_coverage.py",
-    "build/test_rebuild_native_backend.py", "build/test_archive.py",
+    "build/test_bundle.py", "build/test_nativeverify.py", "build/test_archive.py",
 )
 
 
@@ -54,8 +52,7 @@ def api(path: str) -> dict:
 
 
 def source_hash(ref: str) -> str:
-    # Hash tracked entries at the producing commit, never generated working-tree files
-    # such as JavaHost/target (which is absent from git ls-files).
+    # Hash tracked entries at the producing commit, never generated working-tree files.
     listing = git("ls-tree", "-r", ref, "--", *SOURCE_PATHS)
     blobs = "\n".join(line for line in listing.splitlines() if line.strip())
     return hashlib.sha256(blobs.encode()).hexdigest()

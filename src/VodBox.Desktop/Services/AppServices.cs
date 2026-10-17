@@ -26,9 +26,9 @@ public sealed class AppServices : IDisposable
         Directory.CreateDirectory(DataDir);
         LocalControl=new LocalControlServer(Path.Combine(DataDir,"media-inbox"));
         Store = new LibraryStore(Path.Combine(DataDir, "library.db"));
-        // 默认产品路由只使用 C# 原生 provider：不再启动 JVM。尚未迁移的 csp_ 入口会被过滤，
-        // 并由 SourceRegistry 逐项给出「尚未迁移为 C# 原生实现」的明确提示——包括按用户要求跳过的网盘入口。
-        // JavaHost 仍保留在源码中供显式原生验证对照，但默认路径不再依赖它。
+        // 默认产品只使用 C# 原生 provider：不再启动 JVM，JavaHost/JAR/DEX 已从源码与打包中移除。
+        // 未迁移的 csp_ 入口会被过滤并由 SourceRegistry 逐项报告，
+        // 不把缺少实现的站点伪装成可运行——包括按用户要求跳过的网盘入口。
         Registry = new SourceRegistry(Store, configCacheDirectory: Path.Combine(DataDir, "config-cache"));
         // GUI 模式 + 等渲染面：loadfile 不早于 render-context 创建，消除静默丢画面竞态。
         Player = new MpvEngine(waitForVideoSurface: true);

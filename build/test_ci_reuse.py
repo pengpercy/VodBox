@@ -42,7 +42,7 @@ class ReuseTests(unittest.TestCase):
         self.assertFalse(self.probe(event='pull_request'))
         self.assertFalse(self.probe(path='.github/workflows/release.yml'))
 
-    def test_all_tracked_tvbox_inputs_affect_fingerprint_but_generated_target_does_not(self):
+    def test_analysis_assets_affect_source_fingerprint_but_generated_target_does_not(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
 

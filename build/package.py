@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from bundle import verify_windows_closure
+from bundle import verify_no_java_payload, verify_windows_closure
 from nativeverify import verify_linux_closure
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,9 +31,6 @@ def package_macos(rid, source: Path, output: Path, version: str):
                     ignore=shutil.ignore_patterns("*.pdb", "*.dbg", "*.dSYM"))
     resources = contents / "Resources"
     resources.mkdir(parents=True)
-    java_host = contents / "MacOS/JavaHost"
-    if java_host.is_dir():
-        shutil.move(str(java_host), resources / "JavaHost")
     assets = contents / "MacOS" / "Assets"
     if assets.is_dir():
         shutil.move(str(assets), resources / "Assets")
@@ -50,36 +47,6 @@ def package_macos(rid, source: Path, output: Path, version: str):
             continue
         if detritus.name.startswith("."):
             shutil.rmtree(detritus, ignore_errors=True) if detritus.is_dir() else detritus.unlink(missing_ok=True)
-    # Remove the upstream resource seal only in the copied runtime. Keep Info.plist so
-    # codesign recognizes the JRE as a nested bundle and builds a fresh resource seal.
-    runtime = resources / "JavaHost/jre"
-    # jlink shares license text via relative links. Materialize only the copied
-    # runtime's legal files, after validating each target within that runtime.
-    legal = runtime / "legal"
-    if legal.is_dir():
-        runtime_root = runtime.resolve(strict=True)
-        for license_file in sorted(legal.rglob("*")):
-            if not license_file.is_symlink():
-                continue
-            try:
-                target = license_file.resolve(strict=True)
-            except (OSError, RuntimeError) as error:
-                raise ValueError(f"Invalid JRE license link: {license_file}") from error
-            if not target.is_relative_to(runtime_root) or not target.is_file():
-                raise ValueError(f"JRE license target must be a regular file within the JRE: {license_file}")
-            content = target.read_bytes()
-            if not content.strip():
-                raise ValueError(f"Empty JRE license: {license_file}")
-            license_file.unlink()
-            license_file.write_bytes(content)
-    runtime_bundles = []
-    if (runtime / "Contents/Info.plist").is_file():
-        runtime_bundles.append(runtime)
-        old_signature = runtime / "Contents/_CodeSignature"
-        if old_signature.is_symlink():
-            old_signature.unlink()
-        elif old_signature.is_dir():
-            shutil.rmtree(old_signature)
     # Keep libmpv and lib/ together: native dependencies use @loader_path/lib.
     shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/vodbox.icns", resources / "vodbox.icns")
     with (contents / "Info.plist").open("wb") as file:
@@ -97,17 +64,12 @@ def package_macos(rid, source: Path, output: Path, version: str):
     # Passing a bundle's main executable to codesign signs its containing bundle.
     # Leave those executables to the explicit bundle pass after all nested code.
     bundle_executables = {contents / "MacOS/VodBox.Desktop"}
-    for bundle in runtime_bundles:
-        with (bundle / "Contents/Info.plist").open("rb") as file:
-            executable = plistlib.load(file).get("CFBundleExecutable")
-        if executable:
-            bundle_executables.add(bundle / "Contents/MacOS" / executable)
     targets = []
     for file in contents.rglob("*"):
         relative = file.relative_to(contents)
         if "corresponding-source" in relative.parts:
             continue
-        if relative.parts[0] != "MacOS" and not file.is_relative_to(runtime):
+        if relative.parts[0] != "MacOS":
             continue
         if file in bundle_executables or file.is_symlink() or not file.is_file() or file.suffix == ".class":
             continue
@@ -126,10 +88,9 @@ def package_macos(rid, source: Path, output: Path, version: str):
             if file.stat().st_size < 8 + architectures * entry_size:
                 continue
         targets.append(file)
-    # Sign standalone runtime code first, then seal the JRE, then the outer app.
-    # Source/license resources remain intact and are sealed by the outer app.
+    # Sign standalone code first, then seal the outer app.
     ordered_targets = sorted(targets, key=lambda item: (-len(item.parts), str(item)))
-    for target in ordered_targets + runtime_bundles + [app]:
+    for target in ordered_targets + [app]:
         command = ["codesign", "--force", "--sign", identity]
         if identity != "-":
             command += ["--options", "runtime", "--timestamp"]
@@ -184,6 +145,7 @@ def main():
     parser.add_argument("--version", required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    verify_no_java_payload(args.source)
     if args.rid.startswith("win"):
         verify_windows_closure(args.source, args.rid)
         stem = f"VodBox_{args.version}.{args.rid}"
@@ -192,6 +154,7 @@ def main():
         package_macos(args.rid, args.source, args.output, args.version)
     else:
         package_linux(args.rid, args.source, args.output, args.version)
+    verify_no_java_payload(args.output)
     print(f"packaged {args.rid}")
 
 

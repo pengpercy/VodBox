@@ -276,18 +276,3 @@ def verify_executable_arch(path: Path, rid: str) -> str:
     if actual.lower() != expected.lower():
         raise NativeVerifyError(f"{path}: {actual} image in a {rid} ({expected}) bundle")
     return actual
-
-
-def verify_jre(directory: Path, rid: str) -> str:
-    """Assert a bundled JRE's `bin/java` is the RID's architecture, never the build host's.
-
-    This is the guard against a cross-compile leg accidentally shipping the runner's own runtime:
-    an x86-64 launcher inside an arm64 bundle installs fine and then fails to exec.
-    """
-    directory = Path(directory)
-    launcher = directory / "bin" / ("java.exe" if rid.startswith("win") else "java")
-    if not launcher.is_file() and rid.startswith("osx"):
-        launcher = directory / "Contents" / "Home" / "bin" / "java"
-    if not launcher.is_file():
-        raise NativeVerifyError(f"{directory}: bundled JRE is missing its platform Java launcher")
-    return verify_executable_arch(launcher, rid)

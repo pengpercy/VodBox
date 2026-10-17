@@ -134,14 +134,14 @@ public sealed class FtyT4SourceTests
     [InlineData("{\"type\":1,\"siteUrl\":\"file:///tmp/a\"}")]
     [InlineData("{\"type\":1,\"siteUrl\":\"https://user:pass@api.example\"}")]
     [InlineData("invalid!")]
-    public void UnsupportedDefinitionsKeepTheJarFallback(string ext)
+    public void UnsupportedDefinitionsAreSkippedWithoutJarFallback(string ext)
     {
         using var parsed = JsonDocument.Parse(JsonSerializer.Serialize(ext, Json.TypeInfo<string>()));
         var site = new TvBoxSite { Key = "t4", Name = "T4", Api = "csp_T4Guard", Type = 3, Ext = parsed.RootElement.Clone() };
         Assert.False(NativeSpiders.IsSupported(site));
         Assert.False(NativeSpiders.IsSupported(new TvBoxSite { Key = "t4", Name = "T4", Api = "csp_T4Guard ", Type = 3, Ext = parsed.RootElement.Clone() }));
         var config = new TvBoxConfig { Sites = [site] };
-        Assert.Equal(SourceRuntime.Jar, Assert.Single(ConfigLoader.ToSources(config, null, true)).Runtime);
+        // JAR 宿主已下线：任何未被原生实现覆盖的 csp_ 定义都不再产生可运行源。
         Assert.Empty(ConfigLoader.ToSources(config));
     }
 }

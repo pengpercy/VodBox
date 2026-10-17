@@ -20,7 +20,6 @@ import subprocess
 import sys
 from urllib.parse import quote
 
-import source_assets
 from release_evidence import RIDS, ReleaseEvidenceError, find_archives
 
 
@@ -126,20 +125,6 @@ def publish(repo: str, version: str, sha: str) -> int:
     files = sorted({path for rid in RIDS for path in find_archives(rid, runtime)})
     if set(files) != {path for path in runtime.iterdir() if path.is_file()}:
         raise ValueError("Unexpected file in the runtime installer assets")
-    sources = Path("artifacts/sources")
-    indexes = sorted(sources.glob("VodBox-*-source-*.json"))
-    if not indexes:
-        raise ValueError("No independent matching source assets to publish")
-    source_files = set()
-    for path in indexes:
-        index = source_assets.validate_index(path, version, sha)
-        # Source assets have their own namespace; never classify them as RID installers.
-        with source_assets.extracted(index, sources):
-            pass
-        source_files.update((path, sources / index["asset"]))
-    if source_files != {path for path in sources.iterdir() if path.is_file()}:
-        raise ValueError("Unindexed file in the independent source assets")
-    files += sorted(source_files)
     ensure_tag(repo, tag, sha)
     release_id = resolve_release(repo, tag, version)
     release = json.loads(api(f"repos/{repo}/releases/{release_id}"))

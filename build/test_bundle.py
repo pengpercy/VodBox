@@ -18,161 +18,47 @@ class BundleTests(unittest.TestCase):
             with self.subTest(rid=rid), tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
                 archive = pathlib.Path(directory) / 'asset'
                 method = 'bundle_windows' if rid.startswith('win') else 'bundle_linux'
-                with patch('sys.argv', ['bundle.py', rid, directory]), patch.object(bundle, 'download', return_value=archive) as download, patch.object(bundle, method) as package, patch.object(bundle, 'copy_media_notices'), patch.object(bundle, 'bundle_java_host') as java_host:
+                with patch('sys.argv', ['bundle.py', rid, directory]), \
+                        patch.object(bundle, 'download', return_value=archive) as download, \
+                        patch.object(bundle, method) as package, \
+                        patch.object(bundle, 'copy_media_notices'), \
+                        patch.object(bundle, 'verify_no_java_payload') as verify:
                     bundle.main()
                     download.assert_called_once_with(rid)
                     package.assert_called_once_with(archive, pathlib.Path(directory), rid)
+                    verify.assert_called_once_with(pathlib.Path(directory))
 
-    def test_java_host_stages_deps_and_the_rids_own_jre(self):
-        with tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
-            output = pathlib.Path(directory)
-            prebuilt = output / 'prebuilt.jar'; prebuilt.write_bytes(b'host-bytes')
-            (output / 'deps').mkdir(); (output / 'deps/runtime.jar').write_bytes(b'dependency')
-            # The staged backend jar is the *source-rebuilt* one: only this RID's native survives.
-            self._write_backend_jar(output / 'deps', 'osx-arm64')
-            self._write_receipt(output, 'osx-arm64', 'natives/osx_arm64/libunicorn.dylib')
-            (output / 'corresponding-source').mkdir(); (output / 'corresponding-source/pom.xml').write_text('<project/>')
-            (output / 'upstream-runtime.json').write_text('{}')
-            (output / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
-            self._write_runtime(output, 'osx-arm64', 'AArch64')
-            calls = []
-            with patch.object(bundle, 'run', side_effect=lambda *args: calls.append([str(x) for x in args])), \
-                 patch.object(bundle, 'verify_jre', return_value='AArch64') as verify:
-                bundle.bundle_java_host('osx-arm64', output, prebuilt)
-            host = output / 'JavaHost'
-            # host.jar is placed verbatim; nothing is compiled when a prebuilt jar is supplied.
-            self.assertEqual((host / 'host.jar').read_bytes(), b'host-bytes')
-            staged = [call for call in calls if call[1].endswith('fetch-dex-deps.py')]
-            # Dependencies come from the pinned lock table, then the target RID's JRE — never `java`.
-            self.assertEqual([call[2] for call in staged], ['jre'])
-            self.assertEqual((host / 'deps/runtime.jar').read_bytes(), b'dependency')
-            self.assertTrue((host / 'corresponding-source/pom.xml').is_file())
-            self.assertTrue((host / 'upstream-runtime.json').is_file())
-            self.assertIn('osx-arm64', staged[0])
-            verify.assert_called_once_with(host / 'jre', 'osx-arm64')
-            notice = bundle.json.loads((host / 'java-host.json').read_text())
-            self.assertEqual(notice['jre']['architecture'], 'AArch64')
-            self.assertEqual(notice['jre']['kind'], 'jlink')
-            self.assertEqual(notice['jre']['release'], '21.0.11')
-            self.assertIn('java.compiler', notice['jre']['modules'])
-            self.assertEqual(notice['dependencies'], ['deps'])
-
-    def test_environment_prebuilt_preserves_the_complete_component(self):
-        with tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
-            root = pathlib.Path(directory)
-            source = root / 'component'; source.mkdir()
-            (source / 'host.jar').write_bytes(b'prebuilt')
-            (source / 'deps').mkdir(); (source / 'deps/runtime.jar').write_bytes(b'dependency')
-            (source / 'corresponding-source').mkdir(); (source / 'corresponding-source/pom.xml').write_text('<project/>')
-            (source / 'upstream-runtime.json').write_text('{}')
-            (source / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
-            self._write_receipt(source, 'osx-arm64', 'natives/osx_arm64/libunicorn.dylib')
-            target = root / 'publish'; target.mkdir()
-            with patch.dict(bundle.os.environ, {'VODBOX_JAR_HOST': str(source / 'host.jar')}):
-                bundle.build_host_jar(target / 'host.jar', 'osx-arm64')
-            self.assertEqual((target / 'deps/runtime.jar').read_bytes(), b'dependency')
-            self.assertTrue((target / 'corresponding-source/pom.xml').is_file())
-            self.assertTrue((target / 'LICENSE-tvbox-silicon').is_file())
-            # The source-rebuild receipt travels with the staged component.
-            self.assertTrue((target / 'native-backend-receipt.json').is_file())
-
-    def test_prebuilt_component_with_empty_deps_is_rejected(self):
-        # An empty deps/ cannot link the upstream classes: the host starts and fails to load a
-        # plugin. Rejecting it at staging keeps the failure at build time, where it is diagnosable.
-        with tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
-            root = pathlib.Path(directory)
-            component = root / 'JavaHost'; component.mkdir()
-            (component / 'host.jar').write_bytes(b'prebuilt')
-            (component / 'deps').mkdir()
-            (component / 'corresponding-source').mkdir()
-            (component / 'upstream-runtime.json').write_text('{}')
-            (component / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
-            with self.assertRaisesRegex(ValueError, 'empty'):
-                bundle.stage_prebuilt_host(component / 'host.jar', root / 'publish' / 'host.jar')
-
-    def test_java_host_records_the_native_backend_verdict(self):
-        # java-host.json must state whether the RID can run the upstream native backend. A bundled
-        # JRE alone is not evidence, so the verdict is written from the bundled deps' real contents.
-        for rid, supported in (('win-arm64', False), ('linux-arm64', True)):
-            with self.subTest(rid=rid), tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
+    def test_java_product_payload_is_rejected_from_a_stale_publish_tree(self):
+        payloads = (
+            'JavaHost/host.jar',
+            'opt/vodbox/JavaHost/deps/runtime.jar',
+            'Contents/Home/bin/java',
+            'plugin.dex',
+            'dev/example/Plugin.class',
+            'JavaHost/native-backend-receipt.json',
+            'java-host.json',
+            'upstream-runtime.json',
+            'license-tvbox-silicon',
+            'jre/legal/java.base/LICENSE',
+            'jdk/bin/javac',
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload), \
+                    tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
                 output = pathlib.Path(directory)
-                backend = output / 'component'; backend.mkdir()
-                (backend / 'host.jar').write_bytes(b'host-bytes')
-                (backend / 'deps').mkdir()
-                # Source-rebuilt deps: the RID's own native, or none at all for an exclusion RID.
-                self._write_backend_jar(backend / 'deps', rid)
-                self._write_receipt(backend, rid, None if not supported else
-                                    {'linux-arm64': 'natives/linux_arm64/libunicorn.so'}[rid])
-                (backend / 'corresponding-source').mkdir(); (backend / 'corresponding-source/pom.xml').write_text('<project/>')
-                (backend / 'upstream-runtime.json').write_text('{}')
-                (backend / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
-                self._write_runtime(output, rid, 'AArch64')
-                with patch.object(bundle, 'run'), patch.object(bundle, 'verify_jre', return_value='AArch64'):
-                    bundle.bundle_java_host(rid, output, backend / 'host.jar')
-                notice = bundle.json.loads((output / 'JavaHost' / 'java-host.json').read_text())
-                self.assertEqual(notice['nativeBackend']['supported'], supported)
-                self.assertIn(rid, notice['nativeBackend']['verdict'])
-                self.assertEqual(notice['nativeBackend']['excluded'], not supported)
-                if not supported:
-                    self.assertIn('unsupported_native_library', notice['nativeBackend']['verdict'])
+                target = output / payload
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b'stale payload')
+                with self.assertRaisesRegex(ValueError, 'forbidden Java payload'):
+                    bundle.verify_no_java_payload(output)
 
-    def test_java_host_rejects_deps_that_contradict_the_coverage_table(self):
-        # If the shipped backend jar cannot serve a RID the lock table declares supported, the
-        # bundle must fail rather than record a green verdict for an unrunnable platform.
+    def test_java_free_media_payload_is_accepted(self):
         with tempfile.TemporaryDirectory(dir=bundle.ROOT / '.alma') as directory:
             output = pathlib.Path(directory)
-            component = output / 'component'; component.mkdir()
-            (component / 'host.jar').write_bytes(b'host-bytes')
-            (component / 'deps').mkdir()
-            # Only macOS natives: the staged jar cannot serve the linux-x64 bundle being built.
-            self._write_backend_jar(component / 'deps', 'osx-arm64')
-            self._write_receipt(component, 'osx-arm64', 'natives/osx_arm64/libunicorn.dylib')
-            (component / 'corresponding-source').mkdir(); (component / 'corresponding-source/pom.xml').write_text('<project/>')
-            (component / 'upstream-runtime.json').write_text('{}')
-            (component / 'LICENSE-tvbox-silicon').write_text('GPL-3.0-only')
-            self._write_runtime(output, 'linux-x64', 'x86-64')
-            with patch.object(bundle, 'run'), patch.object(bundle, 'verify_jre', return_value='x86-64'):
-                with self.assertRaisesRegex(ValueError, 'native coverage'):
-                    bundle.bundle_java_host('linux-x64', output, component / 'host.jar')
-
-    def _write_runtime(self, output, rid, architecture):
-        runtime = output / 'JavaHost/jre'
-        runtime.mkdir(parents=True)
-        (runtime / bundle.JLINK_METADATA).write_text(bundle.json.dumps({
-            'kind': 'jlink', 'release': '21.0.11', 'rid': rid,
-            'architecture': architecture, 'modules': ['java.base', 'java.compiler'],
-        }))
-
-    def _write_backend_jar(self, deps, rid=None):
-        import zipfile
-        directories = {'osx-x64': ['osx_64'], 'osx-arm64': ['osx_arm64'], 'win-x64': ['windows_64'],
-                       'win-arm64': [], 'linux-x64': ['linux_64'], 'linux-arm64': ['linux_arm64']}
-        with zipfile.ZipFile(deps / 'unidbg-unicorn2-0.9.8.jar', 'w') as archive:
-            # A source-rebuilt jar carries only the requested RID's native (win-arm64 carries none);
-            # without a rid the legacy upstream jar carries all five supported natives.
-            selected = directories[rid] if rid else [d for key, values in directories.items()
-                                                     if key != "win-arm64" for d in values]
-            for directory in selected:
-                filename = ('libunicorn.dylib' if directory.startswith('osx') else
-                            'unicorn.dll' if directory.startswith('windows') else 'libunicorn.so')
-                archive.writestr(f'natives/{directory}/{filename}', b'\x7fELF')
-
-    def _write_receipt(self, component, rid, native_entry):
-        """A source-rebuild receipt shaped like `rebuild_native_backend.py` writes (classes-only
-        when `native_entry` is None, i.e. an exclusion RID such as win-arm64)."""
-        entries = [native_entry] if native_entry else []
-        (component / 'native-backend-receipt.json').write_text(bundle.json.dumps({
-            'schema': 1,
-            'rid': rid,
-            'backend': {
-                'excluded': native_entry is None,
-                'exclusion_reason': '' if native_entry else f'{rid} has no upstream JNI native',
-                'jar_integration': {
-                    'native_entry': native_entry,
-                    'jar_native_entries': entries,
-                },
-            },
-        }))
+            (output / 'libmpv.dylib').write_bytes(b'media')
+            (output / 'Assets/js/lib').mkdir(parents=True)
+            (output / 'Assets/js/lib/cheerio.min.js').write_text('script')
+            bundle.verify_no_java_payload(output)
 
     def test_windows_exe_only_asset_must_fail(self):
         import zipfile

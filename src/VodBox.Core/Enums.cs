@@ -21,11 +21,6 @@ public enum SourceRuntime
     Python,
     /// <summary>csp_ Java jar/其他无桌面实现，桌面端不支持。</summary>
     Node,
-    /// <summary>
-    /// 外部 JAR 插件宿主（CatVod csp_ Java 字节码）。仅在宿主可用时创建；不可用时源保持未注册，
-    /// 由 <c>ImportWarnings</c> 明确提示「需要 Android 插件宿主」，不伪装成可播放。
-    /// </summary>
-    Jar,
     /// <summary>本地媒体。</summary>
     Local,
 }

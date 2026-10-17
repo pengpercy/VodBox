@@ -49,7 +49,7 @@ public sealed class SearchLayoutTests
         main.AttachDispatcher(Dispatcher.UIThread);
         var a = new SourceInfo { Key = "a", Name = "甲站", Runtime = SourceRuntime.MacCms };
         var b = new SourceInfo { Key = "b", Name = "乙站", Runtime = SourceRuntime.MacCms };
-        var bad = new SourceInfo { Key = "bad", Name = "坏站", Runtime = SourceRuntime.Jar };
+        var bad = new SourceInfo { Key = "bad", Name = "坏站", Runtime = SourceRuntime.Node };
         static MediaItem Item(string id) => new() { Id = id, Title = id, Year = "2024" };
         async IAsyncEnumerable<AggregateSearchBatch> Stream(string _, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {

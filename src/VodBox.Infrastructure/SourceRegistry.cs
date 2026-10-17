@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using VodBox.Core;
-using VodBox.PluginHost.JarPlugin;
 
 namespace VodBox.Infrastructure;
 
@@ -14,7 +13,6 @@ public sealed class SourceRegistry : IDisposable
 
     private readonly IPreferences? _preferences;
     private readonly Func<string,CancellationToken,Task<LoadedConfig>> _loadConfig;
-    private readonly bool _jarHostEnabled;
     private readonly string? _configCacheDirectory;
     private string? _subscriptionOrigin;
     private long _configurationGeneration;
@@ -25,10 +23,9 @@ public sealed class SourceRegistry : IDisposable
     public IReadOnlyList<SourceInfo> ChangeableSources=>VisibleSources.Where(source=>CanChange(source)&&Get(source.Key) is not null).ToArray();
     public IReadOnlyList<SourceInfo> VisibleSources => Sources.Where(source => !IsHidden(source.Key)).ToArray();
     /// <param name="configCacheDirectory">远程配置的本地副本目录；为空时不缓存，启动只能等网络。</param>
-    public SourceRegistry(IPreferences? preferences = null, bool enableJarPluginHost = false, string? configCacheDirectory = null)
+    public SourceRegistry(IPreferences? preferences = null, string? configCacheDirectory = null)
     {
         _preferences=preferences;
-        _jarHostEnabled=enableJarPluginHost;
         _configCacheDirectory=configCacheDirectory;
         _loadConfig=async(address,ct)=>
         {
@@ -37,9 +34,9 @@ public sealed class SourceRegistry : IDisposable
             return await new ConfigLoader(_http).LoadAnyWithOriginAsync(address,ct);
         };
     }
-    internal SourceRegistry(Func<string,CancellationToken,Task<TvBoxConfig>> loadConfig,IPreferences? preferences=null,bool enableJarPluginHost=false,string? configCacheDirectory=null)
+    internal SourceRegistry(Func<string,CancellationToken,Task<TvBoxConfig>> loadConfig,IPreferences? preferences=null,string? configCacheDirectory=null)
     {
-        _preferences=preferences;_jarHostEnabled=enableJarPluginHost;_configCacheDirectory=configCacheDirectory;
+        _preferences=preferences;_configCacheDirectory=configCacheDirectory;
         _loadConfig=async(address,ct)=>new LoadedConfig(await loadConfig(address,ct),null);
     }
     internal SourceRegistry(Func<string,CancellationToken,Task<LoadedConfig>> loadConfig,string configCacheDirectory)
@@ -114,7 +111,7 @@ public sealed class SourceRegistry : IDisposable
     {
         var config=loaded.Config;
         _subscriptionOrigin=loaded.Origin;
-        var supported=ConfigLoader.ToSources(config,_subscriptionOrigin,_jarHostEnabled);
+        var supported=ConfigLoader.ToSources(config,_subscriptionOrigin);
         var warnings=new List<string>();
         foreach(var site in config.Sites)
             if(!supported.Any(source=>source.Key==site.Key))
@@ -125,7 +122,6 @@ public sealed class SourceRegistry : IDisposable
                     :"未注册（缺少桌面运行时或站点定义无效）";
                 warnings.Add($"{site.Name}：{reason}");
             }
-        if(_jarHostEnabled) warnings.AddRange(JarPluginWarnings(supported));
         var duplicate=supported.GroupBy(source=>source.Key).Where(group=>group.Count()>1).ToArray();
         foreach(var group in duplicate)warnings.Add($"站点键 {group.Key} 重复，只保留第一项");
         Sources = supported.DistinctBy(source=>source.Key).ToArray();
@@ -171,21 +167,6 @@ public sealed class SourceRegistry : IDisposable
         }
     }
 
-    /// <summary>
-    /// 启用了 JAR 宿主时，为每个 JAR 源生成可见的禁用说明：宿主不可用、或缺 JAR 引用。
-    /// 只有能真正运行的源才不产生提示——避免「导入后静默少一截」。
-    /// </summary>
-    private static IEnumerable<string> JarPluginWarnings(IReadOnlyList<SourceInfo> supported)
-    {
-        var jarSources = supported.Where(source => source.Runtime == SourceRuntime.Jar).ToArray();
-        if (jarSources.Length == 0) return [];
-        if (!JarPluginContentSource.HostAvailable)
-            return jarSources.Select(source => $"{source.Name}：需要 JAR 插件宿主（未找到 Java 运行时或 host.jar），已禁用");
-        return jarSources
-            .Where(source => JarPluginSourceLayout.From(source).EffectiveJar is null)
-            .Select(source => $"{source.Name}：站点与配置均未提供插件 JAR，已禁用");
-    }
-
     private void Rebuild()
     {
         foreach (var source in _sources.Values.OfType<IDisposable>()) source.Dispose();
@@ -206,12 +187,6 @@ public sealed class SourceRegistry : IDisposable
                 case SourceRuntime.QuickJs:
                     _sources[info.Key] = new DrpySource(info);
                     break;
-                case SourceRuntime.Jar:
-                    // 只在宿主可用且有 JAR 引用时创建；否则保持未注册（禁用），
-                    // 由 ImportWarnings 明确提示，而非伪造一个不可播放的源。
-                    if (JarPluginContentSource.TryCreate(info, out var jarPlugin) && jarPlugin is not null)
-                        _sources[info.Key] = jarPlugin;
-                    break;
                 // Python/Node（含未适配 csp_）不在册。
             }
         }
@@ -221,16 +196,14 @@ public sealed class SourceRegistry : IDisposable
     public IContentSource? Get(string key) => _sources.TryGetValue(key, out var source) ? source : null;
 
     /// <summary>
-    /// 默认源（首页推荐）：第一个可运行的非 JAR 源。JAR 站点首屏要起 JVM、加载插件（冷启动常需 20s 以上），
-    /// 不适合当每次启动都要加载的首页；订阅里只有 JAR 站点时才退回第一个 JAR 站点。
+    /// 默认源（首页推荐）：第一个可运行的原生源。
     /// </summary>
     public IContentSource? Default()
     {
         var runnable = VisibleSources.Where(source => Get(source.Key) is not null).ToArray();
-        // 首页默认源优先选能出内容的站点：跳过需要 JVM 的 JAR 源与只给导航提示的信息源，
-        // 避免订阅里排在最前的“点我切源/导航”提醒项成为默认首页。找不到再逐级回退。
-        return (runnable.FirstOrDefault(source => source.Runtime != SourceRuntime.Jar && Get(source.Key) is not IInformationalContentSource)
-            ?? runnable.FirstOrDefault(source => source.Runtime != SourceRuntime.Jar)
+        // 首页默认源优先选能出内容的站点：跳过只给导航/切源提示的信息源，
+        // 避免订阅里排在最前的“点我切源/导航”提醒项成为默认首页。找不到再回退第一项。
+        return (runnable.FirstOrDefault(source => Get(source.Key) is not IInformationalContentSource)
             ?? runnable.FirstOrDefault()) is { } info ? Get(info.Key) : null;
     }
 
@@ -261,8 +234,6 @@ public sealed class SourceRegistry : IDisposable
     /// <summary>
     /// 流式聚合搜索：每完成一个站点就产出一批（该站的命中条目，或该站的失败原因），先到先得。
     /// 单站失败/超时只记录该站，其他站点的成功结果照常产出（部分失败保留成功）。
-    /// JAR 插件站点单独一条通道（<see cref="JarSearchConcurrency"/>、<see cref="JarSearchTimeout"/>）：
-    /// 首次搜索要起 JVM、加载插件，慢且受宿主会话数限制；与原生/HTTP 站点共用并发位会让快站点排在它们后面。
     /// </summary>
     public async IAsyncEnumerable<AggregateSearchBatch> SearchStreamAsync(
         string query, [EnumeratorCancellation] CancellationToken ct = default)
@@ -296,9 +267,7 @@ public sealed class SourceRegistry : IDisposable
         {
             try
             {
-                await Task.WhenAll(
-                    Lane(targets.Where(site => site.Runtime != SourceRuntime.Jar), SearchConcurrency, SearchTimeout),
-                    Lane(targets.Where(site => site.Runtime == SourceRuntime.Jar), JarSearchConcurrency, JarSearchTimeout)).ConfigureAwait(false);
+                await Lane(targets, SearchConcurrency, SearchTimeout).ConfigureAwait(false);
                 channel.Writer.TryComplete();
             }
             catch (Exception error) { channel.Writer.TryComplete(error); }
@@ -319,12 +288,6 @@ public sealed class SourceRegistry : IDisposable
 
     /// <summary>单站聚合搜索超时（独立于调用方 ct）。</summary>
     public static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(25);
-
-    /// <summary>JAR 站点通道的并发：与 JAR 宿主默认会话上限（3）一致，多了也只是在宿主里排队。</summary>
-    public const int JarSearchConcurrency = 3;
-
-    /// <summary>JAR 站点的单站超时：首次搜索包含 JVM 启动、插件下载与加载（含原生 guard），常需数十秒。</summary>
-    public static readonly TimeSpan JarSearchTimeout = TimeSpan.FromSeconds(90);
 
     public void Dispose()
     {

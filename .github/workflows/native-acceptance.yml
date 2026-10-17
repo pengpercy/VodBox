@@ -1,7 +1,7 @@
 name: Native acceptance
 # Six-RID native acceptance on demand. This is the manual entry that exercises the full
-# build.yml matrix (AOT publish, bundled libmpv/QuickJS/JavaHost, native closure and adapter
-# verification on each of the six runners) **without** touching release: it packages nothing
+# build.yml matrix (AOT publish, bundled libmpv/QuickJS and verification on each of the six runners)
+# **without** touching release: it packages nothing
 # and publishes nothing, so it is safe to run against any branch while the native closure is
 # still incomplete. It reuses build.yml, so the two can never drift apart.
 #
@@ -53,20 +53,3 @@ jobs:
       source_sha: ${{ needs.resolve.outputs.sha }}
       reuse_existing: ${{ inputs.reuse }}
       platforms: all
-  # Make the native-closure verdict explicit in the acceptance log, offline and manifest-driven.
-  closure:
-    needs: resolve
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.resolve.outputs.sha }}
-      # Report, do not gate: an acceptance run is allowed to finish while the closure is open. The
-      # RID coverage (binaries) and the corresponding source (obligation) are separate questions and
-      # are reported separately so the log can never be read as "source closure 5/6".
-      - name: Report native binary coverage
-        shell: bash
-        run: python3 build/native_coverage.py closure
-      - name: Report corresponding-source closure
-        shell: bash
-        run: python3 build/native_coverage.py source-closure

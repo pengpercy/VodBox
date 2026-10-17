@@ -528,8 +528,8 @@ public sealed class ViewModelRaceTests
     {
         using var context = new Context();
         var fast = new SourceInfo { Key = "fast", Name = "快站", Runtime = SourceRuntime.MacCms };
-        var broken = new SourceInfo { Key = "broken", Name = "坏站", Runtime = SourceRuntime.Jar };
-        var slow = new SourceInfo { Key = "slow", Name = "慢站", Runtime = SourceRuntime.Jar };
+        var broken = new SourceInfo { Key = "broken", Name = "坏站", Runtime = SourceRuntime.Node };
+        var slow = new SourceInfo { Key = "slow", Name = "慢站", Runtime = SourceRuntime.Node };
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         async IAsyncEnumerable<AggregateSearchBatch> Stream(string _, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
