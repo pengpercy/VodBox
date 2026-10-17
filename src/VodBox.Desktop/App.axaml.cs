@@ -57,6 +57,9 @@ public class App : Application
             if(desktop.Args?.Contains("--ui-smoke")==true)
             {
                 if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VODBOX_DATA_DIR")))throw new InvalidOperationException("UI smoke requires an isolated VODBOX_DATA_DIR.");
+                // 验收会在主窗口之外额外创建搜索/设置窗口，这些窗口不在冒烟结束时逐个关闭；
+                // 默认的 OnLastWindowClose 会让进程在验收输出后一直挂住，改为主窗口关闭即退出。
+                desktop.ShutdownMode=Avalonia.Controls.ShutdownMode.OnMainWindowClose;
                 window.Opened+=async(_,_)=>
                 {
                     try

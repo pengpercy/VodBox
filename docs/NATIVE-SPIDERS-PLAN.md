@@ -228,3 +228,22 @@ loopback Range → 解码/seek」路径。
   `docs/native-spiders/STAGE4-ONLINE-VALIDATION.md`。
 
 验证：主测试 570/570、预览测试 259/259（Release / TreatWarningsAsErrors=true）。
+
+## 阶段 7 收口：原生模式合入主线与去 Java 验收（2026-10-18）
+
+- 合入：`v3-native-spiders` 以快进方式合入 `main`（`e0fac9f..5070743`），纯原生默认路由成为主线行为，
+  JavaHost/JAR/DEX 宿主与随包 JRE 在主线不再存在。
+- 发布产物扫描：`osx-x64` NativeAOT 发布并经 `build/bundle.py` 补齐媒体内核后，`bundle.py` 的
+  `verify_no_java_payload` 通过——133 个条目中无 `JavaHost/JRE/JDK` 路径、无 `.jar/.dex/.class/.jmod/.war`
+  载荷、无 `java/javaw/javac` 启动器。
+- 媒体内核自检：`build/verify_mpv_bundle.py osx-x64` 对 `av1-opus.webm`、`h264-aac.mp4`、`hevc-aac.mp4`、
+  `vp9-opus.webm` 四种编解码解码/seek 全部 OK。
+- 无 JVM 桌面验收：`bash build/test-desktop-smoke.sh <发布产物>` 用合成媒体跑完整 `--ui-smoke --media=`，
+  退出码 0，输出 `Native main player: OK | frames=51, independent single-window/main bounds/pause/seek/
+  fullscreen/compact restore/resume/automatic-next/history` 与 `Native desktop UI: OK | 7 pages, 9 settings
+  sections, light/dark, graceful shutdown`；隔离数据目录日志确认 `VodBox 0.2.10.0 启动` → `界面初始化完成`，
+  全程无 JVM 参与。
+- 修复：`--ui-smoke` 现设 `ShutdownMode.OnMainWindowClose`。此前默认 `OnLastWindowClose`，而验收会在主窗口
+  之外额外创建搜索/设置窗口，导致打印验收结论后进程不退出，`build/test-desktop-smoke.sh` 会一直挂住。
+- 环境说明：本机显示器休眠（`IODisplayWrangler` 状态 0）时 Avalonia.Native 会以 `RenderTimer -6661` 失败；
+  桌面验收前需唤醒显示（如 `caffeinate -u -t 600`），这不是产品缺陷。
