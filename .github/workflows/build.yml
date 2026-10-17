@@ -91,7 +91,6 @@ jobs:
             .packages
             .cache/downloads
             .cache/vulkan
-            .cache/native-rebuild-engine
           key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json') }}
       - name: Install Windows MinGW toolchain
         if: steps.reuse.outputs.skip != 'true' && matrix.rid == 'win-x64'
