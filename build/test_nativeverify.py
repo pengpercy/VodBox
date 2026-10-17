@@ -7,6 +7,8 @@ import nativeverify as n
 from bundle import verify_windows_closure
 
 ROOT = Path(__file__).resolve().parent.parent
+# `.alma` 是 gitignore 的本地工作目录，全新检出时并不存在；测试自建以保证 CI 与本地一致。
+(ROOT / '.alma').mkdir(exist_ok=True)
 
 
 def pe(path, arch=0x8664, dependency='kernel32.dll'):
