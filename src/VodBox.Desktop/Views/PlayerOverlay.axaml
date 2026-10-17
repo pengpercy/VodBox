@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              xmlns:v="clr-namespace:VodBox.Desktop.Views"
+             xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              x:Class="VodBox.Desktop.Views.PlayerOverlay" x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
@@ -57,6 +58,22 @@
     </Style>
     <!-- 置顶与未置顶的图标都是纯白，仅靠图形区分状态。 -->
     <Style Selector="Button.pin"><Setter Property="Foreground" Value="#FFFFFFFF" /></Style>
+    <!-- 抽屉里的频道行：列表本身不做选中态，正在播放的一行由 IsCurrent 高亮。 -->
+    <Style Selector="ListBox#DrawerChannels ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,0,2" />
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <ControlTemplate><ContentPresenter Content="{TemplateBinding Content}"
+            ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" /></ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.drawerChannel"><Setter Property="Background" Value="#00000000" /></Style>
+    <Style Selector="Button.drawerChannel.current"><Setter Property="Background" Value="#2EFFFFFF" /></Style>
+    <Style Selector="Button.drawerChannel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#14FFFFFF" />
+    </Style>
     <Style Selector="Button.pin /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#66000000" />
     </Style>
@@ -154,9 +171,13 @@
         </StackPanel>
       </Border>
 
-      <!-- 底部：单个半透明圆角面板（对齐 IINA 参考图）。
-           IINA 用白色半透明材质：压在亮画面上呈灰白、暗画面上偏深，不是固定黑底。 -->
-      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#F0202429" CornerRadius="{DynamicResource AppPanelCornerRadius}"
+      <!-- 底部：单个毛玻璃圆角面板（对齐 IINA 参考图）。
+           背后的 BackdropBlur 先模糊下方画面，面板再叠半透明深色底：压在亮画面上偏灰、暗画面上偏深，不是固定黑底。
+           模糊层与面板同格同外边距，宽高直接跟随面板实际尺寸。 -->
+      <v:BackdropBlur Grid.Row="2" BlurRadius="40" IsHitTestVisible="False" IsVisible="{Binding #BottomControls.IsVisible}"
+                      CornerRadius="{DynamicResource AppPanelCornerRadius}" Margin="{x:Static v:PlayerLayout.PanelMargin}" HorizontalAlignment="Center"
+                      Width="{Binding #BottomControls.Bounds.Width}" Height="{Binding #BottomControls.Bounds.Height}" />
+      <Border x:Name="BottomControls" IsVisible="{Binding ControlsVisible}" Grid.Row="2" Background="#99202429" CornerRadius="{DynamicResource AppPanelCornerRadius}"
               BorderBrush="#26FFFFFF" BorderThickness="1" TextElement.Foreground="#F2FFFFFF"
               Margin="{x:Static v:PlayerLayout.PanelMargin}" Padding="{x:Static v:PlayerLayout.PanelPadding}" HorizontalAlignment="Center">
         <Border.Width>
@@ -267,12 +288,39 @@
         </Border.Transitions>
         <Grid RowDefinitions="Auto,*">
           <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="14,12,14,8">
-            <TextBlock Text="播放列表" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock x:Name="PlaylistTitle" Text="播放列表" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
             <TextBlock x:Name="PlaylistCount" Grid.Column="2" FontSize="11" Foreground="#80FFFFFF" VerticalAlignment="Center" />
           </Grid>
-          <ScrollViewer Grid.Row="1" Padding="8,0,8,10" HorizontalScrollBarVisibility="Disabled">
+          <!-- 剧集：条数有限，直接逐项生成。 -->
+          <ScrollViewer x:Name="EpisodeScroller" Grid.Row="1" Padding="8,0,8,10" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="PlaylistItems" Spacing="2" />
           </ScrollViewer>
+          <!-- 直播：显示直播页当前的频道列表（同分组/搜索筛选），可达数千个频道，必须虚拟化。 -->
+          <ListBox x:Name="DrawerChannels" Grid.Row="1" IsVisible="False" Padding="8,0,8,10"
+                   Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="core:LiveChannel">
+                <Button Classes="drawerChannel" Classes.current="{Binding IsCurrent}" Tag="{Binding}" Click="OnPlayDrawerChannel"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" BorderThickness="0"
+                        CornerRadius="6" Padding="10,6" Cursor="Hand">
+                  <Grid ColumnDefinitions="34,*">
+                    <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="#80FFFFFF" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="1">
+                      <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Text="正在播放 · " FontSize="12" Foreground="#A8D5B0" IsVisible="{Binding IsCurrent}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="#E6FFFFFF" />
+                      </Grid>
+                      <TextBlock Text="{Binding EpgNow}" FontSize="10.5" Foreground="#80FFFFFF" TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding EpgNow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                  </Grid>
+                </Button>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
         </Grid>
       </Border>
     </Grid>

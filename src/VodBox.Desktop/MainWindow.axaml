@@ -10,12 +10,25 @@
         TransparencyBackgroundFallback="{DynamicResource PageBackgroundBrush}"
         Background="Transparent"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="44"
+        ExtendClientAreaTitleBarHeightHint="{OnPlatform Default=32, macOS=44}"
         WindowDecorations="Full"
         FontSize="13">
 
   <!-- 原生窗口材质：Windows Mica，其他平台回退 Acrylic/Blur。
        材质只在侧边栏列透出（对齐 App Store）；内容区用不透明底色盖住，避免右侧也透出背景。 -->
+  <Window.KeyBindings>
+    <!-- macOS 的 ⌘O 由菜单栏「文件 › 打开文件…」提供；Windows/Linux 用 Ctrl+O。 -->
+    <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
+  </Window.KeyBindings>
+  <Window.Styles>
+    <Style Selector="Panel#TitleScrim">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Panel#TitleScrim.shown"><Setter Property="Opacity" Value="1" /></Style>
+  </Window.Styles>
   <Panel>
     <views:LocalWallpaper HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Path="{Binding WallpaperPath}" Stretch="UniformToFill" IsHitTestVisible="False" />
     <!-- 侧边栏区域：半透明着色，让窗口材质/壁纸透出来 -->
@@ -30,6 +43,7 @@
       <Border x:Name="SidebarTitleBar" Grid.Row="0" Grid.Column="0" Background="Transparent"
               Margin="{OnPlatform Default='0', macOS='90,0,0,0'}"
               chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+
       <!-- 标题栏只保留拖拽区：搜索框已移到侧栏顶部（对齐 App Store），提交后开独立结果窗口。 -->
       <Grid x:Name="TitleBar" Grid.Row="0" Grid.Column="1"
             Background="Transparent" Margin="0,0,132,0"
@@ -61,7 +75,9 @@
             <views:NavItemView Grid.Row="5" Icon="{StaticResource Icon.Star}" Label="收藏" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFavoritesCommand}" />
             <views:NavItemView Grid.Row="6" Icon="{StaticResource Icon.History}" Label="历史" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHistoryCommand}" />
 
-            <views:NavItemView Grid.Row="8" Icon="{StaticResource Icon.Folder}" Label="本地文件" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoFilesCommand}" />
+            <!-- 打开本地文件：直接弹系统文件对话框（媒体文件播放、m3u 作为直播源），不再有自绘的文件浏览页。 -->
+            <views:NavItemView x:Name="OpenFileNav" Grid.Row="8" Icon="{StaticResource Icon.Folder}" Label="打开文件…" IsSelected="False" Command="{Binding OpenFileCommand}"
+                               ToolTip.Tip="打开本地视频或 m3u 直播播放列表（Ctrl+O / ⌘O）" />
             <views:NavItemView Grid.Row="9" Icon="{StaticResource Icon.Settings}" Label="设置" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSettingsCommand}" />
             <TextBlock Grid.Row="10" Text="HTTP 服务 · 未启用" FontSize="10.5" Opacity="0.5" Margin="22,10,0,10" />
           </Grid>
@@ -75,10 +91,28 @@
           <!-- 搜索结果不再作为主窗口内的一页：由独立 SearchWindow 承载，避免进入空白搜索页。 -->
           <views:FavoritesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFavorites}, ConverterParameter=0, Mode=OneWay}" />
           <views:HistoryView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsHistory}, ConverterParameter=0, Mode=OneWay}" />
-          <views:FilesView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsFiles}, ConverterParameter=0, Mode=OneWay}" />
           <views:DetailView IsVisible="{Binding Page, Converter={x:Static views:PageConverters.IsDetail}, ConverterParameter=0, Mode=OneWay}" />
         </Panel>
       </Grid>
+
+      <!-- 首页沉浸式标题栏：首页内容从窗口顶边开始，向下滚动后此处渐显毛玻璃（模糊下方内容 + 半透明页面底色），
+           保证交通灯/窗口按钮在海报与文字上方仍可读；未滚动时完全透明，横幅直通顶边。 -->
+      <Panel x:Name="TitleScrim" Grid.Row="0" Grid.Column="1" IsHitTestVisible="False">
+        <Classes.shown>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Page" Converter="{x:Static views:PageConverters.IsHome}" />
+            <Binding Path="Home.ScrolledUnderTitleBar" />
+          </MultiBinding>
+        </Classes.shown>
+        <views:BackdropBlur BlurRadius="40" />
+        <Border Background="{DynamicResource PageBackgroundBrush}" Opacity="0.72" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,0,0,1" />
+      </Panel>
+      <!-- 页面伸进标题栏行后会盖住下面的拖拽区：在最上层补一条拖拽区，高度由页面决定（TopDragStripHeight）——
+           首页整行；点播/收藏/历史只到页头顶边，不压页头控件；直播页不补（macOS 上它的工具栏在标题栏行内，必须可点）。 -->
+      <Border x:Name="PageTitleBar" Grid.Row="0" Grid.Column="1" Background="Transparent" Margin="0,0,132,0"
+              VerticalAlignment="Top" Height="{Binding TopDragStripHeight}"
+              IsVisible="{Binding TopDragStripHeight, Converter={x:Static views:NumberConverters.IsPositive}}"
+              chrome:WindowDecorationProperties.ElementRole="TitleBar" />
 
       <!-- 状态栏 -->
       <Border Grid.Row="1" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Height="26" Background="#202020" Opacity="0.85"

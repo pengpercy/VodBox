@@ -13,33 +13,37 @@ public sealed class SourceRegistry : IDisposable
     private readonly ConcurrentDictionary<string, IContentSource> _sources = new();
 
     private readonly IPreferences? _preferences;
-    private readonly Func<string,CancellationToken,Task<TvBoxConfig>> _loadConfig;
+    private readonly Func<string,CancellationToken,Task<LoadedConfig>> _loadConfig;
     private readonly bool _jarHostEnabled;
+    private readonly string? _configCacheDirectory;
     private string? _subscriptionOrigin;
     private long _configurationGeneration;
     public IReadOnlyList<SourceInfo> Sources { get; private set; } = [];
     // TVBox 的 changeable 不等于手动选站权限；这里只检查显示状态与实际运行时实现。
     public IReadOnlyList<SourceInfo> SelectableSources => VisibleSources.Where(source => Get(source.Key) is not null).ToArray();
-    public IReadOnlyList<SourceInfo> ChangeableSources=>VisibleSources.Where(CanChange).ToArray();
+    // 换源菜单只列真正能运行的站点：启用 JAR 宿主后，缺少插件 JAR 的 csp_ 站点也会出现在 Sources 里，但未注册。
+    public IReadOnlyList<SourceInfo> ChangeableSources=>VisibleSources.Where(source=>CanChange(source)&&Get(source.Key) is not null).ToArray();
     public IReadOnlyList<SourceInfo> VisibleSources => Sources.Where(source => !IsHidden(source.Key)).ToArray();
-    public SourceRegistry(IPreferences? preferences = null, bool enableJarPluginHost = false)
+    /// <param name="configCacheDirectory">远程配置的本地副本目录；为空时不缓存，启动只能等网络。</param>
+    public SourceRegistry(IPreferences? preferences = null, bool enableJarPluginHost = false, string? configCacheDirectory = null)
     {
         _preferences=preferences;
         _jarHostEnabled=enableJarPluginHost;
+        _configCacheDirectory=configCacheDirectory;
         _loadConfig=async(address,ct)=>
         {
             if(File.Exists(address))
-            {
-                _subscriptionOrigin=null;
-                return ConfigLoader.Parse(await File.ReadAllTextAsync(address,ct))??throw new InvalidDataException("配置解析失败");
-            }
-            var loaded=await new ConfigLoader(_http).LoadAnyWithOriginAsync(address,ct);
-            _subscriptionOrigin=loaded.Origin;
-            return loaded.Config;
+                return new LoadedConfig(ConfigLoader.Parse(await File.ReadAllTextAsync(address,ct))??throw new InvalidDataException("配置解析失败"),null);
+            return await new ConfigLoader(_http).LoadAnyWithOriginAsync(address,ct);
         };
     }
-    internal SourceRegistry(Func<string,CancellationToken,Task<TvBoxConfig>> loadConfig,IPreferences? preferences=null,bool enableJarPluginHost=false)
-    { _preferences=preferences;_loadConfig=loadConfig;_jarHostEnabled=enableJarPluginHost; }
+    internal SourceRegistry(Func<string,CancellationToken,Task<TvBoxConfig>> loadConfig,IPreferences? preferences=null,bool enableJarPluginHost=false,string? configCacheDirectory=null)
+    {
+        _preferences=preferences;_jarHostEnabled=enableJarPluginHost;_configCacheDirectory=configCacheDirectory;
+        _loadConfig=async(address,ct)=>new LoadedConfig(await loadConfig(address,ct),null);
+    }
+    internal SourceRegistry(Func<string,CancellationToken,Task<LoadedConfig>> loadConfig,string configCacheDirectory)
+    { _loadConfig=loadConfig;_configCacheDirectory=configCacheDirectory; }
     private static string PreferenceKey(string key, string property) => "site." + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))) + "." + property;
     public bool IsHidden(string key) => _preferences?.GetBool(PreferenceKey(key, "hidden")) ?? false;
     public bool IsStarred(string key) => _preferences?.GetBool(PreferenceKey(key, "starred")) ?? false;
@@ -65,12 +69,51 @@ public sealed class SourceRegistry : IDisposable
     public event Action? SourcesChanged;
 
     /// <summary>加载 TVBox 配置（URL 或本地路径）并重建源列表。</summary>
-    public async Task LoadConfigAsync(string urlOrPath, CancellationToken ct = default)
+    public async Task LoadConfigAsync(string urlOrPath, CancellationToken ct = default) =>
+        await LoadConfigCoreAsync(urlOrPath, onlyIfChanged: false, ct);
+
+    /// <summary>
+    /// 后台刷新远程配置：内容与本地副本一致时不重建源列表（避免打断已在用的源），返回 false；
+    /// 有变化才应用新配置并返回 true，调用方据此决定是否重载首页。
+    /// </summary>
+    public Task<bool> RefreshConfigAsync(string urlOrPath, CancellationToken ct = default) =>
+        LoadConfigCoreAsync(urlOrPath, onlyIfChanged: true, ct);
+
+    /// <summary>
+    /// 启动快路径：用上次成功抓取的远程配置副本立即建好源列表，不等网络（订阅站点常需 1~3 秒）。
+    /// 没有可用副本返回 false，调用方改走 <see cref="LoadConfigAsync"/>。
+    /// </summary>
+    public async Task<bool> TryLoadCachedConfigAsync(string urlOrPath, CancellationToken ct = default)
     {
         var generation=Interlocked.Increment(ref _configurationGeneration);
-        var config=await _loadConfig(urlOrPath,ct);
+        if(await ReadConfigCacheAsync(urlOrPath,ct) is not { } cached)return false;
+        var config=ConfigLoader.ParseBytes(cached.Raw)??ConfigLoader.Parse(DefaultHttp.Decode(cached.Raw));
+        if(config is null||generation!=Volatile.Read(ref _configurationGeneration))return false;
+        Apply(new LoadedConfig(config,cached.Origin,cached.Raw));
+        return true;
+    }
+
+    private async Task<bool> LoadConfigCoreAsync(string urlOrPath, bool onlyIfChanged, CancellationToken ct)
+    {
+        var generation=Interlocked.Increment(ref _configurationGeneration);
+        var loaded=await _loadConfig(urlOrPath,ct);
         ct.ThrowIfCancellationRequested();
         if(generation!=Volatile.Read(ref _configurationGeneration))throw new OperationCanceledException("配置请求已被新配置替代。");
+        if(loaded.Raw is { } raw)
+        {
+            var cached=await ReadConfigCacheAsync(urlOrPath,ct);
+            var unchanged=cached is not null&&cached.Origin==loaded.Origin&&cached.Raw.AsSpan().SequenceEqual(raw);
+            if(!unchanged)await WriteConfigCacheAsync(urlOrPath,loaded);
+            if(onlyIfChanged&&unchanged)return false;
+        }
+        Apply(loaded);
+        return true;
+    }
+
+    private void Apply(LoadedConfig loaded)
+    {
+        var config=loaded.Config;
+        _subscriptionOrigin=loaded.Origin;
         var supported=ConfigLoader.ToSources(config,_subscriptionOrigin,_jarHostEnabled);
         var warnings=new List<string>();
         foreach(var site in config.Sites)
@@ -83,6 +126,42 @@ public sealed class SourceRegistry : IDisposable
         Parses = config.Parses;
         SortSources();
         Rebuild();
+    }
+
+    // 副本按地址散列存两份：原始字节（与网络响应逐字节一致，便于判断有无变化）+ 跟随重定向后的 origin。
+    private string? ConfigCachePath(string urlOrPath)=>_configCacheDirectory is null?null
+        :Path.Combine(_configCacheDirectory,Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(urlOrPath))));
+
+    private sealed record CachedConfig(byte[] Raw,string? Origin);
+
+    private async Task<CachedConfig?> ReadConfigCacheAsync(string urlOrPath,CancellationToken ct)
+    {
+        if(ConfigCachePath(urlOrPath) is not { } path||!File.Exists(path+".bin"))return null;
+        try
+        {
+            var raw=await File.ReadAllBytesAsync(path+".bin",ct);
+            var origin=File.Exists(path+".origin")?await File.ReadAllTextAsync(path+".origin",ct):null;
+            return new CachedConfig(raw,string.IsNullOrEmpty(origin)?null:origin);
+        }
+        catch(IOException){return null;}
+    }
+
+    private async Task WriteConfigCacheAsync(string urlOrPath,LoadedConfig loaded)
+    {
+        if(ConfigCachePath(urlOrPath) is not { } path)return;
+        try
+        {
+            Directory.CreateDirectory(_configCacheDirectory!);
+            // 先写临时文件再替换，进程中途退出也不会留下半截副本。
+            await File.WriteAllTextAsync(path+".origin.tmp",loaded.Origin??"");
+            await File.WriteAllBytesAsync(path+".bin.tmp",loaded.Raw!);
+            File.Move(path+".origin.tmp",path+".origin",overwrite:true);
+            File.Move(path+".bin.tmp",path+".bin",overwrite:true);
+        }
+        catch(Exception error) when(error is IOException or UnauthorizedAccessException)
+        {
+            VodBoxLog.Warn("config",$"配置副本写入失败：{error.Message}");
+        }
     }
 
     /// <summary>
@@ -134,8 +213,15 @@ public sealed class SourceRegistry : IDisposable
 
     public IContentSource? Get(string key) => _sources.TryGetValue(key, out var source) ? source : null;
 
-    /// <summary>默认源：第一个已注册且有实现的源（MacCMS 或原生爬虫）。</summary>
-    public IContentSource? Default() => VisibleSources.FirstOrDefault(s => Get(s.Key) is not null) is { } info ? Get(info.Key) : null;
+    /// <summary>
+    /// 默认源（首页推荐）：第一个可运行的非 JAR 源。JAR 站点首屏要起 JVM、加载插件（冷启动常需 20s 以上），
+    /// 不适合当每次启动都要加载的首页；订阅里只有 JAR 站点时才退回第一个 JAR 站点。
+    /// </summary>
+    public IContentSource? Default()
+    {
+        var runnable = VisibleSources.Where(source => Get(source.Key) is not null).ToArray();
+        return (runnable.FirstOrDefault(source => source.Runtime != SourceRuntime.Jar) ?? runnable.FirstOrDefault()) is { } info ? Get(info.Key) : null;
+    }
 
     /// <summary>参与聚合搜索的源：可见（未被隐藏）、已开启搜索、且确实注册了桌面运行时实现。</summary>
     public IReadOnlyList<SourceInfo> SearchTargets =>
@@ -163,40 +249,45 @@ public sealed class SourceRegistry : IDisposable
 
     /// <summary>
     /// 流式聚合搜索：每完成一个站点就产出一批（该站的命中条目，或该站的失败原因），先到先得。
-    /// 单站失败/超时只记录该站，其他站点的成功结果照常产出（部分失败保留成功）；
-    /// 并发受 <see cref="SearchConcurrency"/> 限制，每站独立 <see cref="SearchTimeout"/>。
+    /// 单站失败/超时只记录该站，其他站点的成功结果照常产出（部分失败保留成功）。
+    /// JAR 插件站点单独一条通道（<see cref="JarSearchConcurrency"/>、<see cref="JarSearchTimeout"/>）：
+    /// 首次搜索要起 JVM、加载插件，慢且受宿主会话数限制；与原生/HTTP 站点共用并发位会让快站点排在它们后面。
     /// </summary>
     public async IAsyncEnumerable<AggregateSearchBatch> SearchStreamAsync(
         string query, [EnumeratorCancellation] CancellationToken ct = default)
     {
         var channel = Channel.CreateUnbounded<AggregateSearchBatch>(
             new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        var targets = SearchTargets;
+        Task Lane(IEnumerable<SourceInfo> sites, int concurrency, TimeSpan timeout) => Parallel.ForEachAsync(
+            sites,
+            new ParallelOptions { MaxDegreeOfParallelism = concurrency, CancellationToken = ct },
+            async (site, token) =>
+            {
+                // 逐源独立超时：慢站点不拖累整体，也不因共享 ct 而互相取消
+                using var perSite = CancellationTokenSource.CreateLinkedTokenSource(token);
+                perSite.CancelAfter(timeout);
+                try
+                {
+                    var page = await Get(site.Key)!.SearchAsync(query, 1, perSite.Token).ConfigureAwait(false);
+                    channel.Writer.TryWrite(new AggregateSearchBatch(site, page.Items.ToArray()));
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    channel.Writer.TryWrite(new AggregateSearchBatch(site, [], $"超时（{timeout.TotalSeconds:0}s）"));
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    channel.Writer.TryWrite(new AggregateSearchBatch(site, [], error.Message));
+                }
+            });
         var producer = Task.Run(async () =>
         {
             try
             {
-                await Parallel.ForEachAsync(
-                    SearchTargets,
-                    new ParallelOptions { MaxDegreeOfParallelism = SearchConcurrency, CancellationToken = ct },
-                    async (site, token) =>
-                    {
-                        // 逐源独立超时：慢站点不拖累整体，也不因共享 ct 而互相取消
-                        using var perSite = CancellationTokenSource.CreateLinkedTokenSource(token);
-                        perSite.CancelAfter(SearchTimeout);
-                        try
-                        {
-                            var page = await Get(site.Key)!.SearchAsync(query, 1, perSite.Token).ConfigureAwait(false);
-                            channel.Writer.TryWrite(new AggregateSearchBatch(site, page.Items.ToArray()));
-                        }
-                        catch (OperationCanceledException) when (!token.IsCancellationRequested)
-                        {
-                            channel.Writer.TryWrite(new AggregateSearchBatch(site, [], $"超时（{SearchTimeout.TotalSeconds:0}s）"));
-                        }
-                        catch (Exception error) when (error is not OperationCanceledException)
-                        {
-                            channel.Writer.TryWrite(new AggregateSearchBatch(site, [], error.Message));
-                        }
-                    }).ConfigureAwait(false);
+                await Task.WhenAll(
+                    Lane(targets.Where(site => site.Runtime != SourceRuntime.Jar), SearchConcurrency, SearchTimeout),
+                    Lane(targets.Where(site => site.Runtime == SourceRuntime.Jar), JarSearchConcurrency, JarSearchTimeout)).ConfigureAwait(false);
                 channel.Writer.TryComplete();
             }
             catch (Exception error) { channel.Writer.TryComplete(error); }
@@ -217,6 +308,12 @@ public sealed class SourceRegistry : IDisposable
 
     /// <summary>单站聚合搜索超时（独立于调用方 ct）。</summary>
     public static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(25);
+
+    /// <summary>JAR 站点通道的并发：与 JAR 宿主默认会话上限（3）一致，多了也只是在宿主里排队。</summary>
+    public const int JarSearchConcurrency = 3;
+
+    /// <summary>JAR 站点的单站超时：首次搜索包含 JVM 启动、插件下载与加载（含原生 guard），常需数十秒。</summary>
+    public static readonly TimeSpan JarSearchTimeout = TimeSpan.FromSeconds(90);
 
     public void Dispose()
     {

@@ -6,12 +6,14 @@ using VodBox.Desktop.Services;
 
 namespace VodBox.Desktop.ViewModels;
 
-public enum AppPage { Home, Vod, Live, Favorites, History, Files, Settings, Detail }
+public enum AppPage { Home, Vod, Live, Favorites, History, Settings, Detail }
 
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly AppServices _services;
     private readonly bool _designTime;
+    private readonly Func<string, IContentSource?> _getSource;
+    private readonly ILibraryStore _store;
 
     [ObservableProperty] private AppPage _page = AppPage.Home;
     [ObservableProperty] private string _currentSourceName = "未配置";
@@ -27,7 +29,6 @@ public sealed partial class MainViewModel : ObservableObject
     public FavoritesViewModel Favorites { get; }
     public HistoryViewModel History { get; }
     public SettingsViewModel Settings { get; }
-    public FilesViewModel Files { get; }
     public PlayerViewModel Player { get; set; }
     public DetailViewModel Detail { get; }
 
@@ -41,6 +42,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _services = services;
         _designTime = designTime;
+        _getSource = getSource;
+        _store = store;
         _wallpaperPath=designTime?"":services.Prefs.GetString("ui.wallpaper");
         Home = new HomeViewModel(services, this);
         Vod = new VodViewModel(services, this);
@@ -49,26 +52,47 @@ public sealed partial class MainViewModel : ObservableObject
         Favorites = new FavoritesViewModel(services, this);
         History = new HistoryViewModel(services, this);
         Settings = new SettingsViewModel(services, this);
-        Files = new FilesViewModel(services, designTime);
         Detail = new DetailViewModel(getSource, store, this);
         Player = new PlayerViewModel(services, this);
         if (!designTime)
         {
-            // 本地文件 → 播放器。只在此处订阅一次（MainViewModel 与应用同生命周期），避免 View 层重复订阅泄漏。
-            Files.PlayRequested += entry => Player.Play(new PlaybackRequest
-            {
-                Uri = new Uri(entry.FullPath).AbsoluteUri, // 转义 file:// URI，libmpv 可直接打开
-                Title = entry.Name,
-                SourceKey = "local",
-                MediaId = entry.FullPath,
-            });
-            // 本地 m3u 播放列表 → 直播视图（文件名会作为直播源标签显示）。
-            Files.OpenLiveRequested += path => _ = OpenLivePlaylistAsync(path);
             UpdateSourceName();
         }
     }
 
     /// <summary>直接播放一个本地媒体文件（拖放与文件列表共用）。</summary>
+    /// <summary>
+    /// 请求主窗口弹出系统「打开文件」对话框（侧栏「打开文件…」、⌘O/Ctrl+O、菜单栏、媒体收件箱共用）。
+    /// 参数为起始目录，null 表示用系统默认位置。VM 不直接碰窗口与存储提供器。
+    /// </summary>
+    public event Action<string?>? OpenFileRequested;
+
+    public void RequestOpenFile(string? startDirectory = null) => OpenFileRequested?.Invoke(startDirectory);
+
+    [RelayCommand]
+    private void OpenFile() => RequestOpenFile();
+
+    /// <summary>
+    /// 打开本地文件（拖放与「打开文件」对话框共用）：m3u/m3u8 作为直播源打开，媒体文件直接播放；
+    /// 多个文件时播放列表优先。返回是否识别出可处理的文件。
+    /// </summary>
+    public async Task<bool> OpenLocalFilesAsync(IEnumerable<string?> paths)
+    {
+        var (intent, path) = VodBox.Infrastructure.DroppedFiles.Classify(paths);
+        switch (intent)
+        {
+            case VodBox.Infrastructure.DroppedIntent.PlayLive:
+                await OpenLivePlaylistAsync(path);
+                return true;
+            case VodBox.Infrastructure.DroppedIntent.PlayMedia:
+                PlayLocalFile(path);
+                return true;
+            default:
+                StatusMessage = "请选择 .m3u/.m3u8 直播播放列表或媒体文件";
+                return false;
+        }
+    }
+
     public void PlayLocalFile(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
@@ -171,6 +195,19 @@ public sealed partial class MainViewModel : ObservableObject
 
     public Avalonia.Thickness PageContentMargin => GetPageContentMargin(Page, OperatingSystem.IsMacOS());
 
+    /// <summary>
+    /// 页面伸进标题栏行后会盖住下面的拖拽区（例如收藏页整页是一个滚动区，会吃掉指针）：
+    /// 在最上层补一条拖拽区，高度到页头顶边为止，不压页头控件。首页沉浸式整行；未上移的页面不需要。
+    /// </summary>
+    public double TopDragStripHeight => GetTopDragStripHeight(Page, OperatingSystem.IsMacOS());
+
+    internal static double GetTopDragStripHeight(AppPage page, bool isMacOS) => page switch
+    {
+        AppPage.Home => TitleBarHeight,
+        AppPage.Vod or AppPage.Favorites or AppPage.History => PageHeaderTop(isMacOS),
+        _ => 0,
+    };
+
     /// <summary>设置改为独立窗口后，由主窗口订阅此事件来打开窗口（VM 不直接创建窗口）。</summary>
     public event Action? SettingsRequested;
 
@@ -190,13 +227,37 @@ public sealed partial class MainViewModel : ObservableObject
         SettingsRequested?.Invoke();
     }
 
-    // macOS 的窗口按钮位于左侧；其他平台保留完整标题栏高度，避免右侧工具栏覆盖窗口按钮。
-    internal static Avalonia.Thickness GetPageContentMargin(AppPage page, bool isMacOS) =>
-        page == AppPage.Live && isMacOS ? new(0, -24, 0, 0) : new(0);
+    /// <summary>主窗口标题栏行高（与 MainWindow 的第一行一致）。</summary>
+    internal const double TitleBarHeight = 44;
+    /// <summary>
+    /// Windows/Linux 窗口按钮（右上角）的高度：MainWindow 在这两个平台把标题栏高度提示设为 32（Win11 标准高度），
+    /// 按钮只占顶部 32，下面这一截标题栏行可以给页面用。macOS 的交通灯在左侧侧栏上方，不受影响。
+    /// </summary>
+    internal const double CaptionButtonsHeight = 32;
+    /// <summary>点播/收藏/历史页自带的顶边距。</summary>
+    private const double PageHeaderInset = 12;
+
+    /// <summary>
+    /// 点播/收藏/历史的页头顶边在窗口中的位置：macOS 与直播页工具栏齐平（y=20）；
+    /// Windows/Linux 落在窗口按钮下方并留 4px，页头右侧的控件不会压到最小化/最大化/关闭按钮。
+    /// </summary>
+    internal static double PageHeaderTop(bool isMacOS) => isMacOS ? TitleBarHeight - 24 : CaptionButtonsHeight + 4;
+
+    // 首页沉浸式：内容上移一整行标题栏高度，首屏横幅从窗口顶边开始，滚动时内容从标题栏下穿过
+    // （标题栏拖拽区仍在最上层；滚动后标题栏处渐显毛玻璃，保证窗口按钮可读）。
+    // 点播/收藏/历史整体上移进标题栏行（见 PageHeaderTop）；直播页保持原有位置：macOS 上移 24，其他平台不动。
+    internal static Avalonia.Thickness GetPageContentMargin(AppPage page, bool isMacOS) => page switch
+    {
+        AppPage.Home => new(0, -TitleBarHeight, 0, 0),
+        AppPage.Vod or AppPage.Favorites or AppPage.History => new(0, PageHeaderTop(isMacOS) - TitleBarHeight - PageHeaderInset, 0, 0),
+        AppPage.Live when isMacOS => new(0, -24, 0, 0),
+        _ => new(0),
+    };
 
     partial void OnPageChanged(AppPage value)
     {
         OnPropertyChanged(nameof(PageContentMargin));
+        OnPropertyChanged(nameof(TopDragStripHeight));
         if (value != AppPage.Detail) Detail.CancelPending();
         if (_designTime) return; // 设计时假数据已就位，不触网、不覆盖
         if (value != AppPage.Favorites) Favorites.CancelPending();
@@ -212,6 +273,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void Navigate(AppPage page) => Page = page;
 
+    /// <summary>另一个窗口（搜索窗口）自用的详情：同一套站点与存储，但打开时不切主窗口的页面。</summary>
+    internal DetailViewModel CreateDetachedDetail() => new(_getSource, _store, this, navigateMainWindow: false);
+
     [RelayCommand]
     private void GoHome() => Navigate(AppPage.Home);
 
@@ -226,9 +290,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void GoHistory() => Navigate(AppPage.History);
-
-    [RelayCommand]
-    private void GoFiles() => Navigate(AppPage.Files);
 
     [RelayCommand]
     private void GoSettings() => OpenSettings();

@@ -153,6 +153,48 @@ public sealed class PosterCacheTests
         AssertUsable(retry.Bitmap);
     }
 
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RememberedFailureSkipsTheLoaderUntilItExpires(bool timeout)
+    {
+        var calls = 0;
+        using var cache = new PosterCache((_, _) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+                return Task.FromException<Bitmap>(timeout ? new TaskCanceledException("timeout") : new IOException("404"));
+            return Task.FromResult(Image());
+        }, failureMemory: TimeSpan.FromMilliseconds(300));
+        await Assert.ThrowsAnyAsync<Exception>(() => Done(cache.AcquireAsync(Url("broken"))));
+        Assert.True(cache.HasRecentlyFailed(Url("broken")));
+        // 记忆期内：不再调用加载器（不再触网），立即失败。
+        await Assert.ThrowsAsync<IOException>(() => Done(cache.AcquireAsync(Url("broken"))));
+        Assert.Equal(1, calls);
+        Assert.False(cache.HasRecentlyFailed(Url("other")));
+        await Task.Delay(400);
+        Assert.False(cache.HasRecentlyFailed(Url("broken")));
+        using var retry = await Done(cache.AcquireAsync(Url("broken")));
+        Assert.Equal(2, calls);
+    }
+
+    [AvaloniaFact]
+    public async Task CancelledLoadIsNotRememberedAsFailure()
+    {
+        var entered = Gate<bool>();
+        using var cache = new PosterCache((_, ct) =>
+        {
+            entered.TrySetResult(true);
+            return Task.Delay(Timeout.Infinite, ct).ContinueWith<Bitmap>(_ => throw new OperationCanceledException(ct), TaskScheduler.Default);
+        }, abandonDelay: TimeSpan.Zero, failureMemory: TimeSpan.FromMinutes(10));
+        using var scope = new CancellationTokenSource();
+        var pending = cache.AcquireAsync(Url("slow"), scope.Token);
+        await Done(entered.Task);
+        scope.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Done(pending));
+        await Task.Delay(100);
+        Assert.False(cache.HasRecentlyFailed(Url("slow")));
+    }
+
     [AvaloniaFact]
     public async Task IdleImagesFollowLruAndHitsRefreshRecency()
     {

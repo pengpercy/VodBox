@@ -29,6 +29,51 @@
       </Setter>
     </Style>
   </UserControl.Styles>
+  <UserControl.Resources>
+    <!-- 频道卡片：由 ChannelCardRowPanel 按行建好后复用。 -->
+    <DataTemplate x:Key="ChannelCardTemplate" x:DataType="core:LiveChannel">
+      <Button x:Name="ChannelCard" Tag="{Binding}" Click="OnPlayCard" Margin="0,0,14,14"
+              Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Top" HorizontalContentAlignment="Stretch"
+              ToolTip.Tip="{Binding Name}">
+        <Grid RowDefinitions="128,Auto,Auto">
+          <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource CardHoverBrush}"
+                  BorderThickness="1" BorderBrush="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}"
+                  ClipToBounds="True">
+            <Grid>
+              <Path Data="M 0,128 L 260,0 L 260,128 Z" Fill="#06FFFFFF" Stretch="Fill" IsHitTestVisible="False" />
+              <Panel Width="100" Height="54" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="CardPlaceholder" Background="Transparent" IsVisible="{Binding #CardLogo.HasImage, Converter={x:Static views:BoolConverters.Not}}">
+                  <StackPanel Spacing="3" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
+                    <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" />
+                    <TextBlock Text="TV" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </StackPanel>
+                </Border>
+                <views:RemotePoster x:Name="CardLogo" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Stretch="Uniform" />
+              </Panel>
+              <Border Background="#B0202020" CornerRadius="3" Padding="5,2" Margin="5"
+                      HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="White" FontWeight="Bold" />
+              </Border>
+              <TextBlock Text="{Binding Group}" FontSize="10" Foreground="White" Background="#90202020"
+                         Margin="42,0,5,6" HorizontalAlignment="Right" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
+              <Border Background="#B0202020" CornerRadius="3" Padding="5,2" Margin="5"
+                      HorizontalAlignment="Right" VerticalAlignment="Top" IsVisible="{Binding IsCurrent}">
+                <TextBlock Text="正在播放" FontSize="10" Foreground="#A8D5B0" />
+              </Border>
+            </Grid>
+          </Border>
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,7,0,0">
+            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <views:RemotePoster Grid.Column="1" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Width="32" Height="18" Stretch="Uniform" Margin="6,0,0,0" />
+          </Grid>
+          <!-- EPG 行固定预留一行：加载中显示状态占位，避免卡片高度随数据跳变。 -->
+          <TextBlock Grid.Row="2" Text="{Binding EpgNow}" Margin="0,2,0,0" FontSize="11" MinHeight="14"
+                     Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+        </Grid>
+      </Button>
+    </DataTemplate>
+  </UserControl.Resources>
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
@@ -106,6 +151,7 @@
         <!-- ListBox owns the finite viewport; only visible rows and a small cache are realized. -->
         <ListBox x:Name="ChannelCardGrid" ItemsSource="{Binding ChannelCardRows}"
                  SizeChanged="OnCardViewportSizeChanged" Background="Transparent" BorderThickness="0"
+                 views:SmoothWheelScroll.IsEnabled="True"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  Padding="0">
           <ListBox.Styles>
@@ -125,57 +171,10 @@
           </ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:LiveViewModel+ChannelCardRow">
-              <ItemsControl ItemsSource="{Binding Channels}" Height="194" Margin="28,0,6,0">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <UniformGrid Rows="1" Columns="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.CardColumns}" />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="core:LiveChannel">
-                <Button x:Name="ChannelCard" Tag="{Binding}" Click="OnPlayCard" Margin="0,0,14,14"
-                        Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
-                        HorizontalAlignment="Stretch" VerticalAlignment="Top" HorizontalContentAlignment="Stretch"
-                        ToolTip.Tip="{Binding Name}">
-                  <Grid RowDefinitions="128,Auto,Auto">
-                    <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource CardHoverBrush}"
-                            BorderThickness="1" BorderBrush="{Binding IsCurrent, Converter={x:Static views:BoolConverters.ToSelectedRow}}"
-                            ClipToBounds="True">
-                      <Grid>
-                        <Path Data="M 0,128 L 260,0 L 260,128 Z" Fill="#06FFFFFF" Stretch="Fill" IsHitTestVisible="False" />
-                        <Panel Width="100" Height="54" HorizontalAlignment="Center" VerticalAlignment="Center">
-                          <Border x:Name="CardPlaceholder" Background="Transparent" IsVisible="{Binding #CardLogo.HasImage, Converter={x:Static views:BoolConverters.Not}}">
-                            <StackPanel Spacing="3" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
-                              <PathIcon Data="{StaticResource Icon.Broadcast}" Width="24" Height="24" />
-                              <TextBlock Text="TV" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
-                            </StackPanel>
-                          </Border>
-                          <views:RemotePoster x:Name="CardLogo" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Stretch="Uniform" />
-                        </Panel>
-                        <Border Background="#B0202020" CornerRadius="3" Padding="5,2" Margin="5"
-                                HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                          <TextBlock Text="{Binding Number, StringFormat='D3'}" FontSize="11" Foreground="White" FontWeight="Bold" />
-                        </Border>
-                        <TextBlock Text="{Binding Group}" FontSize="10" Foreground="White" Background="#90202020"
-                                   Margin="42,0,5,6" HorizontalAlignment="Right" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
-                        <Border Background="#B0202020" CornerRadius="3" Padding="5,2" Margin="5"
-                                HorizontalAlignment="Right" VerticalAlignment="Top" IsVisible="{Binding IsCurrent}">
-                          <TextBlock Text="正在播放" FontSize="10" Foreground="#A8D5B0" />
-                        </Border>
-                      </Grid>
-                    </Border>
-                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,7,0,0">
-                      <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      <views:RemotePoster Grid.Column="1" Url="{Binding Logo}" ChannelName="{Binding Name}" ChannelIsScrolling="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.IsChannelScrolling}" Width="32" Height="18" Stretch="Uniform" Margin="6,0,0,0" />
-                    </Grid>
-                    <!-- EPG 行固定预留一行：加载中显示状态占位，避免卡片高度随数据跳变。 -->
-                    <TextBlock Grid.Row="2" Text="{Binding EpgNow}" Margin="0,2,0,0" FontSize="11" MinHeight="14"
-                               Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" />
-                  </Grid>
-                </Button>
-              </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+              <!-- ListBox 回收行时会按模板重建行内容；宿主很轻，卡片所在的行面板从池中借还（见 ChannelCardRowHost）。 -->
+              <views:ChannelCardRowHost Channels="{Binding Channels}" CardTemplate="{StaticResource ChannelCardTemplate}"
+                                        Columns="{Binding $parent[views:LiveView].((vm:MainViewModel)DataContext).Live.CardColumns}"
+                                        Height="194" Margin="28,0,6,0" />
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>

@@ -519,6 +519,43 @@ public sealed class ViewModelRaceTests
         Assert.All(cards, card => Assert.False(string.IsNullOrEmpty(card.SourceName)));
     }
 
+    /// <summary>
+    /// 搜索窗口按站点流式回填：先完成的站点立即上屏（JAR 站点首次搜索可达数十秒，不能拖住其它站点），
+    /// 进度在汇总里可见；全部结束后汇总失败站点。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Search_StreamsEachSiteAsItCompletes()
+    {
+        using var context = new Context();
+        var fast = new SourceInfo { Key = "fast", Name = "快站", Runtime = SourceRuntime.MacCms };
+        var broken = new SourceInfo { Key = "broken", Name = "坏站", Runtime = SourceRuntime.Jar };
+        var slow = new SourceInfo { Key = "slow", Name = "慢站", Runtime = SourceRuntime.Jar };
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async IAsyncEnumerable<AggregateSearchBatch> Stream(string _, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            yield return new AggregateSearchBatch(fast, [Item("f1"), Item("f2")]);
+            await release.Task.WaitAsync(ct);
+            yield return new AggregateSearchBatch(broken, [], "超时（90s）");
+            yield return new AggregateSearchBatch(slow, [Item("s1")]);
+        }
+        var search = context.Main.Search;
+        search.SetSearchStream(Stream, 3);
+        search.Keyword = "测试";
+        var running = search.RunSearchAsync();
+        await Until(() => search.AllResults.Count == 2);
+        Assert.True(search.Searching);
+        Assert.Equal(["f1", "f2"], search.ResultRows.SelectMany(row => row.Items).Select(item => item.Id));
+        Assert.Contains("1/3", search.Summary);
+        release.SetResult();
+        await Done(running);
+        Assert.False(search.Searching);
+        Assert.Equal(["快站", "慢站"], search.SiteResults.Select(site => site.SiteName));
+        Assert.Equal("慢站", search.AllResults.Single(item => item.Id == "s1").SourceName);
+        Assert.Contains("2 个站点找到 3 条结果", search.Summary);
+        Assert.Contains("1 个站点失败", search.Summary);
+        Assert.Contains("坏站", search.Summary);
+    }
+
     [AvaloniaFact]
     public async Task Search_PartialFailureStillLabelsSucceededCardsAndSurfacesFailedSites()
     {
@@ -534,6 +571,34 @@ public sealed class ViewModelRaceTests
         Assert.Contains("慢站", search.Summary);
         Assert.Contains("超时", search.Summary);
         Assert.Empty(search.Hint);
+    }
+
+    /// <summary>点播页卡片：来源只在聚合搜索（跨站点）时显示；浏览单个站点时隐藏，避免每张卡片重复同一站名。</summary>
+    [AvaloniaFact]
+    public async Task Vod_CardsShowSourceOnlyInAggregateSearch()
+    {
+        using var context = new Context();
+        var vod = context.Main.Vod;
+        var first = new SourceInfo { Key = "a", Name = "甲站", Runtime = SourceRuntime.MacCms };
+        var second = new SourceInfo { Key = "b", Name = "乙站", Runtime = SourceRuntime.MacCms };
+        vod.SetSearchStream((_, _) => Batches(
+            new AggregateSearchBatch(first, [Item("a1"), Item("a2")]),
+            new AggregateSearchBatch(second, [Item("b1")])));
+        var window = new Window { Width = 1280, Height = 800, Content = new VodView { DataContext = context.Main } };
+        window.Show();
+        try
+        {
+            vod.Keyword = "测试";
+            await Done(vod.RunSearchAsync());
+            for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            TextBlock[] Sources() => window.GetVisualDescendants().OfType<TextBlock>()
+                .Where(text => text.Classes.Contains("cardSource") && text.IsEffectivelyVisible).ToArray();
+            Assert.Equal(["甲站", "甲站", "乙站"], Sources().Select(text => text.Text));
+            vod.SearchMode = false;
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Assert.Empty(Sources());
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]
@@ -619,6 +684,58 @@ public sealed class ViewModelRaceTests
         Assert.All(search.ResultRows.SelectMany(row => row.Items), card => Assert.Equal("站点", card.SourceName));
         search.OpenItemCommand.Execute(search.AllResults[119]);
         Assert.Equal("item119", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    /// <summary>
+    /// 搜索窗口里打开影片：详情在搜索窗口内展示，主窗口不跳到详情页（主窗口自己的详情也不受影响）；
+    /// 「返回搜索结果」、Esc、发起新搜索都回到结果网格。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Search_OpensDetailInsideSearchWindowAndReturnsToResults()
+    {
+        using var context = new Context();
+        var search = context.Main.Search;
+        search.SetDetailedSearch((_, _) => Task.FromResult(new AggregateSearchResult(SearchResults("item", 6), [])));
+        var window = new SearchWindow { DataContext = context.Main, Width = 1040, Height = 720 };
+        window.Show();
+        void Layout() { for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); } }
+        T Named<T>(string name) where T : Control => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
+        try
+        {
+            search.Keyword = "测试";
+            await Done(search.RunSearchAsync());
+            var pageBefore = context.Main.Page;
+            search.OpenItemCommand.Execute(search.AllResults[2]);
+            await Until(() => search.Detail.Detail is not null);
+            Layout();
+            Assert.True(search.ShowingDetail);
+            Assert.Equal("item2", search.Detail.Detail!.Item.Id);
+            Assert.Equal(pageBefore, context.Main.Page);
+            Assert.Null(context.Main.Detail.Detail);
+            Assert.True(Named<Grid>("DetailHost").IsEffectivelyVisible);
+            Assert.False(Named<ListBox>("ResultsList").IsEffectivelyVisible);
+
+            var back = Named<Button>("BackToResults");
+            var center = back.TranslatePoint(new Avalonia.Point(back.Bounds.Width / 2, back.Bounds.Height / 2), window)!.Value;
+            Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, center, Avalonia.Input.MouseButton.Left);
+            Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, center, Avalonia.Input.MouseButton.Left);
+            Layout();
+            Assert.False(search.ShowingDetail);
+            Assert.True(Named<ListBox>("ResultsList").IsEffectivelyVisible);
+            Assert.Equal(6, search.AllResults.Count);
+
+            search.OpenItemCommand.Execute(search.AllResults[0]);
+            Layout();
+            window.GetVisualDescendants().OfType<SearchView>().Single().RaiseEvent(new Avalonia.Input.KeyEventArgs
+                { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
+            Assert.False(search.ShowingDetail);
+
+            search.OpenItemCommand.Execute(search.AllResults[1]);
+            Assert.True(search.ShowingDetail);
+            await Done(search.RunSearchAsync());
+            Assert.False(search.ShowingDetail);
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]
@@ -1450,14 +1567,38 @@ public sealed class ViewModelRaceTests
         context.Services.Dispose();context.Services.Dispose();
     }
 
+    /// <summary>媒体收件箱（遥控端上传的文件）用系统「打开文件」对话框打开，起始目录就是收件箱，不切主窗口页面。</summary>
     [AvaloniaFact]
-    public void Settings_MediaInboxOpensUploadedMediaIncludingM4a()
+    public void Settings_MediaInboxOpensSystemFilePickerAtInbox()
     {
-        using var context=new Context();var directory=Path.Combine(context.Services.DataDir,"media-inbox");Directory.CreateDirectory(directory);
-        File.WriteAllBytes(Path.Combine(directory,"clip.m4a"),[1,2,3]);
+        using var context=new Context();var directory=Path.Combine(context.Services.DataDir,"media-inbox");
+        var page=context.Main.Page;string? requested=null;var count=0;
+        context.Main.OpenFileRequested+=start=>{requested=start;count++;};
         context.Main.Settings.OpenMediaInboxCommand.Execute(null);
-        Assert.Equal(AppPage.Files,context.Main.Page);
-        Assert.Contains(context.Main.Files.Entries,entry=>entry.Name=="clip.m4a");
+        Assert.Equal(1,count);
+        Assert.Equal(directory,requested);
+        Assert.True(Directory.Exists(directory));
+        Assert.Equal(page,context.Main.Page);
+    }
+
+    /// <summary>「打开文件」与拖放共用同一条打开路径：m3u 作为直播源打开，媒体文件直接播放，其他文件给出提示。</summary>
+    [AvaloniaFact]
+    public async Task OpenLocalFiles_PlaysMediaOpensPlaylistsAndRejectsOthers()
+    {
+        using var context=new Context();var directory=Path.Combine(context.Services.DataDir,"open-test");Directory.CreateDirectory(directory);
+        var media=Path.Combine(directory,"clip.m4a");File.WriteAllBytes(media,[1,2,3]);
+        var other=Path.Combine(directory,"notes.txt");File.WriteAllText(other,"x");
+        var requests=0;context.Main.OpenFileRequested+=_=>requests++;
+        context.Main.OpenFileCommand.Execute(null);
+        Assert.Equal(1,requests);
+
+        Assert.False(await context.Main.OpenLocalFilesAsync([other]));
+        Assert.Contains("m3u",context.Main.StatusMessage);
+
+        Assert.True(await context.Main.OpenLocalFilesAsync([media]));
+        await Until(()=>context.Engine.Opened.Count>0);
+        Assert.Equal(new Uri(media).AbsoluteUri,context.Engine.Opened[^1].Request.Uri);
+        Assert.Equal("local",context.Engine.Opened[^1].Request.SourceKey);
     }
 
     [AvaloniaFact]
@@ -2108,6 +2249,53 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public async Task LiveChannelPlaybackDrawerListsChannelsAndSwitchesChannel()
+    {
+        using var context = new Context();
+        var channels = Enumerable.Range(1, 300).Select(i => new LiveChannel
+        { Name = $"频道{i}", Number = i, Group = "测试", Uris = [$"https://example.com/live/{i}"] }).ToArray();
+        context.Main.Live.Groups.Add(new LiveGroup("测试", channels, false, channels.Length));
+        context.Main.Live.SelectedGroup = context.Main.Live.Groups[0];
+        context.Main.Live.PlayChannel(channels[149]);
+        await Until(() => context.Main.Player.IsLiveChannel);
+        var window = new PlayerWindow { DataContext = context.Main, Width = 900, Height = 520 };
+        window.Show();
+        try
+        {
+            var overlay = window.Overlay;
+            var list = overlay.FindControl<ListBox>("DrawerChannels")!;
+            overlay.OpenPlaylistDrawer();
+            for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            Assert.True(list.IsVisible);
+            Assert.False(overlay.FindControl<ScrollViewer>("EpisodeScroller")!.IsVisible);
+            Assert.Equal("频道列表", overlay.FindControl<TextBlock>("PlaylistTitle")!.Text);
+            Assert.Equal("共 300 个频道", overlay.FindControl<TextBlock>("PlaylistCount")!.Text);
+            Button Row(LiveChannel channel) => list.GetVisualDescendants().OfType<Button>()
+                .Single(button => ReferenceEquals(button.Tag, channel));
+            // 打开即滚到正在播放的频道，且该行高亮；长列表只实现可见行。
+            Assert.Contains("current", Row(channels[149]).Classes);
+            IEnumerable<LiveChannel> Rows() => list.GetVisualDescendants().OfType<Button>()
+                .Select(button => button.Tag).OfType<LiveChannel>();
+            Assert.InRange(Rows().Count(), 1, 60);
+            var next = Rows().First(channel => !channel.IsCurrent);
+            Row(next).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            await Until(() => context.Main.Player.Title == next.Name);
+            Assert.Same(next, context.Main.Live.CurrentChannel);
+            Assert.Equal(next.Uris[0], context.Engine.Opened[^1].Request.Uri);
+
+            // 单独打开的网络流（同为直播，但不是频道列表发起）仍显示剧集视图。
+            context.Main.Player.Play(new PlaybackRequest { Uri = "https://example.com/stream.m3u8", Title = "网络流", SourceKey = "smoke", MediaId = "s", IsLive = true });
+            await Until(() => context.Main.Player.Title == "网络流");
+            overlay.OpenPlaylistDrawer();
+            window.UpdateLayout();
+            Assert.False(list.IsVisible);
+            Assert.True(overlay.FindControl<ScrollViewer>("EpisodeScroller")!.IsVisible);
+            Assert.Equal("播放列表", overlay.FindControl<TextBlock>("PlaylistTitle")!.Text);
+        }
+        finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
+    }
+
+    [AvaloniaFact]
     public async Task PlayerPanelMinimumWidthMatchesMeasuredControlsAndNeverOverlaps()
     {
         using var context = new Context();
@@ -2375,15 +2563,15 @@ public sealed class ViewModelRaceTests
             var search = window.FindControl<TextBox>("GlobalSearch")!;
             var home = window.GetVisualDescendants().OfType<HomeView>().Single();
             var originalY = home.TranslatePoint(default, window)!.Value.Y;
+            // 首页沉浸式：从窗口顶边开始（内容在标题栏下方穿过）。
+            Assert.Equal(0, originalY, 1);
             Assert.True(search.IsVisible);
             context.Main.Navigate(AppPage.Live);
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
             Assert.True(search.IsVisible);
             var live = window.GetVisualDescendants().OfType<LiveView>().Single();
-            if (OperatingSystem.IsMacOS())
-                Assert.True(live.TranslatePoint(default, window)!.Value.Y < originalY);
-            else
-                Assert.Equal(originalY, live.TranslatePoint(default, window)!.Value.Y);
+            // 直播页不沉浸：macOS 只上移 24（交通灯在左），其他平台留出整行标题栏。
+            Assert.Equal(MainViewModel.TitleBarHeight + (OperatingSystem.IsMacOS() ? -24 : 0), live.TranslatePoint(default, window)!.Value.Y, 1);
             var groups = live.FindControl<ComboBox>("GroupSelector")!;
             Assert.Equal(34, groups.Bounds.Height);
             context.Main.Navigate(AppPage.Home);
@@ -2422,7 +2610,8 @@ public sealed class ViewModelRaceTests
                 Assert.Equal(34, search.Bounds.Height);
             }
             Assert.Equal(new Avalonia.Thickness(0, -24, 0, 0), MainViewModel.GetPageContentMargin(AppPage.Live, isMacOS: true));
-            Assert.Equal(new Avalonia.Thickness(0), MainViewModel.GetPageContentMargin(AppPage.Home, isMacOS: true));
+            Assert.Equal(new Avalonia.Thickness(0, -MainViewModel.TitleBarHeight, 0, 0), MainViewModel.GetPageContentMargin(AppPage.Home, isMacOS: true));
+            Assert.Equal(new Avalonia.Thickness(0, -MainViewModel.TitleBarHeight, 0, 0), MainViewModel.GetPageContentMargin(AppPage.Home, isMacOS: false));
         }
         finally { window.Close(); }
     }
@@ -2448,6 +2637,126 @@ public sealed class ViewModelRaceTests
             Assert.True(live.IsChannelScrolling);
             await Until(() => !live.IsChannelScrolling);
             Assert.False(live.IsChannelScrolling);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// 打开直播页时卡片绑定不得抛异常：Avalonia 会吞掉绑定里的强转异常，但调试器会在第一次抛出时中断，
+    /// 表现为「点直播进不去页面」。卡片必须先拿到自己的 LiveChannel 再入树。
+    /// </summary>
+    [AvaloniaFact]
+    public void OpeningLivePageThrowsNoBindingCastExceptions()
+    {
+        using var context = new Context();
+        var channels = Enumerable.Range(1, 138).Select(i => new LiveChannel
+        { Name = $"频道{i}", Number = i, Group = "组", Logo = i % 2 == 0 ? $"https://example.invalid/{i}.png" : "", Uris = [$"https://example.com/{i}"] }).ToArray();
+        context.Main.Live.Groups.Add(new LiveGroup("组", channels, false, channels.Length));
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1280, Height = 800 };
+        window.Show();
+        var seen = new List<string>();
+        void Handler(object? s, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            if (e.Exception is InvalidCastException or NullReferenceException) seen.Add(e.Exception.GetType().Name + ": " + e.Exception.Message);
+        }
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            AppDomain.CurrentDomain.FirstChanceException += Handler;
+            context.Main.GoLiveCommand.Execute(null);
+            for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+        }
+        finally { AppDomain.CurrentDomain.FirstChanceException -= Handler; window.Close(); }
+        Assert.True(context.Main.Live.ChannelCards.Count == 138, "频道卡片未加载");
+        Assert.Empty(seen);
+    }
+
+    [AvaloniaFact]
+    public void ChannelListWheelScrollsSmoothlyToTheSameDistance()
+    {
+        using var context = new Context();
+        var channels = Enumerable.Range(1, 400).Select(i => new LiveChannel
+        { Name = $"频道{i}", Number = i, Uris = [$"https://example.com/{i}"] }).ToArray();
+        context.Main.Live.Groups.Add(new LiveGroup("滚轮", channels, false, channels.Length));
+        context.Main.Live.FilterText = "频道";
+        context.Main.Navigate(AppPage.Live);
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            void Layout()
+            {
+                for (var i = 0; i < 4; i++)
+                { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            }
+            void Frames(int count)
+            {
+                for (var i = 0; i < count; i++)
+                { Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(); Dispatcher.UIThread.RunJobs(); }
+            }
+            Layout();
+            var grid = window.GetVisualDescendants().OfType<LiveView>().Single().FindControl<ListBox>("ChannelCardGrid")!;
+            var scroller = grid.GetVisualDescendants().OfType<ScrollViewer>().Single();
+            var point = grid.TranslatePoint(new Avalonia.Point(grid.Bounds.Width / 2, grid.Bounds.Height / 2), window)!.Value;
+            // 不再瞬间跳一整格：一格滚轮要经过多帧中间位置才到达。
+            var positions = new List<double>();
+            scroller.ScrollChanged += (_, _) => positions.Add(scroller.Offset.Y);
+            Avalonia.Headless.HeadlessWindowExtensions.MouseWheel(window, point, new Avalonia.Vector(0, -1));
+            Frames(60);
+            Assert.True(positions.Count(y => y > 0.5 && y < VodBox.Desktop.Views.SmoothWheelScroll.WheelStep - 0.5) >= 3,
+                "滚轮应逐帧推进：" + string.Join(",", positions.Select(y => y.ToString("F1"))));
+            Assert.Equal(VodBox.Desktop.Views.SmoothWheelScroll.WheelStep, scroller.Offset.Y, 1);
+            // 连续快速滚动：目标累加，最终距离 = 格数 × 每格距离。
+            for (var i = 0; i < 3; i++) Avalonia.Headless.HeadlessWindowExtensions.MouseWheel(window, point, new Avalonia.Vector(0, -1));
+            Frames(60);
+            Assert.Equal(4 * VodBox.Desktop.Views.SmoothWheelScroll.WheelStep, scroller.Offset.Y, 1);
+            // 反向：从当前位置起算，不先把剩余的下滚走完。
+            Avalonia.Headless.HeadlessWindowExtensions.MouseWheel(window, point, new Avalonia.Vector(0, 1));
+            Frames(60);
+            Assert.Equal(3 * VodBox.Desktop.Views.SmoothWheelScroll.WheelStep, scroller.Offset.Y, 1);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ClickingChannelCardPlaysThatChannelIncludingRecycledRows()
+    {
+        using var context = new Context();
+        var channels = Enumerable.Range(1, 400).Select(i => new LiveChannel
+        { Name = $"频道{i}", Number = i, Uris = [$"https://example.com/{i}"] }).ToArray();
+        context.Main.Live.Groups.Add(new LiveGroup("点击测试", channels, false, channels.Length));
+        context.Main.Live.FilterText = "频道";
+        context.Main.Navigate(AppPage.Live);
+        var window = new VodBox.Desktop.MainWindow { DataContext = context.Main, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            void Layout()
+            {
+                for (var i = 0; i < 4; i++)
+                { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            }
+            Layout();
+            var grid = window.GetVisualDescendants().OfType<LiveView>().Single().FindControl<ListBox>("ChannelCardGrid")!;
+            Button Card(int number) => grid.GetVisualDescendants().OfType<Button>()
+                .First(b => b.Name == "ChannelCard" && b.IsEffectivelyVisible && b.Tag is LiveChannel c && c.Number == number);
+            // 走真实指针命中测试，而不是直接 RaiseEvent：卡片必须能被鼠标点中。
+            void Press(Button card)
+            {
+                var center = card.TranslatePoint(new Avalonia.Point(card.Bounds.Width / 2, 40), window)!.Value;
+                Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, center, Avalonia.Input.MouseButton.Left);
+                Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, center, Avalonia.Input.MouseButton.Left);
+                Dispatcher.UIThread.RunJobs();
+            }
+            Press(Card(1));
+            Assert.Equal(1, context.Main.Live.CurrentChannel?.Number);
+            grid.GetVisualDescendants().OfType<ScrollViewer>().Single().Offset = new Avalonia.Vector(0, 19400);
+            Layout();
+            var recycled = grid.GetVisualDescendants().OfType<Button>()
+                .First(b => b.Name == "ChannelCard" && b.IsEffectivelyVisible && b.Tag is LiveChannel c && c.Number > 100);
+            var number = ((LiveChannel)recycled.Tag!).Number;
+            Press(recycled);
+            Assert.Equal(number, context.Main.Live.CurrentChannel?.Number);
         }
         finally { window.Close(); }
     }
@@ -2957,8 +3266,15 @@ public sealed class ViewModelRaceTests
             Assert.Equal(new Avalonia.Thickness(30, 0, 10, 0), global.Padding);
             Assert.Equal(14, globalIcon.Bounds.Width);
             Assert.False(globalIcon.IsHitTestVisible);
-            var hero = window.GetVisualDescendants().OfType<HomeView>().Single().FindControl<Border>("HeroCard")!;
-            Assert.Equal(new Avalonia.CornerRadius(6), hero.CornerRadius);
+            var homeView = window.GetVisualDescendants().OfType<HomeView>().Single();
+            var hero = homeView.FindControl<Border>("HeroCard")!;
+            // 沉浸式横幅：铺满内容区、从窗口顶边开始（无圆角）；切换箭头在标题栏下方，不被拖拽区吃掉点击。
+            Assert.Equal(default, hero.CornerRadius);
+            Assert.Equal(0, hero.TranslatePoint(default, window)!.Value.Y, 1);
+            Assert.Equal(homeView.Bounds.Width, hero.Bounds.Width, 1);
+            // 箭头只在多张推荐时显示；横幅顶边即窗口顶边，所以它们所在面板的上边距必须越过标题栏。
+            var arrows = Assert.IsType<StackPanel>(homeView.FindControl<Button>("PreviousHero")!.Parent);
+            Assert.True(arrows.Margin.Top >= MainViewModel.TitleBarHeight);
             // 侧栏不再有「搜索」菜单项；主窗口内也不再有搜索页（结果改由独立窗口承载）。
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<NavItemView>(), item => item.Label == "搜索");
             Assert.Empty(window.GetVisualDescendants().OfType<SearchView>());

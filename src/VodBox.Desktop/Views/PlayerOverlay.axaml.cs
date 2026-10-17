@@ -469,9 +469,37 @@ public partial class PlayerOverlay : UserControl
         _drawerHideTimer.Start();
     }
 
+    /// <summary>
+    /// 从直播频道打开的播放：抽屉显示直播页当前的频道列表（同分组/搜索筛选；筛选为空时退回全部频道）。
+    /// 其余播放（点播、本地文件、单独的网络流）没有当前频道，仍显示剧集。
+    /// </summary>
+    internal IReadOnlyList<LiveChannel>? DrawerLiveChannels()
+    {
+        if (DataContext is not MainViewModel main || !main.Player.IsLiveChannel || main.Live.CurrentChannel is null) return null;
+        return main.Live.ChannelCards.Count > 0
+            ? main.Live.ChannelCards
+            : main.Live.Groups.SelectMany(group => group.Channels).ToArray();
+    }
+
     private void BuildPlaylistItems(PlayerViewModel vm)
     {
         if (this.FindControl<StackPanel>("PlaylistItems") is not { } items) return;
+        var channels = DrawerLiveChannels();
+        var channelList = this.FindControl<ListBox>("DrawerChannels");
+        if (this.FindControl<ScrollViewer>("EpisodeScroller") is { } episodes) episodes.IsVisible = channels is null;
+        if (channelList is not null) channelList.IsVisible = channels is not null;
+        if (this.FindControl<TextBlock>("PlaylistTitle") is { } title) title.Text = channels is null ? "播放列表" : "频道列表";
+        if (channels is not null && channelList is not null)
+        {
+            items.Children.Clear();
+            if (this.FindControl<TextBlock>("PlaylistCount") is { } channelCount) channelCount.Text = $"共 {channels.Count} 个频道";
+            channelList.ItemsSource = channels;
+            // 打开即定位到正在播放的频道；等抽屉显示、列表完成布局后再滚动。
+            if (channels.FirstOrDefault(channel => channel.IsCurrent) is { } current)
+                Dispatcher.UIThread.Post(() => channelList.ScrollIntoView(current), DispatcherPriority.Loaded);
+            return;
+        }
+        if (channelList is not null) channelList.ItemsSource = null;
         if (this.FindControl<TextBlock>("PlaylistCount") is { } count)
             count.Text = vm.Playlist.Count > 0 ? $"共 {vm.Playlist.Count} 集" : "";
         items.Children.Clear();
@@ -515,6 +543,14 @@ public partial class PlayerOverlay : UserControl
             };
             items.Children.Add(item);
         }
+    }
+
+    /// <summary>抽屉里点频道：与直播页点卡片走同一条路径（锁定分组、线路、历史都一致）。</summary>
+    private void OnPlayDrawerChannel(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel main || sender is not Control { Tag: LiveChannel channel }) return;
+        ClosePlaylistDrawer();
+        if (!channel.IsCurrent) main.Live.PlayChannel(channel);
     }
 
     private bool IsInsidePlaylistDrawer(Avalonia.Visual? source)

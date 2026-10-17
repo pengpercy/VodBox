@@ -234,10 +234,10 @@ public sealed partial class LiveViewModel : ObservableObject
     public ObservableCollection<object> VisibleChannels { get; } = [];
 
     /// <summary>与左侧分组/收藏/历史及搜索同步，卡片不包含组头或锁定频道。</summary>
-    public ObservableCollection<LiveChannel> ChannelCards { get; } = [];
+    public BatchObservableCollection<LiveChannel> ChannelCards { get; } = [];
 
     public sealed record ChannelCardRow(IReadOnlyList<LiveChannel> Channels);
-    public ObservableCollection<ChannelCardRow> ChannelCardRows { get; } = [];
+    public BatchObservableCollection<ChannelCardRow> ChannelCardRows { get; } = [];
     private int _cardColumns = 1;
     public int CardColumns => _cardColumns;
 
@@ -253,9 +253,7 @@ public sealed partial class LiveViewModel : ObservableObject
 
     private void RebuildCardRows()
     {
-        ChannelCardRows.Clear();
-        for (var index = 0; index < ChannelCards.Count; index += _cardColumns)
-            ChannelCardRows.Add(new ChannelCardRow(Enumerable.Range(index, Math.Min(_cardColumns, ChannelCards.Count - index)).Select(i => ChannelCards[i]).ToArray()));
+        ChannelCardRows.ReplaceAll(ChannelCards.Chunk(_cardColumns).Select(row => new ChannelCardRow(row)));
     }
 
 
@@ -420,8 +418,7 @@ public sealed partial class LiveViewModel : ObservableObject
         try { ApplyChannelFilter(); }
         finally
         {
-            ChannelCards.Clear();
-            foreach (var channel in VisibleChannels.OfType<LiveChannel>()) ChannelCards.Add(channel);
+            ChannelCards.ReplaceAll(VisibleChannels.OfType<LiveChannel>());
             RebuildCardRows();
             // 只刷新可见/候选项的必要文案，不重建卡片集合、不改排序筛选与滚动位置。
             if (EpgEngaged) foreach (var channel in ChannelCards) RefreshChannelEpgLabel(channel, DateTimeOffset.Now);

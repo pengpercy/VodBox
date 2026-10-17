@@ -101,7 +101,14 @@ public static class JarPluginHostLocator
     public static string DefaultWorkRoot() =>
         Path.Combine(Path.GetTempPath(), "vodbox-jarhost");
 
-    /// <summary>按 环境变量 → 随包 JRE → PATH → JAVA_HOME 的顺序找 Java；找不到返回 null。</summary>
+    /// <summary>宿主字节码目标版本（上游 pom 的 maven.compiler.release=17，类文件 major 61）。</summary>
+    public const int MinimumJavaVersion = 17;
+
+    /// <summary>
+    /// 按 环境变量 → 随包 JRE → JAVA_HOME → macOS java_home → PATH 的顺序找 Java；找不到返回 null。
+    /// 系统 Java 可能过旧（开发机 PATH 上常是 1.8，会拒绝宿主的 --add-opens 参数而立即退出）：
+    /// 能从 JDK 的 release 文件读出版本且低于 <see cref="MinimumJavaVersion"/> 的候选跳过；读不出版本的仍按原顺序兜底。
+    /// </summary>
     public static string? FindJava(string? baseDirectory = null)
     {
         var configured = Environment.GetEnvironmentVariable(JavaEnvironmentVariable);
@@ -114,19 +121,51 @@ public static class JarPluginHostLocator
             var macBundledJava = Path.Combine(directory, "jre", "Contents", "Home", "bin", executable);
             if (File.Exists(macBundledJava)) return macBundledJava;
         }
+        var candidates = new List<string>();
+        var home = Environment.GetEnvironmentVariable("JAVA_HOME");
+        if (!string.IsNullOrWhiteSpace(home)) candidates.Add(Path.Combine(home, "bin", executable));
+        if (OperatingSystem.IsMacOS() && MacJavaHome() is { } macHome) candidates.Add(Path.Combine(macHome, "bin", executable));
         var path = Environment.GetEnvironmentVariable("PATH") ?? "";
         foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            candidates.Add(Path.Combine(directory.Trim(), executable));
+        var existing = candidates.Where(File.Exists).ToArray();
+        return existing.FirstOrDefault(candidate => JavaVersion(candidate) >= MinimumJavaVersion)
+            ?? existing.FirstOrDefault(candidate => JavaVersion(candidate) is null);
+    }
+
+    /// <summary>从 java 可执行文件所在 JDK 的 release 文件读主版本（1.8 → 8）；读不出返回 null。</summary>
+    internal static int? JavaVersion(string javaExecutable)
+    {
+        try
         {
-            var candidate = Path.Combine(directory.Trim(), executable);
-            if (File.Exists(candidate)) return candidate;
+            var resolved = new FileInfo(javaExecutable).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? javaExecutable;
+            var release = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(resolved)))!, "release");
+            if (!File.Exists(release)) return null;
+            foreach (var line in File.ReadLines(release))
+            {
+                if (!line.StartsWith("JAVA_VERSION=", StringComparison.Ordinal)) continue;
+                var parts = line["JAVA_VERSION=".Length..].Trim('"').Split('.', '_', '-', '+');
+                if (!int.TryParse(parts[0], out var major)) return null;
+                return major == 1 && parts.Length > 1 && int.TryParse(parts[1], out var legacy) ? legacy : major;
+            }
         }
-        var home = Environment.GetEnvironmentVariable("JAVA_HOME");
-        if (!string.IsNullOrWhiteSpace(home))
-        {
-            var candidate = Path.Combine(home, "bin", executable);
-            if (File.Exists(candidate)) return candidate;
-        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
         return null;
+    }
+
+    /// <summary>macOS 上满足最低版本的已安装 JDK（/usr/libexec/java_home -v 17+）；没有则 null。</summary>
+    private static string? MacJavaHome()
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/usr/libexec/java_home", ["-v", $"{MinimumJavaVersion}+"])
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false });
+            if (process is null) return null;
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            if (!process.WaitForExit(5000)) { process.Kill(); return null; }
+            return process.ExitCode == 0 && Directory.Exists(output) ? output : null;
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException or IOException) { return null; }
     }
 
     /// <summary>宿主 JAR：优先环境变量，其次随包目录；找不到返回 null。</summary>

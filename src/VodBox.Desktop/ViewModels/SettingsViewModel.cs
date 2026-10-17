@@ -555,8 +555,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void OpenMediaInbox()
     {
+        // 遥控端上传的媒体落在收件箱目录：直接用系统「打开文件」对话框从该目录开始选，不再有自绘的文件浏览页。
         var directory=Path.Combine(_services.DataDir,"media-inbox");Directory.CreateDirectory(directory);
-        _main.Files.Navigate(directory);_main.Navigate(AppPage.Files);
+        _main.RequestOpenFile(directory);
     }
 
     [RelayCommand]
@@ -652,95 +653,4 @@ public sealed class ConfigHistoryEntry
     public string Name { get; init; } = "";
     public string Url { get; init; } = "";
     public bool Current { get; set; }
-}
-
-/// <summary>本地文件：目录浏览 + 直接播放。</summary>
-public sealed partial class FilesViewModel : ObservableObject
-{
-    private readonly AppServices _services;
-
-    public ObservableCollection<FileEntry> Entries { get; } = [];
-
-    [ObservableProperty] private string _currentPath = "";
-    [ObservableProperty] private string _status = "";
-
-    /// <summary>designTime=true：不枚举真实文件系统，停在空根目录（预览器加载快且无副作用）。</summary>
-    public FilesViewModel(AppServices services, bool designTime = false)
-    {
-        _services = services;
-        if (!designTime)
-            Navigate(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        else
-            Navigate("");
-    }
-
-    public void Navigate(string path)
-    {
-        try
-        {
-            CurrentPath = path;
-            Entries.Clear();
-            var directory = new DirectoryInfo(path);
-            if (directory.Parent is not null)
-                Entries.Add(new FileEntry { Name = "..", FullPath = directory.Parent.FullName, IsDirectory = true });
-            foreach (var dir in directory.GetDirectories().OrderBy(d => d.Name))
-                Entries.Add(new FileEntry { Name = dir.Name, FullPath = dir.FullName, IsDirectory = true });
-            foreach (var file in directory.GetFiles().OrderBy(f => f.Name))
-            {
-                // 扩展名清单集中在 LocalMedia：新增格式不会再出现“列表看得见、右键却没有”的错位。
-                if (VodBox.Infrastructure.LocalMedia.Classify(file.FullName) is VodBox.Infrastructure.LocalFileKind.Playlist
-                    or VodBox.Infrastructure.LocalFileKind.Media)
-                    Entries.Add(new FileEntry { Name = file.Name, FullPath = file.FullName, IsDirectory = false });
-            }
-            Status = $"{Entries.Count} 项";
-        }
-        catch (Exception error)
-        {
-            Status = error.Message;
-        }
-    }
-
-    [RelayCommand]
-    public void Open(FileEntry entry)
-    {
-        if (entry.IsDirectory)
-        {
-            Navigate(entry.FullPath);
-            return;
-        }
-        // 播放列表当作直播源打开，其余媒体交给播放器。
-        Play(entry);
-    }
-
-    /// <summary>该条目能否作为直播播放列表打开（m3u / m3u8）。</summary>
-    public static bool CanOpenAsLive(FileEntry entry) =>
-        !entry.IsDirectory &&
-        VodBox.Infrastructure.LocalMedia.Classify(entry.FullPath) == VodBox.Infrastructure.LocalFileKind.Playlist;
-
-    [RelayCommand]
-    public void OpenAsLive(FileEntry entry)
-    {
-        if (!CanOpenAsLive(entry)) return;
-        OpenLiveRequested?.Invoke(entry.FullPath);
-    }
-
-    /// <summary>直接交给播放器播该文件（右键“播放”用；播放列表会转成直播源）。</summary>
-    public void Play(FileEntry entry)
-    {
-        if (entry.IsDirectory) return;
-        if (CanOpenAsLive(entry)) { OpenAsLive(entry); return; }
-        PlayRequested?.Invoke(entry);
-    }
-
-    public event Action<FileEntry>? PlayRequested;
-
-    /// <summary>请求把本地播放列表作为直播源打开（由 MainViewModel 接手加载与跳转）。</summary>
-    public event Action<string>? OpenLiveRequested;
-}
-
-public sealed class FileEntry
-{
-    public string Name { get; init; } = "";
-    public string FullPath { get; init; } = "";
-    public bool IsDirectory { get; init; }
 }

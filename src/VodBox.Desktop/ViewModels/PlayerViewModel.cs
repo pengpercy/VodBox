@@ -134,6 +134,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     public bool IsFailed => State == PlaybackState.Failed;
     /// <summary>当前会话是否直播；决定加载主文案用「连接频道」还是「加载视频」。</summary>
     public bool IsLive => _current?.IsLive ?? false;
+    /// <summary>当前是从直播频道列表发起的播放（不含单独打开的网络流）。</summary>
+    public bool IsLiveChannel => _current is { IsLive: true, SourceKey: "live" };
     /// <summary>加载块主文案（规格 §8）；<see cref="PlaybackState.Resolving"/> 与 <see cref="PlaybackState.Loading"/> 共用同一容器，只换这段文字。</summary>
     public string LoadingText => State switch
     {
@@ -357,7 +359,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         try
         {
             await _store.MarkEpisodeWatchedAsync(request.SourceKey,request.MediaId,request.LineId,request.EpisodeId);
-            await _main.RunOnUiAsync(() => _main.Detail.RefreshWatchedFor(request.SourceKey,request.MediaId,request.LineId));
+            await _main.RunOnUiAsync(() =>
+            {
+                _main.Detail.RefreshWatchedFor(request.SourceKey,request.MediaId,request.LineId);
+                _main.Search.DetailIfCreated?.RefreshWatchedFor(request.SourceKey,request.MediaId,request.LineId);
+            });
         }
         catch(Exception error) { System.Diagnostics.Debug.WriteLine($"[watched] {error.Message}"); }
     }

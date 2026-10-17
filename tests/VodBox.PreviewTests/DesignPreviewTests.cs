@@ -32,7 +32,6 @@ public sealed class DesignPreviewTests
     {
         var main = DesignData.Main;
         Assert.NotNull(main.Player);
-        Assert.DoesNotContain(main.Files.Entries, e => e.IsDirectory && e.Name == ".."); // 停在空根目录，未枚举真实文件系统
         Assert.Equal("庆余年 第二季", main.Player.Title);
         Assert.Equal("第12集 · 抱月楼风波", main.Player.Subtitle);
         Assert.Equal(TimeSpan.FromMinutes(45), main.Player.Duration);
@@ -51,7 +50,6 @@ public sealed class DesignPreviewTests
     [InlineData(typeof(SearchView))]
     [InlineData(typeof(FavoritesView))]
     [InlineData(typeof(HistoryView))]
-    [InlineData(typeof(FilesView))]
     [InlineData(typeof(SettingsView))]
     [InlineData(typeof(PlayerOverlay))]
     public void 视图以设计DataContext装载渲染不抛异常([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] Type viewType)

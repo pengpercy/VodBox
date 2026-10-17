@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="VodBox.Desktop.App"
+             Name="VodBox"
              RequestedThemeVariant="Dark">
   <Application.Resources>
     <ResourceDictionary>
@@ -10,7 +11,9 @@
         <ResourceInclude Source="avares://VodBox.Desktop/Resources/Shapes.axaml" />
       </ResourceDictionary.MergedDictionaries>
       <!-- Mica 风格设计令牌（与 HTML 设计稿对齐） -->
-      <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
+      <!-- 全局只用一种蓝：与主按钮（立即播放/搜索）同色，只用于少量指示（进度条、滑杆、选中描边、加载条）。
+           文字一律用中性的主/次/弱文字色，不再出现浅天蓝（#4CC2FF）的文字与底色。 -->
+      <SolidColorBrush x:Key="AccentBrush" Color="#0078D4" />
       <!-- 海报角标（时长/备注）文字：中性灰，压在半透明黑底上必须保持亮色，因此不跟随亮/暗主题翻转。 -->
       <SolidColorBrush x:Key="PosterBadgeTextBrush" Color="#D0D0D0" />
       <SolidColorBrush x:Key="AccentStrongBrush" Color="#0078D4" />
@@ -40,7 +43,7 @@
     <Style Selector="Slider.md /template/ Track RepeatButton">
       <Setter Property="Height" Value="4" />
       <Setter Property="CornerRadius" Value="2" />
-      <Setter Property="Background" Value="#4CC2FF" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
     <Style Selector="Slider.md /template/ Track Button">
@@ -52,7 +55,7 @@
       <Setter Property="Width" Value="14" />
       <Setter Property="Height" Value="14" />
       <Setter Property="CornerRadius" Value="7" />
-      <Setter Property="Background" Value="#4CC2FF" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderBrush" Value="#FF202020" />
       <Setter Property="BorderThickness" Value="2" />
     </Style>

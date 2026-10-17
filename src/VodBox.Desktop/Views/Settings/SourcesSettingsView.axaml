@@ -20,7 +20,6 @@
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="点播配置（TVBox JSON）" />
                 <TextBlock Classes="rowSubtitle" Text="{Binding VodConfigUrl}"
-                           Foreground="{DynamicResource AccentBrush}"
                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="420" />
               </StackPanel>
               <Button Grid.Column="2" Classes="primary" Content="更改配置…" Margin="24,0,0,0"
@@ -66,7 +65,7 @@
                     <Border CornerRadius="5" Padding="6,1" Background="{DynamicResource CardHoverBrush}"
                             VerticalAlignment="Center">
                       <TextBlock Text="{Binding Runtime}" FontSize="10.5"
-                                 Foreground="{DynamicResource AccentBrush}" />
+                                 Foreground="{DynamicResource TextSecondaryBrush}" />
                     </Border>
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
@@ -172,7 +171,7 @@
                       <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
                       <Border CornerRadius="5" Padding="6,1" Background="{DynamicResource CardHoverBrush}"
                               VerticalAlignment="Center" IsVisible="{Binding Current}">
-                        <TextBlock Text="当前" FontSize="10.5" Foreground="{DynamicResource AccentBrush}" />
+                        <TextBlock Text="当前" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
                       </Border>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"

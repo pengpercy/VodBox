@@ -28,6 +28,7 @@ public partial class MainWindow : Window
             {
                 main.SettingsRequested -= ShowSettingsWindow;
                 main.SearchRequested -= OnSearchRequested;
+                main.OpenFileRequested -= OnOpenFileRequested;
             }
             StopObservingPlayer();
         };
@@ -50,19 +51,39 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
         if (DataContext is not MainViewModel main) return;
-        var (intent, path) = DroppedFiles.Classify(DroppedPaths(e));
+        var paths = DroppedPaths(e);
+        var (intent, path) = DroppedFiles.Classify(paths);
         VodBox.Core.VodBoxLog.Event("drop", "files", ("intent", intent.ToString()), ("path", path));
-        switch (intent)
+        if (!await main.OpenLocalFilesAsync(paths)) main.StatusMessage = "请拖入 .m3u/.m3u8 直播播放列表或媒体文件";
+    }
+
+    /// <summary>系统「打开文件」对话框：只列可播放的媒体与 m3u 播放列表；选中后与拖放走同一条打开路径。</summary>
+    private async void OnOpenFileRequested(string? startDirectory)
+    {
+        if (DataContext is not MainViewModel main || !StorageProvider.CanOpen) return;
+        try
         {
-            case DroppedIntent.PlayLive:
-                await main.OpenLivePlaylistAsync(path);
-                break;
-            case DroppedIntent.PlayMedia:
-                main.PlayLocalFile(path);
-                break;
-            default:
-                main.StatusMessage = "请拖入 .m3u/.m3u8 直播播放列表或媒体文件";
-                break;
+            static string[] Patterns(IEnumerable<string> extensions) => extensions.Select(extension => "*" + extension).ToArray();
+            var options = new FilePickerOpenOptions
+            {
+                Title = "打开文件",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("视频、音频与直播播放列表") { Patterns = Patterns(LocalMedia.MediaExtensions.Concat(LocalMedia.PlaylistExtensions)) },
+                    new FilePickerFileType("直播播放列表（m3u）") { Patterns = Patterns(LocalMedia.PlaylistExtensions) },
+                    FilePickerFileTypes.All,
+                ],
+            };
+            if (startDirectory is not null) options.SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(startDirectory);
+            var files = await StorageProvider.OpenFilePickerAsync(options);
+            if (files.Count == 0) return;
+            await main.OpenLocalFilesAsync(files.Select(file => file.TryGetLocalPath()));
+        }
+        catch (Exception error)
+        {
+            VodBox.Core.VodBoxLog.Error("local", "打开文件失败", error);
+            main.StatusMessage = $"打开文件失败：{error.Message}";
         }
     }
 
@@ -116,6 +137,7 @@ public partial class MainWindow : Window
             _observedPlayer.PropertyChanged += OnPlayerVisibilityChanged;
             playerOwner.SettingsRequested += ShowSettingsWindow;
             playerOwner.SearchRequested += OnSearchRequested;
+            playerOwner.OpenFileRequested += OnOpenFileRequested;
             SyncPlayerWindow();
         }
         if (DataContext is MainViewModel vm && Avalonia.Application.Current is App)
@@ -124,25 +146,67 @@ public partial class MainWindow : Window
             // 启动时若有历史配置则自动加载
             Loaded += async (_, _) =>
             {
+                // 直播源（多为本地 m3u）与点播配置互不依赖，并行加载。
+                var live = App.Services.CurrentLiveConfig is { Length: > 0 } ? vm.Live.LoadAsync() : Task.CompletedTask;
                 if (App.Services.CurrentVodConfig is { Length: > 0 } url)
-                {
-                    try
-                    {
-                        await App.Services.Registry.LoadConfigAsync(url);
-                        vm.UpdateSourceName();
-                        await vm.Home.LoadAsync();
-                    }
-                    catch
-                    {
-                        vm.StatusMessage = "上次配置加载失败，请到设置中重新配置";
-                    }
-                }
-                if (App.Services.CurrentLiveConfig is { Length: > 0 })
-                {
-                    await vm.Live.LoadAsync();
-                }
+                    await LoadStartupConfigAsync(vm, url);
+                await live;
             };
         }
+    }
+
+    /// <summary>
+    /// 冷启动加载点播配置：首页立即进入加载态；有本地副本时先用副本出首页，再后台向网络刷新，
+    /// 只有配置确实变了才重建源并重载首页。没有副本（首次使用）才等网络。
+    /// </summary>
+    private static async Task LoadStartupConfigAsync(MainViewModel vm, string url)
+    {
+        var registry = App.Services.Registry;
+        vm.Home.BeginStartupLoading();
+        try
+        {
+            if (await registry.TryLoadCachedConfigAsync(url))
+            {
+                vm.UpdateSourceName();
+                var home = vm.Home.LoadAsync();
+                await RefreshStartupConfigAsync(vm, url);
+                await home;
+                return;
+            }
+            await registry.LoadConfigAsync(url);
+            vm.UpdateSourceName();
+            await vm.Home.LoadAsync();
+        }
+        catch (Exception error)
+        {
+            VodBox.Core.VodBoxLog.Error("config", "启动加载配置失败", error);
+            vm.Home.CancelStartupLoading();
+            vm.StatusMessage = "上次配置加载失败，请到设置中重新配置";
+        }
+    }
+
+    private static async Task RefreshStartupConfigAsync(MainViewModel vm, string url)
+    {
+        try
+        {
+            if (!await App.Services.Registry.RefreshConfigAsync(url)) return;
+            VodBox.Core.VodBoxLog.Info("config", "远程配置已更新，重载首页");
+            vm.UpdateSourceName();
+            await vm.Home.LoadAsync();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception error)
+        {
+            VodBox.Core.VodBoxLog.Warn("config", $"后台刷新配置失败，继续使用本地副本：{error.Message}");
+        }
+    }
+
+    /// <summary>菜单栏「文件 › 搜索…」（⌘F）：把焦点放到侧栏顶部的全站搜索框。</summary>
+    internal void FocusGlobalSearch()
+    {
+        if (this.FindControl<TextBox>("GlobalSearch") is not { } box) return;
+        box.Focus();
+        box.SelectAll();
     }
 
     /// <summary>把播放窗口提到最前：先还原最小化，再激活（不改变用户的置顶选择）。</summary>
@@ -215,6 +279,7 @@ public partial class MainWindow : Window
             return;
         }
         var window = new Views.SettingsWindow(main.Settings);
+        MacMenus.Attach(window, main);
         _settingsWindow = window;
         window.Closed += (_, _) => { if (ReferenceEquals(_settingsWindow, window)) _settingsWindow = null; };
         // 非模态、不设 Owner：与播放窗口一致，主窗口仍可独立操作。
@@ -234,6 +299,7 @@ public partial class MainWindow : Window
         }
         VodBox.Core.VodBoxLog.Info("player", $"创建独立播放窗口：{main.Player.Title}");
         var player = new Views.PlayerWindow { DataContext = main, Topmost = main.Player.AlwaysOnTop };
+        MacMenus.Attach(player, main);
         PlaybackWindow = player;
         player.Closed += (_, _) => { if (ReferenceEquals(PlaybackWindow, player)) PlaybackWindow = null; };
         // Non-modal and unowned: the main/detail window remains independently interactive.

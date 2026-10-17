@@ -87,14 +87,14 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
         }
         // 持续排空 stdout/stderr：管道写满会让宿主阻塞在打印上，看起来像卡死。
         _ = DrainAsync(_process.StandardOutput);
-        _ = DrainAsync(_process.StandardError);
+        _ = DrainErrorsAsync(_process.StandardError);
 
         var deadline = DateTime.UtcNow + _settings.StartupTimeout;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
             if (File.Exists(readyPath)) return await ReadEnvelopeAsync(readyPath, ct).ConfigureAwait(false);
-            if (!IsRunning) throw new JarPluginException(JarPluginErrors.HostExited, JarPluginFailureKind.Temporary, "插件宿主在就绪前退出。");
+            if (!IsRunning) throw new JarPluginException(JarPluginErrors.HostExited, JarPluginFailureKind.Temporary, "插件宿主在就绪前退出。" + ErrorTail());
             if (DateTime.UtcNow >= deadline)
                 throw new JarPluginException(JarPluginErrors.HostTimeout, JarPluginFailureKind.Temporary, $"插件宿主在 {_settings.StartupTimeout.TotalSeconds:0}s 内未就绪。");
             await Task.Delay(_pollInterval, ct).ConfigureAwait(false);
@@ -235,6 +235,34 @@ public sealed class JarPluginProcessChannel : IJarPluginHostChannel
             while (await reader.ReadAsync(buffer).ConfigureAwait(false) > 0) { /* 仅排空，保持管道畅通。 */ }
         }
         catch (Exception) { /* 进程结束时管道关闭属正常。 */ }
+    }
+
+    // stderr 仍然持续排空，但保留最后几行：宿主在就绪前退出时（如 Java 版本过旧、类路径缺失）这是唯一的原因线索。
+    private const int ErrorTailLines = 8;
+    private readonly Queue<string> _errorTail = new();
+
+    private async Task DrainErrorsAsync(StreamReader reader)
+    {
+        try
+        {
+            while (await reader.ReadLineAsync().ConfigureAwait(false) is { } line)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                lock (_errorTail)
+                {
+                    _errorTail.Enqueue(line.Length > 300 ? line[..300] : line);
+                    while (_errorTail.Count > ErrorTailLines) _errorTail.Dequeue();
+                }
+            }
+        }
+        catch (Exception) { /* 进程结束时管道关闭属正常。 */ }
+    }
+
+    private string ErrorTail()
+    {
+        // 进程刚退出时 stderr 可能还没读完，稍等管道排空再取。
+        Thread.Sleep(100);
+        lock (_errorTail) return _errorTail.Count == 0 ? "" : " 宿主输出：" + string.Join(" | ", _errorTail);
     }
 
     private static void TryDelete(string path)
