@@ -69,6 +69,11 @@ public static class NativeSpiders
             ["csp_Dm84Guard"] = new(info => new Dm84Source(info)),
             ["csp_Kanqiu"] = new(info => new KanqiuSource(info)),
             ["csp_KanqiuGuard"] = new(info => new KanqiuSource(info)),
+            ["csp_Wwys"] = new(info => new WwysSource(info), WwysSource.Supports),
+            ["csp_AppV6"] = new(info => new AppV6Source(info), AppV6Source.Supports),
+            ["csp_TingBook"] = new(info => new TingBookSource(info), TingBookSource.Supports),
+            ["csp_HeMa"] = new(info => new HeMaSource(info), HeMaSource.Supports),
+            ["csp_Feiyu"] = new(info => new FeiyuSource(info), FeiyuSource.Supports),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>

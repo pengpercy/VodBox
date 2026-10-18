@@ -255,3 +255,22 @@ loopback Range → 解码/seek」路径。
 - 删除依赖 JavaHost JDK 的 `tools/native-spiders/ProtocolOracle.java`、未被任何项目引用的 `Avalonia.Diagnostics` 包版本，
   以及 CI 中只为旧 guard 后端服务的 Windows MSYS2/MinGW 工具链步骤。
 - 发布门禁里的 Java 载荷黑名单（`verify_no_java_payload`、`release_evidence`）保留，防止旧产物被重新打包。
+
+## 第八轮：宝盒（宝盒接口.top）插件首批原生迁移（2026-10-18）
+
+本轮处理用户指定的新播放源 `https://宝盒接口.top`：抓取其运行配置（50 条目 / 34 个不同 api），
+对缺失入口按既有的「REA/反编译 → C# 重写 → 原生注册」流程推进。详尽的逐个协议、差异与在线观测见
+[宝盒首批迁移记录](native-spiders/baohe-batch1.md)。
+
+- 移入原生的 5 个入口：`csp_Wwys`（旺旺影视 HTML）、`csp_AppV6`（麦田 JSON）、`csp_TingBook`（六月有声 HTML）、
+  `csp_HeMa`（盒马短剧，经 `hema.php` 转发层）、`csp_Feiyu`（飞鱼签名 JSON）。都在 `NativeSpiders.Entries` 中带 ext 闸门。
+- 本批 5 个源均为纯 Java 实现（无 native `.so` 校验），故未使用 REA/Ghidra；`bh0822.jar` 中带 native 变体的入口
+  （AppTe/AppYd 等）留待后续批次。
+- 在线观测：`Wwys` 首页/分类/详情/播放页与播放器页链路 HTTP 200；`AppV6 /v6/nav` HTTP 200；`TingBook` 详情 200、
+  取章节接口 500（站点侧）；`Feiyu` 后端 502。`HeMa` 转发层未发起真实请求。
+- 覆盖：按该配置的 34 个 api 值，原生从 14 升到 19；仍未迁移的 19 项（含已条件覆盖的 `csp_XPath`/`csp_XBPQ`）
+  已在迁移记录中列出。
+
+验证：主测试 607/607、预览测试 265/265 通过（Release / `TreatWarningsAsErrors=true`），新增
+`NativeBaoheSourceTests` 11 项离线回归。仍属「有实现/离线通过」，复杂入口（AppTe/AppYd/AppDrama/AppXY/
+Czsapp/SaoHuo/Jianpian/Gz360/PianKu8/Tounimabi/KuKuMusic/Douban/FengYe/YunZhenXiang 等）未迁移。
