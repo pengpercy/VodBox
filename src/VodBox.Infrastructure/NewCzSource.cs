@@ -61,7 +61,7 @@ public sealed class NewCzSource : IResolvingContentSource
         if(Uri.TryCreate(site.Ext,UriKind.Absolute,out var uri)&&uri.Scheme is "http" or "https") host=site.Ext!;
         _host=HttpUri(host.TrimEnd('/')+"/");_fetch=fetch??Fetch;
     }
-    private static Regex Rx(string expression)=>new(expression,RegexOptions.Singleline|RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromSeconds(2));
+    private static Regex Rx(string expression)=>HtmlRegex.Get(expression);
     private static string Text(string value)=>WebUtility.HtmlDecode(Rx("<[^>]+>").Replace(value," ")).Trim();
     private static string Attr(string value,string key)=>WebUtility.HtmlDecode(Rx("\\b"+Regex.Escape(key)+"\\s*=\\s*([\"'])(.*?)\\1").Match(value).Groups[2].Value);
     private static string Body(string html, string tag, string css)
@@ -134,9 +134,10 @@ public sealed class NewCzSource : IResolvingContentSource
         string title=Text(Rx("<h1\\b[^>]*>(.*?)</h1>").Match(Body(html,"div","moviedteail_tt")).Groups[1].Value);
         if(title.Length==0)throw new InvalidDataException("NewCz 详情缺少片名。");
         string poster=Attr(Rx("<img\\b[^>]*>").Match(Body(html,"div","dyimg")).Value,"src");
+        string facts=Body(html,"ul","moviedteail_list");
         string Fact(string label)
         {
-            foreach(Match li in Rx("<li\\b[^>]*>(.*?)</li>").Matches(Body(html,"ul","moviedteail_list")))
+            foreach(Match li in Rx("<li\\b[^>]*>(.*?)</li>").Matches(facts))
             {string text=Text(li.Groups[1].Value);if(text.StartsWith(label,StringComparison.Ordinal))return text[(text.IndexOf('：')+1)..].Trim();}return "";
         }
         var episodes=Rx("<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>").Matches(Body(html,"div","paly_list_btn"))

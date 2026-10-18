@@ -1,10 +1,6 @@
 using System.Collections.Concurrent;
-using System.Globalization;
-using System.Net;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using MonoTorrent;
 using MonoTorrent.Client;
 
@@ -149,8 +145,9 @@ public sealed class TorrentStreamServer : IAsyncDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_engine is not null) return _engine;
             Directory.CreateDirectory(_cacheDirectory);
-            // 默认 EngineSettings 启用 DHT（bootstrap 路由）与 UPnP/NAT-PMP 端口映射。
-            _engine = new ClientEngine();
+            // 默认 EngineSettings 启用 DHT（bootstrap 路由）与 UPnP/NAT-PMP 端口映射；但其 CacheDirectory 默认是
+            // 「当前工作目录/cache」——从 Finder/开始菜单启动时那是 / 或只读的安装目录，DHT/fast-resume 缓存会写错地方。
+            _engine = new ClientEngine(new EngineSettingsBuilder { CacheDirectory = Path.Combine(_cacheDirectory, "engine") }.ToSettings());
             return _engine;
         }
         finally { _lifecycle.Release(); }
@@ -163,18 +160,7 @@ public sealed class TorrentStreamServer : IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_app is not null) return;
-            var builder = WebApplication.CreateSlimBuilder();
-            builder.Logging.ClearProviders();
-            builder.WebHost.UseKestrel(options => options.Listen(IPAddress.Loopback, 0));
-            var app = builder.Build();
-            app.MapMethods("/torrent/{id}.{ext}", ["GET", "HEAD"], ServeAsync);
-            try
-            {
-                await app.StartAsync(ct).ConfigureAwait(false);
-                _address = app.Urls.Single();
-                _app = app;
-            }
-            catch { await app.DisposeAsync().ConfigureAwait(false); throw; }
+            (_app, _address) = await LoopbackRangeServer.StartAsync("/torrent/{id}.{ext}", ServeAsync, ct).ConfigureAwait(false);
         }
         finally { _lifecycle.Release(); }
     }
@@ -197,25 +183,17 @@ public sealed class TorrentStreamServer : IAsyncDisposable
 
     private async Task ServeAsync(HttpContext context)
     {
-        if (!IPAddress.IsLoopback(context.Connection.RemoteIpAddress ?? IPAddress.None) || _address is null ||
-            !Uri.TryCreate(_address, UriKind.Absolute, out var local) ||
-            !string.Equals(context.Request.Host.Value, local.Authority, StringComparison.OrdinalIgnoreCase))
+        if (!LoopbackRangeServer.IsLocalRequest(context, _address))
         { context.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
         var id = context.Request.RouteValues["id"]?.ToString() ?? "";
         if (!_sessions.TryGetValue(id, out var session) || session.Expires <= DateTimeOffset.UtcNow)
-        { _sessions.TryRemove(id, out _); context.Response.StatusCode = StatusCodes.Status404NotFound; return; }
-        long total = session.File.Length, start = 0, end = total - 1;
-        bool ranged = context.Request.Headers.TryGetValue("Range", out var range);
-        if (ranged && !ParseRange(range.ToString(), total, out start, out end))
-        { context.Response.StatusCode = StatusCodes.Status416RangeNotSatisfiable; context.Response.Headers.ContentRange = "bytes */" + total; return; }
+        {
+            // 过期会话必须停掉：只从字典摘掉会让它的 swarm 在后台继续下载，直到下次注册或退出。
+            if (_sessions.TryRemove(id, out var expired)) await StopSessionAsync(expired).ConfigureAwait(false);
+            context.Response.StatusCode = StatusCodes.Status404NotFound; return;
+        }
         session.Expires = DateTimeOffset.UtcNow.Add(IdleLifetime);
-        context.Response.ContentType = ContentType(session.Extension);
-        context.Response.ContentLength = end - start + 1;
-        context.Response.Headers.AcceptRanges = "bytes";
-        context.Response.Headers.CacheControl = "no-store";
-        context.Response.StatusCode = ranged ? StatusCodes.Status206PartialContent : StatusCodes.Status200OK;
-        if (ranged) context.Response.Headers.ContentRange = $"bytes {start}-{end}/{total}";
-        if (HttpMethods.IsHead(context.Request.Method)) return;
+        if (!LoopbackRangeServer.BeginResponse(context, session.File.Length, ContentType(session.Extension), out long start, out long end)) return;
         try
         {
             var buffer = new byte[64 * 1024];
@@ -237,22 +215,6 @@ public sealed class TorrentStreamServer : IAsyncDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or OperationCanceledException or IOException)
         { context.Abort(); }
-    }
-
-    internal static bool ParseRange(string text, long total, out long start, out long end)
-    {
-        start = 0; end = total - 1;
-        if (total <= 0 || !text.StartsWith("bytes=", StringComparison.Ordinal) || text.Contains(',')) return false;
-        var parts = text[6..].Split('-'); if (parts.Length != 2) return false;
-        if (parts[0].Length == 0)
-        {
-            if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var suffix) || suffix <= 0) return false;
-            start = Math.Max(0, total - suffix); return true;
-        }
-        if (!long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out start) || start >= total) return false;
-        if (parts[1].Length > 0)
-        { if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out end) || end < start) return false; end = Math.Min(end, total - 1); }
-        return true;
     }
 
     private static ITorrentManagerFile? SelectFile(IList<ITorrentManagerFile> files)
@@ -290,7 +252,8 @@ public sealed class TorrentStreamServer : IAsyncDisposable
     private static async Task StopManagerAsync(ClientEngine engine, TorrentManager manager)
     {
         try { await manager.StopAsync().ConfigureAwait(false); } catch { }
-        try { await engine.RemoveAsync(manager).ConfigureAwait(false); } catch { }
+        // 串流缓存只为本次播放服务：连同已下载分片一起删除，否则每部片子的数据都会永久留在临时目录。
+        try { await engine.RemoveAsync(manager, RemoveMode.CacheDataAndDownloadedData).ConfigureAwait(false); } catch { }
     }
 
     public async ValueTask DisposeAsync()

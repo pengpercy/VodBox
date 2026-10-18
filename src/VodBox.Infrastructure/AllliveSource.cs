@@ -37,12 +37,11 @@ public sealed class AllliveSource : IResolvingContentSource
     }
     private static async Task<string> Fetch(string url,CancellationToken ct)
     {
-        using var http=new DefaultHttp(false);return DefaultHttp.Decode(await http.GetBoundedAsync(url,8*1024*1024,ct,new Dictionary<string,string>{{"sec-fetch-site","same-origin"}}));
+        return DefaultHttp.Decode(await DefaultHttp.SharedNoRedirect.GetBoundedAsync(url,8*1024*1024,ct,new Dictionary<string,string>{{"sec-fetch-site","same-origin"}}));
     }
     private static async Task<string> FetchUid(CancellationToken ct)
     {
-        using var http=new HttpClient{Timeout=TimeSpan.FromSeconds(20)};
-        using var response=await http.PostAsync("https://udblgn.huya.com/web/anonymousLogin",new StringContent("{\"appId\":5002,\"byPass\":3,\"context\":\"\",\"version\":\"2.4\",\"data\":{}}",Encoding.UTF8,"application/json"),ct);
+        using var response=await DefaultHttp.PlainClient.PostAsync("https://udblgn.huya.com/web/anonymousLogin",new StringContent("{\"appId\":5002,\"byPass\":3,\"context\":\"\",\"version\":\"2.4\",\"data\":{}}",Encoding.UTF8,"application/json"),ct);
         response.EnsureSuccessStatusCode();await using var stream=await response.Content.ReadAsStreamAsync(ct);
         using var doc=JsonDocument.Parse(await BoundedContent.ReadAsync(stream,1024*1024,ct));return Text(doc.RootElement.GetProperty("data"),"uid");
     }

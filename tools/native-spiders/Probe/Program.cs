@@ -59,7 +59,8 @@ if (args[0] == "torrent")
     Directory.CreateDirectory(seedDir);
     string seeded = Path.Combine(seedDir, Path.GetFileName(media));
     File.Copy(media, seeded, overwrite: true);
-    using var seeder = new ClientEngine();
+    // 默认 CacheDirectory 是「当前目录/cache」，会在仓库根留下 fast-resume/metadata；放进本次播种的临时目录。
+    using var seeder = new ClientEngine(new EngineSettingsBuilder { CacheDirectory = Path.Combine(seedDir, "engine") }.ToSettings());
     var torrent = Torrent.Load(await new TorrentCreator().CreateAsync(new TorrentFileSource(seeded), CancellationToken.None));
     await seeder.AddAsync(torrent, seedDir);
     await seeder.StartAllAsync();

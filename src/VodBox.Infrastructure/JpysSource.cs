@@ -49,8 +49,7 @@ public sealed class JpysSource : IResolvingContentSource
     private static async Task<string> Fetch(string url,IReadOnlyDictionary<string,string> headers,CancellationToken ct)
     {
         // 裸域会 302 到轮换后的当前域名，必须允许跟随重定向，否则拿到的是空的 302 响应体。
-        using var http=new DefaultHttp(true);
-        return DefaultHttp.Decode(await http.GetBoundedAsync(url,8*1024*1024,ct,headers));
+        return DefaultHttp.Decode(await DefaultHttp.Shared.GetBoundedAsync(url,8*1024*1024,ct,headers));
     }
     internal static string Sign(string canonical,long timestamp)
     {
@@ -73,12 +72,16 @@ public sealed class JpysSource : IResolvingContentSource
     public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult<IReadOnlyList<Category>>([new("1","电影"),new("2","电视剧"),new("4","动漫"),new("3","综艺")]);}
     public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)
     {
-        ct.ThrowIfCancellationRequested();
+        ct.ThrowIfCancellationRequested();return Task.FromResult(Filters(categoryId));
+    }
+    /// <summary>mw-movie 系的固定地区/年份筛选（Appgz 沿用同一份）。</summary>
+    internal static IReadOnlyList<FilterGroup> Filters(string categoryId)
+    {
         var areas=categoryId=="4"?new[]{"中国大陆","美国","日本","其他"}:new[]{"中国大陆","中国香港","中国台湾","美国","日本","韩国","泰国","印度","其他"};
         var years=Enumerable.Range(2020,7).Reverse().Select(y=>y.ToString(CultureInfo.InvariantCulture)).ToList();
         if(categoryId!="3"){years.AddRange(Enumerable.Range(2010,10).Reverse().Select(y=>y.ToString(CultureInfo.InvariantCulture)));years.AddRange(["2009~2000","90年代","80年代"]);}
         if(categoryId is "3" or "4")years.Add("更早");
-        return Task.FromResult<IReadOnlyList<FilterGroup>>([new("area","地区",new[]{new FilterValue("全部","")}.Concat(areas.Select(v=>new FilterValue(v,v))).ToList(),""),new("year","年份",new[]{new FilterValue("全部","")}.Concat(years.Select(v=>new FilterValue(v,v))).ToList(),"")]);
+        return [new("area","地区",new[]{new FilterValue("全部","")}.Concat(areas.Select(v=>new FilterValue(v,v))).ToList(),""),new("year","年份",new[]{new FilterValue("全部","")}.Concat(years.Select(v=>new FilterValue(v,v))).ToList(),"")];
     }
     public async Task<MediaPage> GetHomeAsync(CancellationToken ct=default){using var doc=await Request("home/hotSearch","","",ct);return new(Items(doc.RootElement.GetProperty("data")),1,1);}
     public async Task<MediaPage> GetItemsAsync(string categoryId,int page,IReadOnlyDictionary<string,string>? filters,CancellationToken ct=default)

@@ -32,8 +32,8 @@ public sealed class AppGzSource : IResolvingContentSource
     private static Dictionary<string,string> Headers()=>new(){{"User-Agent","okhttp/3.12.0"},{"Version","2603002"},{"PackageName","com.r3ac892153.q1ed27199a.wf930fc6bf20260401"},{"Ver","3.0.4.0"},{"api-ver","3.0.4.0"},{"code","GZ0001"},{"Referer",Origin}};
     private static async Task<string> Post(string url,IReadOnlyDictionary<string,string> fields,IReadOnlyDictionary<string,string> headers,CancellationToken ct)
     {
-        using var http=new HttpClient{Timeout=TimeSpan.FromSeconds(20)};using var request=new HttpRequestMessage(HttpMethod.Post,url){Content=new FormUrlEncodedContent(fields)};foreach(var pair in headers)request.Headers.TryAddWithoutValidation(pair.Key,pair.Value);
-        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);response.EnsureSuccessStatusCode();await using var stream=await response.Content.ReadAsStreamAsync(ct);return DefaultHttp.Decode(await BoundedContent.ReadAsync(stream,8*1024*1024,ct));
+        using var request=new HttpRequestMessage(HttpMethod.Post,url){Content=new FormUrlEncodedContent(fields)};foreach(var pair in headers)request.Headers.TryAddWithoutValidation(pair.Key,pair.Value);
+        using var response=await DefaultHttp.PlainClient.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);response.EnsureSuccessStatusCode();await using var stream=await response.Content.ReadAsStreamAsync(ct);return DefaultHttp.Decode(await BoundedContent.ReadAsync(stream,8*1024*1024,ct));
     }
     private async Task<JsonDocument> Raw(string path,Dictionary<string,object?> payload,string token,CancellationToken ct)=>AppGzCrypto.Unwrap(await _post(_origin+path,AppGzCrypto.Wrap(AppGzCrypto.Json(payload),token,_clock(),_key,_iv),Headers(),ct));
     private static string Text(JsonElement item,string key)=>AppRjSource.Text(item,key);
@@ -78,7 +78,7 @@ public sealed class AppGzSource : IResolvingContentSource
     }
     private static MediaItem Item(JsonElement item)=>new(){Id=Text(item,"vod_id"),Title=Text(item,"vod_name"),Poster=Text(item,"vod_pic"),Remarks=Text(item,"vod_scroe"),Year=Text(item,"vod_year"),Area=Text(item,"vod_area")};
     public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult<IReadOnlyList<Category>>([new("1","电影"),new("2","电视剧"),new("4","动漫"),new("3","综艺")]);}
-    public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)=>new JpysSource(_site with{Ext=null},(address,headers,token)=>Task.FromResult("{}"),deviceId:"00000000-0000-0000-0000-000000000000").GetFiltersAsync(categoryId,ct);
+    public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult(JpysSource.Filters(categoryId));}
     public async Task<MediaPage> GetHomeAsync(CancellationToken ct=default)
     {
         using var doc=await Request("/App/IndexList/index",new(){{"pid","1"}},ct);var items=new List<MediaItem>();

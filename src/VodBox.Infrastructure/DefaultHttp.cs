@@ -14,15 +14,34 @@ public sealed class DefaultHttp : IDisposable
     /// <summary>TVBox/okhttp 客户端 UA：饭太硬、宝盒接口等站点对桌面浏览器 UA 返回 WAF 挑战页，换此 UA 可拿到真内容。</summary>
     public const string TvBoxUserAgent = "okhttp/4.12.0";
 
+    /// <summary>
+    /// 进程级共享实例（跟随重定向 / 不跟随）：复用连接池、DNS 与 TLS 会话，避免爬虫每次请求新建 HttpClient。
+    /// 不保存 Cookie，与「每次请求一个新实例」的语义一致；需要跨请求会话 Cookie 的站点自建客户端。不得 Dispose。
+    /// </summary>
+    public static DefaultHttp Shared { get; } = new(allowRedirect: true, useCookies: false);
+
+    /// <inheritdoc cref="Shared"/>
+    public static DefaultHttp SharedNoRedirect { get; } = new(allowRedirect: false, useCookies: false);
+
+    /// <summary>
+    /// 与 <c>new HttpClient { Timeout = 20s }</c> 等价的共享裸客户端（无自动解压、跟随重定向），但不保存 Cookie。
+    /// 给自己拼 POST/表单请求的爬虫复用连接；不得 Dispose。
+    /// </summary>
+    internal static HttpClient PlainClient { get; } =
+        new(new HttpClientHandler { UseCookies = false }) { Timeout = TimeSpan.FromSeconds(20) };
+
     private readonly HttpClient _client;
 
-    public DefaultHttp(bool allowRedirect=true)
+    public DefaultHttp(bool allowRedirect=true) : this(allowRedirect, useCookies: true) { }
+
+    private DefaultHttp(bool allowRedirect, bool useCookies)
     {
         var handler = new HttpClientHandler
         {
             AutomaticDecompression = DecompressionMethods.All,
             AllowAutoRedirect = allowRedirect,
             MaxAutomaticRedirections = 5,
+            UseCookies = useCookies,
         };
         _client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
     }

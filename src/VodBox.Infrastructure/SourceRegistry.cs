@@ -113,8 +113,9 @@ public sealed class SourceRegistry : IDisposable
         _subscriptionOrigin=loaded.Origin;
         var supported=ConfigLoader.ToSources(config,_subscriptionOrigin);
         var warnings=new List<string>();
+        var registered=supported.Select(source=>source.Key).ToHashSet(StringComparer.Ordinal);
         foreach(var site in config.Sites)
-            if(!supported.Any(source=>source.Key==site.Key))
+            if(!registered.Contains(site.Key))
             {
                 // 未迁移的 csp_ 入口（Java/JAR 插件）单独说明，避免和真正无效的站点定义混在一起。
                 var reason=site.Runtime==SourceRuntime.Node

@@ -75,7 +75,7 @@ public sealed class LibvioSource : IResolvingContentSource
         }
         _host=HttpUri(host.TrimEnd('/')+"/");_fetch=fetch??Fetch;_post=post??Post;
     }
-    private static Regex Rx(string expression)=>new(expression,RegexOptions.Singleline|RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromSeconds(2));
+    private static Regex Rx(string expression)=>HtmlRegex.Get(expression);
     private static string Text(string value)=>WebUtility.HtmlDecode(Rx("<[^>]+>").Replace(value," ")).Trim();
     private static string Attr(string value,string key)=>WebUtility.HtmlDecode(Rx("\\b"+Regex.Escape(key)+"\\s*=\\s*([\"'])(.*?)\\1").Match(value).Groups[2].Value);
     private static string Body(string html, string tag, string css)
@@ -204,7 +204,7 @@ public sealed class LibvioSource : IResolvingContentSource
         string title=Text(Rx("<h1\\b[^>]*>(.*?)</h1>").Match(html).Groups[1].Value);
         if(title.Length==0) throw new InvalidDataException("Libvio 详情缺少片名。");
         string poster=Attr(Rx("<img\\b[^>]*data-original=[\"'][^\"']+[\"'][^>]*>").Match(Body(html,"div","stui-content__thumb")).Value,"data-original");
-        string Fact(string label)=>Rx(Regex.Escape(label)+"：\\s*(\\S+)").Match(Text(html)).Groups[1].Value;
+        string plain=Text(html);string Fact(string label)=>Rx(Regex.Escape(label)+"：\\s*(\\S+)").Match(plain).Groups[1].Value;
         var markers=Rx("<div\\b[^>]*class=[\"'][^\"']*\\bplaylist-panel\\b[^\"']*[\"'][^>]*>").Matches(html);
         var lines=new List<PlaybackLine>();
         for(int i=0;i<markers.Count;i++)

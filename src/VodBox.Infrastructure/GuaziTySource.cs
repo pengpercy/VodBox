@@ -31,12 +31,11 @@ public sealed class GuaziTySource : IResolvingContentSource
     }
     private static async Task<string> Post(string path, string cipher, CancellationToken ct)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         using var request = new HttpRequestMessage(HttpMethod.Post, Api + path + "?parameter=key") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["parameter"] = cipher }) };
         request.Headers.TryAddWithoutValidation("User-Agent", "okhttp/3.12.0");
         request.Headers.TryAddWithoutValidation("user-platform", "null");
         request.Headers.TryAddWithoutValidation("client-version", "3.0.1.1");
-        using var response = await client.SendAsync(request, ct); response.EnsureSuccessStatusCode();
+        using var response = await DefaultHttp.PlainClient.SendAsync(request, ct); response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
     private async Task<JsonDocument> Request(string path, string plain, CancellationToken ct)

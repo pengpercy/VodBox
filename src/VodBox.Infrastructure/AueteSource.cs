@@ -66,7 +66,8 @@ public sealed class AueteSource : IResolvingContentSource
         _host = HttpUri(host.TrimEnd('/') + "/");
         _fetch = fetch ?? Fetch;
     }
-    private static Regex Pattern(string pattern) => new(pattern, RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, MatchTimeout);
+    /// <summary>只用于固定模式（走缓存）；含 mediaId 等外部输入的模式须自行 new Regex。</summary>
+    private static Regex Pattern(string pattern) => HtmlRegex.Get(pattern);
     private static string Text(string html) => WebUtility.HtmlDecode(Pattern("<[^>]+>").Replace(html, "")).Trim();
     private static string Attribute(string html, string name) => WebUtility.HtmlDecode(Pattern("\\b" + Regex.Escape(name) + "\\s*=\\s*([\"'])(.*?)\\1").Match(html).Groups[2].Value);
     private static string ClassBody(string html, string tag, string css)
@@ -189,6 +190,7 @@ public sealed class AueteSource : IResolvingContentSource
             return "";
         }
         var lines = new List<PlaybackLine>();
+        var playPath = new Regex("^/" + Regex.Escape(mediaId) + "/play-\\d+-\\d+\\.html$", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, MatchTimeout);
         var cards = Pattern("<div\\b[^>]*(?:class=[\"'][^\"']*play-card[^\"']*[\"'][^>]*id=[\"']player_list[\"']|id=[\"']player_list[\"'][^>]*class=[\"'][^\"']*play-card[^\"']*[\"'])[^>]*>").Matches(html);
         for (int index=0; index<cards.Count; index++)
         {
@@ -198,7 +200,7 @@ public sealed class AueteSource : IResolvingContentSource
             label=label[(label.LastIndexOf('』')+1)..];
             if (!LineNames.TryGetValue(label,out var lineId)) continue;
             var episodes=Pattern("<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>").Matches(ClassBody(body,"ul","episode-list"))
-                .Where(m=>Pattern("^/"+Regex.Escape(mediaId)+"/play-\\d+-\\d+\\.html$").IsMatch(m.Groups[1].Value))
+                .Where(m=>playPath.IsMatch(m.Groups[1].Value))
                 .Select(m=>new Episode(lineId+'\u0001'+m.Groups[1].Value,Text(m.Groups[2].Value))).ToArray();
             if (episodes.Length>0) lines.Add(new(lineId,label,episodes));
         }

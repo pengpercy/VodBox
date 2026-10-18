@@ -32,7 +32,7 @@ public sealed class YCyzSource : IResolvingContentSource
         try {using var json=JsonDocument.Parse(FtyExtCodec.JsonConfig(ext));return json.RootElement.ValueKind==JsonValueKind.Object&&!json.RootElement.EnumerateObject().Any();}
         catch(Exception e) when(e is JsonException or InvalidDataException or FormatException) {return false;}
     }
-    private static Regex Rx(string pattern)=>new(pattern,RegexOptions.Singleline|RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromSeconds(2));
+    private static Regex Rx(string pattern)=>HtmlRegex.Get(pattern);
     private static string Text(string html)=>WebUtility.HtmlDecode(Rx("<[^>]+>").Replace(html," ")).Trim();
     private static string Attr(string html,string name)=>WebUtility.HtmlDecode(Rx("\\b"+Regex.Escape(name)+"\\s*=\\s*([\"'])(.*?)\\1").Match(html).Groups[2].Value);
     private static IEnumerable<string> Bodies(string html,string tag,string css)
@@ -103,9 +103,10 @@ public sealed class YCyzSource : IResolvingContentSource
     public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
     {
         ValidateId(mediaId);string html=await _fetch(Url(mediaId),ct).ConfigureAwait(false);
+        string facts=Body(html,"div","info-list");
         string Fact(string label)
         {
-            foreach(string item in Bodies(Body(html,"div","info-list"),"div","info-item"))
+            foreach(string item in Bodies(facts,"div","info-item"))
             {
                 string heading=Text(Body(item,"span","info-label"));if(!heading.Contains(label,StringComparison.Ordinal))continue;
                 return string.Join('/',Rx("<a\\b[^>]*>(.*?)</a>").Matches(item).Select(m=>Text(m.Groups[1].Value)));

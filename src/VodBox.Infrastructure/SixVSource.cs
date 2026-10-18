@@ -236,8 +236,7 @@ public sealed partial class SixVSource : IResolvingContentSource
     private static void RequireCategory(string id) { if (!Categories.Any(c => c.Id == id)) throw new InvalidDataException("SixV 分类无效。"); }
     private static void RequirePage(int page) { if (page is < 1 or > 1000) throw new InvalidDataException("SixV 页码无效。"); }
 
-    private static Regex Rx(string expression) =>
-        new(expression, RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+    private static Regex Rx(string expression) => HtmlRegex.Get(expression);
 
     private static string Text(string value) => WebUtility.HtmlDecode(Tags().Replace(value, " ")).Trim();
     private static string Attr(string text, string key) =>

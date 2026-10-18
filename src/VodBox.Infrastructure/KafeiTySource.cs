@@ -15,7 +15,7 @@ public sealed class KafeiTySource : IResolvingContentSource
     internal KafeiTySource(SourceInfo site, Func<string, CancellationToken, Task<string>>? get)
     { _site = site; _get = get ?? Get; }
     private static async Task<string> Get(string url, CancellationToken ct)
-    { using var http = new DefaultHttp(); return DefaultHttp.Decode(await http.GetBoundedAsync(url, 4 * 1024 * 1024, ct)); }
+    { return DefaultHttp.Decode(await DefaultHttp.Shared.GetBoundedAsync(url, 4 * 1024 * 1024, ct)); }
     private async Task<JsonDocument> Request(string path, CancellationToken ct)
     { using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(20)); return JsonDocument.Parse(await _get(Host + path, timeout.Token)); }
     private static string Text(JsonElement item, string key) => AppRjSource.Text(item, key);

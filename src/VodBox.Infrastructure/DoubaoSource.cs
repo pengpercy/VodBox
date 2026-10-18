@@ -23,7 +23,7 @@ public sealed class DoubaoSource : IResolvingContentSource
     }
     internal static bool Supports(string? ext)=>string.IsNullOrWhiteSpace(ext)||(Uri.TryCreate(ext,UriKind.Absolute,out var uri)&&(uri.Scheme is "http" or "https")&&uri.UserInfo.Length==0&&uri.Query.Length==0&&uri.Fragment.Length==0);
     private static Dictionary<string,string> Headers()=>new(){{"User-Agent",Agent},{"Accept","application/json"},{"Accept-Language","zh-CN"}};
-    private static async Task<string> Fetch(string url,IReadOnlyDictionary<string,string> headers,CancellationToken ct){using var http=new DefaultHttp(false);return DefaultHttp.Decode(await http.GetBoundedAsync(url,8*1024*1024,ct,headers));}
+    private static async Task<string> Fetch(string url,IReadOnlyDictionary<string,string> headers,CancellationToken ct){return DefaultHttp.Decode(await DefaultHttp.SharedNoRedirect.GetBoundedAsync(url,8*1024*1024,ct,headers));}
     private async Task<JsonDocument> Request(string path,CancellationToken ct)=>JsonDocument.Parse(await _fetch(_origin+path,Headers(),ct));
     private static string Text(JsonElement value,string key)=>AppRjSource.Text(value,key);
     private static int Number(JsonElement value,string key,int fallback=0)=>int.TryParse(Text(value,key),out var number)?number:fallback;

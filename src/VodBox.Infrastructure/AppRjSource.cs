@@ -29,8 +29,7 @@ public sealed class AppRjSource : IResolvingContentSource
         _post = post ?? PostAsync;
         _parseFetch = parseFetch ?? (async (address, token) =>
         {
-            using var http = new DefaultHttp(false);
-            return DefaultHttp.Decode(await http.GetBoundedAsync(address, 2 * 1024 * 1024, token));
+            return DefaultHttp.Decode(await DefaultHttp.SharedNoRedirect.GetBoundedAsync(address, 2 * 1024 * 1024, token));
         });
         _clock = clock ?? (() => DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }

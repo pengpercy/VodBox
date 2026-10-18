@@ -7,7 +7,7 @@ namespace VodBox.Infrastructure;
 ///
 /// 两类映射：
 /// 1. 按 <c>csp_*</c> api 名登记已重写入口；部分协议还要核对 ext 形态。
-///    未适配定义由 ConfigLoader 根据策略过滤或交给现有 JAR 宿主；
+///    未适配定义由 ConfigLoader 过滤，并由 SourceRegistry 逐项报告；
 /// 2. 按站点 key——部分高频站点（虎牙/斗鱼/兔小贝）在真实配置里以 .js 入口出现，
 ///    本应有 QuickJS 宿主（S3a），但旧代码已有经真机 AOT 验证的原生 C# 实现，
 ///    按「先易后难」直接复用，比先搭 JS 宿主收益大。
@@ -15,54 +15,60 @@ namespace VodBox.Infrastructure;
 /// </summary>
 public static class NativeSpiders
 {
-    /// <summary>已实现的 csp_ 入口 → 工厂。键为 api 名精确匹配（Guard 变体需单独登记）。</summary>
-    private static readonly Dictionary<string, Func<SourceInfo, IContentSource>> Factories =
+    /// <summary>
+    /// 一个已重写的 csp_ 入口：工厂 + 可选 ext 形态闸门。闸门非空时，只有 ext 被接受才提升为原生，
+    /// 避免只凭 api 名把未验证的配置变体当成可运行。
+    /// </summary>
+    private sealed record Entry(Func<SourceInfo, IContentSource> Create, Func<string?, bool>? AcceptsExt = null);
+
+    /// <summary>已实现的 csp_ 入口。键为 api 名精确匹配（Guard 变体需单独登记）。</summary>
+    private static readonly Dictionary<string, Entry> Entries =
         new(StringComparer.Ordinal)
         {
-            ["csp_Bili"] = info => new BilibiliSource(info),
-            ["csp_BiliGuard"] = info => new BilibiliSource(info),
-            ["csp_FirstAid"] = info => new FirstAidSource(info),
-            ["csp_FirstAidGuard"] = info => new FirstAidSource(info),
-            ["csp_YGP"] = info => new TrailerSource(info),
-            ["csp_YGPGuard"] = info => new TrailerSource(info),
-            ["csp_Huya"] = info => new HuyaSource(info),
-            ["csp_AppGet"] = info => new AppGetSource(info),
-            ["csp_App99"] = info => new App99Source(info),
-            ["csp_App99Guard"] = info => new App99Source(info),
-            ["csp_T4Guard"] = info => new FtyT4Source(info),
-            ["csp_AppTTGuard"] = info => new AppTtSource(info),
-            ["csp_AppSxGuard"] = info => new AppSxSource(info),
-            ["csp_LiveGzGuard"] = info => new LiveGzSource(info),
-            ["csp_Tingshu275Guard"] = info => new Tingshu275Source(info),
-            ["csp_AueteGuard"] = info => new AueteSource(info),
-            ["csp_LibvioGuard"] = info => new LibvioSource(info),
-            ["csp_NewCzGuard"] = info => new NewCzSource(info),
-            ["csp_YCyzGuard"] = info => new YCyzSource(info),
-            ["csp_JPJGuard"] = info => new JPJSource(info),
-            ["csp_JpysGuard"] = info => new JpysSource(info),
-            ["csp_Jpys"] = info => new JpysSource(info),
-            ["csp_AllliveGuard"] = info => new AllliveSource(info),
-            ["csp_MusicGuard"] = info => new MusicSource(info),
-            ["csp_NmyswvGuard"] = info => new NmyswvSource(info),
-            ["csp_DoubaoGuard"] = info => new DoubaoSource(info),
-            ["csp_AppgzGuard"] = info => new AppGzSource(info),
-            ["csp_AiDjGuard"] = info => new AiDjSource(info),
-            ["csp_XPathGuard"] = info => new XPathGuardNoticeSource(info),
-            ["csp_DouDouGuard"] = info => new DouDouNavigationSource(info),
-            ["csp_SixVGuard"] = info => new SixVSource(info),
-            ["csp_Push"] = info => new PushSource(info),
-            ["csp_AppRJ"] = info => new AppRjSource(info),
-            ["csp_QiutongTY"] = info => new QiutongTySource(info),
-            ["csp_QingtingFM"] = info => new QingtingFmSource(info),
-            ["csp_KafeiTY"] = info => new KafeiTySource(info),
-            ["csp_GuaziTY"] = info => new GuaziTySource(info),
-            ["csp_919TY"] = info => new Sports919Source(info),
-            ["csp_Bttwoo"] = info => new BttwooSource(info),
-            ["csp_BttwooGuard"] = info => new BttwooSource(info),
-            ["csp_Dm84"] = info => new Dm84Source(info),
-            ["csp_Dm84Guard"] = info => new Dm84Source(info),
-            ["csp_Kanqiu"] = info => new KanqiuSource(info),
-            ["csp_KanqiuGuard"] = info => new KanqiuSource(info),
+            ["csp_Bili"] = new(info => new BilibiliSource(info)),
+            ["csp_BiliGuard"] = new(info => new BilibiliSource(info)),
+            ["csp_FirstAid"] = new(info => new FirstAidSource(info)),
+            ["csp_FirstAidGuard"] = new(info => new FirstAidSource(info)),
+            ["csp_YGP"] = new(info => new TrailerSource(info)),
+            ["csp_YGPGuard"] = new(info => new TrailerSource(info)),
+            ["csp_Huya"] = new(info => new HuyaSource(info)),
+            ["csp_AppGet"] = new(info => new AppGetSource(info)),
+            ["csp_App99"] = new(info => new App99Source(info)),
+            ["csp_App99Guard"] = new(info => new App99Source(info), App99Source.SupportsGuard),
+            ["csp_T4Guard"] = new(info => new FtyT4Source(info), FtyT4Source.Supports),
+            ["csp_AppTTGuard"] = new(info => new AppTtSource(info), AppTtSource.Supports),
+            ["csp_AppSxGuard"] = new(info => new AppSxSource(info), AppSxSource.Supports),
+            ["csp_LiveGzGuard"] = new(info => new LiveGzSource(info), LiveGzSource.Supports),
+            ["csp_Tingshu275Guard"] = new(info => new Tingshu275Source(info), Tingshu275Source.Supports),
+            ["csp_AueteGuard"] = new(info => new AueteSource(info), AueteSource.Supports),
+            ["csp_LibvioGuard"] = new(info => new LibvioSource(info), LibvioSource.Supports),
+            ["csp_NewCzGuard"] = new(info => new NewCzSource(info), NewCzSource.Supports),
+            ["csp_YCyzGuard"] = new(info => new YCyzSource(info), YCyzSource.Supports),
+            ["csp_JPJGuard"] = new(info => new JPJSource(info), JPJSource.Supports),
+            ["csp_JpysGuard"] = new(info => new JpysSource(info), JpysSource.Supports),
+            ["csp_Jpys"] = new(info => new JpysSource(info), JpysSource.Supports),
+            ["csp_AllliveGuard"] = new(info => new AllliveSource(info), AllliveSource.Supports),
+            ["csp_MusicGuard"] = new(info => new MusicSource(info), MusicSource.Supports),
+            ["csp_NmyswvGuard"] = new(info => new NmyswvSource(info), NmyswvSource.Supports),
+            ["csp_DoubaoGuard"] = new(info => new DoubaoSource(info), DoubaoSource.Supports),
+            ["csp_AppgzGuard"] = new(info => new AppGzSource(info), AppGzSource.Supports),
+            ["csp_AiDjGuard"] = new(info => new AiDjSource(info), AiDjSource.Supports),
+            ["csp_XPathGuard"] = new(info => new XPathGuardNoticeSource(info), XPathGuardNoticeSource.Supports),
+            ["csp_DouDouGuard"] = new(info => new DouDouNavigationSource(info), DouDouNavigationSource.Supports),
+            ["csp_SixVGuard"] = new(info => new SixVSource(info), SixVSource.Supports),
+            ["csp_Push"] = new(info => new PushSource(info)),
+            ["csp_AppRJ"] = new(info => new AppRjSource(info)),
+            ["csp_QiutongTY"] = new(info => new QiutongTySource(info)),
+            ["csp_QingtingFM"] = new(info => new QingtingFmSource(info)),
+            ["csp_KafeiTY"] = new(info => new KafeiTySource(info)),
+            ["csp_GuaziTY"] = new(info => new GuaziTySource(info)),
+            ["csp_919TY"] = new(info => new Sports919Source(info)),
+            ["csp_Bttwoo"] = new(info => new BttwooSource(info)),
+            ["csp_BttwooGuard"] = new(info => new BttwooSource(info)),
+            ["csp_Dm84"] = new(info => new Dm84Source(info)),
+            ["csp_Dm84Guard"] = new(info => new Dm84Source(info)),
+            ["csp_Kanqiu"] = new(info => new KanqiuSource(info)),
+            ["csp_KanqiuGuard"] = new(info => new KanqiuSource(info)),
         };
 
     /// <summary>按站点 key 的原生实现（真实配置里以 .js 入口出现的高频站点）。</summary>
@@ -78,34 +84,14 @@ public static class NativeSpiders
     public static bool IsSupported(string api) => TryGetFactory(api, out _);
 
     /// <summary>有限规则适配按定义检查，不能把特定音频站支持扩大成通用 XBPQ。</summary>
-    public static bool IsSupported(TvBoxSite site) => site.Api.Trim() switch
+    public static bool IsSupported(TvBoxSite site)
     {
-        "csp_App99Guard" => App99Source.SupportsGuard(Ext(site)),
-        "csp_T4Guard" => FtyT4Source.Supports(Ext(site)),
-        "csp_AppTTGuard" => AppTtSource.Supports(Ext(site)),
-        "csp_AppSxGuard" => AppSxSource.Supports(Ext(site)),
-        "csp_LiveGzGuard" => LiveGzSource.Supports(Ext(site)),
-        "csp_Tingshu275Guard" => Tingshu275Source.Supports(Ext(site)),
-        "csp_AueteGuard" => AueteSource.Supports(Ext(site)),
-        "csp_LibvioGuard" => LibvioSource.Supports(Ext(site)),
-        "csp_NewCzGuard" => NewCzSource.Supports(Ext(site)),
-        "csp_YCyzGuard" => YCyzSource.Supports(Ext(site)),
-        "csp_JPJGuard" => JPJSource.Supports(Ext(site)),
-        "csp_JpysGuard" or "csp_Jpys" => JpysSource.Supports(Ext(site)),
-        "csp_AllliveGuard" => AllliveSource.Supports(Ext(site)),
-        "csp_MusicGuard" => MusicSource.Supports(Ext(site)),
-        "csp_NmyswvGuard" => NmyswvSource.Supports(Ext(site)),
-        "csp_DoubaoGuard" => DoubaoSource.Supports(Ext(site)),
-        "csp_AppgzGuard" => AppGzSource.Supports(Ext(site)),
-        "csp_AiDjGuard" => AiDjSource.Supports(Ext(site)),
-        "csp_XPathGuard" => XPathGuardNoticeSource.Supports(Ext(site)),
-        "csp_DouDouGuard" => DouDouNavigationSource.Supports(Ext(site)),
-        "csp_SixVGuard" => SixVSource.Supports(Ext(site)),
-        _ => IsSupported(site.Api) ||
-        (site.Api == "csp_XPath" && (site.Ext is null || site.Ext.Value.ValueKind == System.Text.Json.JsonValueKind.Null)) ||
-        (site.Api == "csp_AppYs" && IsAppYsRule(site.Ext is { ValueKind: System.Text.Json.JsonValueKind.String } ext ? ext.GetString() : null)) ||
-        site.Api == "csp_XBPQ" && IsAudioRule(Ext(site))
-    };
+        var api = site.Api.Trim();
+        if (Entries.TryGetValue(api, out var entry)) return entry.AcceptsExt is null || entry.AcceptsExt(Ext(site));
+        return (api == "csp_XPath" && (site.Ext is null || site.Ext.Value.ValueKind == System.Text.Json.JsonValueKind.Null)) ||
+            (api == "csp_AppYs" && IsAppYsRule(site.Ext is { ValueKind: System.Text.Json.JsonValueKind.String } ext ? ext.GetString() : null)) ||
+            (api == "csp_XBPQ" && IsAudioRule(Ext(site)));
+    }
 
     private static string? Ext(TvBoxSite site) => site.Ext is { ValueKind: System.Text.Json.JsonValueKind.String } value ? value.GetString() : site.Ext?.GetRawText();
 
@@ -134,9 +120,9 @@ public static class NativeSpiders
     /// <summary>尝试按 api 名取得工厂（区分 Guard 变体，不做家族合并）。</summary>
     public static bool TryGetFactory(string api, out Func<SourceInfo, IContentSource> factory)
     {
-        if (!string.IsNullOrWhiteSpace(api) && Factories.TryGetValue(api.Trim(), out var found))
+        if (!string.IsNullOrWhiteSpace(api) && Entries.TryGetValue(api.Trim(), out var found))
         {
-            factory = found;
+            factory = found.Create;
             return true;
         }
         factory = null!;
@@ -155,25 +141,8 @@ public static class NativeSpiders
     }
 
     /// <summary>已登记的 csp_ api 名（用于诊断/统计）。</summary>
-    public static IReadOnlyCollection<string> Registered => Factories.Keys;
+    public static IReadOnlyCollection<string> Registered => Entries.Keys;
 
     /// <summary>已登记的站点 key（用于诊断/统计）。</summary>
     public static IReadOnlyCollection<string> RegisteredKeys => KeyFactories.Keys;
-
-    /// <summary>已登记且行为依赖精确 ext 形态的 csp_ 入口（ext 不匹配时不得提升为原生）。</summary>
-    private static readonly HashSet<string> ExtGated = new(StringComparer.Ordinal)
-    {
-        "csp_App99Guard", "csp_T4Guard", "csp_AppTTGuard", "csp_AppSxGuard",
-        "csp_LiveGzGuard", "csp_Tingshu275Guard",
-        "csp_AueteGuard", "csp_LibvioGuard", "csp_NewCzGuard", "csp_YCyzGuard",
-        "csp_JPJGuard", "csp_JpysGuard", "csp_Jpys", "csp_AllliveGuard", "csp_MusicGuard",
-        "csp_NmyswvGuard", "csp_DoubaoGuard", "csp_AppgzGuard", "csp_AiDjGuard",
-        "csp_XPathGuard", "csp_DouDouGuard",
-        "csp_SixVGuard",
-    };
-
-    /// <summary>仅当该 api 已登记且 ext 形态被接受时才返回 true，避免只凭 api 名提升。</summary>
-    public static bool Supports(TvBoxSite site) =>
-        TryGetFactory(site.Api ?? "", out _) &&
-        (!ExtGated.Contains(site.Api ?? "") || IsSupported(site));
 }

@@ -38,10 +38,9 @@ public sealed partial class BttwooSource : IResolvingContentSource
 
     private static async Task<string> Get(string url, string? referer, CancellationToken ct)
     {
-        using var http = new DefaultHttp();
         var headers = new Dictionary<string, string> { ["User-Agent"] = UserAgent };
         if (referer is not null) headers["Referer"] = referer;
-        return DefaultHttp.Decode(await http.GetBoundedAsync(url, 4 * 1024 * 1024, ct, headers));
+        return DefaultHttp.Decode(await DefaultHttp.Shared.GetBoundedAsync(url, 4 * 1024 * 1024, ct, headers));
     }
 
     private async Task<string> Request(string pathAndQuery, CancellationToken ct, string? referer = null)

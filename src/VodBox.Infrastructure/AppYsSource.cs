@@ -22,7 +22,7 @@ public sealed class AppYsSource : IResolvingContentSource
         _fetch=fetch??Fetch;
     }
     private static async Task<string> Fetch(string url,CancellationToken ct)
-    {using var http=new DefaultHttp();return DefaultHttp.Decode(await http.GetBoundedAsync(url,8*1024*1024,ct));}
+    {return DefaultHttp.Decode(await DefaultHttp.Shared.GetBoundedAsync(url,8*1024*1024,ct));}
     private async Task<JsonDocument> Request(string path,IReadOnlyDictionary<string,string> args,CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

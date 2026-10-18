@@ -15,14 +15,13 @@ public sealed class QingtingFmSource : IResolvingContentSource
     internal QingtingFmSource(SourceInfo site, Func<string, CancellationToken, Task<string>>? get, Func<string, CancellationToken, Task<string>>? post)
     { _site = site; _get = get ?? Get; _post = post ?? Post; }
     private static async Task<string> Get(string url, CancellationToken ct)
-    { using var http = new DefaultHttp(); return DefaultHttp.Decode(await http.GetBoundedAsync(url, 4 * 1024 * 1024, ct)); }
+    { return DefaultHttp.Decode(await DefaultHttp.Shared.GetBoundedAsync(url, 4 * 1024 * 1024, ct)); }
     private static async Task<string> Post(string body, CancellationToken ct)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://webbff.qtfm.cn/www") { Content = content };
         request.Headers.Referrer = new Uri("https://www.qtfm.cn/");
-        using var response = await client.SendAsync(request, ct);
+        using var response = await DefaultHttp.PlainClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }

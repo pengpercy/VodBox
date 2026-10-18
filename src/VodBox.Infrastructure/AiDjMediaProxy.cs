@@ -1,11 +1,8 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 
 namespace VodBox.Infrastructure;
 
@@ -34,7 +31,8 @@ internal sealed class AiDjMediaProxy : IAsyncDisposable
         try
         {
             foreach (var entry in _entries.Where(p => p.Value.Expires <= DateTimeOffset.UtcNow).ToArray()) _entries.TryRemove(entry.Key, out _);
-            if (_entries.Count >= 4) throw new InvalidOperationException("AiDj 最多同时保留 4 个播放会话，请稍后重试。");
+            // 句柄只是内存里的索引：满额时淘汰最早到期的一个，连续切集不应在 15 分钟内第 5 次就失败。
+            if (_entries.Count >= 4) _entries.TryRemove(_entries.MinBy(p => p.Value.Expires).Key, out _);
             var first = await RangeAsync(uri, 0, 15, 16, null, ct).ConfigureAwait(false);
             long total = first.Total, cursor = 0; byte[]? moov = null; long moovStart = 0;
             for (int i = 0; i < 128 && cursor < total; i++)
@@ -68,36 +66,20 @@ internal sealed class AiDjMediaProxy : IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this); if (_app is not null) return;
-            var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders();
-            builder.WebHost.UseKestrel(options => options.Listen(IPAddress.Loopback, 0));
-            var app = builder.Build(); app.MapMethods("/aidj/{id}.mp4", ["GET", "HEAD"], ServeAsync);
-            try
-            {
-                await app.StartAsync(ct).ConfigureAwait(false);
-                _address = app.Urls.Single(); _app = app;
-            }
-            catch { await app.DisposeAsync().ConfigureAwait(false); throw; }
+            (_app, _address) = await LoopbackRangeServer.StartAsync("/aidj/{id}.mp4", ServeAsync, ct).ConfigureAwait(false);
         }
         finally { _lifecycle.Release(); }
     }
     private async Task ServeAsync(HttpContext context)
     {
-        if (!IPAddress.IsLoopback(context.Connection.RemoteIpAddress ?? IPAddress.None) || _address is null ||
-            !Uri.TryCreate(_address, UriKind.Absolute, out var local) || !string.Equals(context.Request.Host.Value, local.Authority, StringComparison.OrdinalIgnoreCase) ||
+        if (!LoopbackRangeServer.IsLocalRequest(context, _address) ||
             context.Request.Headers.TryGetValue("Origin", out var origin) && origin.ToString() != _address)
         { context.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
         var id = context.Request.RouteValues["id"]?.ToString() ?? "";
         if (!_entries.TryGetValue(id, out var entry) || entry.Expires <= DateTimeOffset.UtcNow)
         { _entries.TryRemove(id, out _); context.Response.StatusCode = StatusCodes.Status404NotFound; return; }
-        long total = entry.Index.TotalLength, start = 0, end = total - 1;
-        bool ranged = context.Request.Headers.TryGetValue("Range", out var range);
-        if (ranged && !ParseRange(range.ToString(), total, out start, out end))
-        { context.Response.StatusCode = StatusCodes.Status416RangeNotSatisfiable; context.Response.Headers.ContentRange = "bytes */" + total; return; }
-        context.Response.ContentType = "video/mp4"; context.Response.ContentLength = end - start + 1;
-        context.Response.Headers.AcceptRanges = "bytes"; context.Response.Headers.CacheControl = "no-store";
-        context.Response.StatusCode = ranged ? StatusCodes.Status206PartialContent : StatusCodes.Status200OK;
-        if (ranged) context.Response.Headers.ContentRange = $"bytes {start}-{end}/{total}";
-        if (HttpMethods.IsHead(context.Request.Method)) return;
+        long total = entry.Index.TotalLength;
+        if (!LoopbackRangeServer.BeginResponse(context, total, "video/mp4", out long start, out long end)) return;
         try
         {
             for (long cursor = start; cursor <= end;)
@@ -110,21 +92,6 @@ internal sealed class AiDjMediaProxy : IAsyncDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or OperationCanceledException or IOException)
         { context.Abort(); }
-    }
-    internal static bool ParseRange(string text, long total, out long start, out long end)
-    {
-        start = 0; end = total - 1;
-        if (total <= 0 || !text.StartsWith("bytes=", StringComparison.Ordinal) || text.Contains(',')) return false;
-        var parts = text[6..].Split('-'); if (parts.Length != 2) return false;
-        if (parts[0].Length == 0)
-        {
-            if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var suffix) || suffix <= 0) return false;
-            start = Math.Max(0, total - suffix); return true;
-        }
-        if (!long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out start) || start >= total) return false;
-        if (parts[1].Length > 0)
-        { if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out end) || end < start) return false; end = Math.Min(end, total - 1); }
-        return true;
     }
     private async Task<(byte[] Data, long Total)> RangeAsync(Uri url, long start, long end, int maximum, long? expectedTotal, CancellationToken ct)
     {

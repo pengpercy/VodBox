@@ -33,12 +33,11 @@ public sealed partial class Dm84Source : IResolvingContentSource
 
     private static async Task<string> Send(string url, string? referer, string? json, CancellationToken ct)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         using var request = new HttpRequestMessage(json is null ? HttpMethod.Get : HttpMethod.Post, url);
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
         if (referer is not null) request.Headers.TryAddWithoutValidation("Referer", referer);
         if (json is not null) request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await DefaultHttp.PlainClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength > 4 * 1024 * 1024) throw new InvalidDataException("动漫巴士响应过大。");
         return await response.Content.ReadAsStringAsync(ct);
