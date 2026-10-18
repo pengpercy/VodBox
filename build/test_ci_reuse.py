@@ -81,5 +81,15 @@ class ReuseTests(unittest.TestCase):
              patch.object(reuse, 'api', side_effect=RuntimeError('offline')):
             self.assertFalse(reuse.probe('win-x64', '0.2.1', 'owner/repo')['reused'])
 
+    def test_git_and_api_decode_utf8_regardless_of_platform_locale(self):
+        # Windows runners default to cp1252; Chinese run/commit names in gh api JSON must still decode.
+        payload = '{"name": "修复发布"}'.encode('utf-8')
+        def run(args, **kwargs):
+            self.assertEqual(kwargs.get('encoding'), 'utf-8')
+            return subprocess.CompletedProcess(args, 0, payload.decode(kwargs['encoding']), '')
+        with patch.object(reuse.subprocess, 'run', side_effect=run):
+            self.assertEqual(reuse.api('repos/o/r/actions/runs/1'), {'name': '修复发布'})
+            self.assertEqual(reuse.git('log'), payload.decode('utf-8'))
+
 if __name__=='__main__':
     unittest.main()

@@ -42,12 +42,14 @@ NATIVE_BUILD_PATHS = (
 )
 
 
+# text=True alone decodes with the platform locale (cp1252 on Windows), which chokes on the UTF-8
+# bytes in Chinese commit/run names coming back from git and the GitHub API; force UTF-8 everywhere.
 def git(*args: str, check: bool = True) -> str:
-    return subprocess.run(["git", *args], check=check, capture_output=True, text=True).stdout
+    return subprocess.run(["git", *args], check=check, capture_output=True, text=True, encoding="utf-8").stdout
 
 
 def api(path: str) -> dict:
-    out = subprocess.run(["gh", "api", path], check=True, capture_output=True, text=True).stdout
+    out = subprocess.run(["gh", "api", path], check=True, capture_output=True, text=True, encoding="utf-8").stdout
     return json.loads(out)
 
 
@@ -71,7 +73,7 @@ def version_at(ref: str) -> str:
 def ensure_commit(sha: str) -> bool:
     if subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], capture_output=True).returncode == 0:
         return True
-    fetch = subprocess.run(["git", "fetch", "--depth=1", "origin", sha], capture_output=True, text=True)
+    fetch = subprocess.run(["git", "fetch", "--depth=1", "origin", sha], capture_output=True, text=True, encoding="utf-8")
     return fetch.returncode == 0
 
 
