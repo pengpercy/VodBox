@@ -92,27 +92,6 @@ jobs:
             .cache/downloads
             .cache/vulkan
           key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json') }}
-      - name: Install Windows MinGW toolchain
-        if: steps.reuse.outputs.skip != 'true' && matrix.rid == 'win-x64'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
-      - name: Resolve Windows MinGW tools
-        if: steps.reuse.outputs.skip != 'true' && matrix.rid == 'win-x64'
-        shell: msys2 {0}
-        run: |
-          set -euo pipefail
-          gcc --version
-          test "$(gcc -dumpmachine)" = x86_64-w64-mingw32
-          echo "VODBOX_NATIVE_CC=$(cygpath -m "$(command -v gcc)")" >> "$GITHUB_ENV"
-          echo "VODBOX_ENGINE_CMAKE=$(cygpath -m "$(command -v cmake)")" >> "$GITHUB_ENV"
-          echo "VODBOX_ENGINE_MAKE=$(cygpath -m "$(command -v ninja)")" >> "$GITHUB_ENV"
-          echo "VODBOX_ENGINE_GENERATOR=Ninja" >> "$GITHUB_ENV"
-          echo "VODBOX_NATIVE_BASH=$(cygpath -m /usr/bin/bash.exe)" >> "$GITHUB_ENV"
-          printf 'int main(void){return 0;}\n' > "$RUNNER_TEMP/native-probe.c"
-          gcc "$RUNNER_TEMP/native-probe.c" -o "$RUNNER_TEMP/native-probe.exe"
-          "$RUNNER_TEMP/native-probe.exe"
       - name: Linux native dependencies
         if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
         run: |
