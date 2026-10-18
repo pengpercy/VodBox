@@ -29,6 +29,43 @@ public sealed class MainWindowPreviewTests
     }
 
     /// <summary>
+    /// 侧栏搜索框同样有搜索历史下拉：聚焦弹出、Esc 收起、焦点离开搜索框收起，选一条直接发起搜索。
+    /// </summary>
+    [AvaloniaFact]
+    public void SidebarSearchBoxDropsDownHistoryAndClosesWhenFocusLeaves()
+    {
+        var main = DesignData.Main;
+        var saved = main.Search.SearchHistory.ToArray();
+        main.Search.SearchHistory.Clear();
+        foreach (var word in new[] { "繁花", "三体" }) main.Search.SearchHistory.Add(word);
+        var window = new MainWindow { DataContext = main, Width = 1280, Height = 800 };
+        void Layout() { for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); } }
+        try
+        {
+            window.Show();
+            Layout();
+            var box = window.FindControl<TextBox>("GlobalSearch")!;
+            var popup = window.FindControl<SearchHistoryPopup>("GlobalSearchHistory")!;
+            box.Focus();
+            Layout();
+            Assert.True(popup.IsOpen);
+            box.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+            Assert.False(popup.IsOpen);
+            box.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
+            Assert.True(popup.IsOpen);
+            window.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Focusable).Focus();
+            Layout();
+            Assert.False(popup.IsOpen);
+        }
+        finally
+        {
+            window.Close();
+            main.Search.SearchHistory.Clear();
+            foreach (var word in saved) main.Search.SearchHistory.Add(word);
+        }
+    }
+
+    /// <summary>
     /// 首页沉浸式标题栏：首页内容伸到标题栏下方，标题栏处仍是拖拽区；未滚动时标题栏完全透明，
     /// 向下滚动后渐显毛玻璃，切到其他页面即收起。macOS 直播页上移进标题栏行的工具栏必须仍可点。
     /// </summary>

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VodBox.Core;
@@ -62,23 +63,36 @@ public sealed class SearchWindowTests
     }
 
     /// <summary>
-    /// 搜索框放在标题栏那一行、紧跟 macOS 交通灯（约 0–78px）：左侧与主窗口/设置窗口同样让出 90px；
-    /// 不再有单独的「搜索」标题，窗口第一行下面直接是站点栏与结果。
+    /// 搜索结果页布局：左侧站点栏常驻（宽 220，无边框），分割线贯穿整个窗口高度；
+    /// 「全部结果」与搜索框都在 macOS 交通灯（约 y≤28）下方，搜索框紧挨站点栏右侧。
     /// </summary>
     [AvaloniaFact]
-    public void SearchFieldSitsInTitleRowClearOfMacTrafficLights()
+    public void SearchFieldSitsNextToSidebarBelowMacTrafficLights()
     {
         using var fixture = new Fixture();
-        var window = new SearchWindow { DataContext = fixture.Main };
+        var window = new SearchWindow { DataContext = fixture.Main, Width = 1040, Height = 720 };
         window.Show();
         try
         {
             window.UpdateLayout();
-            var field = window.GetVisualDescendants().OfType<Grid>().Single(grid => grid.Name == "SearchField");
+            T Named<T>(string name) where T : Control => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
+            var field = Named<Grid>("SearchField");
             var origin = Avalonia.VisualExtensions.TranslatePoint(field, default, window)!.Value;
-            Assert.Equal(OperatingSystem.IsMacOS() ? 90 : 20, origin.X, 1);
-            Assert.True(origin.Y + field.Bounds.Height <= 52, "搜索框应在标题栏那一行内");
+            Assert.Equal(240, origin.X, 1);
             Assert.Equal(380, field.Bounds.Width);
+            if (OperatingSystem.IsMacOS()) Assert.True(origin.Y >= 28, $"搜索框不能高过交通灯：y={origin.Y}");
+
+            var sidebar = Named<Border>("SiteSidebar");
+            Assert.True(sidebar.IsEffectivelyVisible);
+            Assert.Equal(default, sidebar.BorderThickness);
+            var divider = Named<Border>("SidebarDivider");
+            var top = Avalonia.VisualExtensions.TranslatePoint(divider, default, window)!.Value;
+            Assert.Equal(0, top.Y, 1);
+            Assert.Equal(window.Bounds.Height, divider.Bounds.Height, 1);
+
+            var all = window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "全部结果");
+            var allTop = Avalonia.VisualExtensions.TranslatePoint(all, default, window)!.Value.Y;
+            if (OperatingSystem.IsMacOS()) Assert.InRange(allTop, 28, 60);
             // 只剩搜索框里内嵌按钮上的「搜索」两字，没有独立的标题文字。
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(),
                 text => text.Text == "搜索" && text.IsEffectivelyVisible && !text.GetVisualAncestors().OfType<Button>().Any());
@@ -86,8 +100,23 @@ public sealed class SearchWindowTests
         finally { window.Close(); }
     }
 
+    private static void Key(Control target, Avalonia.Input.Key key)
+        => target.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = key });
+
+    private static void Click(Window window, Control target)
+    {
+        var center = Avalonia.VisualExtensions.TranslatePoint(target, new Avalonia.Point(target.Bounds.Width / 2, target.Bounds.Height / 2), window)!.Value;
+        Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, center, Avalonia.Input.MouseButton.Left);
+        Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, center, Avalonia.Input.MouseButton.Left);
+        Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+    }
+
+    private static string[] Listed(SearchHistoryPopup popup)
+        => ((IEnumerable<SuggestItem>)popup.FindControl<ItemsControl>("HistoryItems")!.ItemsSource!).Select(item => item.Text).ToArray();
+
     /// <summary>
-    /// 搜索历史下拉（对齐 FongMi/TV）：聚焦即列出全部历史；输入按关键词过滤；单条删除不收起；Esc 收起；选一条即回搜。
+    /// 搜索历史下拉（对齐 FongMi/TV）：聚焦即列出全部历史；输入按关键词过滤；单条删除不收起；
+    /// Esc、搜索框失焦都收起；↓/回车可键盘选；点一条即回搜。
     /// </summary>
     [AvaloniaFact]
     public async Task FocusingSearchFieldDropsDownHistoryThatCanBeFilteredDeletedAndPicked()
@@ -103,34 +132,61 @@ public sealed class SearchWindowTests
         {
             window.UpdateLayout();
             var box = window.GetVisualDescendants().OfType<TextBox>().Single(text => text.Name == "ResultSearch");
-            var dropdown = window.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "SuggestionDropdown");
+            var popup = window.GetLogicalDescendants().OfType<SearchHistoryPopup>().Single();
             box.Focus();
             Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
-            Assert.True(dropdown.IsEffectivelyVisible);
-            Assert.Equal(["庆余年", "繁花", "三体", "庆余年第二季"], search.Suggestions.Select(item => item.Text));
+            Assert.True(popup.IsOpen);
+            Assert.Equal(["庆余年", "繁花", "三体", "庆余年第二季"], Listed(popup));
 
-            search.Keyword = "庆余";
-            Assert.Equal(["庆余年", "庆余年第二季"], search.Suggestions.Select(item => item.Text));
+            box.Text = "庆余";
+            Assert.Equal(["庆余年", "庆余年第二季"], Listed(popup));
 
-            search.OpenHistoryDropdown();
+            box.Text = "";
+            Key(box, Avalonia.Input.Key.Escape);
+            Assert.False(popup.IsOpen);
+            Key(box, Avalonia.Input.Key.Down);
+            Assert.True(popup.IsOpen);
             search.DeleteSearchHistoryCommand.Execute("繁花");
-            Assert.True(search.ShowSuggestions);
-            Assert.DoesNotContain("繁花", search.Suggestions.Select(item => item.Text));
+            Assert.True(popup.IsOpen);
+            Assert.DoesNotContain("繁花", Listed(popup));
             Assert.DoesNotContain("繁花", search.SearchHistory);
 
-            box.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
-            Assert.False(search.ShowSuggestions);
+            // 焦点移出搜索框（如 Tab 到别的控件）即收起。
+            var other = window.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Focusable);
+            other.Focus();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(popup.IsOpen);
 
-            search.OpenHistoryDropdown();
-            window.UpdateLayout();
-            var row = dropdown.GetVisualDescendants().OfType<Border>().First(border => border.Tag is SuggestItem { Text: "三体" });
+            box.Focus();
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.True(popup.IsOpen);
+            Key(box, Avalonia.Input.Key.Down);
+            Key(box, Avalonia.Input.Key.Down);
+            Key(box, Avalonia.Input.Key.Enter);
+            await Until(() => searched.Contains("三体"));
+            Assert.Equal("三体", search.Keyword);
+            Assert.False(popup.IsOpen);
+            Assert.Equal("三体", search.SearchHistory[0]);
+
+            // 回车搜索后焦点仍在搜索框：再点一下搜索框重新列出历史。
+            Click(window, box);
+            Assert.True(popup.IsOpen);
+            var row = popup.GetLogicalDescendants().OfType<Border>().First(border => border.Tag is SuggestItem { Text: "庆余年" });
             var center = Avalonia.VisualExtensions.TranslatePoint(row, new Avalonia.Point(40, row.Bounds.Height / 2), window)!.Value;
             Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, center, Avalonia.Input.MouseButton.Left);
             Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, center, Avalonia.Input.MouseButton.Left);
-            await Until(() => searched.Contains("三体"));
-            Assert.Equal("三体", search.Keyword);
-            Assert.False(search.ShowSuggestions);
-            Assert.Equal("三体", search.SearchHistory[0]);
+            await Until(() => searched.Contains("庆余年"));
+            Assert.False(popup.IsOpen);
+            Assert.Equal("庆余年", search.SearchHistory[0]);
+
+            // 点下拉与搜索框以外的空白处：light dismiss 收起。
+            Click(window, box);
+            Assert.True(popup.IsOpen);
+            var blank = new Avalonia.Point(window.Bounds.Width - 20, window.Bounds.Height - 20);
+            Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, blank, Avalonia.Input.MouseButton.Left);
+            Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, blank, Avalonia.Input.MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(popup.IsOpen);
         }
         finally { window.Close(); }
     }

@@ -74,12 +74,6 @@ public sealed class DesignPreviewTests
             });
             Assert.False(icon.IsSet(PathIcon.ForegroundProperty));
         });
-        if (view is SearchView)
-        {
-            var hot = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "热");
-            var fire = Assert.IsType<StackPanel>(hot.Parent).Children.OfType<PathIcon>().Single();
-            Assert.Equal(hot.Foreground, fire.Foreground);
-        }
         if (Environment.GetEnvironmentVariable("VODBOX_PREVIEW_SHOT") is { Length: > 0 })
         {
             var frame = CaptureFrame(window);

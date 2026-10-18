@@ -431,6 +431,7 @@ public sealed partial class VodViewModel : ObservableObject
     {
         var query = Keyword.Trim();
         if (query.Length == 0) { await ExitSearchAsync(); return; }
+        _main.Search.RecordSearchHistory(query);
         await SearchAsync(query);
     }
 

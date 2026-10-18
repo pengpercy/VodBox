@@ -24,8 +24,6 @@ public sealed partial class SearchViewModel : ObservableObject
 
     public ObservableCollection<SearchSiteResult> SiteResults { get; } = [];
     public ObservableCollection<MediaItem> AllResults { get; } = [];
-    /// <summary>输入联想（站点 suggest 接口 / 本地历史混合，S5 接真接口）。</summary>
-    public ObservableCollection<SuggestItem> Suggestions { get; } = [];
     /// <summary>搜索历史胶囊（点击回搜、× 删除）。</summary>
     public ObservableCollection<string> SearchHistory { get; } = [];
 
@@ -38,7 +36,6 @@ public sealed partial class SearchViewModel : ObservableObject
     [ObservableProperty] private string _keyword = "";
     [ObservableProperty] private bool _searching;
     [ObservableProperty] private string _summary = "";
-    [ObservableProperty] private bool _showSuggestions;
     /// <summary>结果区空态/错误态文案（非空时覆盖网格位置，避免白屏）。</summary>
     [ObservableProperty] private string _hint = "";
     /// <summary>
@@ -61,8 +58,6 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>侧栏「全部」是否为当前选择。</summary>
     public bool IsAllSelected => SelectedSite is null;
     public bool HasFailures => Failures.Count > 0;
-    /// <summary>站点栏只在有东西可列时出现（搜索中、有结果或有失败站点）；首次打开/空态让空态居中。</summary>
-    public bool ShowSidebar => Searching || SiteResults.Count > 0 || Failures.Count > 0;
     /// <summary>空态（尚未搜索或没有结果）且有历史时展示最近搜索，结果页本身不再挂历史条。</summary>
     public bool ShowHistory => !Searching && ResultRows.Count == 0 && SearchHistory.Count > 0;
 
@@ -79,7 +74,6 @@ public sealed partial class SearchViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowSkeleton));
         OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(ShowHistory));
-        OnPropertyChanged(nameof(ShowSidebar));
     }
 
     public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main, services.Prefs)
@@ -99,8 +93,7 @@ public sealed partial class SearchViewModel : ObservableObject
         _main = main;
         _preferences = preferences;
         SearchHistory.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowHistory));
-        Failures.CollectionChanged += (_, _) => { OnPropertyChanged(nameof(HasFailures)); OnPropertyChanged(nameof(ShowSidebar)); };
-        SiteResults.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowSidebar));
+        Failures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasFailures));
         try
         {
             var values = System.Text.Json.JsonSerializer.Deserialize(preferences?.GetString("search.history", "[]") ?? "[]", Json.TypeInfo<List<string>>()) ?? [];
@@ -111,36 +104,29 @@ public sealed partial class SearchViewModel : ObservableObject
 
     /// <summary>搜索历史保留条数（持久化到偏好，跨启动保留；最近的在前）。</summary>
     internal const int HistoryLimit = 20;
-    /// <summary>下拉当前是否列出全部历史（聚焦打开）；输入后改为按关键词过滤。</summary>
-    private bool _suggestAll;
-
-    partial void OnKeywordChanged(string value)
-    {
-        _suggestAll = false;
-        RefreshSuggestions();
-    }
-
     /// <summary>
-    /// 搜索框获得焦点：像 FongMi/TV 一样下拉列出全部搜索历史（最近的在前），选一条即回搜。
+    /// 搜索历史下拉的条目：刚聚焦（<paramref name="all"/>）列出全部历史，最近的在前（像 FongMi/TV）；
+    /// 输入后按关键词过滤，与输入完全相同的词不算联想（点了也只是原样再搜一次）。
+    /// 侧栏、点播、搜索结果三个搜索框共用这一份历史与规则。
     /// </summary>
-    public void OpenHistoryDropdown()
+    public static IReadOnlyList<string> FilterHistory(IEnumerable<string> history, string typed, bool all)
     {
-        _suggestAll = true;
-        RefreshSuggestions();
+        typed = typed.Trim();
+        var matches = all
+            ? history
+            : history.Where(query => typed.Length > 0 && query.Contains(typed, StringComparison.OrdinalIgnoreCase) && !string.Equals(query, typed, StringComparison.OrdinalIgnoreCase));
+        return matches.Take(HistoryLimit).ToArray();
     }
 
-    public void CloseSuggestions() => ShowSuggestions = false;
-
-    /// <summary>输入时按关键词过滤历史；与输入完全相同的词不算联想（点了也只是原样再搜一次）。</summary>
-    private void RefreshSuggestions()
+    /// <summary>记一条搜索历史（移到最前、去重、截断并持久化）；点播页的站内搜索也走这里，三个搜索框共享。</summary>
+    public void RecordSearchHistory(string query)
     {
-        Suggestions.Clear();
-        var typed = Keyword.Trim();
-        var matches = _suggestAll
-            ? SearchHistory
-            : SearchHistory.Where(query => typed.Length > 0 && query.Contains(typed, StringComparison.OrdinalIgnoreCase) && !string.Equals(query, typed, StringComparison.OrdinalIgnoreCase));
-        foreach (var query in matches.Take(HistoryLimit)) Suggestions.Add(new SuggestItem { Text = query, IsHistory = true });
-        ShowSuggestions = Suggestions.Count > 0;
+        query = query.Trim();
+        if (query.Length == 0) return;
+        SearchHistory.Remove(query);
+        SearchHistory.Insert(0, query);
+        while (SearchHistory.Count > HistoryLimit) SearchHistory.RemoveAt(SearchHistory.Count - 1);
+        SaveSearchHistory();
     }
 
     private void SaveSearchHistory()
@@ -180,8 +166,7 @@ public sealed partial class SearchViewModel : ObservableObject
             Searching = true;
             Summary = $"「{query}」搜索中…";
             Status = "正在搜索…";
-            // 一发起搜索就收起联想，不遮挡状态行与结果；在看详情时回到结果（如详情里的「跨站搜索」）。
-            ShowSuggestions = false;
+            // 在看详情时回到结果（如详情里的「跨站搜索」）；历史下拉由搜索框自己在回车/选词时收起。
             CloseDetail();
             Progress = 0;
             Hint = "";
@@ -294,23 +279,19 @@ public sealed partial class SearchViewModel : ObservableObject
         Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {AllResults.Count} 条结果";
         if (failures.Count > 0) Summary += $"；{failures.Count} 个站点失败：" + string.Join("；", failures.Take(5).Select(failure => failure.Site.Name + "：" + failure.Error));
         Hint = AllResults.Count == 0 ? "没有找到匹配的结果，换个关键词或站点试试" : "";
-        ShowSuggestions = false;
-        SearchHistory.Remove(query);
-        SearchHistory.Insert(0, query);
-        while (SearchHistory.Count > HistoryLimit) SearchHistory.RemoveAt(SearchHistory.Count - 1);
-        SaveSearchHistory();
+        RecordSearchHistory(query);
     }
 
     [RelayCommand]
     private void DeleteSearchHistory(string word)
     {
-        SearchHistory.Remove(word);SaveSearchHistory();RefreshSuggestions();
+        SearchHistory.Remove(word);SaveSearchHistory();
     }
 
     [RelayCommand]
     private void ClearSearchHistory()
     {
-        SearchHistory.Clear();Suggestions.Clear();ShowSuggestions=false;SaveSearchHistory();
+        SearchHistory.Clear();SaveSearchHistory();
     }
 
     [RelayCommand]
@@ -392,13 +373,11 @@ public sealed partial class SearchSiteResult : ObservableObject
 /// <summary>未返回结果的站点及原因（侧栏「未返回结果」分组，原因放悬停提示）。</summary>
 public sealed record SearchFailure(string SiteName, string Error);
 
-/// <summary>搜索联想行（热词/历史）。</summary>
-public sealed class SuggestItem
+/// <summary>搜索历史下拉的一行；<see cref="IsSelected"/> 是键盘 ↑/↓ 的当前行。</summary>
+public sealed partial class SuggestItem : ObservableObject
 {
-    /// <summary>来自本机搜索历史（下拉里可单条删除）。</summary>
-    public bool IsHistory { get; init; }
     public string Text { get; init; } = "";
-    public bool Hot { get; init; }
+    [ObservableProperty] private bool _isSelected;
 }
 
 /// <summary>结果网格行（动态列数）。</summary>

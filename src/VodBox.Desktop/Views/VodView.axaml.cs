@@ -81,8 +81,11 @@ public partial class VodView : UserControl
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key is Key.Enter or Key.Return) VM.RunSearchCommand.Execute(null);
+        if (e.Key is Key.Enter or Key.Return && !e.Handled) VM.RunSearchCommand.Execute(null);
     }
+
+    /// <summary>点播搜索框的历史下拉选了一条：词已写回搜索框，按它做跨站搜索。</summary>
+    private void OnSearchHistoryPicked(object? sender, string word) => VM.RunSearchCommand.Execute(null);
 
     private void OnSwitchSource(object? sender, RoutedEventArgs e)
     {

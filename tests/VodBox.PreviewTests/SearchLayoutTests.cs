@@ -67,7 +67,7 @@ public sealed class SearchLayoutTests
         try
         {
             Layout();
-            Assert.False(Named<Border>("SiteSidebar").IsEffectivelyVisible);
+            Assert.True(Named<Border>("SiteSidebar").IsEffectivelyVisible);
             Assert.True(window.GetVisualDescendants().OfType<StackPanel>().Single(panel => panel.Name == "EmptyState").IsEffectivelyVisible);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "繁花" && text.IsEffectivelyVisible);
 

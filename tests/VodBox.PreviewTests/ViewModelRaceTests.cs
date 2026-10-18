@@ -1342,9 +1342,9 @@ public sealed class ViewModelRaceTests
         await Done(search.RunSearchCommand.ExecuteAsync(null));
         var fresh = new SearchViewModel((_, _) => Task.FromResult<IReadOnlyList<(SourceInfo, MediaItem)>>([]), context.Main, context.Preferences);
         Assert.Equal("庆余年", Assert.Single(fresh.SearchHistory));
-        fresh.Keyword = "庆";
-        Assert.Equal("庆余年", Assert.Single(fresh.Suggestions).Text);
-        Assert.True(fresh.ShowSuggestions);
+        Assert.Equal(["庆余年"], SearchViewModel.FilterHistory(fresh.SearchHistory, "庆", all: false));
+        Assert.Empty(SearchViewModel.FilterHistory(fresh.SearchHistory, "庆余年", all: false));
+        Assert.Equal(["庆余年"], SearchViewModel.FilterHistory(fresh.SearchHistory, "庆余年", all: true));
     }
 
     [AvaloniaFact]

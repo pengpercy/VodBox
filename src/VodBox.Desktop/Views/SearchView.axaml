@@ -70,78 +70,83 @@
     </Style>
   </UserControl.Styles>
 
-  <!-- 两行：第一行与窗口标题栏同高，搜索框紧跟 macOS 交通灯、右侧是一行状态；该行空白处仍是窗口拖拽区
-       （SearchWindow 在下面铺了 TitleBar 角色的背景，这里的面板不设背景，空白处点击落到拖拽区）。
-       下方左侧站点栏、右侧虚拟化结果网格；历史下拉浮在结果区上方，不改变页面布局。 -->
-  <Grid RowDefinitions="52,*" DataContext="{Binding Search}">
+  <!-- 两栏贯穿整窗：左侧站点栏（无卡片边框）顶部给 macOS 交通灯让位，「全部结果」紧贴交通灯下方；
+       一条竖分割线从窗口顶到底分开两栏；右栏第一行是搜索框（紧挨分割线，顶边与「全部结果」对齐，不高过交通灯），下面是结果/详情。
+       两栏顶部空白处不设背景，点击落到 SearchWindow 铺在下面的标题栏拖拽区；输入控件标记为 User 保留输入。 -->
+  <Grid ColumnDefinitions="Auto,*" DataContext="{Binding Search}">
 
-    <!-- 上：搜索框（按钮内嵌，交互区标记为 User）+ 状态（进度 / 站点数与条数） -->
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center"
-                Margin="{OnPlatform Default='20,0,0,0', macOS='90,0,0,0'}">
-      <Grid x:Name="SearchField" Width="380" Height="34" chrome:WindowDecorationProperties.ElementRole="User">
-        <TextBox x:Name="ResultSearch" Text="{Binding Keyword}" PlaceholderText="搜索影片、剧集、综艺…" Height="34"
-                 CornerRadius="{DynamicResource AppControlCornerRadius}" FontSize="13" Padding="32,0,74,0"
-                 VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown" GotFocus="OnSearchFocused" LostFocus="OnSearchLostFocus"
-                 chrome:WindowDecorationProperties.ElementRole="User" />
-        <PathIcon x:Name="ResultSearchIcon" Data="{StaticResource Icon.Search}" Width="14" Height="14" Margin="11,0,0,0"
-                  HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
-        <Button x:Name="ResultSearchButton" Command="{Binding RunSearchCommand}" Classes="accent" Content="搜索"
-                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0" Height="28" Padding="14,0"
-                VerticalContentAlignment="Center" CornerRadius="{DynamicResource AppControlCornerRadius}"
-                FontSize="12" FontWeight="SemiBold" Cursor="Hand" chrome:WindowDecorationProperties.ElementRole="User" />
-      </Grid>
-      <TextBlock x:Name="SearchStatus" Text="{Binding Status}" FontSize="12" VerticalAlignment="Center"
-                 Foreground="{DynamicResource TextTertiaryBrush}" ToolTip.Tip="{Binding Summary}" />
-      <ProgressBar IsVisible="{Binding Searching}" Value="{Binding Progress}" Minimum="0" Maximum="1"
-                   Width="100" Height="3" MinHeight="3" CornerRadius="2" VerticalAlignment="Center" />
-    </StackPanel>
-
-    <!-- 下：站点栏 + 结果区 -->
-    <!-- 结果区在看详情时只隐藏不销毁：返回后仍是原来的结果、选中站点与滚动位置。 -->
-    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="20,4,0,0" IsVisible="{Binding !ShowingDetail}">
-      <Border x:Name="SiteSidebar" Grid.Column="0" Width="212" Margin="0,0,20,16" Padding="6" CornerRadius="{DynamicResource AppPanelCornerRadius}"
-              IsVisible="{Binding ShowSidebar}"
-              Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-          <StackPanel>
-            <!-- 「全部」始终在最上，选了某个站点后可一键回到全部结果。 -->
-            <Button x:Name="AllSitesButton" Classes="siteRow" Classes.selected="{Binding IsAllSelected}" Click="OnShowAllSites">
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="siteName" Text="全部结果" FontSize="13" VerticalAlignment="Center" />
-                <Border Grid.Column="1" Classes="countPill"><TextBlock Text="{Binding AllResults.Count}" /></Border>
-              </Grid>
-            </Button>
-            <TextBlock Classes="sectionLabel" Text="站点" IsVisible="{Binding SiteResults.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
-            <ListBox x:Name="SiteList" Classes="siteList" ItemsSource="{Binding SiteResults}" Background="Transparent"
-                     BorderThickness="0" Padding="0" SelectionChanged="OnSiteChanged">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:SearchSiteResult">
-                  <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding SiteName}">
-                    <TextBlock Classes="siteName" Text="{Binding SiteName}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                    <Border Grid.Column="1" Classes="countPill" Margin="8,0,0,0"><TextBlock Text="{Binding Items.Count}" /></Border>
-                  </Grid>
+    <!-- 左：站点栏。始终在位，搜索框位置不随有无结果跳动；无结果时只有「全部结果」一行。 -->
+    <Border x:Name="SiteSidebar" Grid.Column="0" Width="220"
+            Padding="{OnPlatform Default='10,14,10,12', macOS='10,38,10,12'}" Background="Transparent">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <!-- 「全部」始终在最上，选了某个站点后可一键回到全部结果。 -->
+          <Button x:Name="AllSitesButton" Classes="siteRow" Classes.selected="{Binding IsAllSelected}" Click="OnShowAllSites">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="siteName" Text="全部结果" FontSize="13" VerticalAlignment="Center" />
+              <Border Grid.Column="1" Classes="countPill"><TextBlock Text="{Binding AllResults.Count}" /></Border>
+            </Grid>
+          </Button>
+          <TextBlock Classes="sectionLabel" Text="站点" IsVisible="{Binding SiteResults.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
+          <ListBox x:Name="SiteList" Classes="siteList" ItemsSource="{Binding SiteResults}" Background="Transparent"
+                   BorderThickness="0" Padding="0" SelectionChanged="OnSiteChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SearchSiteResult">
+                <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding SiteName}">
+                  <TextBlock Classes="siteName" Text="{Binding SiteName}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <Border Grid.Column="1" Classes="countPill" Margin="8,0,0,0"><TextBlock Text="{Binding Items.Count}" /></Border>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <!-- 失败/超时/插件不受支持的站点单独一组，原因放悬停提示，不再挤在汇总行里。 -->
+          <StackPanel IsVisible="{Binding HasFailures}">
+            <TextBlock Classes="sectionLabel" Text="{Binding Failures.Count, StringFormat='未返回结果 · {0}'}" />
+            <ItemsControl x:Name="FailedSites" ItemsSource="{Binding Failures}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SearchFailure">
+                  <TextBlock Text="{Binding SiteName}" ToolTip.Tip="{Binding Error}" FontSize="12" Margin="10,4"
+                             Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                 </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-            <!-- 失败/超时/插件不受支持的站点单独一组，原因放悬停提示，不再挤在汇总行里。 -->
-            <StackPanel IsVisible="{Binding HasFailures}">
-              <TextBlock Classes="sectionLabel" Text="{Binding Failures.Count, StringFormat='未返回结果 · {0}'}" />
-              <ItemsControl x:Name="FailedSites" ItemsSource="{Binding Failures}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:SearchFailure">
-                    <TextBlock Text="{Binding SiteName}" ToolTip.Tip="{Binding Error}" FontSize="12" Margin="10,4"
-                               Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
-        </ScrollViewer>
-      </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+    <!-- 贯穿整窗高度的分割线（在站点栏右沿）。 -->
+    <Border x:Name="SidebarDivider" Grid.Column="0" Width="1" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+            Background="{DynamicResource StrokeBrush}" IsHitTestVisible="False" />
 
-      <!-- 结果网格：按行分块，ListBox 垂直虚拟化；卡片按列数平分宽度铺满。
-           加载态与结果同格叠加：搜索中显示骨架，结束显示空态/失败文案，都不留白屏。 -->
-      <Panel Grid.Column="1">
+    <Grid Grid.Column="1" RowDefinitions="Auto,*">
+      <!-- 右栏第一行：搜索框（按钮内嵌，交互区标记为 User）+ 状态（进度 / 站点数与条数）；
+           顶边与左栏「全部结果」一行对齐，同在交通灯下方。 -->
+      <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16"
+                  Margin="{OnPlatform Default='20,14,0,0', macOS='20,38,0,0'}">
+        <Grid x:Name="SearchField" Width="380" Height="32" chrome:WindowDecorationProperties.ElementRole="User">
+          <TextBox x:Name="ResultSearch" Text="{Binding Keyword}" PlaceholderText="搜索影片、剧集、综艺…" Height="32"
+                   CornerRadius="{DynamicResource AppControlCornerRadius}" FontSize="13" Padding="32,0,74,0"
+                   VerticalContentAlignment="Center" KeyDown="OnSearchKeyDown"
+                   chrome:WindowDecorationProperties.ElementRole="User" />
+          <PathIcon x:Name="ResultSearchIcon" Data="{StaticResource Icon.Search}" Width="14" Height="14" Margin="11,0,0,0"
+                    HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
+          <Button x:Name="ResultSearchButton" Command="{Binding RunSearchCommand}" Classes="accent" Content="搜索"
+                  HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0" Height="26" Padding="14,0"
+                  VerticalContentAlignment="Center" CornerRadius="{DynamicResource AppControlCornerRadius}"
+                  FontSize="12" FontWeight="SemiBold" Cursor="Hand" chrome:WindowDecorationProperties.ElementRole="User" />
+          <views:SearchHistoryPopup x:Name="ResultSearchHistory" TargetBox="{Binding #ResultSearch}"
+                                    History="{Binding $parent[views:SearchView].((vm:MainViewModel)DataContext).Search}" Picked="OnSearchHistoryPicked" />
+        </Grid>
+        <TextBlock x:Name="SearchStatus" Text="{Binding Status}" FontSize="12" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextTertiaryBrush}" ToolTip.Tip="{Binding Summary}" />
+        <ProgressBar IsVisible="{Binding Searching}" Value="{Binding Progress}" Minimum="0" Maximum="1"
+                     Width="100" Height="3" MinHeight="3" CornerRadius="2" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <!-- 结果区在看详情时只隐藏不销毁：返回后仍是原来的结果、选中站点与滚动位置。 -->
+      <Panel Grid.Row="1" Margin="20,16,0,0" IsVisible="{Binding !ShowingDetail}">
+        <!-- 结果网格：按行分块，ListBox 垂直虚拟化；卡片按列数平分宽度铺满。
+             加载态与结果同格叠加：搜索中显示骨架，结束显示空态/失败文案，都不留白屏。 -->
         <ListBox x:Name="ResultsList" Classes="virtualRows" SizeChanged="OnResultsSizeChanged" ItemsSource="{Binding ResultRows}" Background="Transparent"
                  BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
           <ListBox.ItemTemplate>
@@ -255,65 +260,20 @@
           </StackPanel>
         </StackPanel>
       </Panel>
-    </Grid>
 
-    <!-- 影片详情：在本窗口内打开（主窗口不跳页），返回按钮或 Esc 回到结果。独立的 DetailViewModel，不影响主窗口的详情页。 -->
-    <Grid x:Name="DetailHost" Grid.Row="1" RowDefinitions="Auto,*" IsVisible="{Binding ShowingDetail}">
-      <Button x:Name="BackToResults" Command="{Binding CloseDetailCommand}" HorizontalAlignment="Left" Margin="18,0,0,0"
-              Padding="8,5,12,5" Background="Transparent" BorderThickness="0" Cursor="Hand"
-              CornerRadius="{DynamicResource AppControlCornerRadius}" ToolTip.Tip="返回搜索结果（Esc）">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="14" Height="14" VerticalAlignment="Center" />
-          <TextBlock Text="返回搜索结果" FontSize="13" VerticalAlignment="Center" />
-        </StackPanel>
-      </Button>
-      <views:DetailView Grid.Row="1" DataContext="{Binding Detail}" />
-    </Grid>
-
-    <!-- 搜索历史下拉（对齐 FongMi/TV）：聚焦搜索框即列出全部历史，输入时按关键词过滤；点一条回搜，× 单条删除。
-         浮在结果区上方、紧贴搜索框下沿，不改变页面布局。按钮不可聚焦：点它们不会让搜索框失焦而提前收起下拉。 -->
-    <Border x:Name="SuggestionDropdown" Grid.Row="0" Grid.RowSpan="2" ZIndex="10" Width="380"
-            Margin="{OnPlatform Default='20,46,0,0', macOS='90,46,0,0'}"
-            HorizontalAlignment="Left" VerticalAlignment="Top" MaxHeight="420"
-            CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource SurfaceBrush}"
-            BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" Padding="4"
-            IsVisible="{Binding ShowSuggestions}" ClipToBounds="True" BoxShadow="0 8 24 0 #40000000">
-      <Grid RowDefinitions="Auto,*">
-        <Grid ColumnDefinitions="*,Auto" Margin="10,6,4,4">
-          <TextBlock Text="搜索历史" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Content="清空" Command="{Binding ClearSearchHistoryCommand}" Focusable="False" Background="Transparent"
-                  BorderThickness="0" Padding="6,2" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" Cursor="Hand" />
-        </Grid>
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding Suggestions}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:SuggestItem">
-                <Border Classes="historyChip" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="Transparent" Padding="10,7,4,7"
-                        Cursor="Hand" PointerPressed="OnPickSuggestion" Tag="{Binding}">
-                  <Grid ColumnDefinitions="Auto,*,Auto">
-                    <PathIcon Data="{StaticResource Icon.History}" Width="14" Height="14" Opacity="0.45" Margin="0,0,10,0"
-                              VerticalAlignment="Center" IsVisible="{Binding IsHistory}" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Text}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      <Border CornerRadius="4" Background="#33FFB900" Padding="6,1" IsVisible="{Binding Hot}">
-                        <StackPanel Orientation="Horizontal" Spacing="3" TextElement.Foreground="#FFB900">
-                          <PathIcon Data="{StaticResource Icon.Fire}" Width="12" Height="12" VerticalAlignment="Center" />
-                          <TextBlock Text="热" FontSize="10" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Border>
-                    </StackPanel>
-                    <Button Grid.Column="2" Click="OnDeleteSuggestion" Tag="{Binding Text}" Focusable="False" IsVisible="{Binding IsHistory}"
-                            Padding="5" Background="Transparent" BorderThickness="0" CornerRadius="10" Opacity="0.55"
-                            ToolTip.Tip="删除这条搜索历史" VerticalAlignment="Center">
-                      <PathIcon Data="{StaticResource Icon.Close}" Width="12" Height="12" />
-                    </Button>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+      <!-- 影片详情：在本窗口内打开（主窗口不跳页），返回按钮或 Esc 回到结果。独立的 DetailViewModel，不影响主窗口的详情页。 -->
+      <Grid x:Name="DetailHost" Grid.Row="1" Margin="0,8,0,0" RowDefinitions="Auto,*" IsVisible="{Binding ShowingDetail}">
+        <Button x:Name="BackToResults" Command="{Binding CloseDetailCommand}" HorizontalAlignment="Left" Margin="18,0,0,0"
+                Padding="8,5,12,5" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                CornerRadius="{DynamicResource AppControlCornerRadius}" ToolTip.Tip="返回搜索结果（Esc）">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource Icon.ChevronLeft}" Width="14" Height="14" VerticalAlignment="Center" />
+            <TextBlock Text="返回搜索结果" FontSize="13" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <views:DetailView Grid.Row="1" DataContext="{Binding Detail}" />
       </Grid>
-    </Border>
+
+    </Grid>
   </Grid>
 </UserControl>

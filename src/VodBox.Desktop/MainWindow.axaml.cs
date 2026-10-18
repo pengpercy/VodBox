@@ -309,6 +309,9 @@ public partial class MainWindow : Window
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key is Key.Enter or Key.Return) VM.SubmitSearchCommand.Execute(null);
+        if (e.Key is Key.Enter or Key.Return && !e.Handled) VM.SubmitSearchCommand.Execute(null);
     }
+
+    /// <summary>侧栏搜索框的历史下拉选了一条：词已写回搜索框，直接提交到搜索窗口。</summary>
+    private void OnSearchHistoryPicked(object? sender, string word) => VM.SubmitSearchCommand.Execute(null);
 }

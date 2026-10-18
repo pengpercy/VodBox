@@ -258,10 +258,6 @@ public static class DesignData
         // 分块行（5 张/行）
         for (var i = 0; i < main.Search.AllResults.Count; i += 5)
             main.Search.ResultRows.Add(new ResultRow(main.Search.AllResults.Skip(i).Take(5).ToList()));
-        // 联想列表（热词带 🔥）
-        foreach (var (text, hot) in new[] { ("庆余年 第二季", true), ("庆余年 第一季", false), ("庆余年 动画版", false), ("庆余年 有声书", false) })
-            main.Search.Suggestions.Add(new SuggestItem { Text = text, Hot = hot });
-        main.Search.ShowSuggestions = true;
         foreach (var word in new[] { "庆余年", "繁花", "歌手" })
             main.Search.SearchHistory.Add(word);
     }

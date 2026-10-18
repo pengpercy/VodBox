@@ -65,6 +65,7 @@
                        chrome:WindowDecorationProperties.ElementRole="User" />
               <PathIcon x:Name="GlobalSearchIcon" Data="{StaticResource Icon.Search}" Width="14" Height="14" Margin="10,0,0,0"
                         HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
+              <views:SearchHistoryPopup x:Name="GlobalSearchHistory" TargetBox="{Binding #GlobalSearch}" History="{Binding Search}" Picked="OnSearchHistoryPicked" />
             </Grid>
             <!-- 顶部不再显示品牌 logo 与名称，只保留当前源状态；收紧留白让菜单整体上移。 -->
             <TextBlock Grid.Row="1" Text="{Binding CurrentSourceName}" FontSize="11" Opacity="0.55" Margin="22,0,22,6" />

@@ -1,0 +1,49 @@
+<Popup xmlns="https://github.com/avaloniaui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+       xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+       x:Class="VodBox.Desktop.Views.SearchHistoryPopup"
+       Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+       IsLightDismissEnabled="True" OverlayDismissEventPassThrough="True" ShouldUseOverlayLayer="True">
+  <!-- 搜索历史下拉（对齐 FongMi/TV）：聚焦搜索框即列出全部历史，输入时按关键词过滤；点一条回搜，× 单条删除。
+       浮在页面上方（窗口覆盖层），不改变布局；点下拉与搜索框以外任何地方、Esc、搜索框失焦、窗口失活都会收起。
+       行与按钮都不可聚焦：点它们不会让搜索框先失焦而提前收起。 -->
+  <Border x:Name="HistoryPanel" MaxHeight="420" CornerRadius="{DynamicResource AppPanelCornerRadius}"
+          Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
+          Padding="4" ClipToBounds="True" BoxShadow="0 8 24 0 #40000000">
+    <Border.Styles>
+      <Style Selector="Border.historyRow:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      </Style>
+      <Style Selector="Border.historyRow.selected">
+        <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      </Style>
+    </Border.Styles>
+    <Grid RowDefinitions="Auto,*">
+      <Grid ColumnDefinitions="*,Auto" Margin="10,6,4,4">
+        <TextBlock Text="搜索历史" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+        <Button x:Name="ClearHistory" Grid.Column="1" Content="清空" Focusable="False" Background="Transparent" Click="OnClear"
+                BorderThickness="0" Padding="6,2" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" Cursor="Hand" />
+      </Grid>
+      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl x:Name="HistoryItems">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SuggestItem">
+              <Border Classes="historyRow" Classes.selected="{Binding IsSelected}" CornerRadius="{DynamicResource AppControlCornerRadius}"
+                      Background="Transparent" Padding="10,7,4,7" Cursor="Hand" PointerPressed="OnPick" Tag="{Binding}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <PathIcon Data="{StaticResource Icon.History}" Width="14" Height="14" Opacity="0.45" Margin="0,0,10,0" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <Button Grid.Column="2" Click="OnDelete" Tag="{Binding Text}" Focusable="False"
+                          Padding="5" Background="Transparent" BorderThickness="0" CornerRadius="10" Opacity="0.55"
+                          ToolTip.Tip="删除这条搜索历史" VerticalAlignment="Center">
+                    <PathIcon Data="{StaticResource Icon.Close}" Width="12" Height="12" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Popup>
