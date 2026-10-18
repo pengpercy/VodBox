@@ -1,8 +1,0 @@
-{
-  "url": "https://repo.maven.apache.org/maven2/com/github/zhkl0228/keystone/0.9.7/keystone-0.9.7-sources.jar",
-  "path": "maven-sources/keystone-0.9.7-sources.jar",
-  "sha256": "ee187eddf357652ab3f84535886dac5a08f1d6a4e526026fbed8be5b6c92e670",
-  "java_files": 18,
-  "native_source_entries": [],
-  "warning": "Maven source jar alone is not evidence of full native corresponding source"
-}

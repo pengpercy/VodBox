@@ -1,8 +1,0 @@
-{
-  "url": "https://repo.maven.apache.org/maven2/com/github/zhkl0228/unicorn/1.0.14/unicorn-1.0.14-sources.jar",
-  "path": "maven-sources/unicorn-1.0.14-sources.jar",
-  "sha256": "cb72c1837f9ba7881dec58a8b759371d33ff1d52847c77ae6a3c78d1e8e3cb20",
-  "java_files": 23,
-  "native_source_entries": [],
-  "warning": "Maven source jar alone is not evidence of full native corresponding source"
-}

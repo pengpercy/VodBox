@@ -247,3 +247,11 @@ loopback Range → 解码/seek」路径。
   之外额外创建搜索/设置窗口，导致打印验收结论后进程不退出，`build/test-desktop-smoke.sh` 会一直挂住。
 - 环境说明：本机显示器休眠（`IODisplayWrangler` 状态 0）时 Avalonia.Native 会以 `RenderTimer -6661` 失败；
   桌面验收前需唤醒显示（如 `caffeinate -u -t 600`），这不是产品缺陷。
+
+## 后续清理：移除 Java 时代的第三方快照与工具（2026-10-18）
+
+- 删除 `third_party/tvbox-silicon`（JavaHost 运行时、unicorn guard 后端重建脚本、Maven 源码与许可证证据，448 个受控文件）；
+  `ci_reuse` 的构建指纹路径与对应单测、`.gitignore` 里的 JVM 产物规则同步移除。
+- 删除依赖 JavaHost JDK 的 `tools/native-spiders/ProtocolOracle.java`、未被任何项目引用的 `Avalonia.Diagnostics` 包版本，
+  以及 CI 中只为旧 guard 后端服务的 Windows MSYS2/MinGW 工具链步骤。
+- 发布门禁里的 Java 载荷黑名单（`verify_no_java_payload`、`release_evidence`）保留，防止旧产物被重新打包。

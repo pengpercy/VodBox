@@ -21,7 +21,7 @@ from pathlib import Path
 ARTIFACT_NAME = "vodbox.{rid}"
 # Tracked paths that can change the published binaries. Docs/logs are deliberately excluded.
 SOURCE_PATHS = (
-    "src", "tests", "build", "third_party/tvbox-silicon", "Directory.Build.props", "Directory.Packages.props",
+    "src", "tests", "build", "Directory.Build.props", "Directory.Packages.props",
     "global.json", "VodBox.slnx", "NuGet.Config", "VERSION",
     ".github/workflows/build.yml", ".github/workflows/ci.yml",
 )
@@ -29,7 +29,7 @@ SOURCE_PATHS = (
 # Keep SOURCE_PATHS/source_hash unchanged: existing metadata uses that exact key.
 # Native compilation, bundled dependencies and verification/receipt inputs only.
 NATIVE_BUILD_PATHS = (
-    "src", "tests", "third_party/tvbox-silicon", "Directory.Build.*", "Directory.Packages.*",
+    "src", "tests", "Directory.Build.*", "Directory.Packages.*",
     "global.json", "VodBox.slnx", "NuGet.Config", "VERSION", "**/packages*.lock.json",
     ".github/workflows/build.yml",
     "build/quickjs",

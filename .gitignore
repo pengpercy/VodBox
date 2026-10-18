@@ -14,9 +14,3 @@ build/native/
 
 # Local acceptance logs, synthetic media, publish copies and private checkpoints
 .alma/
-
-# Generated upstream JVM analysis/build output; never product content
-third_party/tvbox-silicon/Runtime/JavaHost/target/
-
-# Source archives fetched with fixed URLs and hashes before component packaging
-third_party/tvbox-silicon/dependency-sources/archives/

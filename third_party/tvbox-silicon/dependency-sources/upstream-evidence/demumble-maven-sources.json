@@ -1,8 +1,0 @@
-{
-  "url": "https://repo.maven.apache.org/maven2/com/github/zhkl0228/demumble/1.0.4/demumble-1.0.4-sources.jar",
-  "path": "maven-sources/demumble-1.0.4-sources.jar",
-  "sha256": "b81f0da573fbae2c8e227275b2325bc1e4dd12b1436c68b969720c9e279ae702",
-  "java_files": 61,
-  "native_source_entries": [],
-  "warning": "Maven source jar alone is not evidence of full native corresponding source"
-}

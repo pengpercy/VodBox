@@ -24,4 +24,4 @@ VODBOX_MPV_LIB=/absolute/path/to/libmpv.dylib dotnet tools/native-spiders/Probe/
 
 `appsx` 在线模式依次验证剧圈和咕咕。fixture 模式只接受回环 HTTP origin，拒绝解码合成媒体地址。探针日志不打印签名媒体 URL、token 或响应正文。
 
-`ProtocolOracle.java` 是可选的原插件分析工具，依赖已有 JavaHost 的 JDK 21 环境（仅此分析工具例外，运行时和默认测试不调用它）；普通 Java 项目仍使用全局约定的 Java 8。
+`aidj_vectors.py` 是可选的离线工具：只对 AiDj 内嵌 Python 中的纯计算函数求值，生成测试向量，不执行其网络/服务器代码。

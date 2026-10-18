@@ -1,7 +1,6 @@
 """Reuse must follow individual verified jobs, version and source identity."""
 import importlib.util
 import subprocess
-import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -41,40 +40,6 @@ class ReuseTests(unittest.TestCase):
     def test_pull_request_and_release_sources_are_not_trusted(self):
         self.assertFalse(self.probe(event='pull_request'))
         self.assertFalse(self.probe(path='.github/workflows/release.yml'))
-
-    def test_analysis_assets_affect_source_fingerprint_but_generated_target_does_not(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-
-            def git(*args, check=True):
-                return subprocess.run(['git', '-C', directory, *args], check=check,
-                                      capture_output=True, text=True).stdout
-
-            git('init')
-            inputs = ('Runtime/JavaHost/pom.xml', 'Runtime/JavaHost/src/Spider.java',
-                      'Runtime/QuickJS/native.c', 'build.sh', 'LICENSE')
-            for name in inputs:
-                path = root / 'third_party/tvbox-silicon' / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text('original')
-            git('add', 'third_party/tvbox-silicon')
-            git('-c', 'user.name=Test', '-c', 'user.email=test@example.com',
-                'commit', '-m', 'inputs')
-            with patch.object(reuse, 'git', side_effect=git):
-                original = reuse.source_hash('HEAD')
-                target = root / 'third_party/tvbox-silicon/Runtime/JavaHost/target/host.jar'
-                target.parent.mkdir(parents=True)
-                target.write_text('generated')
-                self.assertNotIn('target/', git('ls-files', 'third_party/tvbox-silicon'))
-                self.assertEqual(original, reuse.source_hash('HEAD'))
-                for name in inputs:
-                    (root / 'third_party/tvbox-silicon' / name).write_text('changed')
-                    git('add', 'third_party/tvbox-silicon/' + name)
-                    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com',
-                        'commit', '-m', name)
-                    self.assertNotEqual(original, reuse.source_hash('HEAD'), name)
-                    git('reset', '--hard', 'HEAD~1')
-                self.assertEqual(original, reuse.source_hash('HEAD'))
 
     def test_lookup_failure_builds_again(self):
         with patch.object(reuse, 'git', return_value='head'), patch.object(reuse, 'source_hash', return_value='same'), \
