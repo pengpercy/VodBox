@@ -11,6 +11,7 @@ public sealed class NewCzSource : IResolvingContentSource
     // Java yq() 的实际取值：Android Chromecast(CrKey) UA + Accept-language，而非通用桌面 UA。
     private const string Agent="Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 CrKey/1.54.248666";
     // Java 播放头单独使用桌面 UA（见 playerContent 的 user-agent）。
+    private const string CzzyAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
     private const string PlayerAgent="Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
     // 站点前置雷池(SafeLine) WAF：403 响应会下发 sl-session Cookie，Java 插件将其持久化为 czCookie 复用，
     // 故这里共用带 CookieContainer 的客户端，让 WAF 会话 Cookie 跨请求保留。
@@ -128,7 +129,9 @@ public sealed class NewCzSource : IResolvingContentSource
     {
         var uri=HttpUri(Url(id));if(uri.Authority!=_host.Authority||!Rx("^/movie/[^/?#]+\\.html$").IsMatch(uri.AbsolutePath)||uri.Query.Length>0)throw new InvalidDataException("NewCz 影片标识无效。");return uri.AbsoluteUri;
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
+    private readonly DetailCache _details=new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)=>_details.GetAsync(mediaId,LoadDetailAsync,ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId,CancellationToken ct)
     {
         string html=await _fetch(DetailUrl(mediaId),ct).ConfigureAwait(false);
         string title=Text(Rx("<h1\\b[^>]*>(.*?)</h1>").Match(Body(html,"div","moviedteail_tt")).Groups[1].Value);
@@ -143,7 +146,7 @@ public sealed class NewCzSource : IResolvingContentSource
         var episodes=Rx("<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>").Matches(Body(html,"div","paly_list_btn"))
             .Where(m=>Uri.TryCreate(_host,m.Groups[1].Value,out var uri) && uri.Authority==_host.Authority && uri.AbsolutePath.EndsWith(".html",StringComparison.OrdinalIgnoreCase))
             .Select(m=>new Episode("专线\u0001"+(m.Groups[1].Value.StartsWith("http",StringComparison.Ordinal) ? m.Groups[1].Value.Replace(_host.AbsoluteUri,"",StringComparison.Ordinal) : m.Groups[1].Value),Text(m.Groups[2].Value))).DistinctBy(e=>e.Id).ToArray();
-        return new() {Item=new() {Id=mediaId,Title=title,Poster=poster.Length>0?Url(poster):null,Year=Fact("年份"),Area=Fact("地区"),TypeName=Fact("类型"),Remarks=Fact("更新")},Actor=Fact("主演"),Director=Fact("导演"),Description=Text(Body(html,"div","yp_context")),Lines=episodes.Length>0?[new("专线","专线",episodes)]:[]};
+        return new() {Item=new() {Id=mediaId,Title=title,Poster=poster.Length>0?Url(poster):null,Year=Fact("年份"),Area=Fact("地区"),TypeName=Fact("类型"),Remarks=Fact("豆瓣")},Actor=Fact("主演"),Director=Fact("导演"),Description=Text(Body(html,"div","yp_context")),Lines=episodes.Length>0?[new("专线","专线",episodes)]:[]};
     }
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId,string episodeId,CancellationToken ct=default)
     {
@@ -155,6 +158,13 @@ public sealed class NewCzSource : IResolvingContentSource
         string script=html;
         if(cipher.Success)script=CatVodAes.Decrypt(cipher.Groups[1].Value,cipher.Groups[2].Value,cipher.Groups[3].Value);
         var media=Rx("video:\\s*\\{url:\\s*\"([^\"]+)\"").Match(script);
+        if(!media.Success)
+        {
+            // 原插件在 iframe 解析之前识别 t0o1.czzy.fun 播放器：url= 后即媒体地址，需固定 Origin 与桌面 Chrome UA。
+            var direct=Rx("t0o1\\.czzy\\.fun:.*?url=(.*?)\"").Match(html);
+            if(direct.Success)
+                return new() {Uri=HttpUri(direct.Groups[1].Value).AbsoluteUri,Title=detail.Item.Title,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="专线",Headers=new Dictionary<string,string>{{"Origin","https://t0o1.czzy.fun:321"},{"User-Agent",CzzyAgent}}};
+        }
         string resolved=media.Success?media.Groups[1].Value:await ResolveFrame(html,ct).ConfigureAwait(false);
         string url=HttpUri(resolved).AbsoluteUri;
         return new() {Uri=url,Title=detail.Item.Title,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="专线",Headers=new Dictionary<string,string>{{"Origin",_host.GetLeftPart(UriPartial.Authority)},{"User-Agent",PlayerAgent}}};

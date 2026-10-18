@@ -50,9 +50,19 @@ public sealed class Tingshu275Source : IResolvingContentSource
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
         return await BoundedContent.ReadAsync(stream, 8 * 1024 * 1024, timeout.Token).ConfigureAwait(false);
     }
+    // 原插件只在 init 里读一次发现配置；这里同样每个实例只解析一次，失败不缓存。
+    private Task<Uri>? _host;
+    private readonly Lock _hostGate = new();
     private async Task<Uri> Host(CancellationToken ct)
     {
         if (_fixture is not null) return _fixture;
+        Task<Uri> pending;
+        lock (_hostGate) pending = _host ??= Discover(CancellationToken.None);
+        try { return await pending.WaitAsync(ct).ConfigureAwait(false); }
+        catch when (pending.IsFaulted || pending.IsCanceled) { lock (_hostGate) if (ReferenceEquals(_host, pending)) _host = null; throw; }
+    }
+    private async Task<Uri> Discover(CancellationToken ct)
+    {
         string value = Encoding.UTF8.GetString(await Read(new Uri(Discovery), ct).ConfigureAwait(false)).Trim();
         var host = HttpUri(value);
         if (host.Query.Length > 0 || !host.AbsolutePath.EndsWith('/')) throw new InvalidDataException("听书配置不是接口目录。");
@@ -81,7 +91,9 @@ public sealed class Tingshu275Source : IResolvingContentSource
         var items = Required(Required(document.RootElement, "data", JsonValueKind.Object), "list", JsonValueKind.Array).EnumerateArray().Select(Item).ToArray();
         return new(items, page, items.Length >= 10 ? checked(page + 1) : page);
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
+    private readonly DetailCache _details = new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default) => _details.GetAsync(mediaId, LoadDetailAsync, ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId, CancellationToken ct)
     {
         using var document = await Request("book?bookId=" + Uri.EscapeDataString(mediaId), ct).ConfigureAwait(false);
         var book = Required(Required(document.RootElement, "data", JsonValueKind.Object), "bookData", JsonValueKind.Object);
@@ -97,14 +109,14 @@ public sealed class Tingshu275Source : IResolvingContentSource
     }
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId, string episodeId, CancellationToken ct = default)
     {
-        var detail = await GetDetailAsync(mediaId, ct).ConfigureAwait(false);
-        if (!detail.Lines.SelectMany(line => line.Episodes).Any(episode => episode.Id == episodeId)) throw new InvalidDataException("听书选集已失效。");
+        // 原插件 playerContent 直接用 chapterId|||bookId 取地址，不回抓书籍详情与整本章节表。
+        if (!episodeId.StartsWith("直链\u0001", StringComparison.Ordinal)) throw new InvalidDataException("听书选集已失效。");
         string[] parts = episodeId[3..].Split("|||", StringSplitOptions.None);
         if (parts.Length != 2 || parts[1] != mediaId) throw new InvalidDataException("听书选集标识无效。");
         string timestamp = _clock().ToString(CultureInfo.InvariantCulture);
         using var parsed = await Request("AppGetChapterUrl2023?timeStamp=" + timestamp + "&uid=&chapterId=" + Uri.EscapeDataString(parts[0]) + "&addItParapet=" + Sign(timestamp) + "&bookId=" + Uri.EscapeDataString(mediaId), ct).ConfigureAwait(false);
         string url = HttpUri(Text(parsed.RootElement, "src")).AbsoluteUri;
-        return new() { Uri = url, SourceKey = Key, SourceName = Name, MediaId = mediaId, EpisodeId = episodeId, LineId = "直链", Title = detail.Item.Title, Headers = new Dictionary<string, string> { ["User-Agent"] = MediaAgent } };
+        return new() { Uri = url, SourceKey = Key, SourceName = Name, MediaId = mediaId, EpisodeId = episodeId, LineId = "直链", Title = _details.TryGet(mediaId)?.Item.Title ?? Name, Headers = new Dictionary<string, string> { ["User-Agent"] = MediaAgent } };
     }
     public async Task<MediaPage> SearchAsync(string query, int page, CancellationToken ct = default)
     {

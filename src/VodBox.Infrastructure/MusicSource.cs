@@ -84,7 +84,9 @@ public sealed class MusicSource : IResolvingContentSource,IDisposable
             }
         return result.DistinctBy(item=>item.Id).ToArray();
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
+    private readonly DetailCache _details=new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)=>_details.GetAsync(mediaId,LoadDetailAsync,ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId,CancellationToken ct)
     {
         var root=Html.Parse(await Page(mediaId,ct));var container=root.Class("play_list").FirstOrDefault()??throw new InvalidDataException("Music 页面缺少 play_list。");
         var title=container.All("h1").FirstOrDefault()?.Text.Split(',')[0]??Name;var episodes=new List<Episode>();
@@ -100,7 +102,7 @@ public sealed class MusicSource : IResolvingContentSource,IDisposable
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId,string episodeId,CancellationToken ct=default)
     {
         var detail=await GetDetailAsync(mediaId,ct);var episode=detail.Lines.SelectMany(line=>line.Episodes).FirstOrDefault(value=>value.Id==episodeId)??throw new InvalidDataException("Music 选集不存在。");var play=episode.Uri??"";
-        var file=play[(play.LastIndexOf('/')+1)..];if(!file.EndsWith(".html",StringComparison.Ordinal))throw new InvalidDataException("Music 歌曲页标识无效。");var id=file[..^5];string url;
+        var file=play[(play.LastIndexOf('/')+1)..];if(!file.EndsWith(".html",StringComparison.Ordinal))throw new InvalidDataException("Music 歌曲页标识无效。");var id=file[..^5];string url;string? cover=null;
         if(play.Contains("mp4",StringComparison.Ordinal))url="http://www.4c44.com/data/down.php?ac=vplay&id="+Uri.EscapeDataString(id)+"&q=1080";
         else
         {
@@ -108,10 +110,11 @@ public sealed class MusicSource : IResolvingContentSource,IDisposable
             if(id.Length==0)throw new InvalidDataException("Music 歌曲 ID 无效。");
             var key=_clock().ToString("yyyyMMddHHmm",CultureInfo.InvariantCulture)+"4c44";
             // Java SN 在字段初始化时绑定默认域名，init(ext) 不会重建 SN；保留默认端点。
-            using var doc=JsonDocument.Parse(await _send(DefaultOrigin+"/js/play.php",new Dictionary<string,string>{{"id",id},{"type","music"},{"key",key}},ct));url=AppRjSource.Text(doc.RootElement,"url");
+            using var doc=JsonDocument.Parse(await _send(DefaultOrigin+"/js/play.php",new Dictionary<string,string>{{"id",id},{"type","music"},{"key",key}},ct));url=AppRjSource.Text(doc.RootElement,"url");if(AppRjSource.Text(doc.RootElement,"pic") is {Length:>0} pic)cover=pic;
         }
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo.Length>0)throw new InvalidDataException("Music 播放地址无效。");
-        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId="易听",EpisodeId=episodeId,Title=detail.Item.Title+" · "+episode.Title,Headers=new(){{"User-Agent",Agent},{"Referer",_origin}}};
+        // 原插件把 play.php 返回的 pic 作为播放封面。
+        return new(){Uri=url,Poster=cover??detail.Item.Poster,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId="易听",EpisodeId=episodeId,Title=detail.Item.Title+" · "+episode.Title,Headers=new(){{"User-Agent",Agent},{"Referer",_origin}}};
     }
     public void Dispose()=>_http.Dispose();
 

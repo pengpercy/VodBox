@@ -202,9 +202,9 @@ public sealed class SourceRegistry : IDisposable
     public IContentSource? Default()
     {
         var runnable = VisibleSources.Where(source => Get(source.Key) is not null).ToArray();
-        // 首页默认源优先选能出内容的站点：跳过只给导航/切源提示的信息源，
+        // 首页默认源优先选能出内容的站点：跳过只给切源提示的信息源与只列片单的导航源，
         // 避免订阅里排在最前的“点我切源/导航”提醒项成为默认首页。找不到再回退第一项。
-        return (runnable.FirstOrDefault(source => Get(source.Key) is not IInformationalContentSource)
+        return (runnable.FirstOrDefault(source => Get(source.Key) is not (IInformationalContentSource or INavigationContentSource))
             ?? runnable.FirstOrDefault()) is { } info ? Get(info.Key) : null;
     }
 

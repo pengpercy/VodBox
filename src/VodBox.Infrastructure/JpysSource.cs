@@ -16,6 +16,8 @@ public sealed class JpysSource : IResolvingContentSource
     private const string Secret = "cb808529bae6b6be45ecfab29a4889bc";
     private const string Agent = "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
     private static readonly Lazy<string> Device = new(LoadDevice);
+    // 原插件播放请求头的 Origin/Referer 固定为 www 主域；ext 覆盖过域名时用该域名，不退回默认镜像。
+    private string PlayerOrigin=>_origin==DefaultOrigin?"https://www.ghw9zwp5.com":_origin;
     private readonly SourceInfo _site;
     private readonly string _origin;
     private readonly string _device;
@@ -102,12 +104,11 @@ public sealed class JpysSource : IResolvingContentSource
     {
         using var doc=await Request("video/detail","id="+Uri.EscapeDataString(mediaId),"id="+mediaId,ct,detail:true);var data=doc.RootElement.GetProperty("data");
         var episodes=data.GetProperty("episodeList").EnumerateArray().Select(ep=>new Episode("爱电影\u0001"+mediaId+"@"+Text(ep,"nid"),Text(ep,"name"))).ToArray();
-        return new(){Item=Item(data,"vodRemarks") with{Id=mediaId},Description=data.TryGetProperty("vodBlurb",out _)?Text(data,"vodBlurb"):Text(data,"vodContent"),Actor=Text(data,"vodActor"),Director=Text(data,"vodDirector"),Lines=episodes.Length>0?[new PlaybackLine("爱电影","爱电影",episodes)]:[]};
+        return new(){Item=Item(data,"vodRemarks") with{Id=mediaId,Area=Text(data,"vodArea"),TypeName=Text(data,"vodClass")},Description=data.TryGetProperty("vodBlurb",out _)?Text(data,"vodBlurb"):Text(data,"vodContent"),Actor=Text(data,"vodActor"),Director=Text(data,"vodDirector"),Lines=episodes.Length>0?[new PlaybackLine("爱电影","爱电影",episodes)]:[]};
     }
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId,string episodeId,CancellationToken ct=default)
     {
-        var detail=await GetDetailAsync(mediaId,ct);
-        if(!detail.Lines.SelectMany(line=>line.Episodes).Any(ep=>ep.Id==episodeId))throw new InvalidDataException("Jpys 选集不存在。");
+        // 原插件 playerContent 直接用 id@nid 请求播放地址，不再抓详情；归属由下面的 id 比对保证。
         const string prefix="爱电影\u0001";
         if(!episodeId.StartsWith(prefix,StringComparison.Ordinal))throw new InvalidDataException("Jpys 线路标识无效。");
         var parts=episodeId[prefix.Length..].Split('@');if(parts.Length!=2||parts[0]!=mediaId||parts[1].Length==0)throw new InvalidDataException("Jpys 选集标识无效。");
@@ -115,7 +116,6 @@ public sealed class JpysSource : IResolvingContentSource
         using var doc=await Request("v2/video/episode/url","clientType=3&id="+Uri.EscapeDataString(mediaId)+"&nid="+Uri.EscapeDataString(parts[1]),canonical,ct,player:true);
         var url=Text(doc.RootElement.GetProperty("data").GetProperty("list")[0],"url");
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo.Length>0)throw new InvalidDataException("Jpys 播放地址无效。");
-        // Origin/Referer 必须与实际使用的基础地址一致：ext 覆盖过域名时不能退回硬编码默认镜像。
-        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="爱电影",Title=Name,Headers=new(){{"User-Agent",Agent},{"Origin",_origin},{"Referer",_origin}}};
+        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="爱电影",Title=Name,Headers=new(){{"User-Agent",Agent},{"Origin",PlayerOrigin},{"Referer",PlayerOrigin}}};
     }
 }

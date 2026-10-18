@@ -13,6 +13,7 @@ public sealed class JPJSource : IResolvingContentSource
     private static readonly HttpClient Http=new(new HttpClientHandler {AutomaticDecompression=DecompressionMethods.All}) {Timeout=TimeSpan.FromSeconds(20)};
     private readonly SourceInfo _site;
     private readonly Func<string,CancellationToken,Task<string>> _fetch;
+    private readonly Func<string,CancellationToken,Task<bool>> _probe;
     private readonly SemaphoreSlim _gate=new(1,1);
     private Uri _host=new("https://ev5356.970xw.com");
     private string _imageDomain="";
@@ -24,7 +25,8 @@ public sealed class JPJSource : IResolvingContentSource
     internal JPJSource(SourceInfo site,Func<string,CancellationToken,Task<string>>? fetch)
     {
         if(!Supports(site.Ext))throw new NotSupportedException("JPJ ext 配置不受支持。");
-        _site=site;_fetch=fetch??Fetch;
+        // 注入 fetch（测试夹具）时不做真实可达性探测，按列表首个合法域名取图。
+        _site=site;_fetch=fetch??Fetch;_probe=fetch is null?Reachable:(_,_)=>Task.FromResult(true);
     }
     internal static bool Supports(string? ext)
     {
@@ -59,7 +61,7 @@ public sealed class JPJSource : IResolvingContentSource
                     {
                         using var settings=JsonDocument.Parse(await _fetch(new Uri(candidate,"/api/v2/settings/resourceDomainConfig").AbsoluteUri,ct).ConfigureAwait(false));
                         _host=candidate;
-                        SetImageDomain(settings.RootElement);
+                        await SetImageDomain(settings.RootElement,ct).ConfigureAwait(false);
                         break;
                     }
                     catch(Exception error) when(error is HttpRequestException or JsonException or InvalidDataException or KeyNotFoundException) { }
@@ -72,20 +74,39 @@ public sealed class JPJSource : IResolvingContentSource
             if(_imageDomain.Length==0)
             {
                 using var settings=JsonDocument.Parse(await _fetch(new Uri(_host,"/api/v2/settings/resourceDomainConfig").AbsoluteUri,ct).ConfigureAwait(false));
-                SetImageDomain(settings.RootElement);
+                await SetImageDomain(settings.RootElement,ct).ConfigureAwait(false);
             }
             _initialized=true;
         }
         finally {_gate.Release();}
     }
-    private void SetImageDomain(JsonElement root)
+    // 原插件逐个 HEAD 探测 imgDomain（先 https 后 http），取第一个可达的；全部不可达时退回首个合法域名。
+    private async Task SetImageDomain(JsonElement root,CancellationToken ct)
     {
-        var data=root.GetProperty("data");
+        var data=root.GetProperty("data");string fallback="";
         foreach(string raw in Field(data,"imgDomain").Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries))
         {
             string candidate=raw.TrimEnd('/');
-            if(Uri.CheckHostName(candidate)==UriHostNameType.Dns){_imageDomain=candidate;return;}
+            if(Uri.CheckHostName(candidate)!=UriHostNameType.Dns)continue;
+            if(fallback.Length==0)fallback=candidate;
+            if(await _probe(candidate,ct).ConfigureAwait(false)){_imageDomain=candidate;return;}
         }
+        _imageDomain=fallback;
+    }
+    private static async Task<bool> Reachable(string host,CancellationToken ct)
+    {
+        foreach(string scheme in new[]{"https://","http://"})
+        {
+            try
+            {
+                using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(5));
+                using var request=new HttpRequestMessage(HttpMethod.Head,scheme+host+"/");
+                using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token).ConfigureAwait(false);
+                return true;
+            }
+            catch(Exception error) when(error is HttpRequestException or OperationCanceledException && !ct.IsCancellationRequested){}
+        }
+        return false;
     }
     private async Task<JsonDocument> Request(string path,CancellationToken ct)
     {
@@ -123,11 +144,16 @@ public sealed class JPJSource : IResolvingContentSource
         string remarks=Field(value,"mask");if(remarks.Length==0&&value.TryGetProperty("playlist",out var playlist)&&playlist.ValueKind==JsonValueKind.Object)remarks=Field(playlist,"title");
         return new() {Id=Field(value,slide?"jump_id":"id"),Title=Field(value,"title"),Poster=pic.Length>0&&_imageDomain.Length>0?"http://"+_imageDomain+pic:null,Remarks=remarks,Year=Field(value,"year"),Area=Field(value,"area"),TypeName=Names(value,"types")};
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
+    private readonly DetailCache _details=new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)=>_details.GetAsync(mediaId,LoadDetailAsync,ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId,CancellationToken ct)
     {
         if(mediaId.Length is 0 or >128||mediaId.Any(char.IsControl))throw new InvalidDataException("JPJ 影片标识无效。");
         using var json=await Request("/api/video/detailv2?id="+Uri.EscapeDataString(mediaId),ct).ConfigureAwait(false);
         var value=json.RootElement.GetProperty("data");
+        // 原插件 detailContent 遇到类型含「伦理」「情色」时返回空详情。
+        string types=Names(value,"types");
+        if(types.Contains("伦理",StringComparison.Ordinal)||types.Contains("情色",StringComparison.Ordinal))throw new NotSupportedException("该影片已被原插件按分类屏蔽。");
         var lines=new List<PlaybackLine>();
         foreach(var group in Array(value,"source_list_source").EnumerateArray())
         {

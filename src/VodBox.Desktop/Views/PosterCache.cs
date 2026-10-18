@@ -1,4 +1,5 @@
 using Avalonia.Media.Imaging;
+using VodBox.Core;
 
 namespace VodBox.Desktop.Views;
 
@@ -339,7 +340,11 @@ internal sealed class PosterCache : IDisposable
 
     private static async Task<byte[]> FetchPosterBytesAsync(Uri uri,CancellationToken cancellationToken)
     {
-        using var response=await Client.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,cancellationToken).ConfigureAwait(false);
+        // TVBox 图片地址可带 @Referer=…@User-Agent=… 后缀（如豆瓣图床无 Referer 返回 418）：拆成请求头。
+        var (address,headers)=TvBoxLinks.SplitImageHeaders(uri.OriginalString);
+        using var request=new HttpRequestMessage(HttpMethod.Get,headers.Count==0?uri:new Uri(address));
+        foreach(var (name,value) in headers)request.Headers.TryAddWithoutValidation(name,value);
+        using var response=await Client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         if(response.Content.Headers.ContentLength>4*1024*1024)throw new InvalidDataException("Poster exceeds 4MiB.");
         using var stream=await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);

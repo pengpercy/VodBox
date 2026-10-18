@@ -24,13 +24,25 @@ public sealed class DoubaoSource : IResolvingContentSource
     internal static bool Supports(string? ext)=>string.IsNullOrWhiteSpace(ext)||(Uri.TryCreate(ext,UriKind.Absolute,out var uri)&&(uri.Scheme is "http" or "https")&&uri.UserInfo.Length==0&&uri.Query.Length==0&&uri.Fragment.Length==0);
     private static Dictionary<string,string> Headers()=>new(){{"User-Agent",Agent},{"Accept","application/json"},{"Accept-Language","zh-CN"}};
     private static async Task<string> Fetch(string url,IReadOnlyDictionary<string,string> headers,CancellationToken ct){return DefaultHttp.Decode(await DefaultHttp.SharedNoRedirect.GetBoundedAsync(url,8*1024*1024,ct,headers));}
-    private async Task<JsonDocument> Request(string path,CancellationToken ct)=>JsonDocument.Parse(await _fetch(_origin+path,Headers(),ct));
+    // 原插件把赛程表与每个回放分页各缓存 60 秒（SN()/tF()），列表、详情、播放共用；按路径复刻。
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string,(DateTimeOffset Stored,string Body)> _responses=new(StringComparer.Ordinal);
+    private async Task<JsonDocument> Request(string path,CancellationToken ct)
+    {
+        var now=DateTimeOffset.UtcNow;
+        if(!_responses.TryGetValue(path,out var cached)||now-cached.Stored>TimeSpan.FromSeconds(60))
+        {
+            cached=(now,await _fetch(_origin+path,Headers(),ct));
+            foreach(var stale in _responses.Where(pair=>now-pair.Value.Stored>TimeSpan.FromSeconds(60)).Select(pair=>pair.Key).ToArray())_responses.TryRemove(stale,out _);
+            _responses[path]=cached;
+        }
+        return JsonDocument.Parse(cached.Body);
+    }
     private static string Text(JsonElement value,string key)=>AppRjSource.Text(value,key);
     private static int Number(JsonElement value,string key,int fallback=0)=>int.TryParse(Text(value,key),out var number)?number:fallback;
     private static IEnumerable<JsonElement> Array(JsonElement obj,string key)=>obj.TryGetProperty(key,out var array)&&array.ValueKind==JsonValueKind.Array?array.EnumerateArray():Enumerable.Empty<JsonElement>();
     private static IEnumerable<JsonElement> Schedules(JsonDocument doc)=>Array(doc.RootElement.GetProperty("data"),"days").SelectMany(day=>Array(day,"live").Concat(Array(day,"playback")));
     private static string Date(string value)=>DateTimeOffset.TryParse(value,CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal,out var time)?time.ToOffset(TimeSpan.FromHours(8)).ToString("MM-dd HH:mm",CultureInfo.InvariantCulture):value;
-    private static MediaItem Match(JsonElement schedule,string id,bool replay=false)=>new(){Id=id,Title=Text(schedule,"teamA")+(replay?" "+Number(schedule,"teamAscore")+"-"+Number(schedule,"teamBscore")+" ":" vs ")+Text(schedule,"teamB"),Poster=Text(schedule,"teamAImage"),Remarks=Date(Text(schedule,"matchTime"))+" | "+Text(schedule,"league")+" | "+(replay?"回放":Status(Number(schedule,"status")))};
+    private static MediaItem Match(JsonElement schedule,string id,bool replay=false)=>new(){Id=id,Title=Text(schedule,"teamA")+(replay?" "+Number(schedule,"teamAscore")+"-"+Number(schedule,"teamBscore")+" ":" vs ")+Text(schedule,"teamB"),Poster=Text(schedule,"teamAImage"),Remarks=Date(Text(schedule,"matchTime"))+" | "+Text(schedule,"league")+" | "+(replay?"回放":Status(Number(schedule,"status"))),TypeName=Text(schedule,"league")};
     private static string Status(int status)=>status==1?"直播中":status==2?"已结束":"未开始";
     public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult<IReadOnlyList<Category>>([new("live","📡 赛事直播"),new("replay_football","⚽ 足球回放"),new("replay_basketball","🏀 篮球回放"),new("replay_all","🎬 全部回放")]);}
     public Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult<IReadOnlyList<FilterGroup>>([]);}
@@ -83,14 +95,18 @@ public sealed class DoubaoSource : IResolvingContentSource
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId,string episodeId,CancellationToken ct=default)
     {
         var detail=await GetDetailAsync(mediaId,ct);var line=detail.Lines.FirstOrDefault(value=>value.Episodes.Any(ep=>ep.Id==episodeId));var episode=line?.Episodes.FirstOrDefault(value=>value.Id==episodeId);if(episode?.Uri is not {Length:>0} play)throw new InvalidDataException("Doubao 选集不存在。");
-        var url=play;
+        var url=play;bool live=mediaId.StartsWith("live###",StringComparison.Ordinal);
         if(!play.StartsWith("http",StringComparison.Ordinal))
         {
-            var html=(await _fetch(_origin+"/play/"+Uri.EscapeDataString(play),Headers(),ct)).Replace("\\u002F","/",StringComparison.Ordinal);
+            string page=_origin+"/play/"+Uri.EscapeDataString(play);
+            var html=(await _fetch(page,Headers(),ct)).Replace("\\u002F","/",StringComparison.Ordinal);
             var matches=Regex.Matches(html,"(https?://[\\w.\\-/:?=&]+\\.m3u8[^,\"\\s]*)",RegexOptions.CultureInvariant,TimeSpan.FromSeconds(2)).Select(m=>m.Groups[1].Value.TrimEnd(',', '"')).ToArray();
-            url=matches.FirstOrDefault(value=>new[]{"rtmpcdn","live.","pul-","gkykp"}.Any(value.Contains))??matches.FirstOrDefault()??throw new InvalidDataException("Doubao 播放页未返回 m3u8。");
+            var found=matches.FirstOrDefault(value=>new[]{"rtmpcdn","live.","pul-","gkykp"}.Any(value.Contains))??matches.FirstOrDefault();
+            // 原插件播放页里没有 m3u8 时返回该页并置 parse=1，交给网页嗅探。
+            if(found is null)return new(){Uri=page,Resolution=ResolutionKind.Sniff,IsLive=live,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId=line!.Id,EpisodeId=episodeId,Title=detail.Item.Title+" · "+episode.Title,Headers=Headers()};
+            url=found;
         }
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo.Length>0)throw new InvalidDataException("Doubao 播放地址无效。");
-        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId=line!.Id,EpisodeId=episodeId,Title=detail.Item.Title+" · "+episode.Title,Headers=Headers()};
+        return new(){Uri=url,IsLive=live,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId=line!.Id,EpisodeId=episodeId,Title=detail.Item.Title+" · "+episode.Title,Headers=Headers()};
     }
 }

@@ -96,7 +96,9 @@ public sealed partial class SixVSource : IResolvingContentSource
         return new(ParseSearchCards(html), 1, 1);
     }
 
-    public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
+    private readonly DetailCache _details = new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default) => _details.GetAsync(mediaId, LoadDetailAsync, ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId, CancellationToken ct)
     {
         var page = await ReadAsync(SitePage(mediaId), ct).ConfigureAwait(false);
         var heading = ArticleTitle().Match(page);

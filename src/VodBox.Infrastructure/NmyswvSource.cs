@@ -80,7 +80,9 @@ public sealed partial class NmyswvSource : IResolvingContentSource
         var html = await ReadAsync(new(_origin, "/index.php?m=vod-search&wd=" + Uri.EscapeDataString(query.Trim())), ct).ConfigureAwait(false);
         return new(ParseCards(html), page, page);
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
+    private readonly DetailCache _details = new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default) => _details.GetAsync(mediaId, LoadDetailAsync, ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId, CancellationToken ct)
     {
         var uri = SitePage(mediaId);
         var html = await ReadAsync(uri, ct).ConfigureAwait(false);
@@ -104,7 +106,13 @@ public sealed partial class NmyswvSource : IResolvingContentSource
         }
         if (lines.Count == 0) throw new InvalidDataException("Nmyswv 详情没有静态分集列表。");
         var cover = Cover().Match(html);
-        return new() { Item = new() { Id = mediaId, Title = title, Poster = cover.Success ? Media(Attr(cover.Groups[1].Value, "src"), uri)?.AbsoluteUri : null },
+        // 原插件：section.page-bd > div.desc_item:nth-child(2) > font 为备注，nth-child(5) > a 里取四位年份。
+        var facts = PageBodyChildren(html);
+        string Fact(int child, string tag) => facts.Count >= child && facts[child - 1].Class.Contains("desc_item", StringComparison.Ordinal)
+            ? Text(Rx("<" + tag + "\\b[^>]*>(.*?)</" + tag + "\\s*>").Match(facts[child - 1].Body).Groups[1].Value) : "";
+        var year = Rx("(\\d{4})").Match(Fact(5, "a"));
+        return new() { Item = new() { Id = mediaId, Title = title, Poster = cover.Success ? Media(Attr(cover.Groups[1].Value, "src"), uri)?.AbsoluteUri : null,
+            Remarks = Fact(2, "font"), Year = year.Success ? year.Groups[1].Value : null },
             Description = Text(Description().Match(html).Groups[1].Value), Lines = lines };
     }
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId, string episodeId, CancellationToken ct = default)
@@ -123,6 +131,31 @@ public sealed partial class NmyswvSource : IResolvingContentSource
         return new() { Uri = url, Title = detail.Item.Title, SourceKey = Key, SourceName = Name, MediaId = mediaId, EpisodeId = episodeId, LineId = line.Id,
             Headers = new() { ["User-Agent"] = UserAgent } };
     }
+    /// <summary>section.page-bd 的直接子元素（按出现顺序，供 nth-child 定位）。</summary>
+    private static List<(string Class, string Body)> PageBodyChildren(string html)
+    {
+        var result = new List<(string, string)>();
+        var open = Rx("<section\\b[^>]*class=[\"'][^\"']*\\bpage-bd\\b[^\"']*[\"'][^>]*>").Match(html);
+        if (!open.Success) return result;
+        int depth = 0, start = 0; string cls = "";
+        foreach (Match token in Rx("<(/?)([a-zA-Z][a-zA-Z0-9]*)\\b([^>]*)>").Matches(html, open.Index + open.Length))
+        {
+            string tag = token.Groups[2].Value.ToLowerInvariant();
+            if (tag is "br" or "img" or "hr" or "input" or "meta" or "link" || token.Value.EndsWith("/>", StringComparison.Ordinal)) continue;
+            if (token.Groups[1].Value.Length == 0)
+            {
+                if (depth == 0) { start = token.Index + token.Length; cls = Attr(token.Groups[3].Value, "class"); }
+                depth++;
+            }
+            else
+            {
+                if (depth == 0) break; // </section>
+                if (--depth == 0) result.Add((cls, html[start..token.Index]));
+            }
+        }
+        return result;
+    }
+    private static Regex Rx(string pattern) => HtmlRegex.Get(pattern);
     internal static string DecodePlayback(string html, string episodeId)
     {
         var separator = episodeId.IndexOf('\u0001');

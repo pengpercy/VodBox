@@ -20,6 +20,9 @@ public interface IInformationalContentSource : IContentSource
     string Notice { get; }
 }
 
+/// <summary>导航目录源：只列片单，卡片点击转为全局搜索（<see cref="TvBoxLinks"/>），不作默认首页源。</summary>
+public interface INavigationContentSource : IContentSource;
+
 /// <summary>播放地址解析器（对应 TVBox Parse 的 type 1 JSON 接口）。</summary>
 public interface IPlayResolver
 {

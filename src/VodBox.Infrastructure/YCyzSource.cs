@@ -17,14 +17,15 @@ public sealed class YCyzSource : IResolvingContentSource
     private readonly Uri _host;
     private readonly Func<string,CancellationToken,Task<string>> _fetch;
     private readonly Func<long> _clock;
+    private readonly Func<string,IReadOnlyDictionary<string,string>,CancellationToken,Task<string>> _post;
     public string Key=>_site.Key;
     public string Name=>_site.Name;
     private static readonly Category[] Categories=[new("0","电影"),new("1","电视剧"),new("1#中国大陆","大陆剧"),new("1@gangtaiju","港台剧"),new("1@hanju","韩剧"),new("1@meiju","美剧"),new("1@riju","日剧"),new("1@donghua","动画"),new("1@zongyi","综艺")];
     public YCyzSource(SourceInfo site):this(site,null,null) { }
-    internal YCyzSource(SourceInfo site,Func<string,CancellationToken,Task<string>>? fetch,Func<long>? clock=null)
+    internal YCyzSource(SourceInfo site,Func<string,CancellationToken,Task<string>>? fetch,Func<long>? clock=null,Func<string,IReadOnlyDictionary<string,string>,CancellationToken,Task<string>>? post=null)
     {
         if(!Supports(site.Ext))throw new NotSupportedException("YCyz ext 配置不受支持。");
-        _site=site;_host=new("https://v.xl01.cc.ua/");_fetch=fetch??Fetch;_clock=clock??(()=>DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        _site=site;_host=new("https://v.xl01.cc.ua/");_fetch=fetch??Fetch;_post=post??Post;_clock=clock??(()=>DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     }
     internal static bool Supports(string? ext)
     {
@@ -50,6 +51,14 @@ public sealed class YCyzSource : IResolvingContentSource
     }
     private static string Body(string html,string tag,string css)=>Bodies(html,tag,css).FirstOrDefault()??"";
     private string Url(string path)=>new Uri(_host,path).AbsoluteUri;
+    private async Task<string> Post(string url,IReadOnlyDictionary<string,string> fields,CancellationToken ct)
+    {
+        using var request=new HttpRequestMessage(HttpMethod.Post,HttpUri(url)){Content=new FormUrlEncodedContent(fields)};
+        request.Headers.TryAddWithoutValidation("User-Agent",Agent);request.Headers.TryAddWithoutValidation("Origin",_host.GetLeftPart(UriPartial.Authority));request.Headers.TryAddWithoutValidation("Referer",_host.AbsoluteUri);
+        using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct).ConfigureAwait(false);response.EnsureSuccessStatusCode();
+        await using var stream=await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        return Encoding.UTF8.GetString(await BoundedContent.ReadAsync(stream,4*1024*1024,ct).ConfigureAwait(false));
+    }
     private async Task<string> Fetch(string url,CancellationToken ct)
     {
         using var request=new HttpRequestMessage(HttpMethod.Get,HttpUri(url));
@@ -100,7 +109,9 @@ public sealed class YCyzSource : IResolvingContentSource
         string text=await _fetch("http://czzy.xn--t75a.eu.org/bidisearch.php?wd="+Uri.EscapeDataString(query),ct).ConfigureAwait(false);
         return new(text.Split("$$$",StringSplitOptions.RemoveEmptyEntries).Select(v=>v.Split('|')).Where(v=>v.Length>=4&&v[1].Length>0).Select(v=>new MediaItem {Id=v[0],Title=v[1],Poster=v[2],Remarks=v[3]}).ToArray(),1,1);
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
+    private readonly DetailCache _details=new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)=>_details.GetAsync(mediaId,LoadDetailAsync,ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId,CancellationToken ct)
     {
         ValidateId(mediaId);string html=await _fetch(Url(mediaId),ct).ConfigureAwait(false);
         string facts=Body(html,"div","info-list");
@@ -128,8 +139,30 @@ public sealed class YCyzSource : IResolvingContentSource
         using var json=JsonDocument.Parse(await _fetch(Url("lines?t="+time.ToString(CultureInfo.InvariantCulture)+"&sg="+signature+"&pid="+Uri.EscapeDataString(pid.Groups[1].Value)),ct).ConfigureAwait(false));
         var data=json.RootElement.GetProperty("data");
         var candidates=new[]{Field(data,"url3"),Field(data,"m3u8"),Field(data,"m3u8_2")}.SelectMany(v=>v.Split(',',StringSplitOptions.RemoveEmptyEntries)).Select(v=>v.Replace("www.bde4.cc",_host.Host,StringComparison.Ordinal)).Where(v=>Uri.TryCreate(v,UriKind.Absolute,out var uri)&&uri.Scheme is "http" or "https").Distinct(StringComparer.Ordinal).ToArray();
+        if(candidates.Length==0&&Field(data,"ptoken")=="888")
+        {
+            // 原插件：lines 没给出地址且 ptoken=888 时，用同一组 t/sg 向 /god/{pid} 换取地址（参考实现按 SN+"/god/" 拼接，保留双斜杠）。
+            string god=await _post(_host.AbsoluteUri+"/god/"+Uri.EscapeDataString(pid.Groups[1].Value),new Dictionary<string,string>{{"t",time.ToString(CultureInfo.InvariantCulture)},{"sg",signature},{"verifyCode","888"}},ct).ConfigureAwait(false);
+            using var answer=JsonDocument.Parse(god);
+            string value=GodUrl(Field(answer.RootElement,"url"));
+            if(Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme is "http" or "https")candidates=[value];
+        }
         if(candidates.Length==0)throw new InvalidDataException("YCyz lines 没有媒体地址。");
         return new() {Uri=candidates[0],Title=detail.Item.Title,SourceKey=Key,SourceName=Name,MediaId=mediaId,EpisodeId=episodeId,LineId="自动",ProxyMedia=true,Headers=new Dictionary<string,string>{{"User-Agent",Agent},{"Referer",_host.AbsoluteUri}},Choices=candidates.Select((url,index)=>new PlaybackChoice("线路"+(index+1),url)).ToArray()};
+    }
+    private static readonly string[] BlockedCdn=["-f19","-f77","lf16-capcut.faceueditorv.com","lf16-secsdk.bitssec.com","lf16-data.bytepluscdn.com","lf16-fdm.fdmings.com","lf16-cc-everphoto.faceulv.com","lf16-faceulv.com","lf16-geckocdn-offline.g-p-static.com"];
+    /// <summary>原插件对 /god 返回地址的 CDN 改写：tiktokcdn→akamaized；tos 对象按是否命中受限 CDN 换到镜像前缀。</summary>
+    internal static string GodUrl(string url)
+    {
+        if(url.Length==0)return url;
+        url=url.Replace("v16m-default.tiktokcdn.com","v16m-default.akamaized.net",StringComparison.Ordinal);
+        bool blocked=BlockedCdn.Any(value=>url.Contains(value,StringComparison.Ordinal));
+        const string mirror="https://p16-hera-sign-va.ibyteimg.com/obj/";
+        int alisg=url.IndexOf("tos-alisg-v-0000",StringComparison.Ordinal);
+        if(alisg>-1)return (blocked?"http://lf77-geckocdn.bytegecko-i18n.com/obj/":mirror)+url[alisg..];
+        int maliva=url.IndexOf("tos-maliva-o-0000-us",StringComparison.Ordinal);
+        if(maliva>-1)return (blocked?"http://lf16-cdn-solve.gauthmath.com/obj/":mirror)+url[maliva..];
+        return url;
     }
     internal static string Sign(string pid,long time)
     {

@@ -169,7 +169,9 @@ public sealed class AueteSource : IResolvingContentSource
         }
         return new(items.DistinctBy(i => i.Id).ToArray(), page, count);
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
+    private readonly DetailCache _details = new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default) => _details.GetAsync(mediaId, LoadDetailAsync, ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId, CancellationToken ct)
     {
         if (!Pattern("^\\w+/\\w+/\\w+$").IsMatch(mediaId)) throw new InvalidDataException("Auete 影片标识无效。");
         string html = await Page(mediaId + "/", ct).ConfigureAwait(false);

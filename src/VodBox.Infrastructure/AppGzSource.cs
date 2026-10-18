@@ -93,7 +93,7 @@ public sealed class AppGzSource : IResolvingContentSource
     public async Task<MediaPage> SearchAsync(string query,int page,CancellationToken ct=default)
     {
         if(page<1)throw new InvalidDataException("页码无效。");if(page>1)return new([],page,page);
-        using var doc=await Request("/App/Index/findMoreVod",new(){{"keywords",query},{"order_val","1"}},ct);return new(doc.RootElement.GetProperty("list").EnumerateArray().Select(Item).ToArray(),1,1);
+        using var doc=await Request("/App/Index/findMoreVod",new(){{"keywords",query},{"order_val","1"}},ct);return new(doc.RootElement.GetProperty("list").EnumerateArray().Select(Item).Where(item=>item.Title.Contains(query,StringComparison.Ordinal)).ToArray(),1,1);
     }
     private async Task<(MediaItem Item,string Actor,string Director,IReadOnlyList<Episode> Episodes)> Detail(string mediaId,CancellationToken ct)
     {
@@ -107,15 +107,20 @@ public sealed class AppGzSource : IResolvingContentSource
         }
         return(item,actor,director,episodes);
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
+    private readonly DetailCache _details=new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)=>_details.GetAsync(mediaId,LoadDetailAsync,ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId,CancellationToken ct)
     {
         var data=await Detail(mediaId,ct);return new(){Item=data.Item,Description="内详",Actor=data.Actor,Director=data.Director,Lines=data.Episodes.Count>0?[new PlaybackLine("专线播放","专线播放",data.Episodes)]:[]};
     }
     public async Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId,string episodeId,CancellationToken ct=default)
     {
-        var detail=await Detail(mediaId,ct);var episode=detail.Episodes.FirstOrDefault(value=>value.Id==episodeId)??throw new InvalidDataException("Appgz 选集不存在。");var param=episode.Uri??"";
+        // 原插件 playerContent 直接解析分集里的 param 请求 showOne，不回抓 playInfo/Vurl/show 两个详情接口。
+        const string prefix="专线播放\u0001";
+        if(!episodeId.StartsWith(prefix,StringComparison.Ordinal))throw new InvalidDataException("Appgz 选集不存在。");var param=episodeId[prefix.Length..];
         var values=param.TrimStart('?').Split('&').Select(value=>value.Split('=',2)).Where(value=>value.Length==2).ToDictionary(value=>value[0],value=>System.Net.WebUtility.UrlDecode(value[1]),StringComparer.Ordinal);
         string Value(string name)=>values.TryGetValue(name,out var value)?value:throw new InvalidDataException("Appgz 播放参数缺少 "+name);
+        if(Value("vod_d_id")!=mediaId)throw new InvalidDataException("Appgz 选集不属于当前影片。");
         var fields=new Dictionary<string,object?>{{"domain_type",Value("domain_type")},{"vod_id",Value("vod_d_id")},{"type",Value("type")},{"resolution",Value("resolution")},{"vurl_id",Value("vurl_id")}};
         using var doc=await Request("/App/Resource/VurlDetail/showOne",fields,ct);var url=Text(doc.RootElement,"url");
         if(Uri.TryCreate(url,UriKind.Absolute,out var candidate)&&candidate.AbsolutePath.TrimEnd('/').EndsWith("/hls/index.m3u8",StringComparison.OrdinalIgnoreCase))
@@ -123,6 +128,6 @@ public sealed class AppGzSource : IResolvingContentSource
             await Authenticate(ct,true);using var retried=await Request("/App/Resource/VurlDetail/showOne",fields,ct);url=Text(retried.RootElement,"url");
         }
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo.Length>0)throw new InvalidDataException("Appgz 返回无效播放地址。");
-        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId="专线播放",EpisodeId=episodeId,Title=detail.Item.Title+" · "+episode.Title,Headers=new(){{"User-Agent","Lavf/57.83.100"}}};
+        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId="专线播放",EpisodeId=episodeId,Title=_details.TryGet(mediaId) is {} detail?detail.Item.Title+" · "+(detail.Lines.SelectMany(line=>line.Episodes).FirstOrDefault(value=>value.Id==episodeId)?.Title??""):Name,Headers=new(){{"User-Agent","Lavf/57.83.100"}}};
     }
 }

@@ -20,6 +20,8 @@ public sealed partial class AiDjSource : IResolvingContentSource
     private readonly SourceInfo _source;
     private readonly HttpClient _http;
     private readonly Func<string, byte[], CancellationToken, Task<string>> _register;
+    // 原插件每个实例生成一对随机 device_id/install_id 并在所有签名请求里复用。
+    private readonly string _deviceId = RandomId();
     private readonly string _installId = RandomId();
     private static readonly IReadOnlyList<Category> Categories = [new("comic", "AI漫剧"), new("ai", "AI短剧")];
     public string Key => _source.Key;
@@ -83,7 +85,9 @@ public sealed partial class AiDjSource : IResolvingContentSource
         if (search.ValueKind != JsonValueKind.Object) throw new InvalidDataException("AiDj SSR search data missing.");
         return new(Array(search, "searchList").Select(WebCard).ToArray(), 1, 1);
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
+    private readonly DetailCache _details = new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default) => _details.GetAsync(mediaId, LoadDetailAsync, ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId, CancellationToken ct)
     {
         string sid = SeriesId(mediaId);
         var body = Encoding.UTF8.GetBytes("{\"biz_param\":{\"detail_page_version\":0,\"disable_digg_stat\":false,\"disable_video_relate_book\":false,\"need_all_video_definition\":false,\"need_mp4_align\":false,\"screen_width_px\":\"900\",\"source\":7,\"use_os_player\":false,\"use_server_dns\":false},\"series_id\":\"" + sid + "\"}");
@@ -136,7 +140,7 @@ public sealed partial class AiDjSource : IResolvingContentSource
     }
     private async Task<JsonDocument> ApiAsync(string path, byte[] body, CancellationToken ct)
     {
-        var device = new Dictionary<string, string>(StringComparer.Ordinal) { ["device_id"] = RandomId(), ["iid"] = _installId, ["install_id"] = _installId, ["device_brand"] = "Redmi", ["device_model"] = "25053RT47C", ["device_type"] = "25053RT47C", ["device_manufacturer"] = "Xiaomi", ["os_version"] = "16", ["version_name"] = "7.1.3.32", ["x_tt_dt"] = "", ["sec_device_token"] = "", ["device_sec_device_token"] = "", ["ua"] = AppUserAgent };
+        var device = new Dictionary<string, string>(StringComparer.Ordinal) { ["device_id"] = _deviceId, ["iid"] = _installId, ["install_id"] = _installId, ["device_brand"] = "Redmi", ["device_model"] = "25053RT47C", ["device_type"] = "25053RT47C", ["device_manufacturer"] = "Xiaomi", ["os_version"] = "16", ["version_name"] = "7.1.3.32", ["x_tt_dt"] = "", ["sec_device_token"] = "", ["device_sec_device_token"] = "", ["ua"] = AppUserAgent };
         var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["iid"] = _installId, ["device_id"] = device["device_id"], ["ac"] = "wifi", ["channel"] = "update_64", ["aid"] = "8662", ["app_name"] = "novelread", ["version_code"] = "71332", ["version_name"] = "7.1.3.32", ["device_platform"] = "android", ["os"] = "android", ["ssmix"] = "a", ["device_type"] = "25053RT47C", ["device_brand"] = "Redmi", ["language"] = "zh", ["os_api"] = "36", ["os_version"] = "16", ["manifest_version_code"] = "71332", ["resolution"] = "1280*2772", ["dpi"] = "520", ["update_version_code"] = "71332", ["host_abi"] = "arm64-v8a", ["dragon_device_type"] = "phone", ["pv_player"] = "71332", ["compliance_status"] = "0", ["need_personal_recommend"] = "1", ["player_so_load"] = "1", ["is_android_pad_screen"] = "0"

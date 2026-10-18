@@ -15,6 +15,9 @@ public sealed class AllliveSource : IResolvingContentSource
     private readonly Func<CancellationToken,Task<string>> _uid;
     private readonly Func<long> _clock;
     private string _cookie="";
+    // 原插件只在 init 里取一次虎牙匿名 uid（字段 N）并复用；失败时下次再取，不缓存失败。
+    private Task<string>? _uidOnce;
+    private readonly Lock _uidGate=new();
     public string Key=>_site.Key;
     public string Name=>_site.Name;
     public AllliveSource(SourceInfo site):this(site,null,null,null){}
@@ -101,7 +104,14 @@ public sealed class AllliveSource : IResolvingContentSource
     public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
     {
         using var doc=await Detail(mediaId,ct);var data=doc.RootElement.GetProperty("data");
-        return new(){Item=new(){Id=mediaId,Title=Text(data,"title"),Poster=Text(data,"cover"),Remarks=Text(data,"online"),TypeName=Text(data,"category")},Actor=Text(data,"nickname"),Director=Text(data,"siteId"),Description=Text(data,"url"),Lines=Lines(data,data.TryGetProperty("info",out var info)&&info.ValueKind==JsonValueKind.Object?HuyaSuffix(info,await _uid(ct),_clock()):"")};
+        return new(){Item=new(){Id=mediaId,Title=Text(data,"title"),Poster=Text(data,"cover"),Remarks=Text(data,"online"),TypeName=Text(data,"category")},Actor=Text(data,"nickname"),Director=Text(data,"siteId"),Description=Text(data,"url"),Lines=Lines(data,data.TryGetProperty("info",out var info)&&info.ValueKind==JsonValueKind.Object?HuyaSuffix(info,await Uid(ct),_clock()):"")};
+    }
+    private async Task<string> Uid(CancellationToken ct)
+    {
+        Task<string> pending;
+        lock(_uidGate)pending=_uidOnce??=_uid(CancellationToken.None);
+        try{return await pending.WaitAsync(ct);}
+        catch when(pending.IsFaulted||pending.IsCanceled){lock(_uidGate)if(ReferenceEquals(_uidOnce,pending))_uidOnce=null;throw;}
     }
     private static string Md5(string input)=>Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
     internal static string HuyaSuffix(JsonElement info,string uid,long milliseconds)
@@ -128,9 +138,9 @@ public sealed class AllliveSource : IResolvingContentSource
         var selected=matches.Length>0?matches[0]:candidates.Length>0?candidates[0]:default;
         if(selected.episode is null)throw new InvalidDataException("Alllive 选集不存在。");
         var url=Text(data.GetProperty("stream")[selected.i].GetProperty("lines")[selected.j],"url");
-        if(data.TryGetProperty("info",out var info)&&info.ValueKind==JsonValueKind.Object)url+=HuyaSuffix(info,await _uid(ct),_clock());
+        if(data.TryGetProperty("info",out var info)&&info.ValueKind==JsonValueKind.Object)url+=HuyaSuffix(info,await Uid(ct),_clock());
         if(url.StartsWith("//",StringComparison.Ordinal))url="https:"+url;
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo.Length>0)throw new InvalidDataException("Alllive 播放地址无效。");
-        return new(){Uri=url,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId=selected.line.Id,EpisodeId=episodeId,Title=Text(data,"title")+" · "+selected.episode.Title};
+        return new(){Uri=url,IsLive=true,SourceKey=Key,SourceName=Name,MediaId=mediaId,LineId=selected.line.Id,EpisodeId=episodeId,Title=Text(data,"title")+" · "+selected.episode.Title};
     }
 }

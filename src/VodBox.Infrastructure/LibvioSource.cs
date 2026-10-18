@@ -198,7 +198,9 @@ public sealed class LibvioSource : IResolvingContentSource
     {
         var uri=HttpUri(Url(id));if(uri.Authority!=_host.Authority || !Rx("^/detail/\\d+\\.html$").IsMatch(uri.AbsolutePath)||uri.Query.Length>0) throw new InvalidDataException("Libvio 影片标识无效。");return uri.AbsoluteUri;
     }
-    public async Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)
+    private readonly DetailCache _details=new(TimeSpan.FromMinutes(5));
+    public Task<MediaDetail> GetDetailAsync(string mediaId,CancellationToken ct=default)=>_details.GetAsync(mediaId,LoadDetailAsync,ct);
+    private async Task<MediaDetail> LoadDetailAsync(string mediaId,CancellationToken ct)
     {
         string html=await _fetch(DetailUrl(mediaId),ct).ConfigureAwait(false);
         string title=Text(Rx("<h1\\b[^>]*>(.*?)</h1>").Match(html).Groups[1].Value);
@@ -211,7 +213,8 @@ public sealed class LibvioSource : IResolvingContentSource
         {
             string body=html[(markers[i].Index+markers[i].Length)..(i+1<markers.Count?markers[i+1].Index:html.Length)];
             string label=Text(Body(body,"div","panel-head"));
-            if(new[]{"夸克","优汐","阿里","百度","UC","嘟嘟"}.Any(s=>label.Contains(s,StringComparison.OrdinalIgnoreCase))) continue;
+            // 网盘线路按要求跳过；原插件同样不把「下载」面板当作播放线路。
+            if(new[]{"夸克","优汐","阿里","百度","UC","嘟嘟","下载"}.Any(s=>label.Contains(s,StringComparison.OrdinalIgnoreCase))) continue;
             var episodes=Rx("<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>").Matches(body)
                 .Where(m=>Rx("(?:^|/)play/\\d+-\\d+-\\d+\\.html$").IsMatch(m.Groups[1].Value))
                 .Select(m=>new Episode(label+'\u0001'+Url(m.Groups[1].Value),Text(m.Groups[2].Value))).DistinctBy(e=>e.Id).ToArray();
@@ -237,7 +240,7 @@ public sealed class LibvioSource : IResolvingContentSource
             {
                 "vr2"=>"vid/plyr/vr2.php?url=",
                 "ty_new1"=>"vid/ty4.php?url=",
-                "cczz" or "zxyy" or "gwj" or "lbyy" or "NBY" or "03yy"=>"vid/yd.php?url=",
+                "BBA" or "cczz" or "zxyy" or "gwj" or "lbyy" or "NBY" or "03yy" or "yd189"=>"vid/yd.php?url=",
                 _=>throw new NotSupportedException("Libvio 未识别的匿名播放器："+from)
             };
             string parser=await Page(endpoint+url+"&nid="+Field(json.RootElement,"nid")+"&id="+Field(json.RootElement,"id"),ct).ConfigureAwait(false);

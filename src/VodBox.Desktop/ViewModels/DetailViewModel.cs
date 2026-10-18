@@ -114,7 +114,12 @@ public sealed partial class DetailViewModel : ObservableObject
     }
 
     /// <summary>从卡片进入详情。</summary>
-    public void Open(string sourceKey, MediaItem item) => _ = OpenAsync(sourceKey, item);
+    public void Open(string sourceKey, MediaItem item)
+    {
+        // TVBox 导航卡片（msearch:###片名###图）没有详情：按原插件约定改为用片名全局搜索。
+        if (TvBoxLinks.TryGetSearchKeyword(item.Id, out var keyword)) { _main.RequestSearch(keyword); return; }
+        _ = OpenAsync(sourceKey, item);
+    }
 
     public Task OpenAsync(string sourceKey, MediaItem item) => LoadAsync(sourceKey, item.Id, null);
 
