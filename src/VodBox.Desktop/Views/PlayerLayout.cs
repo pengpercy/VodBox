@@ -52,12 +52,8 @@ public static class PlayerLayout
     public const double RightGroupWidth = 6 * IconButtonSize + RateButtonMaxWidth;
     /// <summary>中央三键整组宽度。</summary>
     public const double TransportWidth = 3 * TransportButtonSize + 2 * TransportSpacing;
-    /// <summary>紧凑模式左侧只剩静音键。</summary>
-    public const double CompactLeftGroupWidth = IconButtonSize;
-    /// <summary>紧凑模式右侧只剩小窗/列表/倍速/全屏/设置。</summary>
-    public const double CompactRightGroupWidth = 4 * IconButtonSize + RateButtonMaxWidth;
-    /// <summary>紧凑模式中央只剩播放键。</summary>
-    public const double CompactTransportWidth = TransportButtonSize;
+    /// <summary>窄面板宽度：保留三键及长视频的两端时间标签与可拖动进度条。</summary>
+    public const double NarrowPanelWidth = 190;
     /// <summary>三键与左右组之间必须保留的最小空隙。</summary>
     public const double GroupGap = 12;
     /// <summary>控制条左右内边距合计。</summary>
@@ -85,10 +81,9 @@ public static class PlayerLayout
     /// 面板内容宽 C 需满足：三键居中占 [C/2−半宽, C/2+半宽]，两侧组不得与其相交，
     /// 故 C ≥ 2 × (较宽一侧组 + 三键半宽 + 空隙) + 左右内边距。
     /// </summary>
-    public static double MinimumPanelWidth(bool compact) =>
-        2 * (Math.Max(compact ? CompactLeftGroupWidth : LeftGroupWidth,
-                      compact ? CompactRightGroupWidth : RightGroupWidth)
-             + (compact ? CompactTransportWidth : TransportWidth) / 2
+    public static double MinimumPanelWidth(bool compact) => compact ? NarrowPanelWidth :
+        2 * (Math.Max(LeftGroupWidth, RightGroupWidth)
+             + TransportWidth / 2
              + GroupGap) + HorizontalPadding;
 
     /// <summary>窗口最小宽度：面板需求再加左右余量。</summary>

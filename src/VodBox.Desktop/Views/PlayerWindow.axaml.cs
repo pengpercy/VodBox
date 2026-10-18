@@ -18,8 +18,8 @@ public partial class PlayerWindow : Window
     public PlayerWindow()
     {
         AvaloniaXamlLoader.Load(this);
-        // 面板内容宽度决定窗口最小宽度，避免三键与右侧图标组在窄窗口重叠。
-        MinWidth = PlayerLayout.MinimumWindowWidth(compact: false);
+        // 窄窗口只需容纳精简面板；侧组显隐由实际面板宽度决定。
+        MinWidth = PlayerLayout.MinimumWindowWidth(compact: true);
         AddHandler(KeyDownEvent, OnPlaybackKeyDown, RoutingStrategies.Bubble);
         Closing += OnClosing;
         Closed += (_, _) => _closed = true;

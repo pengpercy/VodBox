@@ -17,13 +17,13 @@ internal static class PlayerWindowSizing
         var maxScale=Math.Min(maxHeight,maxWidth/ratio);
         // 浮点乘法可能把上限算成1600.0000000000002；向内收一ULP保证不越屏。
         if(maxScale*ratio>maxWidth)maxScale=Math.BitDecrement(maxScale);
-        var minScale=Math.Min(maxScale,Math.Max((compact?180:280)/ratio,compact?120:180));
+        var minScale=Math.Min(maxScale,Math.Max(210/ratio,compact?120:180));
         var targetScale=Math.Min(compact?360:720,(compact?640:1280)/ratio);
         var scale=Math.Clamp(targetScale,minScale,maxScale);
         var size=new Size(scale*ratio,scale);
         var minimum=new Size(minScale*ratio,minScale);
-        // 控制条需要真实宽度：窗口最小宽度按控件需求抬高，但不突破屏幕与当前尺寸。
-        var required=Math.Min(maxWidth,PlayerLayout.MinimumWindowWidth(compact));
+        // 只为精简面板保留最小宽度，竖屏视频不受完整控制条宽度限制。
+        var required=Math.Min(maxWidth,PlayerLayout.MinimumWindowWidth(true));
         minimum=new Size(Math.Min(size.Width,Math.Max(minimum.Width,required)),minimum.Height);
         return new(size,minimum,new Size(maxScale*ratio,maxScale));
     }

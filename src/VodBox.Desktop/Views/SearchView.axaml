@@ -10,6 +10,9 @@
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <UserControl.Styles>
+    <Style Selector="ScrollBar">
+      <Setter Property="chrome:WindowDecorationProperties.ElementRole" Value="User" />
+    </Style>
     <!-- 侧栏行：全部 / 站点共用一套样式，选中只用浅底 + 加粗，不用主题色大块高亮。 -->
     <Style Selector="Button.siteRow">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -77,18 +80,19 @@
 
     <!-- 左：站点栏。始终在位，搜索框位置不随有无结果跳动；无结果时只有「全部结果」一行。 -->
     <Border x:Name="SiteSidebar" Grid.Column="0" Width="220"
-            Padding="{OnPlatform Default='10,14,10,12', macOS='10,38,10,12'}" Background="Transparent">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            Padding="{OnPlatform Default='10,14,10,12', macOS='10,38,10,12'}" Background="Transparent"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" chrome:WindowDecorationProperties.ElementRole="TitleBar">
         <StackPanel>
           <!-- 「全部」始终在最上，选了某个站点后可一键回到全部结果。 -->
-          <Button x:Name="AllSitesButton" Classes="siteRow" Classes.selected="{Binding IsAllSelected}" Click="OnShowAllSites">
+          <Button chrome:WindowDecorationProperties.ElementRole="User" x:Name="AllSitesButton" Classes="siteRow" Classes.selected="{Binding IsAllSelected}" Click="OnShowAllSites">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Classes="siteName" Text="全部结果" FontSize="13" VerticalAlignment="Center" />
               <Border Grid.Column="1" Classes="countPill"><TextBlock Text="{Binding AllResults.Count}" /></Border>
             </Grid>
           </Button>
           <TextBlock Classes="sectionLabel" Text="站点" IsVisible="{Binding SiteResults.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
-          <ListBox x:Name="SiteList" Classes="siteList" ItemsSource="{Binding SiteResults}" Background="Transparent"
+          <ListBox chrome:WindowDecorationProperties.ElementRole="User" x:Name="SiteList" Classes="siteList" ItemsSource="{Binding SiteResults}" Background="Transparent"
                    BorderThickness="0" Padding="0" SelectionChanged="OnSiteChanged">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:SearchSiteResult">

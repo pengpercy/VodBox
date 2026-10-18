@@ -2315,7 +2315,7 @@ public sealed class ViewModelRaceTests
             Dispatcher.UIThread.RunJobs();
             window.UpdateLayout();
             var overlay = window.Overlay;
-            Assert.Equal(minimumWindow, window.MinWidth);
+            Assert.Equal(PlayerLayout.MinimumWindowWidth(true), window.MinWidth);
             Assert.Equal(minimumWindow, window.Width, 1);
             var (leftGroup, rightGroup, transport) = ControlGroups(overlay);
 
@@ -2357,17 +2357,117 @@ public sealed class ViewModelRaceTests
             Assert.True(transport.Bounds.Right <= rightGroup.Bounds.X, "三键与右侧组重叠");
             Assert.True(rightGroup.Bounds.Right <= panel.Bounds.Width - 16 + 0.5, "右侧组溢出面板");
 
-            // 低于最小宽度时窗口不得再缩；窗口本身也不会小于面板需求。
-            Assert.True(window.MinWidth >= PlayerLayout.MinimumPanelWidth(false));
+            // Portrait and PiP windows keep all three transport buttons but hide both side groups.
+            context.Main.Player.Duration = TimeSpan.FromHours(2);
+            context.Main.Player.Position = TimeSpan.FromMinutes(40);
+            foreach (var compact in new[] { false, true })
+            {
+                context.Main.Player.CompactMode = compact;
+                foreach (var width in new[] { 405d, 210d })
+                {
+                    window.Width = width;
+                    for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+                    Assert.False(leftGroup.IsEffectivelyVisible);
+                    Assert.False(rightGroup.IsEffectivelyVisible);
+                    Assert.True(transport.IsEffectivelyVisible);
+                    Assert.Equal(3, transport.Children.OfType<Button>().Count(button => button.IsEffectivelyVisible));
+                    var progress = overlay.FindControl<Slider>("ProgressSlider")!;
+                    Assert.True(progress.IsEffectivelyVisible);
+                    Assert.True(progress.Bounds.Width > 20);
+                    var times = ((Grid)progress.Parent!).Children.OfType<TextBlock>().Select(text => text.Text ?? "").ToArray();
+                    Assert.Equal(["40:00", "02:00:00"], times);
+                    Assert.True(panel.Bounds.Width <= window.Bounds.Width);
+                }
+            }
+            window.Width = minimumWindow;
+            for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            Assert.True(leftGroup.IsEffectivelyVisible);
+            Assert.True(rightGroup.IsEffectivelyVisible);
         }
         finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
+    }
+
+    [AvaloniaFact]
+    public async Task PlaybackMenusRefreshEpisodesTracksAndRejectStaleActions()
+    {
+        using var context = new Context();
+        var vm = context.Main.Player;
+        var entries = new[]
+        {
+            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
+            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
+        };
+        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
+        var window = new PlayerWindow { DataContext = context.Main };
+        var menus = MacMenus.CreatePlaybackMenus(context.Main, () => window).ToArray();
+        NativeMenuItem Find(NativeMenu menu, string header) => menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == header);
+        // Simulate the native exporter's update callback before opening a menu.
+        void Refresh(NativeMenu menu) => typeof(NativeMenu).GetMethod(
+            "Avalonia.Controls.INativeMenuExporterEventsImplBridge.RaiseNeedsUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(menu, null);
+        var play = menus.Single(item => item.Header == "播放").Menu!;
+        var audio = menus.Single(item => item.Header == "音频").Menu!;
+        var subtitles = menus.Single(item => item.Header == "字幕").Menu!;
+        try
+        {
+            Assert.Equal(2, Find(play, "选集").Menu!.Items.Count);
+            IEnumerable<NativeMenuItem> Descendants(IEnumerable<NativeMenuItem> items)
+            {
+                foreach (var item in items)
+                {
+                    yield return item;
+                    if (item.Menu is { } submenu)
+                        foreach (var child in Descendants(submenu.Items.OfType<NativeMenuItem>())) yield return child;
+                }
+            }
+            var windowMenu = MacMenus.CreateWindowMenu(context.Main, "", out var detach);
+            var navigation = windowMenu.Items.OfType<NativeMenuItem>().Where(item => item.Header is "文件" or "显示");
+            var application = MacMenus.CreateApplicationMenu(context.Main).Items.OfType<NativeMenuItem>();
+            var gestures = Descendants(menus.Concat(navigation).Concat(application))
+                .Where(item => item.Gesture is not null).Select(item => item.Gesture!).ToArray();
+            Assert.True(gestures.Length >= 40);
+            Assert.Equal(gestures.Length, gestures.Distinct().Count());
+            Assert.Equal(new Avalonia.Input.KeyGesture(Avalonia.Input.Key.P, Avalonia.Input.KeyModifiers.Meta), Find(play, vm.IsPlaying ? "暂停" : "播放").Gesture);
+            var speeds = Find(play, "播放速度").Menu!;
+            Find(speeds, "加快播放速度").Command!.Execute(null);
+            Assert.Equal(1.25, vm.Rate);
+            Find(speeds, "恢复正常速度").Command!.Execute(null);
+            Assert.Equal(1, vm.Rate);
+            Find(play, "切换片头跳过时长").Command!.Execute(null);
+            Assert.Equal(30, vm.OpeningSkipSeconds);
+            for (var index = 0; index < 4; index++) Find(play, "切换片头跳过时长").Command!.Execute(null);
+            Assert.Equal(0, vm.OpeningSkipSeconds);
+            detach();
+            Find(play, "自动下一集：开").Command!.Execute(null);
+            Assert.False(vm.AutoNext);
+            Refresh(play);
+            Assert.NotNull(Find(play, "自动下一集：关"));
+            var staleRate = Find(Find(play, "播放速度").Menu!, "2×");
+            context.Engine.Tracks.Add(new MediaTrack("a1", "中文音轨", TrackKind.Audio, true));
+            context.Engine.Tracks.Add(new MediaTrack("s1", "中文字幕", TrackKind.Subtitle, true));
+            Refresh(audio);
+            Refresh(subtitles);
+            Assert.True(Find(Find(audio, "音轨").Menu!, "中文音轨").IsChecked);
+            Assert.True(Find(Find(subtitles, "字幕轨道").Menu!, "中文字幕").IsChecked);
+            Find(Find(subtitles, "字幕同步").Menu!, "字幕延后 0.5 秒").Command!.Execute(null);
+            Assert.Equal(.5, vm.SubtitleDelay);
+            Assert.NotNull(Find(subtitles, "加载本地字幕…"));
+            Assert.Equal(3, Find(subtitles, "字幕字号").Menu!.Items.Count);
+            await Done(vm.PlayResolvedAsync(entries[1].Resolve, entries, 1));
+            staleRate.Command!.Execute(null);
+            Assert.NotEqual(2, vm.Rate);
+            Refresh(play);
+            Assert.True(Find(Find(play, "选集").Menu!, "第二集").IsChecked);
+            Assert.False(Find(play, "下一集").IsEnabled);
+        }
+        finally { await Done(vm.Close()); window.CloseAfterPlayback(); }
     }
 
     [AvaloniaFact]
     public void PlayerWindowSizingHonoursControlRequirementsAndTinyScreens()
     {
         var normal = PlayerWindowSizing.Fit(16d / 9, 1920, 1080);
-        Assert.True(normal.Minimum.Width >= PlayerLayout.MinimumWindowWidth(false));
+        Assert.True(normal.Minimum.Width >= PlayerLayout.MinimumWindowWidth(true));
         Assert.True(normal.Size.Width >= normal.Minimum.Width);
         Assert.True(normal.Minimum.Width <= normal.Maximum.Width);
 
@@ -3549,7 +3649,8 @@ public sealed class ViewModelRaceTests
             Subtitles.Add(path);
             return Task.CompletedTask;
         }
-        public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) => [];
+        public List<MediaTrack> Tracks { get; } = [];
+        public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) => Tracks.Where(track => track.Kind == kind).ToArray();
         public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

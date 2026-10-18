@@ -433,7 +433,7 @@ public partial class PlayerOverlay : UserControl
         if (VM is { } vm) vm.FlashToast("插件（S3 接）");
     }
 
-    private void OnTogglePlaylist(object? sender, RoutedEventArgs e)
+    internal void OnTogglePlaylist(object? sender, RoutedEventArgs e)
     {
         if (VM is null) return;
         if (_drawerOpen) ClosePlaylistDrawer();
@@ -564,7 +564,13 @@ public partial class PlayerOverlay : UserControl
     private void OnToggleSettings(object? sender, RoutedEventArgs e)
     {
         if (VM is not { } vm || sender is not Button button) return;
+        OpenControlMenu(button, BuildSettingsMenu());
+    }
+
+    internal ContextMenu BuildSettingsMenu()
+    {
         var menu = new ContextMenu();
+        if (VM is not { } vm) return menu;
         var autoNext = new MenuItem { Header = vm.AutoNext ? "自动下一集：开" : "自动下一集：关" };
         autoNext.Click += (_, _) => vm.AutoNext = !vm.AutoNext;
         menu.Items.Add(autoNext);
@@ -689,7 +695,7 @@ public partial class PlayerOverlay : UserControl
             group.ItemsSource = items;
             menu.Items.Add(group);
         }
-        OpenControlMenu(button, menu);
+        return menu;
     }
 
     private void OnToggleAspectRatio(object? sender, RoutedEventArgs e)
@@ -718,6 +724,8 @@ public partial class PlayerOverlay : UserControl
 
 public static class PlayerLayoutConverters
 {
+    public static readonly IValueConverter ShowExtras = new FuncValueConverter<double, bool>(width => width >= PlayerLayout.MinimumPanelWidth(false));
+
     /// <summary>播放列表抽屉宽度：按窗口宽度收窄，上下限见 PlayerLayout。</summary>
     public static readonly IValueConverter PlaylistDrawerWidth = new DrawerWidthConverter();
 
@@ -738,8 +746,8 @@ public static class PlayerLayoutConverters
         public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
         {
             if (values.Count < 2 || values[0] is not double width || !double.IsFinite(width) || width <= 0) return 0d;
-            var compact = values[1] as bool? ?? false;
-            return Math.Min(width, Math.Max(width * .6, PlayerLayout.MinimumPanelWidth(compact)));
+            var available = Math.Max(0, width - PlayerLayout.WindowMargin);
+            return Math.Min(available, Math.Max(width * .6, PlayerLayout.MinimumPanelWidth(false)));
         }
 
         public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)

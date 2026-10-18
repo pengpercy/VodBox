@@ -49,6 +49,12 @@ public sealed class MainWindowPreviewTests
             box.Focus();
             Layout();
             Assert.True(popup.IsOpen);
+            var historyPanel = popup.FindControl<Border>("HistoryPanel")!;
+            Assert.Equal(box.Bounds.Width, historyPanel.Bounds.Width, 5);
+            Assert.True(historyPanel.Bounds.Width < 260);
+            box.Width = 160;
+            Layout();
+            Assert.Equal(box.Bounds.Width, historyPanel.Bounds.Width, 5);
             box.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
             Assert.False(popup.IsOpen);
             box.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
@@ -63,6 +69,31 @@ public sealed class MainWindowPreviewTests
             main.Search.SearchHistory.Clear();
             foreach (var word in saved) main.Search.SearchHistory.Add(word);
         }
+    }
+
+    [AvaloniaFact]
+    public void SearchSidebarBlankSpaceDragsWindowWhileSiteControlsRemainClickable()
+    {
+        var window = new SearchWindow { DataContext = DesignData.Main, Width = 1040, Height = 720 };
+        try
+        {
+            window.Show();
+            for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
+            Dispatcher.UIThread.RunJobs();
+            var sidebar = window.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "SiteSidebar");
+            foreach (var x in new[] { 5d, 110d, 215d })
+            {
+                var point = sidebar.TranslatePoint(new Point(x, sidebar.Bounds.Height - 30), window)!.Value;
+                Assert.Equal(WindowDecorationsElementRole.TitleBar, HitTestChrome(window, point));
+            }
+            var all = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "AllSitesButton");
+            var center = all.TranslatePoint(new Point(all.Bounds.Width / 2, all.Bounds.Height / 2), window)!.Value;
+            Assert.Equal(WindowDecorationsElementRole.User, HitTestChrome(window, center));
+            var sites = window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "SiteList");
+            Assert.Equal(WindowDecorationsElementRole.User, WindowDecorationProperties.GetElementRole(sites));
+        }
+        finally { window.Close(); }
     }
 
     /// <summary>

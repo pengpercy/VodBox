@@ -32,7 +32,6 @@ public partial class SearchHistoryPopup : Popup
     /// <summary>用户选了一条历史；搜索框里已经是这个词。</summary>
     public event EventHandler<string>? Picked;
 
-    private const double MinPanelWidth = 260;
     private readonly List<SuggestItem> _items = [];
     private bool _listAll;
     private bool _writingText;
@@ -126,6 +125,7 @@ public partial class SearchHistoryPopup : Popup
 
     private void OnBoxPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
+        if (e.Property == BoundsProperty && IsOpen) UpdatePanelWidth();
         if (e.Property != TextBox.TextProperty || _writingText || TargetBox?.IsFocused != true) return;
         Show(all: false);
     }
@@ -163,8 +163,14 @@ public partial class SearchHistoryPopup : Popup
             .Select(text => new SuggestItem { Text = text, IsSelected = text == selected }));
         if (_items.Count == 0) { Dismiss(); return; }
         if (this.FindControl<ItemsControl>("HistoryItems") is { } list) { list.ItemsSource = null; list.ItemsSource = _items; }
-        if (this.FindControl<Border>("HistoryPanel") is { } panel) panel.Width = Math.Max(box.Bounds.Width, MinPanelWidth);
+        UpdatePanelWidth();
         IsOpen = true;
+    }
+
+    private void UpdatePanelWidth()
+    {
+        if (TargetBox is { } box && this.FindControl<Border>("HistoryPanel") is { } panel)
+            panel.Width = panel.MaxWidth = box.Bounds.Width;
     }
 
     private void Dismiss()

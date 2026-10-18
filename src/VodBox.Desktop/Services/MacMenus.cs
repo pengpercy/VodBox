@@ -11,7 +11,7 @@ namespace VodBox.Desktop.Services;
 /// 标准项必须保留（并译成中文），否则应用菜单没有「退出」，⌘Q 也随之失效。窗口菜单（文件/显示/播放/帮助）挂到每个窗口上：macOS 的菜单栏跟随当前活动窗口，
 /// 搜索、设置、播放窗口在前台时同样可用。NativeMenu 实例不能被多个窗口共用，所以每个窗口各建一份。
 /// </summary>
-internal static class MacMenus
+internal static partial class MacMenus
 {
     /// <summary>设置窗口「关于」分区的编号（与 SettingsWindowViewModel 一致）。</summary>
     internal const int AboutSection = 7;
@@ -116,28 +116,12 @@ internal static class MacMenus
         return menu;
     }
 
-    /// <param name="detach">取消对播放器状态的订阅；窗口关闭时调用（播放窗口每次播放新建，不能让订阅越积越多）。</param>
+    /// <param name="detach">窗口关闭时的清理回调；播放菜单通过 NeedsUpdate 刷新，不订阅播放器。</param>
     public static NativeMenu CreateWindowMenu(MainViewModel main, string dataDirectory, out Action detach)
     {
         void Show(AppPage page) { ActivateMain(); main.Navigate(page); }
 
-        var playPause = Item("播放 / 暂停", () => main.Player.TogglePlayPause());
-        var next = Item("下一集", () => main.Player.NextEpisodeCommand.Execute(null), new KeyGesture(Key.Right, KeyModifiers.Meta));
-        var close = Item("关闭播放", () => main.Player.CloseCommand.Execute(null));
-        void SyncPlayback()
-        {
-            playPause.IsEnabled = main.Player.Visible;
-            close.IsEnabled = main.Player.Visible;
-            next.IsEnabled = main.Player.Visible && main.Player.HasNextEpisode;
-        }
-        SyncPlayback();
-        void OnPlayerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName is nameof(PlayerViewModel.Visible) or nameof(PlayerViewModel.HasNextEpisode)) SyncPlayback();
-        }
-        var player = main.Player;
-        player.PropertyChanged += OnPlayerChanged;
-        detach = () => player.PropertyChanged -= OnPlayerChanged;
+        detach = () => { }; // Dynamic menus refresh on NeedsUpdate; no player subscriptions.
 
         var menu = new NativeMenu();
         menu.Add(Submenu("文件",
@@ -150,7 +134,7 @@ internal static class MacMenus
             Item("直播", () => Show(AppPage.Live), Cmd(Key.D3)),
             Item("收藏", () => Show(AppPage.Favorites), Cmd(Key.D4)),
             Item("历史", () => Show(AppPage.History), Cmd(Key.D5))));
-        menu.Add(Submenu("播放", playPause, next, new NativeMenuItemSeparator(), close));
+        foreach (var group in CreatePlaybackMenus(main)) menu.Add(group);
         menu.Add(Submenu("帮助",
             Item("打开日志文件夹", () => OpenFolder(Path.Combine(dataDirectory, "logs")))));
         return menu;

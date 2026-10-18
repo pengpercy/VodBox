@@ -86,7 +86,7 @@ public sealed class MacMenusTests
         try
         {
             var menu = MacMenus.CreateWindowMenu(main, directory, out var detach);
-            Assert.Equal(["文件", "显示", "播放", "帮助"], menu.Items.OfType<NativeMenuItem>().Where(item => item is not NativeMenuItemSeparator).Select(item => item.Header ?? ""));
+            Assert.Equal(["文件", "显示", "播放", "视频", "音频", "字幕", "帮助"], menu.Items.OfType<NativeMenuItem>().Where(item => item is not NativeMenuItemSeparator).Select(item => item.Header ?? ""));
             var file = Find(menu, "文件").Menu!;
             var show = Find(menu, "显示").Menu!;
             var play = Find(menu, "播放").Menu!;
@@ -103,14 +103,20 @@ public sealed class MacMenusTests
             Assert.Equal(AppPage.History, main.Page);
             Assert.Equal(new KeyGesture(Key.D1, KeyModifiers.Meta), Find(show, "首页").Gesture);
 
-            // 播放菜单只在有播放时可用；窗口关闭后不再跟随播放器状态（不残留订阅）。
-            Assert.False(Find(play, "播放 / 暂停").IsEnabled);
+            Assert.False(Find(play, "播放").IsEnabled);
             main.Player.Visible = true;
-            Assert.True(Find(play, "播放 / 暂停").IsEnabled);
-            Assert.True(Find(play, "关闭播放").IsEnabled);
+            var updated = MacMenus.CreateWindowMenu(main, directory, out var updatedDetach);
+            var updatedPlay = Find(updated, "播放").Menu!;
+            Assert.True(Find(updatedPlay, "播放").IsEnabled);
+            Assert.True(Find(updatedPlay, "关闭播放").IsEnabled);
+            Assert.Equal(new KeyGesture(Key.Left, KeyModifiers.Meta), Find(updatedPlay, "上一集").Gesture);
+            Find(Find(updated, "音频").Menu!, "增加音量").Command!.Execute(null);
+            var video = Find(updated, "视频").Menu!;
+            Find(Find(video, "画面比例").Menu!, "16:9").Command!.Execute(null);
+            Find(Find(updatedPlay, "播放速度").Menu!, "1.5×").Command!.Execute(null);
+            Assert.Equal(1.5, main.Player.Rate);
             detach();
-            main.Player.Visible = false;
-            Assert.True(Find(play, "播放 / 暂停").IsEnabled);
+            updatedDetach();
         }
         finally
         {
