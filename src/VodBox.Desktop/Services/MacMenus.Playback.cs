@@ -12,7 +12,9 @@ internal static partial class MacMenus
     private static KeyGesture PlaybackKey(Key key, KeyModifiers modifiers = KeyModifiers.None) => new(key, KeyModifiers.Meta | modifiers);
 
     // Rebuild native menus before export so tracks, episodes and selected options follow the current session.
-    internal static IEnumerable<NativeMenuItem> CreatePlaybackMenus(MainViewModel main, Func<PlayerWindow?>? playbackWindow = null)
+    // arrowShortcuts=false: windows with text boxes (main/search/settings) keep the menus but drop ⌘/⌥/⇧/⌃+arrow
+    // key equivalents, which would otherwise swallow caret movement and selection while something is playing.
+    internal static IEnumerable<NativeMenuItem> CreatePlaybackMenus(MainViewModel main, Func<PlayerWindow?>? playbackWindow = null, bool arrowShortcuts = true)
     {
         foreach (var title in new[] { "播放", "视频", "音频", "字幕" })
         {
@@ -182,9 +184,19 @@ internal static partial class MacMenus
                     Settings(label => label.StartsWith("弹幕"));
                 }
             }
-            Refresh();
-            menu.NeedsUpdate += (_, _) => Refresh();
+            void Update() { Refresh(); if (!arrowShortcuts) StripArrowShortcuts(menu); }
+            Update();
+            menu.NeedsUpdate += (_, _) => Update();
             yield return new NativeMenuItem(title) { Menu = menu };
+        }
+    }
+
+    private static void StripArrowShortcuts(NativeMenu menu)
+    {
+        foreach (var item in menu.Items.OfType<NativeMenuItem>())
+        {
+            if (item.Gesture?.Key is Key.Left or Key.Right or Key.Up or Key.Down) item.Gesture = null;
+            if (item.Menu is { } submenu) StripArrowShortcuts(submenu);
         }
     }
 }

@@ -105,11 +105,24 @@ public sealed class MacMenusTests
 
             Assert.False(Find(play, "播放").IsEnabled);
             main.Player.Visible = true;
-            var updated = MacMenus.CreateWindowMenu(main, directory, out var updatedDetach);
+            var updated = MacMenus.CreateWindowMenu(main, directory, out var updatedDetach, playerWindow: true);
             var updatedPlay = Find(updated, "播放").Menu!;
             Assert.True(Find(updatedPlay, "播放").IsEnabled);
             Assert.True(Find(updatedPlay, "关闭播放").IsEnabled);
             Assert.Equal(new KeyGesture(Key.Left, KeyModifiers.Meta), Find(updatedPlay, "上一集").Gesture);
+            Assert.Equal(new KeyGesture(Key.Up, KeyModifiers.Meta), Find(Find(updated, "音频").Menu!, "增加音量").Gesture);
+
+            // 有输入框的窗口（主/搜索/设置）：播放菜单照常可用，但不带方向键快捷键，⌘←/⌘⇧→ 等仍归输入框移动光标/选择。
+            var textWindow = MacMenus.CreateWindowMenu(main, directory, out var textDetach);
+            IEnumerable<NativeMenuItem> All(NativeMenu root) => root.Items.OfType<NativeMenuItem>()
+                .SelectMany(item => item.Menu is { } sub ? new[] { item }.Concat(All(sub)) : [item]);
+            Assert.DoesNotContain(All(textWindow), item => item.Gesture?.Key is Key.Left or Key.Right or Key.Up or Key.Down);
+            var textPlay = Find(textWindow, "播放").Menu!;
+            Assert.Null(Find(textPlay, "上一集").Gesture);
+            Assert.True(Find(textPlay, "上一集").Command is not null);
+            Assert.Equal(new KeyGesture(Key.P, KeyModifiers.Meta), Find(textPlay, "播放").Gesture);
+            Assert.Contains(All(updated), item => item.Gesture?.Key is Key.Right && item.Gesture.KeyModifiers == (KeyModifiers.Meta | KeyModifiers.Shift));
+            textDetach();
             Find(Find(updated, "音频").Menu!, "增加音量").Command!.Execute(null);
             var video = Find(updated, "视频").Menu!;
             Find(Find(video, "画面比例").Menu!, "16:9").Command!.Execute(null);

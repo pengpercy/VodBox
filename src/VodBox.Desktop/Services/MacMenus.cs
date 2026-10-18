@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using VodBox.Desktop.ViewModels;
+using VodBox.Desktop.Views;
 
 namespace VodBox.Desktop.Services;
 
@@ -117,7 +118,8 @@ internal static partial class MacMenus
     }
 
     /// <param name="detach">窗口关闭时的清理回调；播放菜单通过 NeedsUpdate 刷新，不订阅播放器。</param>
-    public static NativeMenu CreateWindowMenu(MainViewModel main, string dataDirectory, out Action detach)
+    /// <param name="playerWindow">只有播放窗口（没有输入框）带方向键快捷键；其他窗口的输入框要保留 ⌘←/⌘→ 等光标操作。</param>
+    public static NativeMenu CreateWindowMenu(MainViewModel main, string dataDirectory, out Action detach, bool playerWindow = false)
     {
         void Show(AppPage page) { ActivateMain(); main.Navigate(page); }
 
@@ -134,7 +136,7 @@ internal static partial class MacMenus
             Item("直播", () => Show(AppPage.Live), Cmd(Key.D3)),
             Item("收藏", () => Show(AppPage.Favorites), Cmd(Key.D4)),
             Item("历史", () => Show(AppPage.History), Cmd(Key.D5))));
-        foreach (var group in CreatePlaybackMenus(main)) menu.Add(group);
+        foreach (var group in CreatePlaybackMenus(main, arrowShortcuts: playerWindow)) menu.Add(group);
         menu.Add(Submenu("帮助",
             Item("打开日志文件夹", () => OpenFolder(Path.Combine(dataDirectory, "logs")))));
         return menu;
@@ -144,7 +146,7 @@ internal static partial class MacMenus
     public static void Attach(Window window, MainViewModel main)
     {
         if (!OperatingSystem.IsMacOS() || App.Services is null) return;
-        NativeMenu.SetMenu(window, CreateWindowMenu(main, App.Services.DataDir, out var detach));
+        NativeMenu.SetMenu(window, CreateWindowMenu(main, App.Services.DataDir, out var detach, window is PlayerWindow));
         window.Closed += (_, _) => detach();
     }
 
