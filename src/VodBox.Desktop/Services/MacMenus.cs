@@ -7,8 +7,8 @@ using VodBox.Desktop.ViewModels;
 namespace VodBox.Desktop.Services;
 
 /// <summary>
-/// macOS 菜单栏。应用菜单（「VodBox」）放关于、检查更新、设置；Avalonia 默认追加的服务/隐藏/退出保留（名字取自
-/// Application.Name）。窗口菜单（文件/显示/播放/帮助）挂到每个窗口上：macOS 的菜单栏跟随当前活动窗口，
+/// macOS 菜单栏。应用菜单（「VodBox」）放关于、检查更新、设置；Avalonia 首次导出时追加的服务/隐藏/退出一组
+/// 标准项必须保留（并译成中文），否则应用菜单没有「退出」，⌘Q 也随之失效。窗口菜单（文件/显示/播放/帮助）挂到每个窗口上：macOS 的菜单栏跟随当前活动窗口，
 /// 搜索、设置、播放窗口在前台时同样可用。NativeMenu 实例不能被多个窗口共用，所以每个窗口各建一份。
 /// </summary>
 internal static class MacMenus
@@ -41,22 +41,69 @@ internal static class MacMenus
 
     /// <summary>
     /// 安装应用菜单。Avalonia 的 macOS 应用菜单导出器在启动早期（AfterSetup）就创建，那时应用还没有菜单，
-    /// 它会生成带「About Avalonia」的默认菜单挂到 Application 上；之后再用 SetMenu 换一个新的 NativeMenu 对象，
-    /// 导出器并不监听这个替换，菜单栏仍是默认的。它只在「已导出菜单」的条目变化时重新导出，
-    /// 所以这里把已挂着的那份菜单的条目原地换成我们的；还没有菜单时才直接设置（导出器随后会读到）。
+    /// 它会生成带「About Avalonia」的默认菜单挂到 Application 上，并在首次导出时往这份菜单末尾追加
+    /// 「Services / Hide / Hide Others / Show All / Quit」标准项。之后再用 SetMenu 换一个新的 NativeMenu 对象，
+    /// 导出器并不监听这个替换；它只在「已导出菜单」的条目变化时重新导出。所以这里原地替换标准项之前的条目
+    /// （即 About Avalonia），保留并汉化标准项；还没有菜单时才直接设置（导出器随后把标准项追加进我们的菜单）。
     /// </summary>
     public static void InstallApplicationMenu(Application application, MainViewModel main)
     {
         var ours = CreateApplicationMenu(main);
         if (NativeMenu.GetMenu(application) is not { } exported)
         {
+            LocalizeStandardItems(ours);
             NativeMenu.SetMenu(application, ours);
             return;
         }
         var items = ours.Items.ToList();
         ours.Items.Clear();
-        exported.Items.Clear();
-        foreach (var item in items) exported.Items.Add(item);
+        int standard = StandardBlockStart(exported);
+        for (int i = standard - 1; i >= 0; i--) exported.Items.RemoveAt(i);
+        for (int i = 0; i < items.Count; i++) exported.Items.Insert(i, items[i]);
+        // 标准项被禁用（DisableDefaultApplicationMenuItems）时自己补「退出」，应用菜单不能没有退出入口。
+        if (standard == exported.Items.Count - items.Count && !exported.Items.OfType<NativeMenuItem>().Any(item => item.Header == QuitHeader))
+        {
+            exported.Items.Add(new NativeMenuItemSeparator());
+            exported.Items.Add(Item(QuitHeader, Quit, Cmd(Key.Q)));
+        }
+        LocalizeStandardItems(exported);
+    }
+
+    private const string QuitHeader = "退出 VodBox";
+
+    /// <summary>标准项一组以「分隔线 + Services」开头；找不到时返回条目总数（整份都是可替换的默认项）。</summary>
+    private static int StandardBlockStart(NativeMenu menu)
+    {
+        for (int i = 0; i + 1 < menu.Items.Count; i++)
+            if (menu.Items[i] is NativeMenuItemSeparator && menu.Items[i + 1] is NativeMenuItem { Header: "Services" or "服务" }) return i;
+        return menu.Items.Count;
+    }
+
+    /// <summary>把 Avalonia 追加的英文标准项改成中文；之后追加的（首次导出时）也通过集合变更即时改名。</summary>
+    private static void LocalizeStandardItems(NativeMenu menu)
+    {
+        foreach (var item in menu.Items) Localize(item);
+        if (menu.Items is System.Collections.Specialized.INotifyCollectionChanged observable)
+            observable.CollectionChanged += (_, e) => { foreach (var item in e.NewItems?.OfType<NativeMenuItemBase>() ?? []) Localize(item); };
+    }
+
+    private static void Localize(NativeMenuItemBase item)
+    {
+        if (item is not NativeMenuItem menuItem) return;
+        menuItem.Header = menuItem.Header switch
+        {
+            "Services" => "服务",
+            "Hide Others" => "隐藏其他",
+            "Show All" => "全部显示",
+            "Quit" => QuitHeader,
+            { } header when header.StartsWith("Hide ", StringComparison.Ordinal) => "隐藏 VodBox",
+            var header => header,
+        };
+    }
+
+    private static void Quit()
+    {
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) desktop.TryShutdown();
     }
 
     public static NativeMenu CreateApplicationMenu(MainViewModel main)
