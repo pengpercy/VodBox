@@ -16,21 +16,62 @@ public sealed class UpdateWindowTests
             new string('a', 64), "https://github.com/pengpercy/VodBox/releases/tag/v99.0.0", notes, 1024);
 
     [AvaloniaFact]
-    public async Task OfferRequiresDownloadAndSeparateInstallConsent()
+    public async Task OfferShowsSkipAndClosingWithoutInstallOnQuitEndsTheSession()
     {
         var model = new UpdateViewModel(Offer(), "0.2.6", _ => { });
         Assert.Equal("0.2.6", model.CurrentVersion);
         Assert.Equal("99.0.0", model.NewVersion);
         Assert.Equal("## 发行说明\n- 修复更新流程", model.ReleaseNotes);
-        Assert.True(model.CanDownload);
+        Assert.True(model.CanSkip);
         Assert.False(model.IsReady);
         Assert.False(model.HasProgress);
-        Assert.False(await model.InstallAsync());
-        await model.CloseAsync();
-        Assert.False(model.CanDownload);
-        Assert.False(await model.InstallAsync());
+        Assert.False(model.InstallOnQuit);
+        // 测试进程不是正式安装包：只能打开下载页面，不能原地安装。
+        Assert.True(model.UsesExternalDownload);
+        Assert.False(model.CanInstallNow);
+        Assert.False(await model.InstallNowAsync());
+        await model.WindowClosedAsync();
+        Assert.True(model.IsFinished);
+        Assert.False(model.CanSkip);
         Assert.Contains("未安装", model.StatusText);
         Assert.Contains("未提供发行说明", new UpdateViewModel(Offer(""), "0.2.6", _ => { }).ReleaseNotes);
+    }
+
+    [AvaloniaFact]
+    public async Task SkipRemembersTheVersionAndAutoInstallWritesThePreference()
+    {
+        var preferences = new MemoryUpdatePreferences();
+        var model = new UpdateViewModel(Offer(), "0.2.6", _ => { }, preferences);
+        model.AutoInstall = true;
+        Assert.True(preferences.AutoInstallUpdates);
+        await model.SkipAsync();
+        Assert.Equal("99.0.0", preferences.SkippedUpdateVersion);
+        Assert.True(model.IsFinished);
+        Assert.Contains("已跳过版本 99.0.0", model.StatusText);
+    }
+
+    [AvaloniaFact]
+    public void WindowOffersSkipInstallOnQuitAndInstallAndRestart()
+    {
+        var window = new UpdateWindow(new UpdateViewModel(Offer(), "0.2.6", _ => { }));
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var buttons = window.GetVisualDescendants().OfType<Button>().ToDictionary(button => button.Name ?? "", button => button);
+            Assert.Equal("跳过这个版本", buttons["SkipVersion"].Content);
+            Assert.Equal("退出时安装", buttons["InstallOnQuit"].Content);
+            Assert.Equal("安装并重启应用", buttons["InstallNow"].Content);
+            Assert.True(buttons["SkipVersion"].IsEffectivelyVisible);
+            var autoInstall = window.GetVisualDescendants().OfType<CheckBox>().Single(box => box.Name == "AutoInstall");
+            Assert.Equal("以后自动下载并安装更新", autoInstall.Content);
+            // 开发/测试进程不能原地更新：安装按钮与自动安装勾选隐藏，改为打开下载页面。
+            Assert.False(buttons["InstallNow"].IsEffectivelyVisible);
+            Assert.False(buttons["InstallOnQuit"].IsEffectivelyVisible);
+            Assert.False(autoInstall.IsEffectivelyVisible);
+            Assert.True(buttons["OpenDownloadPage"].IsEffectivelyVisible);
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]
@@ -46,7 +87,7 @@ public sealed class UpdateWindowTests
             var window = Assert.Single(owner.OwnedWindows.OfType<UpdateWindow>());
             window.UpdateLayout();
             Assert.Contains(window.GetVisualDescendants().OfType<SelectableTextBlock>(), text => text.Text == Offer().ReleaseNotes);
-            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsEffectivelyVisible && Equals(button.Content, "确认安装并重启"));
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsEffectivelyVisible && Equals(button.Content, "安装并重启应用"));
             service.Show(Offer(), "0.2.6", owner, automatic: false, _ => { });
             Assert.Same(window, Assert.Single(owner.OwnedWindows.OfType<UpdateWindow>()));
             await service.CloseAsync();

@@ -191,6 +191,33 @@ public sealed class SearchWindowTests
         finally { window.Close(); }
     }
 
+    /// <summary>鼠标悬停的历史行要高亮（行背景由样式给，不能被模板本地值压住）。</summary>
+    [AvaloniaFact]
+    public void HoveringHistoryRowHighlightsIt()
+    {
+        using var fixture = new Fixture();
+        foreach (var word in new[] { "庆余年", "繁花" }) fixture.Main.Search.SearchHistory.Add(word);
+        var window = new SearchWindow { DataContext = fixture.Main };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var box = window.GetVisualDescendants().OfType<TextBox>().Single(text => text.Name == "ResultSearch");
+            var popup = window.GetLogicalDescendants().OfType<SearchHistoryPopup>().Single();
+            box.Focus();
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var rows = popup.GetLogicalDescendants().OfType<Border>().Where(border => border.Tag is SuggestItem).ToArray();
+            static bool Highlighted(Border row) => row.Background is Avalonia.Media.ISolidColorBrush { Color.A: > 0 };
+            Assert.DoesNotContain(rows, Highlighted);
+            var center = Avalonia.VisualExtensions.TranslatePoint(rows[1], new Avalonia.Point(40, rows[1].Bounds.Height / 2), window)!.Value;
+            Avalonia.Headless.HeadlessWindowExtensions.MouseMove(window, center);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(Highlighted(rows[1]));
+            Assert.False(Highlighted(rows[0]));
+        }
+        finally { window.Close(); }
+    }
+
     /// <summary>
     /// 详情页两种宿主（主窗口给 MainViewModel、搜索窗口给独立 DetailViewModel）都不能让绑定强转失败：
     /// Avalonia 会吞掉这类异常，但调试器会在第一次抛出时中断，表现为页面「打不开」。

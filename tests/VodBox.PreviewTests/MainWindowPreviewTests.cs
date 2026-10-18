@@ -121,6 +121,11 @@ public sealed class MainWindowPreviewTests
             Layout();
             Assert.DoesNotContain("shown", scrim.Classes);
             Assert.False(scrim.IsHitTestVisible);
+            // Windows/Linux 窗口按钮下垫的毛玻璃小底板：未滚动时显示，只占右上角按钮区，不挡指针。
+            var plate = window.FindControl<Border>("CaptionPlate")!;
+            Assert.Contains("shown", plate.Classes);
+            Assert.False(plate.IsHitTestVisible);
+            Assert.Equal(!OperatingSystem.IsMacOS(), plate.IsVisible);
             // 首页内容在标题栏下方（横幅从窗口顶边开始），但标题栏那一行依然能拖动窗口。
             Assert.Equal(WindowDecorationsElementRole.TitleBar, HitTestChrome(window, new Point(640, 20)));
 
@@ -128,10 +133,13 @@ public sealed class MainWindowPreviewTests
             Layout();
             Assert.True(main.Home.ScrolledUnderTitleBar);
             Assert.Contains("shown", scrim.Classes);
+            // 整行毛玻璃接替，底板淡出，不叠成两层。
+            Assert.DoesNotContain("shown", plate.Classes);
 
             main.Page = AppPage.Vod;
             Layout();
             Assert.DoesNotContain("shown", scrim.Classes);
+            Assert.DoesNotContain("shown", plate.Classes);
             // 点播页的补充拖拽区只到页头顶边，不压页头控件。
             var strip = window.FindControl<Border>("PageTitleBar")!;
             Assert.True(strip.IsVisible);

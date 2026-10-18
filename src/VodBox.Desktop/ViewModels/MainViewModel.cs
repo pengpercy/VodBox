@@ -233,7 +233,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// Windows/Linux 窗口按钮（右上角）的高度：MainWindow 在这两个平台把标题栏高度提示设为 32（Win11 标准高度），
     /// 按钮只占顶部 32，下面这一截标题栏行可以给页面用。macOS 的交通灯在左侧侧栏上方，不受影响。
     /// </summary>
-    internal const double CaptionButtonsHeight = 32;
+    public const double CaptionButtonsHeight = 32;
+    /// <summary>Windows/Linux 窗口按钮区宽度（三个 46 宽的按钮，Win11 标准）。</summary>
+    public const double CaptionButtonsWidth = 138;
     /// <summary>点播/收藏/历史页自带的顶边距。</summary>
     private const double PageHeaderInset = 12;
 

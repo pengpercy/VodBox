@@ -9,7 +9,7 @@ using VodBox.Desktop.Services;
 namespace VodBox.Desktop.ViewModels;
 
 /// <summary>设置：配置订阅（点播/直播 URL）+ 站点列表 + 关于。</summary>
-public sealed partial class SettingsViewModel : ObservableObject
+public sealed partial class SettingsViewModel : ObservableObject, IUpdatePreferences
 {
     private readonly AppServices _services;
     private readonly MainViewModel _main;
@@ -30,6 +30,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand] private void ToggleSiteChange(SourceInfo site){_services.Registry.SetChangeable(site.Key,!_services.Registry.CanChange(site));Message=_services.Registry.CanChange(site)?"站点换源已开启":"站点换源已关闭";}
     [RelayCommand] private void ToggleSiteStar(SourceInfo site) { _services.Registry.SetStarred(site.Key, !_services.Registry.IsStarred(site.Key)); RefreshSites(); }
     [RelayCommand] private void MoveSiteUp(SourceInfo site) { _services.Registry.MoveUp(site.Key); RefreshSites(); }
+    [RelayCommand] private void MoveSiteToTop(SourceInfo site) { _services.Registry.MoveToTop(site.Key); RefreshSites(); }
 
     [ObservableProperty] private string _vodConfigUrl = "";
     [ObservableProperty] private string _liveConfigUrl = "";
@@ -47,7 +48,24 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _message = "";
     [ObservableProperty] private string _updateMessage = "尚未检查更新";
     [ObservableProperty] private bool _autoCheckUpdates = true;
-    partial void OnAutoCheckUpdatesChanged(bool value) => _services.Prefs.Set("updates.auto-check", value);
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        _services.Prefs.Set("updates.auto-check", value);
+        if (!value) AutoInstallUpdates = false;
+    }
+    /// <summary>以后自动下载并安装更新：自动检查发现新版本时后台下载，退出 VodBox 时安装，不再弹窗。</summary>
+    [ObservableProperty] private bool _autoInstallUpdates;
+    partial void OnAutoInstallUpdatesChanged(bool value)
+    {
+        _services.Prefs.Set("updates.auto-install", value);
+        if (value) AutoCheckUpdates = true;
+    }
+    /// <summary>「跳过这个版本」记下的版本：自动检查不再提示它，手动检查仍会显示。</summary>
+    public string SkippedUpdateVersion
+    {
+        get => _services.Prefs.GetString("updates.skipped-version");
+        set => _services.Prefs.Set("updates.skipped-version", value);
+    }
     public string AppVersion => typeof(App).Assembly.GetName().Version?.ToString(3) ?? "未知";
     public UpdateOffer? AvailableUpdate { get; private set; }
     [ObservableProperty] private bool _updateBusy;
@@ -68,8 +86,11 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (_updatesStopped || cancellation.IsCancellationRequested) return;
             UpdateMessage = AvailableUpdate is { } offer ? $"发现新版本 {offer.Version}" : "当前已是最新版本，或暂无可用的安全更新包";
             owner ??= (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-            if (AvailableUpdate is { } update && owner is { IsVisible: true } && (!automatic || AutoCheckUpdates))
-                _updateWindows.Show(update, AppVersion, owner, automatic, message => UpdateMessage = message);
+            if (AvailableUpdate is not { } update || automatic && !AutoCheckUpdates) return;
+            if (automatic && update.Version == SkippedUpdateVersion) { UpdateMessage = $"发现新版本 {update.Version}（已跳过此版本）"; return; }
+            void Report(string message) => UpdateMessage = message;
+            if (automatic && AutoInstallUpdates && _updateWindows.StartBackground(update, AppVersion, Report, this)) return;
+            if (owner is { IsVisible: true }) _updateWindows.Show(update, AppVersion, owner, automatic, Report, this);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { UpdateMessage = "已取消检查更新"; }
         catch (Exception error) { UpdateMessage = $"检查更新失败：{error.Message}"; }
@@ -243,6 +264,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         _services = services;
         AutoCheckUpdates = services.Prefs.GetBool("updates.auto-check", true);
+        _autoInstallUpdates = services.Prefs.GetBool("updates.auto-install", false);
         _main = main;
         VodConfigUrl = services.CurrentVodConfig ?? "";
         LiveConfigUrl = services.CurrentLiveConfig ?? "";

@@ -218,4 +218,15 @@ public class AppUpdaterTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void InstallOnQuitScriptReplacesWithoutRelaunching()
+    {
+        var relaunch = AppUpdater.BuildMacScript("/Applications/VodBox.app", "/tmp/in/VodBox.app", "/tmp/in", "/tmp/backup", "/tmp/cache", 42);
+        var quiet = AppUpdater.BuildMacScript("/Applications/VodBox.app", "/tmp/in/VodBox.app", "/tmp/in", "/tmp/backup", "/tmp/cache", 42, relaunch: false);
+        Assert.Contains("/usr/bin/open '/Applications/VodBox.app'", relaunch);
+        Assert.DoesNotContain("/usr/bin/open", quiet);
+        Assert.Contains("/usr/bin/codesign --verify --deep --strict '/Applications/VodBox.app'", quiet);
+        Assert.Contains("while kill -0 42", quiet);
+    }
 }

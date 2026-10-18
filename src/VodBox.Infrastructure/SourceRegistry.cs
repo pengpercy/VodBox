@@ -58,6 +58,18 @@ public sealed class SourceRegistry : IDisposable
         for (var position = 0; position < list.Count; position++) _preferences?.Set(PreferenceKey(list[position].Key, "order"), position);
         Sources = list; SourcesChanged?.Invoke();
     }
+    /// <summary>置顶：一次移到最前。星标站点总排在前面，所以未星标的站点只能顶到星标组之后。</summary>
+    public void MoveToTop(string key)
+    {
+        var list = Sources.ToList(); var index = list.FindIndex(source => source.Key == key);
+        if (index < 0) return;
+        var site = list[index]; list.RemoveAt(index);
+        var top = IsStarred(key) ? 0 : list.TakeWhile(source => IsStarred(source.Key)).Count();
+        if (top == index) return;
+        list.Insert(top, site);
+        for (var position = 0; position < list.Count; position++) _preferences?.Set(PreferenceKey(list[position].Key, "order"), position);
+        Sources = list; SourcesChanged?.Invoke();
+    }
     private void SortSources() => Sources = Sources.OrderByDescending(source => IsStarred(source.Key))
         .ThenBy(source => _preferences?.GetInt(PreferenceKey(source.Key, "order"), int.MaxValue) ?? int.MaxValue).ToArray();
 

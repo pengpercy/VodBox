@@ -28,6 +28,13 @@
       </Setter>
     </Style>
     <Style Selector="Panel#TitleScrim.shown"><Setter Property="Opacity" Value="1" /></Style>
+    <Style Selector="Border#CaptionPlate">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border#CaptionPlate.shown"><Setter Property="Opacity" Value="1" /></Style>
   </Window.Styles>
   <Panel>
     <views:LocalWallpaper HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Path="{Binding WallpaperPath}" Stretch="UniformToFill" IsHitTestVisible="False" />
@@ -108,6 +115,24 @@
         <views:BackdropBlur BlurRadius="40" />
         <Border Background="{DynamicResource PageBackgroundBrush}" Opacity="0.72" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,0,0,1" />
       </Panel>
+      <!-- Windows/Linux 的最小化/最大化/关闭按钮画在右上角、颜色跟随应用主题，未滚动时直接压在首页横幅上：
+           浅色主题下是深色图标压深色海报，几乎看不见。首页未滚动时在按钮底下垫一块同材质的毛玻璃小底板
+           （只占按钮区，横幅其余部分仍直通顶边）；滚动后由整行毛玻璃接替，底板淡出避免叠成两层。macOS 交通灯在侧栏上方，不需要。 -->
+      <Border x:Name="CaptionPlate" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top"
+              Width="{x:Static vm:MainViewModel.CaptionButtonsWidth}" Height="{x:Static vm:MainViewModel.CaptionButtonsHeight}"
+              CornerRadius="0,0,0,10" ClipToBounds="True" IsHitTestVisible="False"
+              IsVisible="{OnPlatform Default=True, macOS=False}">
+        <Classes.shown>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Page" Converter="{x:Static views:PageConverters.IsHome}" />
+            <Binding Path="!Home.ScrolledUnderTitleBar" />
+          </MultiBinding>
+        </Classes.shown>
+        <Panel>
+          <views:BackdropBlur BlurRadius="40" />
+          <Border Background="{DynamicResource PageBackgroundBrush}" Opacity="0.72" />
+        </Panel>
+      </Border>
       <!-- 页面伸进标题栏行后会盖住下面的拖拽区：在最上层补一条拖拽区，高度由页面决定（TopDragStripHeight）——
            首页整行；点播/收藏/历史只到页头顶边，不压页头控件；直播页不补（macOS 上它的工具栏在标题栏行内，必须可点）。 -->
       <Border x:Name="PageTitleBar" Grid.Row="0" Grid.Column="1" Background="Transparent" Margin="0,0,132,0"

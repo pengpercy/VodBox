@@ -16,6 +16,17 @@ public class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
+    /// <summary>
+    /// 「安装并重启应用」：更新器已在等本进程退出。关主窗口走正常停机（播放器、服务）；
+    /// 停机若卡住，后台看门狗到时强制退出，避免用户只能手动杀进程。
+    /// </summary>
+    internal static void ShutdownForUpdate()
+    {
+        new Thread(() => { Thread.Sleep(TimeSpan.FromSeconds(20)); Environment.Exit(0); }) { IsBackground = true, Name = "update-exit-watchdog" }.Start();
+        if ((Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow is { } main) main.Close();
+        else Environment.Exit(0);
+    }
+
     public override void OnFrameworkInitializationCompleted()
     {
         if(ApplicationLifetime is IClassicDesktopStyleApplicationLifetime validationLifetime&&validationLifetime.Args?.Contains("--ui-smoke")==true&&string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VODBOX_DATA_DIR")))
@@ -39,6 +50,9 @@ public class App : Application
             var main=new MainViewModel(Services);
             var window=new MainWindow{DataContext=main};
             desktop.MainWindow=window;
+            // 主窗口关闭即整体停机（服务随之释放）：设置、搜索等无 Owner 的窗口不能把进程挂住，
+            // 否则「安装并重启」后进程不退出，独立更新器永远等不到替换时机。
+            desktop.ShutdownMode=Avalonia.Controls.ShutdownMode.OnMainWindowClose;
             // macOS 菜单栏：应用菜单（关于/检查更新/设置）+ 主窗口的文件/显示/播放/帮助菜单；其他窗口在创建时各自挂上。
             if(OperatingSystem.IsMacOS())
             {
@@ -57,9 +71,6 @@ public class App : Application
             if(desktop.Args?.Contains("--ui-smoke")==true)
             {
                 if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VODBOX_DATA_DIR")))throw new InvalidOperationException("UI smoke requires an isolated VODBOX_DATA_DIR.");
-                // 验收会在主窗口之外额外创建搜索/设置窗口，这些窗口不在冒烟结束时逐个关闭；
-                // 默认的 OnLastWindowClose 会让进程在验收输出后一直挂住，改为主窗口关闭即退出。
-                desktop.ShutdownMode=Avalonia.Controls.ShutdownMode.OnMainWindowClose;
                 window.Opened+=async(_,_)=>
                 {
                     try

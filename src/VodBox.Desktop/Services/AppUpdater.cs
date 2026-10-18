@@ -230,17 +230,22 @@ public static class AppUpdater
         using var probe = new FileStream(Path.Combine(parent, ".vodbox-write-" + Guid.NewGuid().ToString("N")), FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose);
     }
 
-    internal static string BuildMacScript(string target, string incoming, string stage, string backup, string cache, int pid)
+    /// <summary>独立更新器已启动：进程必须尽快退出，否则更新器一直等不到替换时机。</summary>
+    public static bool UpdaterLaunched { get; private set; }
+
+    internal static string BuildMacScript(string target, string incoming, string stage, string backup, string cache, int pid, bool relaunch = true)
     {
         static string Q(string text) => "'" + text.Replace("'", "'\\''") + "'";
+        var verified = $"/usr/bin/codesign --verify --deep --strict {Q(target)}" + (relaunch ? $" && /usr/bin/open {Q(target)}" : "");
         return $"#!/bin/sh\nset -eu\nwhile kill -0 {pid} 2>/dev/null; do sleep 1; done\n" +
             $"cleanup() {{ rm -rf {Q(stage)} {Q(cache)}; }}\ntrap cleanup EXIT\n" +
             $"mv {Q(target)} {Q(backup)}\nif mv {Q(incoming)} {Q(target)}; then\n" +
-            $"  if /usr/bin/codesign --verify --deep --strict {Q(target)} && /usr/bin/open {Q(target)}; then rm -rf {Q(backup)}; exit 0; fi\n" +
+            $"  if {verified}; then rm -rf {Q(backup)}; exit 0; fi\n" +
             $"  mv {Q(target)} {Q(incoming)}\nfi\nmv {Q(backup)} {Q(target)}\n";
     }
 
-    public static async Task PrepareAndLaunchAsync(string archive, string processPath, string cache, CancellationToken token)
+    /// <param name="relaunch">false = 退出时安装：替换完成后不再启动新版本。</param>
+    public static async Task PrepareAndLaunchAsync(string archive, string processPath, string cache, CancellationToken token, bool relaunch = true)
     {
         if (!IsPackaged(processPath)) throw new InvalidOperationException("开发模式下不能原地更新，请安装正式发行包。");
         var mac = OperatingSystem.IsMacOS();
@@ -263,9 +268,10 @@ public static class AppUpdater
             var backup = Path.Combine(parent, ".vodbox-backup-" + Guid.NewGuid().ToString("N"));
             if (mac)
             {
-                var body = BuildMacScript(target, incoming, stage, backup, cache, Environment.ProcessId);
+                var body = BuildMacScript(target, incoming, stage, backup, cache, Environment.ProcessId, relaunch);
                 await File.WriteAllTextAsync(script, body, token);
                 _ = Process.Start(new ProcessStartInfo("/bin/sh") { ArgumentList = { script }, UseShellExecute = false }) ?? throw new InvalidOperationException("无法启动独立更新器。");
+                UpdaterLaunched = true;
             }
             else
             {
@@ -274,12 +280,13 @@ public static class AppUpdater
                     $"$target={Ps(target)}; $stage={Ps(incoming)}; $backup={Ps(backup)}\n" +
                     "try { Move-Item -LiteralPath $target -Destination $backup -ErrorAction Stop; " +
                     "try { Move-Item -LiteralPath $stage -Destination $target -ErrorAction Stop; " +
-                    "Start-Process -FilePath (Join-Path $target 'VodBox.Desktop.exe') } " +
+                    (relaunch ? "Start-Process -FilePath (Join-Path $target 'VodBox.Desktop.exe') } " : "} ") +
                     "catch { if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }; Move-Item -LiteralPath $backup -Destination $target -ErrorAction Stop; throw }; " +
                     $"Remove-Item -LiteralPath {Ps(backup)} -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath {Ps(cache)} -Recurse -Force -ErrorAction SilentlyContinue " +
                     $"}} catch {{ if (Test-Path -LiteralPath {Ps(stage)}) {{ Remove-Item -LiteralPath {Ps(stage)} -Recurse -Force -ErrorAction SilentlyContinue }}; exit 1 }}\n";
                 await File.WriteAllTextAsync(script, body, token);
                 _ = Process.Start(new ProcessStartInfo("powershell.exe") { ArgumentList = { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script }, UseShellExecute = false, CreateNoWindow = true }) ?? throw new InvalidOperationException("无法启动独立更新器。");
+                UpdaterLaunched = true;
             }
         }
         catch { if (Directory.Exists(stage)) Directory.Delete(stage, true); throw; }

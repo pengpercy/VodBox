@@ -85,6 +85,9 @@
                     <Button Classes="secondary" Padding="10,6" Content="上移"
                             Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteUpCommand}"
                             CommandParameter="{Binding}" />
+                    <Button Classes="secondary" Padding="10,6" Content="置顶" ToolTip.Tip="移到列表最前（星标站点始终排在前面）"
+                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteToTopCommand}"
+                            CommandParameter="{Binding}" />
                   </StackPanel>
                 </Grid>
               </Border>

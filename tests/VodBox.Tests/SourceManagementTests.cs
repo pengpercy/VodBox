@@ -56,4 +56,29 @@ public sealed class SourceManagementTests
         }
         finally { Directory.Delete(directory, true); }
     }
+
+    [Fact]
+    public async Task MoveToTopJumpsInOneStepButStaysBelowStarredSites()
+    {
+        var directory = Path.Combine(AppContext.BaseDirectory, "sites-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "config.json");
+        try
+        {
+            var sites = string.Join(",", "abcde".Select(key => $"{{\"key\":\"{key}\",\"name\":\"{key}\",\"api\":\"https://example.com/{key}\",\"type\":1}}"));
+            await File.WriteAllTextAsync(path, $"{{\"sites\":[{sites}]}}", TestContext.Current.CancellationToken);
+            using var store = new LibraryStore(Path.Combine(directory, "library.db"));
+            using var first = new SourceRegistry(store);
+            await first.LoadConfigAsync(path, TestContext.Current.CancellationToken);
+            first.MoveToTop("e");
+            Assert.Equal("eabcd", string.Concat(first.Sources.Select(site => site.Key)));
+            first.SetStarred("c", true);
+            first.MoveToTop("d");
+            Assert.Equal("cdeab", string.Concat(first.Sources.Select(site => site.Key)));
+            using var second = new SourceRegistry(store);
+            await second.LoadConfigAsync(path, TestContext.Current.CancellationToken);
+            Assert.Equal("cdeab", string.Concat(second.Sources.Select(site => site.Key)));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
 }
