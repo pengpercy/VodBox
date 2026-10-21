@@ -23,12 +23,18 @@ public sealed class UpdateWindowTests
         Assert.Equal("99.0.0", model.NewVersion);
         Assert.Equal("## 发行说明\n- 修复更新流程", model.ReleaseNotes);
         Assert.True(model.CanSkip);
+        Assert.True(model.IsOffer);
         Assert.False(model.IsReady);
-        Assert.False(model.HasProgress);
+        Assert.False(model.IsInProgress);
         Assert.False(model.InstallOnQuit);
+        Assert.Equal("软件更新", model.WindowTitle);
+        Assert.Contains("VodBox 99.0.0 可供下载，您现在的版本是 0.2.6。", model.OfferText);
         // 测试进程不是正式安装包：只能打开下载页面，不能原地安装。
         Assert.True(model.UsesExternalDownload);
+        Assert.False(model.CanInstall);
         Assert.False(model.CanInstallNow);
+        await model.InstallAsync();
+        Assert.Equal(UpdateState.Available, model.State);
         Assert.False(await model.InstallNowAsync());
         await model.WindowClosedAsync();
         Assert.True(model.IsFinished);
@@ -51,27 +57,45 @@ public sealed class UpdateWindowTests
     }
 
     [AvaloniaFact]
-    public void WindowOffersSkipInstallOnQuitAndInstallAndRestart()
+    public void WindowOffersSkipRemindLaterAndInstall()
     {
         var window = new UpdateWindow(new UpdateViewModel(Offer(), "0.2.6", _ => { }));
         window.Show();
         try
         {
             window.UpdateLayout();
-            var buttons = window.GetVisualDescendants().OfType<Button>().ToDictionary(button => button.Name ?? "", button => button);
+            var buttons = window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is not null).ToDictionary(button => button.Name!, button => button);
             Assert.Equal("跳过这个版本", buttons["SkipVersion"].Content);
-            Assert.Equal("退出时安装", buttons["InstallOnQuit"].Content);
-            Assert.Equal("安装并重启应用", buttons["InstallNow"].Content);
+            Assert.Equal("稍后提示我", buttons["RemindLater"].Content);
+            Assert.Equal("安装更新", buttons["Install"].Content);
             Assert.True(buttons["SkipVersion"].IsEffectivelyVisible);
+            Assert.True(buttons["RemindLater"].IsEffectivelyVisible);
+            // 进度面板在发现新版本阶段隐藏。
+            Assert.False(buttons["InstallNow"].IsEffectivelyVisible);
+            Assert.False(buttons["Cancel"].IsEffectivelyVisible);
             var autoInstall = window.GetVisualDescendants().OfType<CheckBox>().Single(box => box.Name == "AutoInstall");
             Assert.Equal("以后自动下载并安装更新", autoInstall.Content);
             // 开发/测试进程不能原地更新：安装按钮与自动安装勾选隐藏，改为打开下载页面。
-            Assert.False(buttons["InstallNow"].IsEffectivelyVisible);
-            Assert.False(buttons["InstallOnQuit"].IsEffectivelyVisible);
+            Assert.False(buttons["Install"].IsEffectivelyVisible);
             Assert.False(autoInstall.IsEffectivelyVisible);
             Assert.True(buttons["OpenDownloadPage"].IsEffectivelyVisible);
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ReleaseNotesRenderHeadingsBulletsAndBold()
+    {
+        var notes = Assert.IsType<StackPanel>(UpdateWindow.RenderNotes("## Fixed\n\n- **崩溃修复.** 卡片网格\n- 第二项 [链接](https://example.com)"));
+        var heading = Assert.IsType<SelectableTextBlock>(notes.Children[0]);
+        Assert.Equal("Fixed", Assert.IsType<Avalonia.Controls.Documents.Run>(Assert.Single(heading.Inlines!)).Text);
+        var first = Assert.IsType<Grid>(notes.Children[1]);
+        Assert.Equal("•", Assert.IsType<TextBlock>(first.Children[0]).Text);
+        var runs = Assert.IsType<SelectableTextBlock>(first.Children[1]).Inlines!.OfType<Avalonia.Controls.Documents.Run>().ToList();
+        Assert.Equal(("崩溃修复.", Avalonia.Media.FontWeight.Bold), (runs[0].Text, runs[0].FontWeight));
+        Assert.Equal(" 卡片网格", runs[1].Text);
+        var second = Assert.IsType<SelectableTextBlock>(Assert.IsType<Grid>(notes.Children[2]).Children[1]);
+        Assert.Equal("第二项 链接", string.Concat(second.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Select(run => run.Text)));
     }
 
     [AvaloniaFact]
@@ -86,7 +110,7 @@ public sealed class UpdateWindowTests
             Dispatcher.UIThread.RunJobs();
             var window = Assert.Single(owner.OwnedWindows.OfType<UpdateWindow>());
             window.UpdateLayout();
-            Assert.Contains(window.GetVisualDescendants().OfType<SelectableTextBlock>(), text => text.Text == Offer().ReleaseNotes);
+            Assert.Contains(window.GetVisualDescendants().OfType<SelectableTextBlock>(), text => text.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Any(run => run.Text == "修复更新流程") == true);
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsEffectivelyVisible && Equals(button.Content, "安装并重启应用"));
             service.Show(Offer(), "0.2.6", owner, automatic: false, _ => { });
             Assert.Same(window, Assert.Single(owner.OwnedWindows.OfType<UpdateWindow>()));

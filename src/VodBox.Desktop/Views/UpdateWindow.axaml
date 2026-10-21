@@ -2,51 +2,69 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
         x:Class="VodBox.Desktop.Views.UpdateWindow" x:DataType="vm:UpdateViewModel"
-        Title="VodBox 更新" Icon="/Assets/Icons/linux/256/vodbox.png"
-        Width="620" Height="560" MinWidth="520" MinHeight="440"
+        Title="{Binding WindowTitle}" Icon="/Assets/Icons/linux/256/vodbox.png"
+        Width="640" Height="420" MinWidth="520" MinHeight="360"
         Background="{DynamicResource PageBackgroundBrush}"
         WindowStartupLocation="CenterOwner">
-  <Grid RowDefinitions="Auto,*,Auto" Margin="24">
-    <StackPanel Spacing="10" Margin="0,0,0,16">
-      <TextBlock Text="发现 VodBox 新版本" FontSize="22" FontWeight="SemiBold" />
-      <StackPanel Orientation="Horizontal" Spacing="24">
-        <TextBlock Text="{Binding CurrentVersion, StringFormat='当前版本：{0}'}" />
-        <TextBlock Text="{Binding NewVersion, StringFormat='新版本：{0}'}" FontWeight="SemiBold" />
+  <Window.Styles>
+    <Style Selector="Button.update">
+      <Setter Property="MinWidth" Value="104" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Padding" Value="14,5" />
+    </Style>
+    <Style Selector="Button.update.primary">
+      <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.update.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+  </Window.Styles>
+  <!-- 同一窗口两种布局（参照 macOS Sparkle）：发现新版本时展示发行说明，开始更新后收起为紧凑的进度面板。 -->
+  <Grid ColumnDefinitions="Auto,*" Margin="20,18,20,18">
+    <Image Source="/Assets/Icons/linux/256/vodbox.png" Width="64" Height="64" VerticalAlignment="Top" Margin="0,2,18,0" />
+
+    <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" IsVisible="{Binding IsOffer}">
+      <TextBlock Text="新版本的 VodBox 已经发布" FontSize="15" FontWeight="SemiBold" />
+      <TextBlock Grid.Row="1" Text="{Binding OfferText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,12,0,6">
+        <TextBlock Text="更新信息：" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="在 GitHub 查看" Click="OnReleasePage" Padding="6,2" FontSize="12"
+                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentStrongBrush}" Cursor="Hand" />
+      </Grid>
+      <Border Grid.Row="3" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ContentControl x:Name="Notes" Margin="16,12" />
+        </ScrollViewer>
+      </Border>
+      <StackPanel Grid.Row="4" Spacing="8" Margin="0,10,0,0">
+        <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" TextWrapping="Wrap" Foreground="{DynamicResource DangerBrush}" />
+        <CheckBox x:Name="AutoInstall" Content="以后自动下载并安装更新" IsChecked="{Binding AutoInstall}"
+                  IsVisible="{Binding SupportsInPlaceUpdate}" />
       </StackPanel>
-      <TextBlock Text="{Binding PolicyText}" TextWrapping="Wrap" FontSize="12"
-                 Foreground="{DynamicResource TextSecondaryBrush}" />
-    </StackPanel>
-    <Border Grid.Row="1" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}"
-            BorderThickness="1" CornerRadius="8">
-      <!-- Plain text preserves the complete release body without remote images or an additional renderer. -->
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="16" Spacing="12">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="发行说明" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Content="在 GitHub 查看" Click="OnReleasePage" Padding="8,3" FontSize="12"
-                    Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentStrongBrush}" Cursor="Hand" />
-          </Grid>
-          <SelectableTextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" />
+      <!-- 关闭窗口 = 稍后提示我。 -->
+      <Grid Grid.Row="5" ColumnDefinitions="Auto,*,Auto" Margin="0,12,0,0">
+        <Button x:Name="SkipVersion" Classes="update" Content="跳过这个版本" Click="OnSkip" IsEnabled="{Binding CanSkip}" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+          <Button x:Name="RemindLater" Classes="update" Content="稍后提示我" Click="OnRemindLater" />
+          <Button x:Name="OpenDownloadPage" Classes="update primary" Content="打开下载页面" Click="OnOpenDownloadPage" IsVisible="{Binding CanOpenDownloadPage}" />
+          <Button x:Name="Install" Classes="update primary" Content="安装更新" Click="OnInstall" IsVisible="{Binding CanInstall}" IsDefault="True" />
         </StackPanel>
-      </ScrollViewer>
-    </Border>
-    <StackPanel Grid.Row="2" Spacing="12" Margin="0,16,0,0">
-      <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" />
-      <ProgressBar Value="{Binding DownloadProgress}" Maximum="100" Height="8"
-                   IsVisible="{Binding HasProgress}" IsIndeterminate="{Binding ProgressIndeterminate}" />
-      <CheckBox x:Name="AutoInstall" Content="以后自动下载并安装更新" IsChecked="{Binding AutoInstall}"
-                IsVisible="{Binding SupportsInPlaceUpdate}" />
-      <!-- 关闭窗口 = 稍后提醒；下载中关闭会取消下载（已选择「退出时安装」的继续在后台下载）。 -->
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <Button x:Name="SkipVersion" Content="跳过这个版本" Click="OnSkip" IsVisible="{Binding CanSkip}" />
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <Button x:Name="CancelDownload" Content="取消下载" Click="OnCancelDownload" IsVisible="{Binding IsDownloading}" />
-          <Button x:Name="OpenDownloadPage" Content="打开下载页面" Click="OnOpenDownloadPage" IsVisible="{Binding CanOpenDownloadPage}"
-                  Background="{DynamicResource AccentStrongBrush}" Foreground="White" />
-          <Button x:Name="InstallOnQuit" Content="退出时安装" Click="OnInstallOnQuit" IsVisible="{Binding CanInstallOnQuit}" />
-          <Button x:Name="InstallNow" Content="安装并重启应用" Click="OnInstallNow" IsVisible="{Binding CanInstallNow}"
-                  Background="{DynamicResource AccentStrongBrush}" Foreground="White" />
-        </StackPanel>
+      </Grid>
+    </Grid>
+
+    <StackPanel Grid.Column="1" Spacing="12" IsVisible="{Binding IsInProgress}" VerticalAlignment="Center">
+      <TextBlock x:Name="Phase" Text="{Binding PhaseText}" FontSize="15" FontWeight="SemiBold" />
+      <ProgressBar x:Name="Progress" Value="{Binding Progress}" Maximum="100" Height="6" MinHeight="6"
+                   IsIndeterminate="{Binding ProgressIndeterminate}" />
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding DetailText}" IsVisible="{Binding HasDetail}" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+        <Button x:Name="Cancel" Grid.Column="1" Classes="update" Content="取消" Click="OnCancel"
+                IsVisible="{Binding ShowCancel}" IsEnabled="{Binding CanCancel}" />
+        <Button x:Name="InstallNow" Grid.Column="1" Classes="update primary" Content="安装并重启应用" Click="OnInstallNow"
+                IsVisible="{Binding CanInstallNow}" />
       </Grid>
     </StackPanel>
   </Grid>

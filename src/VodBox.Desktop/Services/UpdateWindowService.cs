@@ -49,7 +49,7 @@ public sealed class UpdateWindowService
     {
         if (_currentWindow is not null || _session is { IsFinished: false } || _automaticOffers.Contains(offer.Version)) return false;
         var session = Session(offer, currentVersion, report, preferences);
-        if (!session.CanInstallOnQuit) return false;
+        if (!session.CanInstall) return false;
         session.ScheduleInstallOnQuit();
         _automaticOffers.Add(offer.Version);
         return true;

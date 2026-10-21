@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="VodBox.Desktop.Views.UpdateCheckWindow"
+        Title="正在更新 VodBox" Icon="/Assets/Icons/linux/256/vodbox.png"
+        Width="440" SizeToContent="Height" CanResize="False"
+        Background="{DynamicResource PageBackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+  <!-- 手动检查更新：检查中显示不确定进度条，结果为「已是最新版本」或失败原因；发现新版本时由更新窗口接手。 -->
+  <Grid ColumnDefinitions="Auto,*" Margin="20,18,20,18">
+    <Image Source="/Assets/Icons/linux/256/vodbox.png" Width="64" Height="64" VerticalAlignment="Top" Margin="0,2,18,0" />
+    <StackPanel Grid.Column="1" Spacing="12" VerticalAlignment="Center">
+      <TextBlock x:Name="Headline" Text="正在检查更新…" FontSize="15" FontWeight="SemiBold" />
+      <ProgressBar x:Name="Progress" IsIndeterminate="True" Height="6" MinHeight="6" />
+      <TextBlock x:Name="Detail" IsVisible="False" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+      <Button x:Name="Action" Content="取消" Click="OnAction" HorizontalAlignment="Right" MinWidth="104"
+              HorizontalContentAlignment="Center" Padding="14,5" />
+    </StackPanel>
+  </Grid>
+</Window>

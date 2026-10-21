@@ -10,6 +10,8 @@ namespace VodBox.Desktop.Services;
 
 public sealed record UpdateOffer(string Version, string Name, Uri Url, string Sha256, string ReleaseUrl, string ReleaseNotes = "", long SizeBytes = 0);
 public sealed record UpdateDownloadProgress(long BytesReceived, long? TotalBytes, bool IsVerifying = false);
+/// <summary>已解压、已验证、等待替换的更新：Stage 位于安装目录旁，便于同卷原子移动。</summary>
+public sealed record StagedUpdate(string Target, string Stage, string Incoming);
 
 /// <summary>Release discovery, verified staging and detached replacement. No replacement occurs before explicit UI consent.</summary>
 public static class AppUpdater
@@ -152,11 +154,21 @@ public static class AppUpdater
         return string.Equals(Convert.ToHexString(await SHA256.HashDataAsync(stream, token)), expected, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static void ExtractSafe(string archive, string destination, bool mac)
+    /// <param name="progress">已解压字节占声明总大小的比例（0–1）。</param>
+    public static void ExtractSafe(string archive, string destination, bool mac, IProgress<double>? progress = null)
     {
         Directory.CreateDirectory(destination);
         using var zip = ZipFile.OpenRead(archive);
         long declaredSize = 0, actualSize = 0;
+        var expectedSize = Math.Max(1, zip.Entries.Sum(entry => entry.Length));
+        var reported = -1;
+        void Report()
+        {
+            var percent = (int)Math.Min(100, actualSize * 100 / expectedSize);
+            if (percent == reported) return;
+            reported = percent;
+            progress?.Report(percent / 100d);
+        }
         var links = new List<(string Path, string Target)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in zip.Entries)
@@ -207,6 +219,7 @@ public static class AppUpdater
                 actualSize += read;
                 if (entryBytes > MaxArchiveBytes || actualSize > 3_000_000_000) throw new InvalidDataException("解压内容过大。");
                 output.Write(buffer, 0, read);
+                Report();
             }
             if (mac && unixType == 0x8000 && OperatingSystem.IsMacOS())
                 File.SetUnixFileMode(target, (UnixFileMode)((entry.ExternalAttributes >> 16) & 0x1FF));
@@ -244,51 +257,79 @@ public static class AppUpdater
             $"  mv {Q(target)} {Q(incoming)}\nfi\nmv {Q(backup)} {Q(target)}\n";
     }
 
-    /// <param name="relaunch">false = 退出时安装：替换完成后不再启动新版本。</param>
-    public static async Task PrepareAndLaunchAsync(string archive, string processPath, string cache, CancellationToken token, bool relaunch = true)
+    /// <summary>
+    /// 安全解压并（macOS）验证签名，产物放在安装目录旁等待替换。不启动任何更新器，可通过 <see cref="Discard"/> 撤销。
+    /// </summary>
+    public static async Task<StagedUpdate> StageAsync(string archive, string processPath, CancellationToken token, IProgress<double>? progress = null)
     {
         if (!IsPackaged(processPath)) throw new InvalidOperationException("开发模式下不能原地更新，请安装正式发行包。");
         var mac = OperatingSystem.IsMacOS();
         var target = mac ? FindMacApp(processPath)! : Path.GetDirectoryName(processPath)!;
         ValidateInstallDirectory(target);
         var parent = Path.GetDirectoryName(target)!;
+        SweepStaleStages(parent);
         var stage = Path.Combine(parent, ".vodbox-stage-" + Guid.NewGuid().ToString("N"));
+        var staged = new StagedUpdate(target, stage, mac ? Path.Combine(stage, "VodBox.app") : stage);
         try
         {
-            ExtractSafe(archive, stage, mac);
-            var incoming = mac ? Path.Combine(stage, "VodBox.app") : stage;
+            ExtractSafe(archive, stage, mac, progress);
+            token.ThrowIfCancellationRequested();
             if (mac)
             {
-                using var verify = Process.Start(new ProcessStartInfo("/usr/bin/codesign") { ArgumentList = { "--verify", "--deep", "--strict", incoming }, UseShellExecute = false })!;
+                using var verify = Process.Start(new ProcessStartInfo("/usr/bin/codesign") { ArgumentList = { "--verify", "--deep", "--strict", staged.Incoming }, UseShellExecute = false })!;
                 await verify.WaitForExitAsync(token);
                 if (verify.ExitCode != 0) throw new InvalidDataException("app bundle 签名校验失败。");
             }
-            token.ThrowIfCancellationRequested();
-            var script = Path.Combine(cache, mac ? "apply.sh" : "apply.ps1");
-            var backup = Path.Combine(parent, ".vodbox-backup-" + Guid.NewGuid().ToString("N"));
-            if (mac)
-            {
-                var body = BuildMacScript(target, incoming, stage, backup, cache, Environment.ProcessId, relaunch);
-                await File.WriteAllTextAsync(script, body, token);
-                _ = Process.Start(new ProcessStartInfo("/bin/sh") { ArgumentList = { script }, UseShellExecute = false }) ?? throw new InvalidOperationException("无法启动独立更新器。");
-                UpdaterLaunched = true;
-            }
-            else
-            {
-                static string Ps(string text) => "'" + text.Replace("'", "''") + "'";
-                var body = $"while (Get-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue) {{ Start-Sleep -Seconds 1 }}\n" +
-                    $"$target={Ps(target)}; $stage={Ps(incoming)}; $backup={Ps(backup)}\n" +
-                    "try { Move-Item -LiteralPath $target -Destination $backup -ErrorAction Stop; " +
-                    "try { Move-Item -LiteralPath $stage -Destination $target -ErrorAction Stop; " +
-                    (relaunch ? "Start-Process -FilePath (Join-Path $target 'VodBox.Desktop.exe') } " : "} ") +
-                    "catch { if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }; Move-Item -LiteralPath $backup -Destination $target -ErrorAction Stop; throw }; " +
-                    $"Remove-Item -LiteralPath {Ps(backup)} -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath {Ps(cache)} -Recurse -Force -ErrorAction SilentlyContinue " +
-                    $"}} catch {{ if (Test-Path -LiteralPath {Ps(stage)}) {{ Remove-Item -LiteralPath {Ps(stage)} -Recurse -Force -ErrorAction SilentlyContinue }}; exit 1 }}\n";
-                await File.WriteAllTextAsync(script, body, token);
-                _ = Process.Start(new ProcessStartInfo("powershell.exe") { ArgumentList = { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script }, UseShellExecute = false, CreateNoWindow = true }) ?? throw new InvalidOperationException("无法启动独立更新器。");
-                UpdaterLaunched = true;
-            }
+            return staged;
         }
-        catch { if (Directory.Exists(stage)) Directory.Delete(stage, true); throw; }
+        catch { Discard(staged); throw; }
+    }
+
+    /// <summary>上次崩溃或强退遗留的解压目录（超过一天未动）。</summary>
+    private static void SweepStaleStages(string parent)
+    {
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(parent, ".vodbox-stage-*"))
+                if (Directory.GetLastWriteTimeUtc(dir) < DateTime.UtcNow.AddDays(-1)) Directory.Delete(dir, true);
+        }
+        catch (Exception error) { VodBox.Core.VodBoxLog.Error("update", "清理遗留更新目录失败", error); }
+    }
+
+    public static void Discard(StagedUpdate staged)
+    {
+        if (Directory.Exists(staged.Stage)) Directory.Delete(staged.Stage, true);
+    }
+
+    /// <param name="relaunch">false = 退出时安装：替换完成后不再启动新版本。</param>
+    public static async Task LaunchAsync(StagedUpdate staged, string cache, bool relaunch = true)
+    {
+        var (target, stage, incoming) = staged;
+        var mac = OperatingSystem.IsMacOS();
+        var parent = Path.GetDirectoryName(target)!;
+        if (!Directory.Exists(incoming)) throw new InvalidDataException("已解压的更新文件丢失，请重新下载。");
+        var script = Path.Combine(cache, mac ? "apply.sh" : "apply.ps1");
+        var backup = Path.Combine(parent, ".vodbox-backup-" + Guid.NewGuid().ToString("N"));
+        if (mac)
+        {
+            var body = BuildMacScript(target, incoming, stage, backup, cache, Environment.ProcessId, relaunch);
+            await File.WriteAllTextAsync(script, body);
+            _ = Process.Start(new ProcessStartInfo("/bin/sh") { ArgumentList = { script }, UseShellExecute = false }) ?? throw new InvalidOperationException("无法启动独立更新器。");
+        }
+        else
+        {
+            static string Ps(string text) => "'" + text.Replace("'", "''") + "'";
+            var body = $"while (Get-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue) {{ Start-Sleep -Seconds 1 }}\n" +
+                $"$target={Ps(target)}; $stage={Ps(incoming)}; $backup={Ps(backup)}\n" +
+                "try { Move-Item -LiteralPath $target -Destination $backup -ErrorAction Stop; " +
+                "try { Move-Item -LiteralPath $stage -Destination $target -ErrorAction Stop; " +
+                (relaunch ? "Start-Process -FilePath (Join-Path $target 'VodBox.Desktop.exe') } " : "} ") +
+                "catch { if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }; Move-Item -LiteralPath $backup -Destination $target -ErrorAction Stop; throw }; " +
+                $"Remove-Item -LiteralPath {Ps(backup)} -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath {Ps(cache)} -Recurse -Force -ErrorAction SilentlyContinue " +
+                $"}} catch {{ if (Test-Path -LiteralPath {Ps(stage)}) {{ Remove-Item -LiteralPath {Ps(stage)} -Recurse -Force -ErrorAction SilentlyContinue }}; exit 1 }}\n";
+            await File.WriteAllTextAsync(script, body);
+            _ = Process.Start(new ProcessStartInfo("powershell.exe") { ArgumentList = { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script }, UseShellExecute = false, CreateNoWindow = true }) ?? throw new InvalidOperationException("无法启动独立更新器。");
+        }
+        UpdaterLaunched = true;
     }
 }

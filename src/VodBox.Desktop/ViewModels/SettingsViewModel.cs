@@ -80,21 +80,46 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
         using var cancellation = new CancellationTokenSource();
         _updateCheckCancellation = cancellation;
         UpdateMessage = "正在检查更新…";
+        owner ??= (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        // 手动检查：先弹出「正在检查更新…」，结果在同一窗口给出；自动检查保持静默。
+        var checking = !automatic && owner is { IsVisible: true } ? new Views.UpdateCheckWindow() : null;
+        if (checking is not null)
+        {
+            checking.CancelRequested += cancellation.Cancel;
+            checking.Show(owner!);
+        }
         try
         {
             AvailableUpdate = await AppUpdater.CheckAsync(AppVersion, cancellation.Token);
             if (_updatesStopped || cancellation.IsCancellationRequested) return;
             UpdateMessage = AvailableUpdate is { } offer ? $"发现新版本 {offer.Version}" : "当前已是最新版本，或暂无可用的安全更新包";
-            owner ??= (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-            if (AvailableUpdate is not { } update || automatic && !AutoCheckUpdates) return;
+            if (AvailableUpdate is not { } update)
+            {
+                checking?.ShowResult("VodBox 已是最新版本", $"VodBox {AppVersion} 是目前的最新版本。");
+                return;
+            }
+            checking?.Dismiss();
+            checking = null;
+            if (automatic && !AutoCheckUpdates) return;
             if (automatic && update.Version == SkippedUpdateVersion) { UpdateMessage = $"发现新版本 {update.Version}（已跳过此版本）"; return; }
             void Report(string message) => UpdateMessage = message;
             if (automatic && AutoInstallUpdates && _updateWindows.StartBackground(update, AppVersion, Report, this)) return;
             if (owner is { IsVisible: true }) _updateWindows.Show(update, AppVersion, owner, automatic, Report, this);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { UpdateMessage = "已取消检查更新"; }
-        catch (Exception error) { UpdateMessage = $"检查更新失败：{error.Message}"; }
-        finally { _updateCheckCancellation = null; UpdateBusy = false; }
+        catch (Exception error)
+        {
+            UpdateMessage = $"检查更新失败：{error.Message}";
+            checking?.ShowResult("检查更新失败", error.Message);
+            checking = null;
+        }
+        finally
+        {
+            _updateCheckCancellation = null;
+            UpdateBusy = false;
+            // 取消或停机时收起仍在「检查中」的窗口；已显示结果的窗口留给用户关闭。
+            if (cancellation.IsCancellationRequested) checking?.Dismiss();
+        }
     }
 
     public async Task StopUpdatesAsync()
