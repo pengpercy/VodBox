@@ -10,6 +10,9 @@
     <Style Selector="Button.update">
       <Setter Property="MinWidth" Value="104" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <!-- 全局 Button.primary 带 MinHeight=32：内容默认纵向拉伸会让文字贴顶，这里统一高度并纵向居中。 -->
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="MinHeight" Value="32" />
       <Setter Property="Padding" Value="14,5" />
     </Style>
     <Style Selector="Button.update.primary">
