@@ -11,6 +11,9 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
       <SolidColorBrush x:Key="SkeletonBrush" Color="#1FFFFFFF" />
+      <!-- 覆盖 Fluent 输入框聚焦底色：默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；
+           改成比静止态略亮一档的半透明白，聚焦感交给底部强调色描边。 -->
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#14FFFFFF" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Light">
       <SolidColorBrush x:Key="PageBackgroundBrush" Color="#F3F3F3" />
@@ -35,6 +38,9 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
       <SolidColorBrush x:Key="SkeletonBrush" Color="#1FFFFFFF" />
+      <!-- 覆盖 Fluent 输入框聚焦底色：默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；
+           改成比静止态略亮一档的半透明白，聚焦感交给底部强调色描边。 -->
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#14FFFFFF" />
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>
