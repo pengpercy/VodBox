@@ -22,7 +22,9 @@ jobs:
         include:
           - { os: windows-2022, rid: win-x64 }
           - { os: windows-11-arm, rid: win-arm64 }
-          - { os: macos-15-intel, rid: osx-x64 }
+          # Packaging only copies, thins, signs and archives: nothing executes the x64 binaries, so it
+          # runs on the Apple Silicon pool instead of queueing for the scarce Intel runners.
+          - { os: macos-15, rid: osx-x64 }
           - { os: macos-15, rid: osx-arm64 }
           - { os: ubuntu-24.04, rid: linux-x64 }
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }

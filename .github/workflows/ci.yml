@@ -24,6 +24,10 @@ concurrency:
   cancel-in-progress: true
 jobs:
   version:
+    # A version-bump commit is always pushed together with its tag, and the tag's Release run builds
+    # and tests the same tree on all six RIDs. Building it twice only doubles the macOS runner demand,
+    # which queued Release's packaging behind CI for up to 30 minutes.
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Bump version')
     runs-on: ubuntu-22.04
     outputs:
       value: ${{ steps.version.outputs.value }}
@@ -33,6 +37,7 @@ jobs:
         run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
   # Structural gate: catches duplicate YAML keys and reuse guards silently disappearing.
   lint:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Bump version')
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:

@@ -51,6 +51,23 @@ class PackageTests(unittest.TestCase):
             self.assertFalse((app / 'MacOS/VodBox.Desktop.dSYM').exists())
             self.assertFalse((app / 'MacOS/VodBox.Desktop.pdb').exists())
 
+    def test_macos_thins_universal_dylibs_to_the_package_architecture(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
+            root = pathlib.Path(temp)
+            source = root / 'source'; source.mkdir()
+            (source / 'VodBox.Desktop').write_bytes(b'\xcf\xfa\xed\xfe' + bytes(28))
+            # Two-slice universal header, as NuGet ships libSkiaSharp.dylib.
+            (source / 'libSkiaSharp.dylib').write_bytes(b'\xca\xfe\xba\xbe\x00\x00\x00\x02' + bytes(40))
+            (source / 'libmpv.dylib').write_bytes(b'\xcf\xfa\xed\xfe' + bytes(28))
+            # A Java class file shares the fat magic but is not a Mach-O.
+            (source / 'Stale.bin').write_bytes(b'\xca\xfe\xba\xbe\x00\x00\x00\x41')
+            output = root / 'output'; output.mkdir()
+            with patch.object(package, 'run') as run:
+                package.package_macos('osx-arm64', source, output, '0.2.1')
+            lipo = [call.args for call in run.call_args_list if call.args[0] == 'lipo']
+            dylib = output / 'osx-arm64/VodBox.app/Contents/MacOS/libSkiaSharp.dylib'
+            self.assertEqual([('lipo', dylib, '-thin', 'arm64', '-output', dylib)], lipo)
+
     def test_macos_rejects_a_stale_java_payload_before_packaging(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.alma') as temp:
             root = pathlib.Path(temp)

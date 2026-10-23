@@ -18,6 +18,29 @@ def run(*args, **kwargs):
     subprocess.run([str(x) for x in args], check=True, **kwargs)
 
 
+MACOS_ARCH = {"osx-x64": "x86_64", "osx-arm64": "arm64"}
+MACHO_THIN = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce")
+MACHO_FAT = (b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca", b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca")
+
+
+def macho_kind(file: Path) -> str | None:
+    """"thin" or "fat" for a Mach-O image, None for anything else."""
+    with file.open("rb") as content:
+        header = content.read(8)
+    if header[:4] in MACHO_THIN:
+        return "thin"
+    if header[:4] not in MACHO_FAT or len(header) < 8:
+        return None
+    # Java class files share CAFEBABE with fat Mach-O, but their version
+    # field is not a plausible fat architecture count.
+    byteorder = "big" if header[:4] in (MACHO_FAT[0], MACHO_FAT[2]) else "little"
+    architectures = int.from_bytes(header[4:8], byteorder)
+    entry_size = 32 if header[:4] in MACHO_FAT[2:] else 20
+    if not 1 <= architectures <= 64 or file.stat().st_size < 8 + architectures * entry_size:
+        return None
+    return "fat"
+
+
 def package_macos(rid, source: Path, output: Path, version: str):
     stem = f"VodBox_{version}.{rid}"
     app = output / rid / "VodBox.app"
@@ -59,8 +82,6 @@ def package_macos(rid, source: Path, output: Path, version: str):
         }, file)
     # libmpv.dylib 也在 MacOS 下（MpvNative 候选路径包含 ../Resources）
     identity = os.environ.get("CODESIGN_IDENTITY") or "-"
-    macho = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",
-             b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca", b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca")
     # Passing a bundle's main executable to codesign signs its containing bundle.
     # Leave those executables to the explicit bundle pass after all nested code.
     bundle_executables = {contents / "MacOS/VodBox.Desktop"}
@@ -71,23 +92,17 @@ def package_macos(rid, source: Path, output: Path, version: str):
             continue
         if relative.parts[0] != "MacOS":
             continue
-        if file in bundle_executables or file.is_symlink() or not file.is_file() or file.suffix == ".class":
+        if file.is_symlink() or not file.is_file() or file.suffix == ".class":
             continue
-        with file.open("rb") as content:
-            header = content.read(8)
-        if header[:4] not in macho:
+        kind = macho_kind(file)
+        if kind is None:
             continue
-        # Java class files share CAFEBABE with fat Mach-O, but their version
-        # field is not a plausible fat architecture count.
-        if header[:4] in macho[4:]:
-            byteorder = "big" if header[:4] in (macho[4], macho[6]) else "little"
-            architectures = int.from_bytes(header[4:8], byteorder)
-            entry_size = 32 if header[:4] in (macho[6], macho[7]) else 20
-            if len(header) < 8 or not 1 <= architectures <= 64:
-                continue
-            if file.stat().st_size < 8 + architectures * entry_size:
-                continue
-        targets.append(file)
+        # NuGet ships SkiaSharp, HarfBuzzSharp and AvaloniaNative as universal x86_64+arm64
+        # dylibs; each RID package carries only its own slice, before anything is signed.
+        if kind == "fat":
+            run("lipo", file, "-thin", MACOS_ARCH[rid], "-output", file)
+        if file not in bundle_executables:
+            targets.append(file)
     # Sign standalone code first, then seal the outer app.
     ordered_targets = sorted(targets, key=lambda item: (-len(item.parts), str(item)))
     for target in ordered_targets + [app]:

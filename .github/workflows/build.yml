@@ -30,14 +30,17 @@ jobs:
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json, os
+          # osx-x64 cross-compiles on Apple Silicon and runs its x64 checks under Rosetta: the Intel
+          # pool is both slower and scarce enough to queue releases for tens of minutes.
           runners = {"win-x64":"windows-2022", "win-arm64":"windows-11-arm",
-                     "osx-x64":"macos-15-intel", "osx-arm64":"macos-15",
+                     "osx-x64":"macos-15", "osx-arm64":"macos-15",
                      "linux-x64":"ubuntu-24.04", "linux-arm64":"ubuntu-24.04-arm"}
           value = os.environ["PLATFORMS"].strip()
           requested = list(runners) if value == "all" else list(dict.fromkeys(x.strip() for x in value.split(",")))
           if not requested or any(x not in runners for x in requested):
               raise SystemExit("Unknown or empty platform selection")
-          print("matrix=" + json.dumps({"include":[{"os":runners[x], "rid":x} for x in requested]}))
+          rosetta = {"osx-x64"}
+          print("matrix=" + json.dumps({"include":[{"os":runners[x], "rid":x, "rosetta":x in rosetta} for x in requested]}))
           PY
   build:
     needs: select
@@ -92,14 +95,28 @@ jobs:
             .cache/downloads
             .cache/vulkan
           key: nuget-${{ matrix.rid }}-${{ hashFiles('Directory.Packages.props', 'build/native-assets.json') }}
+      # ~100 MB of debs: a slow Azure apt mirror once stretched this download to 29 minutes. Debs with
+      # an unchanged version come from this cache; apt only fetches what the runner image moved past.
+      - uses: actions/cache@v6
+        if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
+        with:
+          path: .cache/apt
+          key: apt-${{ matrix.rid }}-${{ hashFiles('.github/workflows/build.yml') }}
+          restore-keys: apt-${{ matrix.rid }}-
       - name: Linux native dependencies
         if: steps.reuse.outputs.skip != 'true' && startsWith(matrix.rid, 'linux')
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang zlib1g-dev libicu-dev libmpv2 libpipewire-0.3-0 libmujs3 libdisplay-info1 liblua5.2-0 patchelf zstd
+          mkdir -p .cache/apt/partial
+          apt_opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Dir::Cache::Archives="$PWD/.cache/apt")
+          sudo apt-get "${apt_opts[@]}" update
+          sudo apt-get "${apt_opts[@]}" install -y clang zlib1g-dev libicu-dev libmpv2 libpipewire-0.3-0 libmujs3 libdisplay-info1 liblua5.2-0 patchelf zstd
+          # apt leaves root-owned lock/partial entries the cache action cannot archive.
+          sudo rm -rf .cache/apt/partial .cache/apt/lock
+          sudo chown -R "$(id -u):$(id -g)" .cache/apt
       - name: Restore and test
         # Managed tests do not depend on CPU architecture: run them once per OS, on the faster runner.
-        # macOS uses the Apple Silicon leg; the Intel runner is the slowest one and sets the critical path.
+        # macOS uses the native Apple Silicon leg; osx-x64 runs under Rosetta on the same pool.
         if: steps.reuse.outputs.skip != 'true' && contains(fromJSON('["win-x64","linux-x64","osx-arm64"]'), matrix.rid)
         shell: bash
         run: |
@@ -125,7 +142,11 @@ jobs:
       - name: Verify bundled libmpv decoding
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
-        run: python3 build/verify_mpv_bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+        run: |
+          python=python3
+          # ctypes can only load the x64 libmpv into an x64 process: the system Python is universal.
+          if [ "${{ matrix.rosetta }}" = "true" ]; then python="arch -x86_64 /usr/bin/python3"; fi
+          $python build/verify_mpv_bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
       - uses: actions/cache@v6
         if: steps.reuse.outputs.skip != 'true'
         with:
@@ -135,8 +156,10 @@ jobs:
         if: steps.reuse.outputs.skip != 'true'
         shell: bash
         run: python3 build/quickjs/build.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
+      # The JIT host is the runner's arm64 dotnet, which cannot load an x64 bridge; under Rosetta the
+      # NativeAOT smoke below runs the shipped x64 code path instead.
       - name: Verify bundled QuickJS and drpy runtime
-        if: steps.reuse.outputs.skip != 'true'
+        if: steps.reuse.outputs.skip != 'true' && !matrix.rosetta
         shell: bash
         run: |
           case "${{ matrix.rid }}" in
