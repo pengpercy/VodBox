@@ -17,6 +17,9 @@ internal static class Program
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .With(new AvaloniaNativePlatformOptions { RenderingMode=[AvaloniaNativeRenderingMode.OpenGl,AvaloniaNativeRenderingMode.Software] })
+            // Avalonia 默认会用 Application.Name 调 setProcessName，平台初始化时 App.axaml 的 Name 尚未加载，
+            // 进程名会先被登记为 "Avalonia Application"；关掉后由 Info.plist 的 CFBundleName 决定。
+            .With(new MacOSPlatformOptions { DisableSetProcessName = true })
             .WithInterFont()
             .LogToTrace();
 }
