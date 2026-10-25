@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from bundle import verify_no_java_payload, verify_windows_closure
@@ -122,8 +123,17 @@ def package_macos(rid, source: Path, output: Path, version: str):
         shutil.copytree(app, stage / "VodBox.app", symlinks=True)
         (stage / "Applications").symlink_to("/Applications")
         # ULMO (LZMA) needs macOS 10.15+; the app already requires 12.0.
-        run("hdiutil", "create", "-volname", "VodBox", "-srcfolder", stage,
-            "-format", "ULMO", "-ov", output / (stem + ".dmg"))
+        # hdiutil intermittently fails with "Resource busy" on CI runners; a retry clears it.
+        for attempt in range(1, 4):
+            try:
+                run("hdiutil", "create", "-volname", "VodBox", "-srcfolder", stage,
+                    "-format", "ULMO", "-ov", output / (stem + ".dmg"))
+                break
+            except subprocess.CalledProcessError:
+                if attempt == 3:
+                    raise
+                print(f"hdiutil create failed, retrying in 5 seconds ({attempt}/3)", flush=True)
+                time.sleep(5)
 
 
 def package_linux(rid, source: Path, output: Path, version: str):

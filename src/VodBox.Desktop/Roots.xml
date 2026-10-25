@@ -1,7 +1,8 @@
 <linker>
-  <!-- Avalonia XAML 编译生成的类型由 StartUp 间接保留；此处显式根化 App 与 DesignData（设计预览） -->
+  <!-- Avalonia XAML 编译生成的类型由 StartUp 间接保留；此处显式根化 App。
+       DesignData 只给设计器预览（Debug、不裁剪）用，编译后的 XAML 不会引用 Design.DataContext，
+       Release 里不再根化它，免得把演示数据和它牵连的类型一起打进 AOT 产物。 -->
   <assembly fullname="VodBox.Desktop">
     <type fullname="VodBox.Desktop.App" preserve="All" />
-    <type fullname="VodBox.Desktop.Design.DesignData" preserve="All" />
   </assembly>
 </linker>

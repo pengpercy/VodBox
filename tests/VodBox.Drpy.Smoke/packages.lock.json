@@ -45,27 +45,27 @@
       "vodbox.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "[10.0.0, )",
+          "Microsoft.Data.Sqlite.Core": "[10.0.13, )",
           "Mono.Nat": "[3.0.4, )",
           "MonoTorrent": "[3.0.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.3.8, )",
-          "VodBox.PluginHost": "[0.3.8, )"
+          "VodBox.Core": "[0.3.9, )",
+          "VodBox.PluginHost": "[0.3.9, )"
         }
       },
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.3.8, )"
+          "VodBox.Core": "[0.3.9, )"
         }
       },
       "Microsoft.Data.Sqlite.Core": {
         "type": "CentralTransitive",
-        "requested": "[10.0.0, )",
-        "resolved": "10.0.0",
-        "contentHash": "wPKG/Ym6tSMCo06UOZXzVfeFGzawnOZrTba/R3PfK+RhNuNELZ9I7nFns4WGTtv2kKlrlmmErgJ+kgTXHaNdHg==",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "Gge8XsSCOwcbkbdmt2UDAe6kIv9Q0vA6yb3wsTStjjexaMFLTWfc/1gH4kbhJ+zWiXRTRA4lG2sOQNVfir204w==",
         "dependencies": {
-          "SQLitePCLRaw.core": "2.1.11"
+          "SQLitePCLRaw.core": "2.1.13"
         }
       },
       "Mono.Nat": {
