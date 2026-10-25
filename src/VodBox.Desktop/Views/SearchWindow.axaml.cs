@@ -14,6 +14,7 @@ public partial class SearchWindow : Window
     public SearchWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        Services.WindowsResizeFrame.Attach(this);
         Closed += (_, _) =>
         {
             // 关窗即取消在途搜索：代次 +1 并取消请求，任何已经发出的旧结果都会被判为过期而丢弃，

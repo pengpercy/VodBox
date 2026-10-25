@@ -12,6 +12,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        Services.WindowsResizeFrame.Attach(this);
         // 骨架阶段自带一个默认分区，保证窗口可以独立 new 出来并显示。
         DataContext = new SettingsWindowViewModel();
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble);

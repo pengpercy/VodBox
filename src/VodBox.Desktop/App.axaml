@@ -30,6 +30,26 @@
     <Style Selector="ContextMenu"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="ContextMenu MenuItem"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="Window"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /></Style>
+    <!-- 自绘标题栏（Windows / Linux 自绘时）的窗口按钮：三个 46 宽的直角按钮紧挨着，
+         与 MainViewModel.CaptionButtonsWidth（138）一致。按钮面板的 Spacing/内缩由 WindowChrome 清掉。 -->
+    <Style Selector="Button#PART_MinimizeButton, Button#PART_MaximizeButton, Button#PART_CloseButton">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="MinWidth" Value="46" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+    </Style>
+    <!-- Win32 从不上报 AllowedWindowActions，Avalonia 12.1 因此总会多画一个「全屏」按钮；
+         12.2 之前没有公开 API 去掉它（12.2 起改用 WindowDrawnDecorations.TitleBarDecorations），只能用样式压成 0 宽隐藏。
+         播放窗口的全屏由播放控制条与快捷键负责，不依赖这个按钮。 -->
+    <Style Selector="Button#PART_FullScreenButton, Button#PART_PopoverFullScreenButton">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="Width" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MaxWidth" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+    </Style>
     <StyleInclude Source="avares://VodBox.Desktop/Views/VirtualRows.axaml" />
     <StyleInclude Source="avares://VodBox.Desktop/Resources/Skeleton.axaml" />
     <!-- Material Design 3 风格滑杆：4px 圆头轨道 + 14px 圆 thumb，配 MDI 图标 -->

@@ -18,6 +18,7 @@ public partial class PlayerWindow : Window
     public PlayerWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        Services.WindowsResizeFrame.Attach(this);
         // 窄窗口只需容纳精简面板；侧组显隐由实际面板宽度决定。
         MinWidth = PlayerLayout.MinimumWindowWidth(compact: true);
         AddHandler(KeyDownEvent, OnPlaybackKeyDown, RoutingStrategies.Bubble);

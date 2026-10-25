@@ -143,6 +143,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
         _services.Prefs.Set("ui.poster-density",Math.Clamp(value,0,2));_main.Vod.RefreshPosterDensity();
     }
     [ObservableProperty] private int _themeIndex;
+    public bool IsLinux => OperatingSystem.IsLinux();
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(LinuxTitleBarRestartRequired))] private bool _linuxDrawnTitleBar;
+    /// <summary>X11 的标题栏模式在 Avalonia 启动时固定，开关和当前进程不一致时提示重启。</summary>
+    public bool LinuxTitleBarRestartRequired => IsLinux && LinuxDrawnTitleBar != WindowChrome.UsesLinuxDrawnDecorations;
+    partial void OnLinuxDrawnTitleBarChanged(bool value) => _services.Prefs.Set(WindowChrome.LinuxDrawnTitleBarKey, value);
     partial void OnThemeIndexChanged(int value)
     {
         _services.Prefs.Set("ui.theme", Math.Clamp(value, 0, 2));
@@ -296,6 +301,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
         EpgSubscriptionUrl = services.Prefs.GetString("live.epg-url");
         _proxyPushedMedia = services.Prefs.GetBool("push.use-proxy", false);
         _themeIndex = Math.Clamp(services.Prefs.GetInt("ui.theme", 0), 0, 2);
+        _linuxDrawnTitleBar = services.Prefs.GetBool(WindowChrome.LinuxDrawnTitleBarKey, true);
         _posterDensity=Math.Clamp(services.Prefs.GetInt("ui.poster-density",1),0,2);
         // 节目表状态入口由直播页维护；设置页转发它的变化，避免两处状态各说各话。
         _main.Live.PropertyChanged += (_, e) =>

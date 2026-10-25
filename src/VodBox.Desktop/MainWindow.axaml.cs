@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        WindowsResizeFrame.Attach(this);
         Closed += (_, _) =>
         {
             _searchWindow?.Close();

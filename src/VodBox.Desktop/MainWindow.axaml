@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:VodBox.Desktop.Views"
         xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+        xmlns:services="clr-namespace:VodBox.Desktop.Services"
         xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
         x:Class="VodBox.Desktop.MainWindow" x:DataType="vm:MainViewModel"
         Title="VodBox" Icon="/Assets/Icons/linux/256/vodbox.png"
@@ -121,7 +122,7 @@
       <Border x:Name="CaptionPlate" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top"
               Width="{x:Static vm:MainViewModel.CaptionButtonsWidth}" Height="{x:Static vm:MainViewModel.CaptionButtonsHeight}"
               CornerRadius="0,0,0,10" ClipToBounds="True" IsHitTestVisible="False"
-              IsVisible="{OnPlatform Default=True, macOS=False}">
+              IsVisible="{x:Static services:WindowChrome.HasClientCaptionButtons}">
         <Classes.shown>
           <MultiBinding Converter="{x:Static BoolConverters.And}">
             <Binding Path="Page" Converter="{x:Static views:PageConverters.IsHome}" />

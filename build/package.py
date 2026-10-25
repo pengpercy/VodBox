@@ -136,7 +136,7 @@ def package_linux(rid, source: Path, output: Path, version: str):
         apps = stage / "usr/share/applications"
         apps.mkdir(parents=True)
         (apps / "vodbox.desktop").write_text(
-            "[Desktop Entry]\nType=Application\nName=VodBox\nExec=vodbox\nIcon=vodbox\n"
+            "[Desktop Entry]\nType=Application\nName=VodBox\nExec=vodbox\nIcon=vodbox\nStartupWMClass=vodbox\n"
             "Categories=AudioVideo;Player;\nTerminal=false\n")
         for size in (16, 24, 32, 48, 64, 128, 256, 512, 1024):
             icons = stage / f"usr/share/icons/hicolor/{size}x{size}/apps"
