@@ -379,9 +379,9 @@
           "Avalonia.Themes.Fluent": "[12.1.4, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
           "QRCoder": "[1.6.0, )",
-          "VodBox.Core": "[0.3.9, )",
-          "VodBox.Infrastructure": "[0.3.9, )",
-          "VodBox.Playback.Mpv": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )",
+          "VodBox.Infrastructure": "[0.3.10, )",
+          "VodBox.Playback.Mpv": "[0.3.10, )"
         }
       },
       "vodbox.infrastructure": {
@@ -391,21 +391,21 @@
           "Mono.Nat": "[3.0.4, )",
           "MonoTorrent": "[3.0.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.3.9, )",
-          "VodBox.PluginHost": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )",
+          "VodBox.PluginHost": "[0.3.10, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )"
         }
       },
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )"
         }
       },
       "Avalonia": {

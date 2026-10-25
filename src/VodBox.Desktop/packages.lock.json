@@ -257,21 +257,21 @@
           "Mono.Nat": "[3.0.4, )",
           "MonoTorrent": "[3.0.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.3.9, )",
-          "VodBox.PluginHost": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )",
+          "VodBox.PluginHost": "[0.3.10, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )"
         }
       },
       "vodbox.pluginhost": {
         "type": "Project",
         "dependencies": {
-          "VodBox.Core": "[0.3.9, )"
+          "VodBox.Core": "[0.3.10, )"
         }
       },
       "Microsoft.Data.Sqlite.Core": {
