@@ -11,8 +11,15 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
       <SolidColorBrush x:Key="SkeletonBrush" Color="#1FFFFFFF" />
-      <!-- 覆盖 Fluent 输入框聚焦底色：默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；
-           改成比静止态略亮一档的半透明白，聚焦感交给底部强调色描边。 -->
+      <!-- 输入框描边三档：静止 → 悬停 → 聚焦逐级变亮，全部是中性白，不用系统强调色。
+           Fluent 默认静止就有 60% 白、聚焦是强调色加 2px 底边，压在深色半透明界面上很扎眼；
+           静止档收到与卡片描边同一量级，聚焦档仍是最亮的一档，键盘焦点照样看得出。下拉框同一套。 -->
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#52FFFFFF" />
+      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#8CFFFFFF" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#52FFFFFF" />
+      <!-- 聚焦底色：Fluent 默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；改成略亮一档的半透明白。 -->
       <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#14FFFFFF" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Light">
@@ -26,6 +33,14 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#99202020" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#66202020" />
       <SolidColorBrush x:Key="SkeletonBrush" Color="#14000000" />
+      <!-- 输入框描边三档（同深色主题的说明），中性灰。聚焦底色必须在浅色里显式给出：
+           否则会回落到 Default 字典里的深色值（#14FFFFFF），聚焦时输入框几乎透明。 -->
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#29000000" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#45000000" />
+      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#7A000000" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#29000000" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#45000000" />
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFFFF" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Default">
       <SolidColorBrush x:Key="PageBackgroundBrush" Color="#202020" />
@@ -38,9 +53,18 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#85FFFFFF" />
       <SolidColorBrush x:Key="MutedTextBrush" Color="#4CFFFFFF" />
       <SolidColorBrush x:Key="SkeletonBrush" Color="#1FFFFFFF" />
-      <!-- 覆盖 Fluent 输入框聚焦底色：默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；
-           改成比静止态略亮一档的半透明白，聚焦感交给底部强调色描边。 -->
+      <!-- 输入框描边三档：静止 → 悬停 → 聚焦逐级变亮，全部是中性白，不用系统强调色。
+           Fluent 默认静止就有 60% 白、聚焦是强调色加 2px 底边，压在深色半透明界面上很扎眼；
+           静止档收到与卡片描边同一量级，聚焦档仍是最亮的一档，键盘焦点照样看得出。下拉框同一套。 -->
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#52FFFFFF" />
+      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#8CFFFFFF" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#52FFFFFF" />
+      <!-- 聚焦底色：Fluent 默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；改成略亮一档的半透明白。 -->
       <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#14FFFFFF" />
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
+  <!-- 聚焦时四边都保持 1px（Fluent 默认底边 2px），避免输入框聚焦时整体跳动、底边一条粗线。 -->
+  <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
 </ResourceDictionary>
