@@ -72,6 +72,16 @@
     <TrimmerRootAssembly Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
 
+  <!-- 未打包运行（bin/ 下）的 macOS 可执行文件从旁边的 *.lproj 取本地化；没有它，打开文件面板等原生界面一律英文。
+       发布包由 build/package.py 把 lproj 放进 Contents/Resources，这里不进发布目录。 -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <Content Include="../../build/resources/macos/*.lproj/**">
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <!--
     开发期原生库：bin 目录默认不含 libmpv 与脚本运行库（发布包由 build/bundle.py 打进产物），
     因此在 IDE / dotnet run 下播放会以 DllNotFoundException 失败。

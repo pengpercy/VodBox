@@ -72,6 +72,10 @@ def package_macos(rid, source: Path, output: Path, version: str):
             shutil.rmtree(detritus, ignore_errors=True) if detritus.is_dir() else detritus.unlink(missing_ok=True)
     # Keep libmpv and lib/ together: native dependencies use @loader_path/lib.
     shutil.copy2(ROOT / "src/VodBox.Desktop/Assets/Icons/vodbox.icns", resources / "vodbox.icns")
+    # 界面只有简体中文：只声明 zh-Hans 一种本地化，AppKit 的打开/保存面板、标准菜单项才会跟着用中文，
+    # 否则没有 .lproj 的包一律回退英文（与系统语言无关）。
+    for lproj in (ROOT / "build/resources/macos").glob("*.lproj"):
+        shutil.copytree(lproj, resources / lproj.name)
     with (contents / "Info.plist").open("wb") as file:
         plistlib.dump({
             "CFBundleName": "VodBox", "CFBundleDisplayName": "VodBox",
@@ -79,6 +83,7 @@ def package_macos(rid, source: Path, output: Path, version: str):
             "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version,
             "CFBundleVersion": version, "CFBundleIconFile": "vodbox.icns",
             "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "12.0",
+            "CFBundleDevelopmentRegion": "zh_CN", "CFBundleLocalizations": ["zh-Hans"],
         }, file)
     # libmpv.dylib 也在 MacOS 下（MpvNative 候选路径包含 ../Resources）
     identity = os.environ.get("CODESIGN_IDENTITY") or "-"
