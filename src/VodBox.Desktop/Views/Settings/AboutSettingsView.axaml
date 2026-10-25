@@ -3,16 +3,16 @@
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              x:Class="VodBox.Desktop.Views.Settings.AboutSettingsView" x:DataType="vm:SettingsViewModel">
   <!-- 关于：版本号 / 自动检查更新 / 检查按钮；下载与安装确认由独立更新窗口处理。 -->
-  <StackPanel Spacing="24">
-    <StackPanel Spacing="10">
+  <StackPanel Spacing="20">
+    <StackPanel Spacing="8">
       <TextBlock Classes="groupTitle" Text="版本与更新" />
       <Border Classes="card">
         <StackPanel>
           <!-- 版本号 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Information}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" FontSize="11.5" Text="{Binding AppVersion, StringFormat='VodBox {0}'}" />
               </StackPanel>
@@ -21,10 +21,10 @@
           <Border Classes="rowSep" />
 
           <!-- 启动时自动检查更新 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Refresh}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="启动时自动检查更新" />
               </StackPanel>
@@ -34,10 +34,10 @@
           <Border Classes="rowSep" />
 
           <!-- 自动下载并安装：后台下载，退出时安装 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Download}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="自动下载并安装更新" />
                 <TextBlock Classes="rowSubtitle" Text="发现新版本时在后台下载并校验，退出 VodBox 时安装" />
@@ -48,10 +48,10 @@
           <Border Classes="rowSep" />
 
           <!-- 更新状态 + 单一检查入口 -->
-          <Border Padding="16,12">
+          <Border Padding="16,8">
             <Grid ColumnDefinitions="Auto,*">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Sparkles}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" Spacing="10">
                 <StackPanel>
                   <TextBlock Classes="rowTitle" Text="更新状态" />

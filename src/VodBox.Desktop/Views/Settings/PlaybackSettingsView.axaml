@@ -9,18 +9,18 @@
        DataContext 是 SettingsViewModel，所以分区可见性只能走控件自身的 IsPlayback / IsDanmaku / IsSubtitles。
        列表项按钮直接取本控件 DataContext 上的命令（旧页的 $parent[views:SettingsView] 在新窗口里不存在）。
        样式见 Resources/SettingsCardStyles.axaml -->
-  <StackPanel Spacing="24">
+  <StackPanel Spacing="20">
 
     <!-- ======================= Section = Playback ======================= -->
-    <StackPanel Spacing="10" IsVisible="{Binding $parent[settings:PlaybackSettingsView].IsPlayback}">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:PlaybackSettingsView].IsPlayback}">
       <TextBlock Classes="groupTitle" Text="播放行为" />
       <Border Classes="card">
         <StackPanel>
           <!-- 自动下一集 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Playlist}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="自动下一集" />
                 <TextBlock Classes="rowSubtitle" Text="当前剧集播完后自动播放下一集。" />
@@ -31,10 +31,10 @@
           <Border Classes="rowSep" />
 
           <!-- 不记录播放历史 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Incognito}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="不记录播放历史" />
                 <TextBlock Classes="rowSubtitle" Text="开启后不再写入观看历史与已看记录。" />
@@ -45,10 +45,10 @@
           <Border Classes="rowSep" />
 
           <!-- 音量 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.VolumeHigh}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="音量" />
                 <TextBlock Classes="rowSubtitle" Text="调整后立即作用于正在播放的播放器。" />
@@ -64,10 +64,10 @@
           <Border Classes="rowSep" />
 
           <!-- 倍速 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Speed}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="倍速" />
                 <TextBlock Classes="rowSubtitle" Text="0.25× 至 4×，调整后立即作用于正在播放的播放器。" />
@@ -79,10 +79,10 @@
           <Border Classes="rowSep" />
 
           <!-- 跳片头 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.SkipPrevious}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="跳片头（秒）" />
                 <TextBlock Classes="rowSubtitle" Text="播放开始时自动跳过的时间，下次播放生效。" />
@@ -94,10 +94,10 @@
           <Border Classes="rowSep" />
 
           <!-- 跳片尾 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.SkipNext}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="跳片尾（秒）" />
                 <TextBlock Classes="rowSubtitle" Text="接近结尾时提前跳过的秒数，下次播放生效。" />
@@ -111,15 +111,15 @@
     </StackPanel>
 
     <!-- ======================= Section = Danmaku ======================= -->
-    <StackPanel Spacing="10" IsVisible="{Binding $parent[settings:PlaybackSettingsView].IsDanmaku}">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:PlaybackSettingsView].IsDanmaku}">
       <TextBlock Classes="groupTitle" Text="弹幕显示" />
       <Border Classes="card">
         <StackPanel>
           <!-- 显示弹幕 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Danmaku}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="显示弹幕" />
                 <TextBlock Classes="rowSubtitle" Text="仅对带有弹幕地址的媒体生效。" />
@@ -130,10 +130,10 @@
           <Border Classes="rowSep" />
 
           <!-- 透明度 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Sparkles}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="透明度" />
                 <TextBlock Classes="rowSubtitle" Text="数值越大弹幕越不透明。" />
@@ -149,10 +149,10 @@
           <Border Classes="rowSep" />
 
           <!-- 屏幕弹幕上限 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.ViewList}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="屏幕弹幕上限" />
                 <TextBlock Classes="rowSubtitle" Text="同时显示的最大弹幕条数。" />
@@ -164,10 +164,10 @@
           <Border Classes="rowSep" />
 
           <!-- 说明 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Information}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <TextBlock Grid.Column="1" Classes="rowSubtitle" Margin="0" VerticalAlignment="Center"
                          Text="支持XML、JSON与gzip；弹幕随播放时间同步，缺少弹幕地址的媒体不会生成假数据。" />
             </Grid>
@@ -177,15 +177,15 @@
     </StackPanel>
 
     <!-- ======================= Section = Subtitles ======================= -->
-    <StackPanel Spacing="10" IsVisible="{Binding $parent[settings:PlaybackSettingsView].IsSubtitles}">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:PlaybackSettingsView].IsSubtitles}">
       <TextBlock Classes="groupTitle" Text="同步与显示" />
       <Border Classes="card">
         <StackPanel>
           <!-- 同步偏移 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.History}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="同步偏移（秒，正值延后）" />
                 <TextBlock Classes="rowSubtitle" Text="正值让字幕更晚出现，负值更早。" />
@@ -197,10 +197,10 @@
           <Border Classes="rowSep" />
 
           <!-- 字号 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Subtitles}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="字号" />
                 <TextBlock Classes="rowSubtitle" Text="字幕渲染字号。" />
@@ -212,14 +212,14 @@
         </StackPanel>
       </Border>
 
-      <TextBlock Classes="groupTitle" Text="在线字幕" Margin="4,10,0,0" />
+      <TextBlock Classes="groupTitle" Text="在线字幕" Margin="4,12,0,0" />
       <Border Classes="card">
         <StackPanel>
           <!-- 凭据 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Lock}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="ASSRT 服务凭据" />
                 <TextBlock Classes="rowSubtitle" Text="ASSRT服务凭据仅保留在本次会话内存，不写入偏好或备份。" />
@@ -231,10 +231,10 @@
           <Border Classes="rowSep" />
 
           <!-- 搜索 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Search}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="搜索片名" />
                 <TextBlock Classes="rowSubtitle" Text="留空使用当前播放标题。" />
@@ -249,7 +249,7 @@
       </Border>
 
       <!-- 在线字幕结果 -->
-      <TextBlock Classes="groupTitle" Text="在线字幕列表" Margin="4,10,0,0" />
+      <TextBlock Classes="groupTitle" Text="在线字幕列表" Margin="4,12,0,0" />
       <Border Classes="card">
         <ItemsControl ItemsSource="{Binding OnlineSubtitles}">
           <ItemsControl.ItemTemplate>
@@ -266,7 +266,7 @@
       </Border>
 
       <!-- 字幕文件结果 -->
-      <TextBlock Classes="groupTitle" Text="字幕文件列表" Margin="4,10,0,0" />
+      <TextBlock Classes="groupTitle" Text="字幕文件列表" Margin="4,12,0,0" />
       <Border Classes="card">
         <ItemsControl ItemsSource="{Binding SubtitleFiles}">
           <ItemsControl.ItemTemplate>

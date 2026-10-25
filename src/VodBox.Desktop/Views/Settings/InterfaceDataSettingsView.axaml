@@ -7,18 +7,18 @@
              x:Class="VodBox.Desktop.Views.Settings.InterfaceDataSettingsView" x:DataType="vm:SettingsViewModel">
   <!-- 界面·数据：卡片式设置分区。窗口为两个分区各挂一个实例，靠 Section 决定显示哪一半；
        样式见 Resources/SettingsCardStyles.axaml -->
-  <StackPanel Spacing="24">
+  <StackPanel Spacing="20">
 
     <!-- ======================= Section = Interface ======================= -->
-    <StackPanel Spacing="10" IsVisible="{Binding $parent[settings:InterfaceDataSettingsView].IsInterface}">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:InterfaceDataSettingsView].IsInterface}">
       <TextBlock Classes="groupTitle" Text="外观" />
       <Border Classes="card">
         <StackPanel>
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.ViewGrid}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="界面主题" />
                 <TextBlock Classes="rowSubtitle" Text="基础页面与导航跟随主题；视频控制层保留深色以保证画面对比度。" />
@@ -32,10 +32,31 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <!-- Linux：自绘标题栏（默认）或窗口管理器的原生标题栏；X11 选项启动时固定，改了要重启。
+               分隔线放在行内，隐藏这一行时连同分隔线一起隐藏。 -->
+          <StackPanel IsVisible="{Binding IsLinux}">
+            <Border Padding="16,8" MinHeight="48">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <PathIcon Grid.Column="0" Data="{StaticResource Icon.ViewList}" Width="18" Height="18"
+                          Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <TextBlock Classes="rowTitle" Text="使用自绘标题栏" />
+                  <TextBlock Classes="rowSubtitle" Text="关闭后改用窗口管理器的标题栏；重启 VodBox 后生效。"
+                             IsVisible="{Binding !LinuxTitleBarRestartRequired}" />
+                  <TextBlock Classes="rowSubtitle" Text="重启 VodBox 后生效。" Foreground="{DynamicResource WarnBrush}"
+                             IsVisible="{Binding LinuxTitleBarRestartRequired}" />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="2" IsChecked="{Binding LinuxDrawnTitleBar}" OnContent="" OffContent=""
+                              MinWidth="44" VerticalAlignment="Center" Margin="16,0,0,0" />
+              </Grid>
+            </Border>
+            <Border Classes="rowSep" />
+          </StackPanel>
+
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Filmstrip}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="海报密度" />
               </StackPanel>
@@ -48,10 +69,10 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.FolderOpen}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="本地壁纸" />
               </StackPanel>
@@ -67,15 +88,15 @@
     </StackPanel>
 
     <!-- ========================= Section = Data ========================== -->
-    <StackPanel Spacing="10" IsVisible="{Binding $parent[settings:InterfaceDataSettingsView].IsData}">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:InterfaceDataSettingsView].IsData}">
       <TextBlock Classes="groupTitle" Text="备份与恢复" />
       <Border Classes="card">
         <StackPanel>
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.ContentSave}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="导出备份" />
               </StackPanel>
@@ -84,10 +105,10 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Refresh}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="合并恢复备份" />
               </StackPanel>
@@ -98,14 +119,14 @@
         </StackPanel>
       </Border>
 
-      <TextBlock Classes="groupTitle" Text="缓存与历史" />
+      <TextBlock Classes="groupTitle" Text="缓存与历史" Margin="4,12,0,0" />
       <Border Classes="card">
         <StackPanel>
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Subtitles}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="清理下载字幕缓存" />
               </StackPanel>
@@ -114,10 +135,10 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Movie}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="清空媒体缓存" />
               </StackPanel>
@@ -126,10 +147,10 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Folder}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="清理上传收件箱" />
               </StackPanel>
@@ -138,10 +159,10 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.History}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="清空观看历史与已看记录" />
               </StackPanel>

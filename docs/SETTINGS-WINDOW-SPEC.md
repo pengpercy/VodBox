@@ -49,9 +49,9 @@ Panel                                   ← 不透明主题底（无窗口材质
 ├─ Grid ColumnDefinitions="216,*" RowDefinitions="44,*"
 │   ├─ [0,0] Border  DragArea  ElementRole=TitleBar  Margin=OnPlatform macOS '90,0,0,0'
 │   ├─ [0,1] Border  头部条    ElementRole=TitleBar  Margin=OnPlatform Default '0,0,140,0'
-│   │        └─ TextBlock 当前分区标题 · Padding=28,0,28,0 · 垂直居中 · 左对齐
+│   │        └─ TextBlock 当前分区标题 · Padding=24,0,24,0 · 垂直居中 · 左对齐
 │   ├─ [1,0] ScrollViewer 左栏导航（Padding 0,4,0,0）
-│   ├─ [1,1] ScrollViewer 右栏内容（Padding 28,20,28,32）
+│   ├─ [1,1] ScrollViewer 右栏内容（Padding 24,8,24,24）
 │   └─ Border  Grid.Column=0 · Width=1 · HorizontalAlignment=Right · Background=StrokeBrush · RowSpan=2   ← 竖向分隔线
 └─ Border 左栏底部版本卡片（Dock 到左栏底部，不随导航滚动）
 ```
@@ -65,7 +65,7 @@ Panel                                   ← 不透明主题底（无窗口材质
 | 左栏着色 | `PageBackgroundBrush` @ `Opacity=0.40`，让 Mica/Acrylic 透出（同主窗口侧边栏） |
 | 右栏底色 | `PageBackgroundBrush` 不透明，**不**透材质（与主窗口内容区一致，保证表格/文字可读） |
 | 头部条高 | 44 |
-| 右栏内边距 | `28,20,28,32` |
+| 右栏内边距 | `24,8,24,24`（紧凑版：头部条 44 已留出标题，顶部只补 8） |
 | 内容列最大宽 | **720**，`HorizontalAlignment="Left"`（窗口拉宽时内容不无限拉伸） |
 
 ---
@@ -125,7 +125,7 @@ Panel                                   ← 不透明主题底（无窗口材质
 ### 4.1 顶部头部条
 
 - 高度 44，与标题条同一 `Grid.Row=0`，整条 `ElementRole="TitleBar"`。
-- 内容：**只有当前分区标题**，`FontSize=15.5` · `FontWeight=SemiBold` · `Foreground="{DynamicResource TextPrimaryBrush}"` · 左对齐 · `Padding="28,0,28,0"` · 垂直居中。
+- 内容：**只有当前分区标题**，`FontSize=15.5` · `FontWeight=SemiBold` · `Foreground="{DynamicResource TextPrimaryBrush}"` · 左对齐 · `Padding="24,0,24,0"` · 垂直居中。
 - **不需要返回/前进箭头。** 判断与理由：
   1. 这是独立顶层窗口，没有可回退的导航栈——箭头会承诺一个不存在的「上一页」；
   2. 分区切换在左栏永远一键可达，返回箭头是冗余的第二条路径；
@@ -141,7 +141,7 @@ Panel                                   ← 不透明主题底（无窗口材质
 | 字重 | `SemiBold` |
 | 颜色 | `{DynamicResource TextTertiaryBrush}` |
 | 位置 | 卡片上方，`Margin="4,0,0,8"` |
-| 与上一张卡片的距离 | **24**（第一个分组标题距离头部条 0，由 ScrollViewer 顶部 padding 20 提供） |
+| 与上一张卡片的距离 | **20**（同一 StackPanel 内的后续分组标题用 `Margin="4,12,0,0"` + 间距 8 补齐；第一个分组标题距离头部条由 ScrollViewer 顶部 padding 8 提供） |
 | 说明文字（可选） | 分组/分区引导句 `FontSize=11.5` · `TextTertiaryBrush` · `TextWrapping=Wrap` · `Margin="4,0,0,10"` |
 
 ### 4.3 卡片容器
@@ -153,20 +153,20 @@ Panel                                   ← 不透明主题底（无窗口材质
 | 边框 | `BorderThickness="1"` · `BorderBrush="{DynamicResource StrokeBrush}"`（很淡，深色 9% 白） |
 | 内边距 | **0**（间距由每行自己承担，分隔线才能通到卡片边缘） |
 | 裁剪 | `ClipToBounds="True"`（保证首/末行不溢出圆角） |
-| 分组间距 | 同组内多个卡片间距 **8**；卡片到下一个分组标题 **24** |
+| 分组间距 | 分组标题到卡片 **8**；卡片到下一个分组标题 **20** |
 | 列宽 | 卡片 `Stretch` 到内容列（最大 720） |
 
 ### 4.4 设置行
 
-行结构：`Grid ColumnDefinitions="Auto,*,Auto"`，`Padding="16,12"`，`MinHeight=60`（双行行）/ `48`（单行行）。
+行结构：`Grid ColumnDefinitions="Auto,*,Auto"`，`Padding="16,8"`，`MinHeight=48`（32 高的控件 + 上下 8；双行行按内容撑高）/ `44`（列表行）。
 
 | 元素 | 规格 |
 |---|---|
-| 左侧图标（可选） | `PathIcon` **18×18** · `Foreground="{DynamicResource TextSecondaryBrush}"` · `Margin="0,0,14,0"` · 垂直居中。**仅用于身份性行**（如「点播配置」「直播配置」），纯开关行不加图标以减噪 |
-| 标题 | `FontSize=13.5` · `TextPrimaryBrush` · 单行不换行 |
-| 副标题 | `FontSize=11.5` · `TextTertiaryBrush` · 与标题间距 **3** · 允许换行（`TextWrapping=Wrap`），`MaxWidth=420` · **`HorizontalAlignment=Left`**（必须：Avalonia 12 会把 Stretch+MaxWidth 的控件居中，不写 Left 短描述会缩进到行中间） |
+| 左侧图标（可选） | `PathIcon` **18×18** · `Foreground="{DynamicResource TextSecondaryBrush}"` · `Margin="0,0,12,0"` · 垂直居中（与分隔线左缩进 46 = 16 + 18 + 12 对齐）。**仅用于身份性行**（如「点播配置」「直播配置」），纯开关行不加图标以减噪 |
+| 标题 | `FontSize=13` · `TextPrimaryBrush` · 单行不换行 |
+| 副标题 | `FontSize=11.5` · `TextTertiaryBrush` · 与标题间距 **2** · 允许换行（`TextWrapping=Wrap`），`MaxWidth=420` · **`HorizontalAlignment=Left`**（必须：Avalonia 12 会把 Stretch+MaxWidth 的控件居中，不写 Left 短描述会缩进到行中间） |
 | 副标题若是可复制值/链接 | `Foreground="{DynamicResource AccentBrush}"`（#4CC2FF）+ `TextTrimming="CharacterEllipsis"` |
-| 右侧控件列 | `Auto` 宽 · 垂直居中 · 与文字列间距 **24**（`Margin="24,0,0,0"`） |
+| 右侧控件列 | `Auto` 宽 · 垂直居中 · 与文字列间距 **16**（`Margin="16,0,0,0"`） |
 | 行间分隔线 | 1px · 颜色 `{DynamicResource StrokeBrush}` · **左侧缩进 46px**（16 padding + 18 图标 + 12 gap）· 右侧 0 · 末行不加。用 `Border Height=1 Margin="46,0,0,0"`，**不要**用硬编码 `#17FFFFFF`（旧代码遗留），统一走 token |
 
 ### 4.5 右侧控件形态规格

@@ -5,7 +5,7 @@
              x:Class="VodBox.Desktop.Views.Settings.SourcesSettingsView" x:DataType="vm:SettingsViewModel">
   <!-- 源与订阅：卡片式设置分区。样式见 Resources/SettingsCardStyles.axaml
        本控件 DataContext 即 SettingsViewModel；列表行内的命令需经 $parent[UserControl] 回到本控件再取 SettingsViewModel。 -->
-  <StackPanel Spacing="24">
+  <StackPanel Spacing="20">
 
     <!-- ===== 点播 / 直播配置 ===== -->
     <StackPanel Spacing="8">
@@ -13,32 +13,32 @@
       <Border Classes="card">
         <StackPanel>
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Broadcast}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="点播配置（TVBox JSON）" />
                 <TextBlock Classes="rowSubtitle" Text="{Binding VodConfigUrl}"
                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="420" />
               </StackPanel>
-              <Button Grid.Column="2" Classes="primary" Content="更改配置…" Margin="24,0,0,0"
+              <Button Grid.Column="2" Classes="primary" Content="更改配置…" Margin="16,0,0,0"
                       VerticalAlignment="Center" Command="{Binding OpenConfigDialogCommand}" />
             </Grid>
           </Border>
 
           <Border Classes="rowSep" />
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Television}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="直播配置（m3u / txt）" />
                 <TextBlock Classes="rowSubtitle" Text="IPTV 直播源地址" />
               </StackPanel>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
-                          Margin="24,0,0,0" VerticalAlignment="Center">
+                          Margin="16,0,0,0" VerticalAlignment="Center">
                 <TextBox Text="{Binding LiveConfigUrl}" Width="280" Height="32"
                          PlaceholderText="https://…/live.m3u"
                          CornerRadius="{DynamicResource AppControlCornerRadius}" />
@@ -58,7 +58,7 @@
         <ItemsControl ItemsSource="{Binding Sites}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="core:SourceInfo">
-              <Border Padding="16,12" MinHeight="60">
+              <Border Padding="16,8" MinHeight="48">
                 <Grid ColumnDefinitions="*,Auto">
                   <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
@@ -69,7 +69,7 @@
                     </Border>
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                              Margin="24,0,0,0" VerticalAlignment="Center">
+                              Margin="16,0,0,0" VerticalAlignment="Center">
                     <Button Classes="secondary" Padding="10,6" Content="显示/隐藏"
                             Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteHiddenCommand}"
                             CommandParameter="{Binding}" />
@@ -104,15 +104,15 @@
         <StackPanel>
 
           <!-- 内置节目表：默认自动获取，无需填写地址；手动订阅会覆盖它。 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Broadcast}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="{Binding EpgStatusText}" />
                 <TextBlock Classes="rowSubtitle" Text="{Binding EpgStatusDetailText}" />
               </StackPanel>
-              <Button Grid.Column="2" Classes="secondary" Content="恢复内置节目表" Margin="24,0,0,0"
+              <Button Grid.Column="2" Classes="secondary" Content="恢复内置节目表" Margin="16,0,0,0"
                       VerticalAlignment="Center" IsVisible="{Binding EpgManualOverride}"
                       Command="{Binding RestoreBuiltInEpgCommand}" />
             </Grid>
@@ -121,16 +121,16 @@
           <Border Classes="rowSep" />
 
           <!-- 手动订阅：填写后覆盖内置节目表；失败保留原缓存，不偷偷改回内置。 -->
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Refresh}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="手动订阅（XMLTV）" />
                 <TextBlock Classes="rowSubtitle" Text="内置节目表自动获取并每 2 小时更新；填写地址刷新后改为手动订阅并覆盖内置，失败保留原缓存。" />
               </StackPanel>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
-                          Margin="24,0,0,0" VerticalAlignment="Center">
+                          Margin="16,0,0,0" VerticalAlignment="Center">
                 <TextBox Text="{Binding EpgSubscriptionUrl}" Width="300" Height="32"
                          PlaceholderText="XMLTV订阅地址"
                          CornerRadius="{DynamicResource AppControlCornerRadius}" />
@@ -150,15 +150,15 @@
       <Border Classes="card">
         <StackPanel>
 
-          <Border Padding="16,12" MinHeight="60">
+          <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.History}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Classes="rowTitle" Text="直播订阅历史" />
                 <TextBlock Classes="rowSubtitle" Text="切换后立即替换直播页的分组与频道。" />
               </StackPanel>
-              <Button Grid.Column="2" Classes="secondary" Content="查看直播订阅历史" Margin="24,0,0,0"
+              <Button Grid.Column="2" Classes="secondary" Content="查看直播订阅历史" Margin="16,0,0,0"
                       VerticalAlignment="Center" Command="{Binding LoadLiveConfigHistoryCommand}" />
             </Grid>
           </Border>
@@ -168,7 +168,7 @@
           <ItemsControl ItemsSource="{Binding LiveConfigHistory}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ConfigHistoryEntry">
-                <Border Padding="16,12" MinHeight="48">
+                <Border Padding="16,8" MinHeight="44">
                   <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                       <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
@@ -178,7 +178,7 @@
                       </Border>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                                Margin="24,0,0,0" VerticalAlignment="Center">
+                                Margin="16,0,0,0" VerticalAlignment="Center">
                       <Button Classes="secondary" Padding="10,6" Content="切换"
                               Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SwitchLiveConfigCommand}"
                               CommandParameter="{Binding}" />

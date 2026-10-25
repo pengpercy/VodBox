@@ -14,88 +14,7 @@
         WindowStartupLocation="CenterOwner"
         FontSize="13">
 
-  <Window.Styles>
-    <!-- 卡片容器：圆角 8 / CardBrush / 极淡描边（设计规格 §4.3） -->
-    <Style Selector="Border.card">
-      <Setter Property="CornerRadius" Value="{DynamicResource AppPanelCornerRadius}" />
-      <Setter Property="Background" Value="{DynamicResource CardBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
-      <Setter Property="ClipToBounds" Value="True" />
-    </Style>
-    <!-- 分组标题：12 SemiBold TextTertiary（设计规格 §4.2） -->
-    <Style Selector="TextBlock.groupTitle">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
-      <Setter Property="Margin" Value="4,0,0,0" />
-    </Style>
-    <!-- 行标题 / 副标题（设计规格 §4.4） -->
-    <Style Selector="TextBlock.rowTitle">
-      <Setter Property="FontSize" Value="13.5" />
-      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-    </Style>
-    <!-- 副标题统一使用 Resources/SettingsCardStyles.axaml 的 rowSubtitle 样式。 -->
-    <!-- 行间分隔线：1px StrokeBrush，左缩进 46（16 padding + 18 图标 + 12 gap） -->
-    <Style Selector="Border.rowSep">
-      <Setter Property="Height" Value="1" />
-      <Setter Property="Margin" Value="46,0,0,0" />
-      <Setter Property="Background" Value="{DynamicResource StrokeBrush}" />
-    </Style>
-    <!-- 主按钮 / 次按钮 / 危险按钮（设计规格 §4.5 1~3） -->
-    <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
-      <Setter Property="Padding" Value="14,7" />
-      <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="MinHeight" Value="32" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Button.secondary">
-      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
-      <Setter Property="Padding" Value="14,7" />
-      <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="MinHeight" Value="32" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Button.danger">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="12,6" />
-      <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <!-- 缩略图单选：内容即缩略图，隐藏默认圆点（设计规格 §4.5 7） -->
-    <Style Selector="Border.thumb">
-      <Setter Property="Width" Value="96" />
-      <Setter Property="Height" Value="60" />
-      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
-      <Setter Property="Background" Value="{DynamicResource CardBrush}" />
-    </Style>
-    <Style Selector="RadioButton.thumbChoice">
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Template">
-        <ControlTemplate><ContentPresenter Content="{TemplateBinding Content}"
-            ContentTemplate="{TemplateBinding ContentTemplate}" /></ControlTemplate>
-      </Setter>
-    </Style>
-    <!-- 选中态是「选中值」语义，是这里唯一允许出现蓝色的地方 -->
-    <Style Selector="RadioButton.thumbChoice:checked Border.thumb">
-      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-      <Setter Property="BorderThickness" Value="2" />
-    </Style>
-  </Window.Styles>
+  <!-- 卡片、设置行与按钮样式统一在 Resources/SettingsCardStyles.axaml（App.axaml 全局引入），这里不再重复定义。 -->
 
   <Panel>
     <!-- 左栏（侧边菜单）用主题底色不透明铺满：设置窗口不使用 Mica/Acrylic 毛玻璃，
@@ -117,7 +36,7 @@
       <Border Grid.Row="0" Grid.Column="1" Background="Transparent"
               Margin="{OnPlatform Default='0,0,140,0', macOS='0'}"
               chrome:WindowDecorationProperties.ElementRole="TitleBar">
-        <TextBlock Text="{Binding CurrentTitle}" Padding="28,0,28,0" VerticalAlignment="Center"
+        <TextBlock Text="{Binding CurrentTitle}" Padding="24,0,24,0" VerticalAlignment="Center"
                    FontSize="15.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
       </Border>
 
@@ -166,7 +85,7 @@
            可见性由左栏选中项驱动。
            容器必须 Stretch + MaxWidth（不能用 Left）：Left 会让容器收缩到当前分区内容的宽度，
            导致各分区的卡片宽度互不相同；Stretch 下宽度恒为 min(可用宽度, 720)。 -->
-      <ScrollViewer Grid.Row="1" Grid.Column="1" Padding="28,20,28,32" VerticalScrollBarVisibility="Auto"
+      <ScrollViewer Grid.Row="1" Grid.Column="1" Padding="24,8,24,24" VerticalScrollBarVisibility="Auto"
                     HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Left">
         <StackPanel MaxWidth="720" HorizontalAlignment="Stretch">
           <settings:SourcesSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Sources.IsSelected}" DataContext="{Binding Content}" />
@@ -184,7 +103,7 @@
       <!-- 状态提示固定在右下角：Message 是所有分区共用的反馈（清缓存、开关遥控、字幕搜索、壁纸…），
            放在窗口层而非某个分区里，否则只有「源与订阅」能看到反馈。 -->
       <Border Grid.Row="1" Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Left"
-              Margin="28,0,28,16" Padding="14,8" MaxWidth="720"
+              Margin="24,0,24,16" Padding="14,8" MaxWidth="720"
               CornerRadius="{DynamicResource AppControlCornerRadius}"
               Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
               IsVisible="{Binding Content.Message, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}">
