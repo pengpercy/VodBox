@@ -85,6 +85,13 @@ public static class VodBoxLog
     public static void Error(string area, string message, Exception? error = null) =>
         Write("ERROR", area, error is null ? message : $"{message} :: {error.GetType().Name}: {error.Message}");
 
+    /// <summary>
+    /// 崩溃级错误：连同完整调用栈（含内部异常）一起写入。发布版只有「模块+偏移」形式的栈帧，
+    /// 用同版本 CI 产出的符号包即可还原出函数名与行号。
+    /// </summary>
+    public static void Crash(string area, string message, Exception? error) =>
+        Write("ERROR", area, error is null ? message : $"{message} :: {error}");
+
     /// <summary>结构化事件：按 key=value 顺序追加，值自动脱敏。</summary>
     public static void Event(string area, string name, params (string Key, string? Value)[] fields)
     {

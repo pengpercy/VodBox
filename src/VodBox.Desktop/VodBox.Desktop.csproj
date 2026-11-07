@@ -41,7 +41,8 @@
     <EventSourceSupport>false</EventSourceSupport>
     <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
     <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
-    <StackTraceSupport>false</StackTraceSupport>
+    <!-- 保留调用栈（不含方法名，只有模块+偏移，体积代价很小），崩溃日志才能配合符号包还原出代码位置。 -->
+    <StackTraceSupport>true</StackTraceSupport>
     <UseSystemResourceKeys>true</UseSystemResourceKeys>
     <AppleGenerateDSym>false</AppleGenerateDSym>
   </PropertyGroup>

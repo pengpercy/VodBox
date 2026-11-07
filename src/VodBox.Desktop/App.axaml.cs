@@ -36,10 +36,17 @@ public class App : Application
         VodBox.Core.VodBoxLog.Initialize(Services.DataDir);
         VodBox.Core.VodBoxLog.Info("app", $"VodBox {typeof(App).Assembly.GetName().Version} 启动 | data={Services.DataDir}");
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-            VodBox.Core.VodBoxLog.Error("app", "未处理的异常", e.ExceptionObject as Exception);
+            VodBox.Core.VodBoxLog.Crash("app", "未处理的异常", e.ExceptionObject as Exception);
+        // 界面线程上的异常在这里记下完整调用栈并吞掉，不再让整个应用闪退
+        // （否则 Avalonia 会在主循环外重新抛出，原始调用栈随之丢失）。
+        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            VodBox.Core.VodBoxLog.Crash("app", "界面线程未处理的异常", e.Exception);
+            e.Handled = true;
+        };
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
-            VodBox.Core.VodBoxLog.Error("app", "未观察的任务异常", e.Exception);
+            VodBox.Core.VodBoxLog.Crash("app", "未观察的任务异常", e.Exception);
             e.SetObserved();
         };
         RequestedThemeVariant = Services.Prefs.GetInt("ui.theme", 0) switch
