@@ -130,7 +130,7 @@ public sealed class SearchLayoutTests
             yield return new SourceSearchBatch(a, [Item("x0", "a"), Item("x1", "a"), Item("x2", "a")]);
             firstDone.TrySetResult();
             await gate.Task;
-            // x0 也出现在乙站（聚合卡片变为「2 个源」），另加两部新片。
+            // x0 也出现在乙站（并入同一张聚合卡片），另加两部新片。
             yield return new SourceSearchBatch(b, [Item("x0", "b"), Item("y0", "b"), Item("y1", "b")]);
         }
         main.Search.SetSearchStream(Stream, 2);
@@ -145,6 +145,7 @@ public sealed class SearchLayoutTests
             var run = main.Search.RunSearchAsync();
             while (!firstDone.Task.IsCompleted) { Dispatcher.UIThread.RunJobs(); await Task.Delay(5); }
             Layout();
+            var x0 = Card("x0");
             var x1 = Card("x1");
             var x2 = Card("x2");
             var rowsBefore = main.Search.ResultRows[0];
@@ -155,7 +156,10 @@ public sealed class SearchLayoutTests
             Assert.Same(x1, Card("x1"));
             Assert.Same(x2, Card("x2"));
             Assert.Equal(["x0", "x1", "x2", "y0", "y1"], main.Search.ResultRows.SelectMany(row => row.Items).Select(item => item.Title));
-            Assert.Equal("2 个源", main.Search.ResultRows[0].Items[0].SourceName);
+            // x0 多了一个源，但卡片上显示的内容没变：沿用原卡片，不重建控件、不重载海报、不重播动画。
+            Assert.Same(x0, Card("x0"));
+            Assert.Equal(6, main.Search.AllResults.Count);
+            Assert.Equal(5, main.Search.AggregatedResults.Count);
             // 新卡片挂上时已取走入场序号（动画已排队），不会残留到下次滚动回收再播。
             Assert.False(main.Search.TakeEntrance(main.Search.ResultRows.SelectMany(row => row.Items).Single(item => item.Title == "y0"), out _));
             Assert.Equal(["甲站", "乙站"], main.Search.SiteResults.Select(site => site.SiteName));

@@ -273,7 +273,7 @@ public sealed partial class SearchViewModel : ObservableObject
         foreach (var cardGroup in SearchAggregation.Group(_results))
         {
             var card = SearchAggregation.ToCard(cardGroup);
-            if (index < previous.Length && previous[index].Equals(card)) card = previous[index];
+            if (index < previous.Length && LooksSame(previous[index], card)) card = previous[index];
             _cardGroups[card] = cardGroup;
             if (index < AggregatedResults.Count) { if (!ReferenceEquals(AggregatedResults[index], card)) AggregatedResults[index] = card; }
             else AggregatedResults.Add(card);
@@ -282,6 +282,15 @@ public sealed partial class SearchViewModel : ObservableObject
         while (AggregatedResults.Count > index) AggregatedResults.RemoveAt(AggregatedResults.Count - 1);
         return true;
     }
+
+    /// <summary>
+    /// 卡片上看得见的字段都没变就沿用原实例：新源只让「N 个源」/豆瓣 id 变化时，不必替换卡片
+    /// （替换会让网格销毁重建该卡片、海报重载、入场动画重播，流式搜索时整片闪烁）。
+    /// 打开详情走 <see cref="_cardGroups"/> 里的最新分组，不依赖卡片上的源数量。
+    /// </summary>
+    private static bool LooksSame(MediaItem shown, MediaItem next) =>
+        shown.Equals(next) || (shown.Title == next.Title && shown.Poster == next.Poster && shown.Year == next.Year
+            && shown.Remarks == next.Remarks && shown.Rating == next.Rating && shown.Area == next.Area && shown.TypeName == next.TypeName);
 
     private void FinishSearch(string query, IReadOnlyList<(ApiSite Site, string Error)> failures)
     {
@@ -371,12 +380,13 @@ public sealed partial class SearchViewModel : ObservableObject
     /// </summary>
     private void SyncResultRows()
     {
-        var shown = new HashSet<MediaItem>(ResultRows.SelectMany(row => row.Items), ReferenceEqualityComparer.Instance);
+        // 流式结果只会追加（分组按首次出现顺序），所以只有排在已显示数量之后的才是新卡片；
+        // 已有位置上换了实例（例如补上了海报）只是原地更新，不再重播入场动画。
+        var shownCount = 0;
+        foreach (var row in ResultRows) shownCount += row.Items.Count;
         var items = VisibleItems();
         _entering.Clear();
-        var order = 0;
-        foreach (var item in items)
-            if (!shown.Contains(item) && !_entering.ContainsKey(item)) _entering[item] = order++;
+        for (var i = shownCount; i < items.Count; i++) _entering.TryAdd(items[i], i - shownCount);
         var rows = (items.Count + _columns - 1) / _columns;
         for (var r = 0; r < rows; r++)
         {
