@@ -14,3 +14,6 @@ build/native/
 
 # Local acceptance logs, synthetic media, publish copies and private checkpoints
 .alma/
+
+# Local design drafts
+design/

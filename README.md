@@ -47,4 +47,4 @@ dotnet run --project src/VodBox.Desktop
 
 发版：推送与 `VERSION` 一致的 `vX.Y.Z` 标签，CI 会构建各平台安装包并发布到 Releases。
 
-设计稿见 [design/DESIGN.md](design/DESIGN.md)，打包相关说明见 [媒体发行说明](docs/MEDIA-BUNDLING.md)。
+打包相关说明见 [媒体发行说明](docs/MEDIA-BUNDLING.md)。
