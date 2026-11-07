@@ -40,6 +40,9 @@
     </Style>
     <!-- 主按钮 / 次按钮 / 危险按钮（设计规格 §4.5 1~3） -->
     <Style Selector="Button.primary">
+      <!-- 默认 Stretch 会把文字框撑满 MinHeight 后贴顶绘制；居中才能上下对齐（行内按钮常把 Padding 调小）。 -->
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="BorderThickness" Value="0" />
@@ -51,6 +54,9 @@
       <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.secondary">
+      <!-- 默认 Stretch 会把文字框撑满 MinHeight 后贴顶绘制；居中才能上下对齐（行内按钮常把 Padding 调小）。 -->
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
       <Setter Property="BorderThickness" Value="0" />
@@ -61,6 +67,10 @@
       <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.danger">
+      <!-- 默认 Stretch 会把文字框撑满 MinHeight 后贴顶绘制；居中才能上下对齐（行内按钮常把 Padding 调小）。 -->
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="MinHeight" Value="32" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
       <Setter Property="BorderThickness" Value="0" />

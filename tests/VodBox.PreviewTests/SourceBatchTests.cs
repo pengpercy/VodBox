@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -212,6 +213,63 @@ public sealed class SourceBatchTests : IDisposable
             Assert.True(Assert.Single(_settings.Sites, row => row.IsSelected).Key == "ffzy");
             var rowBox = rows.GetVisualDescendants().OfType<CheckBox>().Single();
             Assert.True(rowBox.IsChecked);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ResultMessagesDisappearButProgressMessagesStay()
+    {
+        _settings.MessageLifetime = TimeSpan.FromMilliseconds(20);
+        _settings.Sites[0].IsSelected = true;
+        _settings.DisableSelectedSitesCommand.Execute(null);
+        Assert.Equal("已禁用 1 个源", _settings.Message);
+        for (var i = 0; i < 100 && _settings.Message.Length > 0; i++) { await Task.Delay(20); Dispatcher.UIThread.RunJobs(); }
+        Assert.Equal("", _settings.Message);
+
+        _settings.Message = "正在拉取订阅…";
+        await Task.Delay(300); Dispatcher.UIThread.RunJobs();
+        Assert.Equal("正在拉取订阅…", _settings.Message);
+
+        // 新提示替换旧提示后，旧提示的计时不能把新提示清掉。
+        _settings.MessageLifetime = TimeSpan.FromMilliseconds(400);
+        _settings.Message = "第一条";
+        await Task.Delay(300);
+        _settings.Message = "第二条提示";
+        await Task.Delay(350); Dispatcher.UIThread.RunJobs();
+        Assert.Equal("第二条提示", _settings.Message);
+    }
+
+    [AvaloniaFact]
+    public void UnchangedSourceListKeepsExistingRows()
+    {
+        var before = _settings.Sites.ToArray();
+        _services.SourceConfig.SetSubscription(new SubscriptionState { Url = "https://example/config.json" });
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(before, _settings.Sites); // 同一批行对象：没有整表重建
+        _services.SourceConfig.SetSourceDisabled("ffzy", true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(_settings.Sites.First(row => row.Key == "ffzy").Disabled);
+    }
+
+    [AvaloniaFact]
+    public void SettingsButtonsCenterTheirText()
+    {
+        var window = new VodBox.Desktop.Views.SettingsWindow(_settings) { Width = 1000, Height = 900 };
+        window.Show();
+        try
+        {
+            for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
+            var buttons = window.GetVisualDescendants().OfType<Button>()
+                .Where(b => b.IsEffectivelyVisible && (b.Classes.Contains("secondary") || b.Classes.Contains("danger") || b.Classes.Contains("primary"))).ToArray();
+            Assert.Contains(buttons, b => Equals(b.Content, "置顶"));
+            foreach (var button in buttons)
+            {
+                if (button.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(t => t.IsEffectivelyVisible) is not { } text) continue;
+                var top = text.TranslatePoint(new Avalonia.Point(0, 0), button)!.Value.Y;
+                var bottom = button.Bounds.Height - top - text.Bounds.Height;
+                Assert.True(Math.Abs(top - bottom) <= 1.5, $"「{text.Text}」上 {top:0.#} 下 {bottom:0.#}，没有上下居中");
+            }
         }
         finally { window.Close(); }
     }

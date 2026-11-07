@@ -23,6 +23,20 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     [ObservableProperty] private string _epgSubscriptionUrl = "";
     [ObservableProperty] private bool _applying;
     [ObservableProperty] private string _message = "";
+    /// <summary>提示停留时长：结果类提示到时自动消失；以「…」结尾的进行中提示保留到被下一条替换。</summary>
+    internal TimeSpan MessageLifetime { get; set; } = TimeSpan.FromSeconds(4);
+    private int _messageGeneration;
+    partial void OnMessageChanged(string value)
+    {
+        var generation = Interlocked.Increment(ref _messageGeneration);
+        if (string.IsNullOrEmpty(value) || value.EndsWith('…')) return;
+        // 长提示（如失败原因）多留一会儿，便于看完。
+        var lifetime = MessageLifetime + TimeSpan.FromMilliseconds(Math.Min(value.Length * 60, 6000));
+        _ = Task.Delay(lifetime).ContinueWith(_ => _main.RunOnUi(() =>
+        {
+            if (generation == Volatile.Read(ref _messageGeneration)) Message = "";
+        }), TaskScheduler.Default);
+    }
     [ObservableProperty] private string _updateMessage = "尚未检查更新";
     [ObservableProperty] private bool _autoCheckUpdates = true;
     partial void OnAutoCheckUpdatesChanged(bool value)

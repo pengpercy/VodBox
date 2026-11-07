@@ -63,7 +63,7 @@
         <!-- 左侧导航 -->
         <Border x:Name="SidebarDragArea" Grid.Column="0" Background="Transparent"
                 chrome:WindowDecorationProperties.ElementRole="TitleBar">
-          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Margin="0,0,0,10">
             <!-- 全站搜索框固定在侧栏菜单最上方（对齐 App Store）。输入即全站聚合搜索，回车提交后打开独立结果窗口，
                  不再有「搜索」菜单项，也不再进入主窗口内的空白搜索页。 -->
             <Grid Grid.Row="0" Margin="14,10,14,8" Height="34" chrome:WindowDecorationProperties.ElementRole="User">
@@ -88,7 +88,6 @@
             <views:NavItemView x:Name="OpenFileNav" Grid.Row="8" Icon="{StaticResource Icon.Folder}" Label="打开文件…" IsSelected="False" Command="{Binding OpenFileCommand}"
                                ToolTip.Tip="打开本地视频或 m3u 直播播放列表（Ctrl+O / ⌘O）" />
             <views:NavItemView Grid.Row="9" Icon="{StaticResource Icon.Settings}" Label="设置" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsSettings}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoSettingsCommand}" />
-            <TextBlock Grid.Row="10" Text="HTTP 服务 · 未启用" FontSize="10.5" Opacity="0.5" Margin="22,10,0,10" />
           </Grid>
         </Border>
 

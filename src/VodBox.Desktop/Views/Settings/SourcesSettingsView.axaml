@@ -108,7 +108,9 @@
           <Border Classes="rowSep" />
           <TextBlock Text="没有匹配的采集源" Margin="16,14" FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}"
                      IsVisible="{Binding !FilteredSites.Count}" />
+          <!-- 虚拟化：上百个源时只生成可见行，拉取订阅/筛选不再整表生成控件卡住界面。 -->
           <ItemsControl Name="SiteRows" ItemsSource="{Binding FilteredSites}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SourceRow">
                 <Border Padding="16,6" MinHeight="44" Opacity="{Binding Enabled, Converter={x:Static views:OpacityConverters.EnabledDim}}">

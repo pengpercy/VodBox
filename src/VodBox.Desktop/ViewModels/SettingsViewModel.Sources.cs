@@ -136,13 +136,28 @@ public sealed partial class SettingsViewModel
         PreferBestSource = settings.PreferBestSource;
         BlockAds = settings.BlockAds;
         _loadingSourceSettings = false;
-        _services.SourceConfig.Changed += () => _main.RunOnUi(RefreshSites);
+        _services.SourceConfig.Changed += RequestRefreshSites;
         RefreshSites();
     }
 
-    /// <summary>从存储重建源列表/分类/直播源（保留检测结果）。</summary>
+    private int _refreshQueued;
+
+    /// <summary>存储变化（可能在后台线程、可能连发多次）：合并成一次 UI 刷新。</summary>
+    private void RequestRefreshSites()
+    {
+        if (Interlocked.Exchange(ref _refreshQueued, 1) == 1) return;
+        _main.RunOnUi(() => { Volatile.Write(ref _refreshQueued, 0); RefreshSites(); });
+    }
+
+    /// <summary>从存储重建源列表/分类/直播源（保留检测结果）。源列表没变时不重建行，避免整表重新生成控件。</summary>
     public void RefreshSites()
     {
+        var current = _services.SourceConfig.Sources;
+        if (current.Count == Sites.Count && current.Select((site, i) => ReferenceEquals(site, Sites[i].Site) || site == Sites[i].Site).All(same => same))
+        {
+            RefreshSourceExtras();
+            return;
+        }
         var status = Sites.ToDictionary(row => row.Key, row => (row.Status, row.StatusDetail, row.IsSelected));
         foreach (var row in Sites) row.PropertyChanged -= OnSourceRowChanged;
         Sites.Clear();
@@ -155,6 +170,11 @@ public sealed partial class SettingsViewModel
             Sites.Add(row);
         }
         ApplySiteFilter();
+        RefreshSourceExtras();
+    }
+
+    private void RefreshSourceExtras()
+    {
         OnPropertyChanged(nameof(DeletedSourceCount));
         OnPropertyChanged(nameof(HasDeletedSources));
         Categories.Clear();
