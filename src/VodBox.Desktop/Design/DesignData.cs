@@ -317,15 +317,15 @@ public static class DesignData
 
     private static void FillSettings(MainViewModel main)
     {
-        main.Settings.VodConfigUrl = "https://example.com/tvbox.json";
+        main.Settings.VodConfigUrl = "https://example.com/config.json";
         main.Settings.LiveConfigUrl = "https://example.com/live.m3u";
-        main.Settings.Sites.Add(new SourceInfo { Key = "lzi", Name = "量子资源", Runtime = SourceRuntime.MacCms, Api = "https://cj.lziapi.com/api.php/provide/vod", Type = 0 });
-        main.Settings.Sites.Add(new SourceInfo { Key = "fty", Name = "饭太硬", Runtime = SourceRuntime.QuickJs, Api = "https://example.com/spider.js", Type = 3 });
+        main.Settings.Sites.Add(new SourceRow(new ApiSite { Key = "lzi", Name = "量子资源", Api = "https://cj.lziapi.com/api.php/provide/vod" }, 1) { StatusDetail = "有效 · 320ms" });
+        main.Settings.Sites.Add(new SourceRow(new ApiSite { Key = "ffzy", Name = "非凡资源", Api = "https://api.ffzyapi.com/api.php/provide/vod", From = SourceOrigin.Custom }, 2));
         main.Settings.Message = "设计时预览数据";
         // 配置弹窗演示：当前使用中 + 可切换/删除历史（对齐设计稿 ②）
         main.Settings.ConfigDialogOpen = true;
         main.Settings.DialogUrl = "https://mirror.ghproxy.com/.../tvbox.json";
-        main.Settings.ConfigHistory.Add(new ConfigHistoryEntry { Name = "tvbox.json（当前）", Url = "https://example.com/tvbox.json", Current = true });
+        main.Settings.ConfigHistory.Add(new ConfigHistoryEntry { Name = "config.json（当前）", Url = "https://example.com/config.json", Current = true });
         main.Settings.ConfigHistory.Add(new ConfigHistoryEntry { Name = "https://.../fm.json", Url = "https://example.com/fm.json" });
         main.Settings.ConfigHistory.Add(new ConfigHistoryEntry { Name = "clan://localhost/.../duo.json", Url = "clan://localhost/.../duo.json" });
     }

@@ -88,10 +88,10 @@
           <Button chrome:WindowDecorationProperties.ElementRole="User" x:Name="AllSitesButton" Classes="siteRow" Classes.selected="{Binding IsAllSelected}" Click="OnShowAllSites">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Classes="siteName" Text="全部结果" FontSize="13" VerticalAlignment="Center" />
-              <Border Grid.Column="1" Classes="countPill"><TextBlock Text="{Binding AllResults.Count}" /></Border>
+              <Border Grid.Column="1" Classes="countPill"><TextBlock Text="{Binding AggregatedResults.Count}" /></Border>
             </Grid>
           </Button>
-          <TextBlock Classes="sectionLabel" Text="站点" IsVisible="{Binding SiteResults.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
+          <TextBlock Classes="sectionLabel" Text="采集源" IsVisible="{Binding SiteResults.Count, Converter={x:Static views:CountConverters.IsNotZero}}" />
           <ListBox chrome:WindowDecorationProperties.ElementRole="User" x:Name="SiteList" Classes="siteList" ItemsSource="{Binding SiteResults}" Background="Transparent"
                    BorderThickness="0" Padding="0" SelectionChanged="OnSiteChanged">
             <ListBox.ItemTemplate>
@@ -141,6 +141,8 @@
           <views:SearchHistoryPopup x:Name="ResultSearchHistory" TargetBox="{Binding #ResultSearch}"
                                     History="{Binding $parent[views:SearchView].((vm:MainViewModel)DataContext).Search}" Picked="OnSearchHistoryPicked" />
         </Grid>
+        <ToggleSwitch x:Name="AggregateToggle" IsChecked="{Binding Aggregate}" OnContent="聚合" OffContent="逐条" VerticalAlignment="Center"
+                      ToolTip.Tip="聚合：同名同年同类型的结果合并为一张卡片，打开后可换源" chrome:WindowDecorationProperties.ElementRole="User" />
         <TextBlock x:Name="SearchStatus" Text="{Binding Status}" FontSize="12" VerticalAlignment="Center"
                    Foreground="{DynamicResource TextTertiaryBrush}" ToolTip.Tip="{Binding Summary}" />
         <ProgressBar IsVisible="{Binding Searching}" Value="{Binding Progress}" Minimum="0" Maximum="1"
@@ -230,7 +232,7 @@
                      IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}"
                      FontSize="13" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center"
                      Foreground="{DynamicResource TextSecondaryBrush}" />
-          <TextBlock Text="输入关键词，在订阅的所有站点中搜索"
+          <TextBlock Text="输入关键词，在全部启用的采集源中聚合搜索"
                      IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNullOrEmpty}}"
                      FontSize="13" TextAlignment="Center" HorizontalAlignment="Center"
                      Foreground="{DynamicResource TextSecondaryBrush}" />

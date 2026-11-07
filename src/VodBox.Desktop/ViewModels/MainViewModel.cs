@@ -12,7 +12,7 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly AppServices _services;
     private readonly bool _designTime;
-    private readonly Func<string, IContentSource?> _getSource;
+    private readonly DetailDependencies _detailDependencies;
     private readonly ILibraryStore _store;
 
     [ObservableProperty] private AppPage _page = AppPage.Home;
@@ -22,7 +22,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _busy;
     [ObservableProperty] private string _wallpaperPath="";
 
-    public HomeViewModel Home { get; }
+    public HomeViewModel Home { get; internal set; }
     public VodViewModel Vod { get; }
     public LiveViewModel Live { get; }
     public SearchViewModel Search { get; }
@@ -34,15 +34,15 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>设计时构造：纯内存 VM 图，不枚举文件系统（Files 初始为空目录）、不挂播放管线（填充发生在设置 Player 之后）。</summary>
     public MainViewModel(AppServices services, bool designTime)
-        : this(services, designTime, services.Registry.Get, services.Store)
+        : this(services, designTime, DetailDependencies.From(services), services.Store)
     {
     }
 
-    internal MainViewModel(AppServices services, bool designTime, Func<string, IContentSource?> getSource, ILibraryStore store)
+    internal MainViewModel(AppServices services, bool designTime, DetailDependencies detailDependencies, ILibraryStore store)
     {
         _services = services;
         _designTime = designTime;
-        _getSource = getSource;
+        _detailDependencies = detailDependencies;
         _store = store;
         _wallpaperPath=designTime?"":services.Prefs.GetString("ui.wallpaper");
         Home = new HomeViewModel(services, this);
@@ -52,7 +52,7 @@ public sealed partial class MainViewModel : ObservableObject
         Favorites = new FavoritesViewModel(services, this);
         History = new HistoryViewModel(services, this);
         Settings = new SettingsViewModel(services, this);
-        Detail = new DetailViewModel(getSource, store, this);
+        Detail = new DetailViewModel(detailDependencies, store, this);
         Player = new PlayerViewModel(services, this);
         if (!designTime)
         {
@@ -62,7 +62,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>直接播放一个本地媒体文件（拖放与文件列表共用）。</summary>
     /// <summary>
-    /// 请求主窗口弹出系统「打开文件」对话框（侧栏「打开文件…」、⌘O/Ctrl+O、菜单栏、媒体收件箱共用）。
+    /// 请求主窗口弹出系统「打开文件」对话框（侧栏「打开文件…」、⌘O/Ctrl+O、菜单栏共用）。
     /// 参数为起始目录，null 表示用系统默认位置。VM 不直接碰窗口与存储提供器。
     /// </summary>
     public event Action<string?>? OpenFileRequested;
@@ -138,15 +138,14 @@ public sealed partial class MainViewModel : ObservableObject
         Detail.CancelPending();Vod.CancelPending();Search.CancelPending();Live.CancelPending();Settings.CancelSubtitleSearch();
         Favorites.CancelPending();History.CancelPending();
         await Settings.StopUpdatesAsync();
-        await _services.LocalControl.DisposeAsync();
-        Settings.ClearPairingPresentation();
+        await _services.MediaServer.DisposeAsync();
         await Player.CloseCommand.ExecuteAsync(null);
     }
 
     public void UpdateSourceName() =>
-        CurrentSourceName = _services.Registry.VisibleSources.Count > 0
-            ? $"当前源：{_services.Registry.VisibleSources[0].Name}"
-            : "未配置";
+        CurrentSourceName = _services.SourceConfig.EnabledSources.Count is var count and > 0
+            ? $"{count} 个采集源"
+            : "未配置采集源";
 
     /// <summary>
     /// 统一的续播入口：历史/收藏里的记录按 source_key 分流。
@@ -219,7 +218,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// 打开设置窗口。设置不再是主窗口的一页，所以这里**不切页**（切过去只会留下空白内容区），
-    /// 而是刷新站点列表并请求主窗口开窗口。侧边栏、远程配置、推送回调都走这一条路径。
+    /// 而是刷新站点列表并请求主窗口开窗口。侧边栏等入口都走这一条路径。
     /// </summary>
     public void OpenSettings()
     {
@@ -276,7 +275,7 @@ public sealed partial class MainViewModel : ObservableObject
     public void Navigate(AppPage page) => Page = page;
 
     /// <summary>另一个窗口（搜索窗口）自用的详情：同一套站点与存储，但打开时不切主窗口的页面。</summary>
-    internal DetailViewModel CreateDetachedDetail() => new(_getSource, _store, this, navigateMainWindow: false);
+    internal DetailViewModel CreateDetachedDetail() => new(_detailDependencies, _store, this, navigateMainWindow: false);
 
     [RelayCommand]
     private void GoHome() => Navigate(AppPage.Home);

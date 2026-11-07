@@ -23,7 +23,7 @@ public partial class SettingsWindow : Window
     {
         ViewModel.Content = settings;
         // 新建窗口也必须落在请求的分区：右栏可见性由 IsSelected 驱动，
-        // 只设 Content 会让「手机扫码推送」这类入口停在默认的「源与订阅」上。
+        // 只设 Content 会让外部入口停在默认的「源与订阅」上。
         ViewModel.SelectSection(settings.Section);
     }
 
@@ -36,7 +36,10 @@ public partial class SettingsWindow : Window
     {
         // Esc 关闭独立窗口；分区切换只走左栏，不需要拦截其他按键。
         if (e.Key != Key.Escape) return;
-        Close();
+        // 弹窗打开时 Esc 只关弹窗（删除确认等同于取消）。
+        if (ViewModel.Content is { DeleteDialogOpen: true } settings) settings.CancelDeleteSitesCommand.Execute(null);
+        else if (ViewModel.Content is { ConfigDialogOpen: true } config) config.ConfigDialogOpen = false;
+        else Close();
         e.Handled = true;
     }
 }

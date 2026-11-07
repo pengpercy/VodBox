@@ -2,98 +2,351 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.Settings.SourcesSettingsView" x:DataType="vm:SettingsViewModel">
   <!-- 源与订阅：卡片式设置分区。样式见 Resources/SettingsCardStyles.axaml
        本控件 DataContext 即 SettingsViewModel；列表行内的命令需经 $parent[UserControl] 回到本控件再取 SettingsViewModel。 -->
   <StackPanel Spacing="20">
 
-    <!-- ===== 点播 / 直播配置 ===== -->
+    <!-- ===== 配置订阅（LunaTV / MoonTV config.json） ===== -->
     <StackPanel Spacing="8">
-      <TextBlock Classes="groupTitle" Text="点播配置" />
+      <TextBlock Classes="groupTitle" Text="配置订阅" />
       <Border Classes="card">
         <StackPanel>
+          <Border Padding="16,10">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <PathIcon Grid.Column="0" Data="{StaticResource Icon.Broadcast}" Width="18" Height="18"
+                          Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding VodConfigUrl}" Height="32" PlaceholderText="订阅地址：返回 JSON 或 base58 编码的 config.json"
+                         CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <ToggleSwitch Grid.Column="2" IsChecked="{Binding SubscriptionAutoUpdate}" OnContent="自动更新" OffContent="自动更新" Margin="12,0,0,0" VerticalAlignment="Center" />
+                <Button Grid.Column="3" Classes="primary" Content="拉取订阅" Margin="8,0,0,0" Command="{Binding ApplyVodConfigCommand}" IsEnabled="{Binding !Applying}" />
+              </Grid>
+              <TextBlock Classes="rowSubtitle" Text="{Binding SubscriptionStatus}" Margin="30,0,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Classes="rowSep" />
+          <Border Padding="16,10">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="rowTitle" Text="配置文件" />
+              <TextBlock Classes="rowSubtitle" Text="也可以直接粘贴配置 JSON（api_site / custom_category / lives / cache_time），与现有源合并：订阅里的源更新名称与地址，你的启用状态与排序保留。" TextWrapping="Wrap" />
+              <TextBox Text="{Binding ConfigText}" AcceptsReturn="True" TextWrapping="Wrap" Height="96" FontFamily="Menlo, Consolas, monospace" FontSize="11.5"
+                       PlaceholderText="{}{ &quot;api_site&quot;: { &quot;key&quot;: { &quot;name&quot;: &quot;…&quot;, &quot;api&quot;: &quot;https://…/api.php/provide/vod&quot; } } }"
+                       CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <Button Classes="secondary" Content="应用配置文件" HorizontalAlignment="Right" Command="{Binding ApplyConfigTextCommand}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+    </StackPanel>
 
+    <!-- ===== 采集源 ===== -->
+    <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="groupTitle" Text="{Binding SourceSummary, StringFormat='采集源 · {0}'}" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+          <Button Classes="secondary" Padding="10,4" Content="全部启用" Command="{Binding EnableAllSitesCommand}" />
+          <Button Classes="secondary" Padding="10,4" Content="全部禁用" Command="{Binding DisableAllSitesCommand}" />
+          <Button Classes="secondary" Padding="10,4" Content="禁用无效源" Command="{Binding DisableInvalidSitesCommand}" />
+          <Button Classes="secondary" Padding="10,4" Content="{Binding DeletedSourceCount, StringFormat='恢复已删除（{0}）'}"
+                  IsVisible="{Binding HasDeletedSources}" Command="{Binding RestoreDeletedSitesCommand}"
+                  ToolTip.Tip="删除过的订阅源刷新订阅时不会加回；点此按最近一次配置恢复" />
+        </StackPanel>
+      </Grid>
+      <Border Classes="card">
+        <StackPanel>
           <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Broadcast}" Width="18" Height="18"
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Search}" Width="18" Height="18"
                         Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Classes="rowTitle" Text="点播配置（TVBox JSON）" />
-                <TextBlock Classes="rowSubtitle" Text="{Binding VodConfigUrl}"
-                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                <TextBlock Classes="rowTitle" Text="有效性检测" />
+                <TextBlock Classes="rowSubtitle" Text="用关键词搜索验证连通性：标题命中为有效，返回但无匹配为无结果，请求失败为无效。有勾选时只检测勾选的源，否则检测当前筛选出的源。" TextWrapping="Wrap" />
               </StackPanel>
-              <Button Grid.Column="2" Classes="primary" Content="更改配置…" Margin="16,0,0,0"
-                      VerticalAlignment="Center" Command="{Binding OpenConfigDialogCommand}" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding ValidationSummary}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                <TextBox Text="{Binding ValidateKeyword}" Width="120" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <Button Classes="secondary" Command="{Binding ValidateSitesCommand}">
+                  <Panel>
+                    <TextBlock Text="{Binding ValidateButtonLabel}" IsVisible="{Binding !Validating}" />
+                    <TextBlock Text="停止检测" IsVisible="{Binding Validating}" />
+                  </Panel>
+                </Button>
+              </StackPanel>
             </Grid>
           </Border>
-
           <Border Classes="rowSep" />
+          <!-- 过滤：模糊搜索 + 状态 -->
+          <Border Padding="16,8">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+              <TextBox Name="SiteFilterBox" Text="{Binding SiteFilter}" Height="32" PlaceholderText="模糊搜索采集源：名称 / 键 / 接口地址，空格分隔多个词"
+                       CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <ComboBox Grid.Column="1" Name="SiteStatusFilter" ItemsSource="{Binding SiteStatusFilterOptions}" SelectedIndex="{Binding SiteStatusFilterIndex}"
+                        Width="120" Margin="8,0,0,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding SiteFilterSummary}" FontSize="11.5" Margin="12,0,0,0" MinWidth="72"
+                         Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Classes="secondary" Padding="10,4" Margin="8,0,0,0" Content="清除筛选"
+                      IsVisible="{Binding IsSiteFilterActive}" Command="{Binding ClearSiteFilterCommand}" />
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <!-- 批量操作 -->
+          <Border Padding="16,6" MinHeight="40">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <CheckBox Name="SelectAllSites" IsThreeState="True" IsChecked="{Binding AllVisibleSelected}" Content="全选筛选结果" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding SelectionSummary}" FontSize="11.5" Margin="12,0,0,0"
+                         Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" IsEnabled="{Binding HasSelectedSites}">
+                <Button Classes="secondary" Padding="10,4" Content="启用" Command="{Binding EnableSelectedSitesCommand}" />
+                <Button Classes="secondary" Padding="10,4" Content="禁用" Command="{Binding DisableSelectedSitesCommand}" />
+                <Button Name="DeleteSelectedButton" Classes="danger" Padding="10,4" Content="删除" Command="{Binding DeleteSelectedSitesCommand}" />
+                <Button Classes="secondary" Padding="10,4" Content="取消选择" Command="{Binding ClearSiteSelectionCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <TextBlock Text="没有匹配的采集源" Margin="16,14" FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}"
+                     IsVisible="{Binding !FilteredSites.Count}" />
+          <ItemsControl Name="SiteRows" ItemsSource="{Binding FilteredSites}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SourceRow">
+                <Border Padding="16,6" MinHeight="44" Opacity="{Binding Enabled, Converter={x:Static views:OpacityConverters.EnabledDim}}">
+                  <Grid ColumnDefinitions="28,30,*,Auto,Auto">
+                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" MinWidth="0" Padding="0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Index}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
+                        <Border CornerRadius="5" Padding="6,1" Background="{DynamicResource CardHoverBrush}" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding OriginLabel}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Border>
+                      </StackPanel>
+                      <TextBlock Classes="rowSubtitle" Text="{Binding Api}" TextTrimming="CharacterEllipsis" MaxWidth="360" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="3" Text="{Binding StatusDetail}" FontSize="11" Margin="12,0" MaxWidth="160" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding StatusDetail}" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <Button Classes="secondary" Padding="10,4" Content="{Binding ToggleLabel}"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteDisabledCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="secondary" Padding="8,4" Content="↑" ToolTip.Tip="上移"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteUpCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="secondary" Padding="8,4" Content="↓" ToolTip.Tip="下移"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteDownCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="secondary" Padding="8,4" Content="置顶"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteToTopCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="danger" Padding="8,4" Content="删除"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).DeleteSiteCommand}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Classes="rowSep" />
+          <Border Padding="16,10">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="rowTitle" Text="添加采集源（苹果 CMS V10 JSON 接口）" />
+              <Grid ColumnDefinitions="140,8,110,8,*,8,170,8,Auto">
+                <TextBox Grid.Column="0" Text="{Binding NewSiteName}" PlaceholderText="名称" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <TextBox Grid.Column="2" Text="{Binding NewSiteKey}" PlaceholderText="键（可选）" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <TextBox Grid.Column="4" Text="{Binding NewSiteApi}" PlaceholderText="https://…/api.php/provide/vod" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <TextBox Grid.Column="6" Text="{Binding NewSiteDetail}" PlaceholderText="详情页根地址（可选）" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <Button Grid.Column="8" Classes="primary" Content="添加" Command="{Binding AddSiteCommand}" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+    </StackPanel>
 
+    <!-- ===== 豆瓣与播放 ===== -->
+    <StackPanel Spacing="8">
+      <TextBlock Classes="groupTitle" Text="豆瓣与播放" />
+      <Border Classes="card">
+        <StackPanel>
+          <Border Padding="16,8" MinHeight="48">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Sparkles}" Width="18" Height="18"
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="rowTitle" Text="豆瓣数据代理" />
+                <TextBlock Classes="rowSubtitle" Text="首页与点播页的豆瓣榜单/分类数据从哪里取；直连可能被豆瓣限流，推荐 CDN。" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBox Text="{Binding DoubanProxy}" Width="200" Height="32" PlaceholderText="代理前缀，如 https://x.workers.dev/?url="
+                         IsVisible="{Binding DoubanProxyIsCustom}" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <ComboBox ItemsSource="{Binding DoubanProxyOptions}" SelectedIndex="{Binding DoubanProxyIndex}" Width="240" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <Border Padding="16,8" MinHeight="48">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Movie}" Width="18" Height="18"
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="rowTitle" Text="豆瓣图片代理" />
+                <TextBlock Classes="rowSubtitle" Text="豆瓣海报图片的加载方式；只影响 doubanio.com 图片。" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBox Text="{Binding DoubanImageProxy}" Width="200" Height="32" PlaceholderText="代理前缀"
+                         IsVisible="{Binding DoubanImageProxyIsCustom}" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <ComboBox ItemsSource="{Binding DoubanImageProxyOptions}" SelectedIndex="{Binding DoubanImageProxyIndex}" Width="240" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <Border Padding="16,8" MinHeight="48">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Search}" Width="18" Height="18"
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="rowTitle" Text="搜索最大页数" />
+                <TextBlock Classes="rowSubtitle" Text="每个采集源最多拉取的搜索结果页数（首页之外的页并发获取）。" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <NumericUpDown Value="{Binding SearchMaxPage}" Minimum="1" Maximum="20" Increment="1" FormatString="0" Width="120" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <Border Padding="16,8" MinHeight="48">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Filmstrip}" Width="18" Height="18"
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="rowTitle" Text="过滤成人内容" />
+                <TextBlock Classes="rowSubtitle" Text="按分类名过滤伦理、福利等成人分类的搜索结果。" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <ToggleSwitch IsChecked="{Binding YellowFilter}" OnContent="" OffContent="" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <Border Padding="16,8" MinHeight="48">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Refresh}" Width="18" Height="18"
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="rowTitle" Text="优选播放源" />
+                <TextBlock Classes="rowSubtitle" Text="打开影片时对各播放源测速（分辨率 / 速度 / 延迟），自动选择最佳源。" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <ToggleSwitch IsChecked="{Binding PreferBestSource}" OnContent="" OffContent="" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
           <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <PathIcon Grid.Column="0" Data="{StaticResource Icon.Television}" Width="18" Height="18"
                         Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Classes="rowTitle" Text="直播配置（m3u / txt）" />
-                <TextBlock Classes="rowSubtitle" Text="IPTV 直播源地址" />
+                <TextBlock Classes="rowTitle" Text="去广告" />
+                <TextBlock Classes="rowSubtitle" Text="经本机代理过滤 HLS 播放列表里插播的广告分段。" TextWrapping="Wrap" />
               </StackPanel>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
-                          Margin="16,0,0,0" VerticalAlignment="Center">
-                <TextBox Text="{Binding LiveConfigUrl}" Width="280" Height="32"
-                         PlaceholderText="https://…/live.m3u"
-                         CornerRadius="{DynamicResource AppControlCornerRadius}" />
-                <Button Classes="primary" Content="加载" Command="{Binding ApplyLiveConfigCommand}" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <ToggleSwitch IsChecked="{Binding BlockAds}" OnContent="" OffContent="" />
               </StackPanel>
             </Grid>
           </Border>
-
         </StackPanel>
       </Border>
     </StackPanel>
 
-    <!-- ===== 站点列表 ===== -->
+    <!-- ===== 自定义分类 ===== -->
     <StackPanel Spacing="8">
-      <TextBlock Classes="groupTitle" Text="站点列表" />
-      <Border Classes="card" MinHeight="60">
-        <ItemsControl ItemsSource="{Binding Sites}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="core:SourceInfo">
-              <Border Padding="16,8" MinHeight="48">
-                <Grid ColumnDefinitions="*,Auto">
-                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                    <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
-                    <Border CornerRadius="5" Padding="6,1" Background="{DynamicResource CardHoverBrush}"
-                            VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Runtime}" FontSize="10.5"
-                                 Foreground="{DynamicResource TextSecondaryBrush}" />
-                    </Border>
-                  </StackPanel>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                              Margin="16,0,0,0" VerticalAlignment="Center">
-                    <Button Classes="secondary" Padding="10,6" Content="显示/隐藏"
-                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteHiddenCommand}"
-                            CommandParameter="{Binding}" />
-                    <Button Classes="secondary" Padding="10,6" Content="搜索开关"
-                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteSearchCommand}"
-                            CommandParameter="{Binding}" />
-                    <Button Classes="secondary" Padding="10,6" Content="换源开关"
-                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteChangeCommand}"
-                            CommandParameter="{Binding}" />
-                    <Button Classes="secondary" Padding="10,6" Content="星标"
-                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteStarCommand}"
-                            CommandParameter="{Binding}" />
-                    <Button Classes="secondary" Padding="10,6" Content="上移"
-                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteUpCommand}"
-                            CommandParameter="{Binding}" />
-                    <Button Classes="secondary" Padding="10,6" Content="置顶" ToolTip.Tip="移到列表最前（星标站点始终排在前面）"
-                            Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteToTopCommand}"
-                            CommandParameter="{Binding}" />
-                  </StackPanel>
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+      <TextBlock Classes="groupTitle" Text="自定义分类" />
+      <Border Classes="card">
+        <StackPanel>
+          <ItemsControl ItemsSource="{Binding Categories}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="core:CustomCategory">
+                <Border Padding="16,6" MinHeight="40">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <TextBlock Classes="rowTitle" Text="{Binding DisplayName}" />
+                      <TextBlock Classes="rowSubtitle" Text="{Binding Type}" />
+                      <TextBlock Classes="rowSubtitle" Text="已禁用" IsVisible="{Binding Disabled}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                      <Button Classes="secondary" Padding="10,4" Content="启用/禁用" Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleCategoryCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="danger" Padding="8,4" Content="删除" Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).DeleteCategoryCommand}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Padding="16,10">
+            <Grid ColumnDefinitions="140,8,*,8,100,8,Auto">
+              <TextBox Grid.Column="0" Text="{Binding NewCategoryName}" PlaceholderText="显示名（可选）" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <TextBox Grid.Column="2" Text="{Binding NewCategoryQuery}" PlaceholderText="豆瓣标签，如：经典、科幻、日本动画" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <ComboBox Grid.Column="4" SelectedIndex="{Binding NewCategoryTypeIndex}" HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="电影" />
+                <ComboBoxItem Content="剧集" />
+              </ComboBox>
+              <Button Grid.Column="6" Classes="primary" Content="添加" Command="{Binding AddCategoryCommand}" />
+            </Grid>
+          </Border>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <!-- ===== 直播源 ===== -->
+    <StackPanel Spacing="8">
+      <TextBlock Classes="groupTitle" Text="直播源" />
+      <Border Classes="card">
+        <StackPanel>
+          <ItemsControl ItemsSource="{Binding LiveSites}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="core:LiveSite">
+                <Border Padding="16,6" MinHeight="40">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Classes="rowTitle" Text="{Binding Name}" />
+                        <TextBlock Classes="rowSubtitle" Text="已禁用" IsVisible="{Binding Disabled}" />
+                      </StackPanel>
+                      <TextBlock Classes="rowSubtitle" Text="{Binding Url}" TextTrimming="CharacterEllipsis" MaxWidth="420" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                      <Button Classes="secondary" Padding="10,4" Content="启用/禁用" Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleLiveSiteCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="danger" Padding="8,4" Content="删除" Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).DeleteLiveSiteCommand}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Padding="16,10">
+            <Grid ColumnDefinitions="140,8,*,8,160,8,Auto">
+              <TextBox Grid.Column="0" Text="{Binding NewLiveName}" PlaceholderText="名称" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <TextBox Grid.Column="2" Text="{Binding NewLiveUrl}" PlaceholderText="m3u / txt 地址" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <TextBox Grid.Column="4" Text="{Binding NewLiveUa}" PlaceholderText="User-Agent（可选）" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+              <Button Grid.Column="6" Classes="primary" Content="添加" Command="{Binding AddLiveSiteCommand}" />
+            </Grid>
+          </Border>
+          <Border Classes="rowSep" />
+          <Border Padding="16,8" MinHeight="48">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Television}" Width="18" Height="18"
+                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Classes="rowTitle" Text="手动直播地址（m3u / txt）" />
+                <TextBlock Classes="rowSubtitle" Text="填写后优先于上面的直播源；清空并点「用订阅直播源」恢复。" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBox Text="{Binding LiveConfigUrl}" Width="260" Height="32" PlaceholderText="https://…/live.m3u"
+                         CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                <Button Classes="primary" Content="加载" Command="{Binding ApplyLiveConfigCommand}" />
+                <Button Classes="secondary" Content="用订阅直播源" Command="{Binding UseConfigLivesCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </StackPanel>
       </Border>
     </StackPanel>
 

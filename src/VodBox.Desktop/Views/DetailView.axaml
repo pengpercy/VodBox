@@ -7,6 +7,11 @@
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
+  <UserControl.Styles>
+    <Style Selector="Button.sourceChip.current">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+  </UserControl.Styles>
 
   <!-- 根元素的 DataContext 由代码按宿主设置：主窗口给 MainViewModel（取其 Detail），搜索窗口直接给自己的 DetailViewModel。 -->
   <ScrollViewer x:Name="DetailRoot" Padding="0" HorizontalScrollBarVisibility="Disabled">
@@ -77,7 +82,7 @@
           <!-- 元信息行：站源 + 年份 + 地区 + 类型 + 时长（对齐设计稿 p-detail） -->
           <WrapPanel Orientation="Horizontal">
             <TextBlock FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}">
-              <Run Text="站源：" /><Run Text="{Binding SourceName}" Foreground="{DynamicResource TextSecondaryBrush}" />
+              <Run Text="播放源：" /><Run Text="{Binding SourceName}" Foreground="{DynamicResource TextSecondaryBrush}" />
             </TextBlock>
             <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
               <TextBlock Text="{Binding Detail.Item.Year}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -113,18 +118,11 @@
                 <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Command="{Binding SearchOtherSourcesCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
+            <Button Command="{Binding SearchOtherSourcesCommand}" ToolTip.Tip="用片名在搜索窗口聚合搜索全部采集源" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
                     CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" />
                 <TextBlock Text="跨站搜索" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Command="{Binding OpenRemoteControlCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
-                    CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" />
-                <TextBlock Text="遥控设置" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </WrapPanel>
@@ -164,21 +162,55 @@
         </StackPanel>
       </Grid>
 
-      <!-- 线路（vod_play_from 拆分；播放失败时可切换其他线路） -->
+      <!-- 播放源（LunaTV 换源）：同名影片在各采集源上的结果；测速后按分辨率/速度/延迟排序 -->
       <StackPanel Spacing="10">
         <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="播放源" FontSize="14" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding SourcesStatus}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+          <ProgressBar IsIndeterminate="True" Width="40" Height="3" VerticalAlignment="Center" IsVisible="{Binding SourcesBusy}" />
+          <Button Command="{Binding RetestSourcesCommand}" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="{DynamicResource CardHoverBrush}"
+                  Padding="10,3" FontSize="11.5" Cursor="Hand" Content="重新测速" IsVisible="{Binding !SourcesBusy}" />
+        </StackPanel>
+        <ScrollViewer MaxHeight="150" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding Sources}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DetailSource">
+                <Button Classes="sourceChip" Classes.current="{Binding IsCurrent}" Click="OnPickSource" Tag="{Binding}" Margin="0,0,8,8" Width="176"
+                        CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,6" Cursor="Hand" HorizontalContentAlignment="Stretch"
+                        Background="{DynamicResource CardHoverBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}">
+                  <StackPanel Spacing="2">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding EpisodeLabel}" FontSize="10.5" Margin="6,0,0,0" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="{Binding SpeedLabel}" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding SpeedLabel, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </StackPanel>
+
+      <!-- 线路（当前播放源的 vod_play_from 拆分；多于一条时显示） -->
+      <StackPanel Spacing="10" IsVisible="{Binding HasMultipleLines}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
           <TextBlock Text="线路" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="播放失败时可切换其他线路" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+          <TextBlock Text="同一播放源内的不同线路" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
         </StackPanel>
         <ItemsControl ItemsSource="{Binding Lines}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="8" />
+              <WrapPanel Orientation="Horizontal" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Button Content="{Binding Name}" Click="OnPickLine" Tag="{Binding}"
+              <Button Content="{Binding Name}" Click="OnPickLine" Tag="{Binding}" Margin="0,0,8,8"
                       CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,6" FontSize="12.5" Cursor="Hand"
                       Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" />
             </DataTemplate>

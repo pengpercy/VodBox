@@ -20,8 +20,8 @@ public sealed class MediaCacheTests
         await app.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server=new LocalControlServer(Path.Combine(directory,"inbox"));
-            await server.StartAsync(_=>Task.CompletedTask,_=>Task.CompletedTask,ct:TestContext.Current.CancellationToken);
+            await using var server=new LocalMediaServer(Path.Combine(directory,"media-cache"));
+            await server.StartAsync(TestContext.Current.CancellationToken);
             var address=server.RegisterCachedMedia(app.Urls.Single()+"/bytes");using var client=new HttpClient();
             Assert.Equal("cached",await client.GetStringAsync(address,TestContext.Current.CancellationToken));
             Assert.Equal("cached",await client.GetStringAsync(address,TestContext.Current.CancellationToken));Assert.Equal(1,calls);

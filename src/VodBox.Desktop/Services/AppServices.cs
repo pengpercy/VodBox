@@ -10,10 +10,19 @@ public sealed class AppServices : IDisposable
     private int _disposed;
     public string DataDir { get; }
     public LibraryStore Store { get; }
-    public SourceRegistry Registry { get; }
+    /// <summary>源配置（采集源 / 自定义分类 / 直播源 / 站点设置 / 订阅），LunaTV AdminConfig 的桌面版。</summary>
+    public SourceConfigStore SourceConfig { get; }
+    /// <summary>点播目录：采集客户端 + 聚合搜索 + 换源 + 源检测。</summary>
+    public VodCatalog Catalog { get; }
+    public DoubanClient Douban { get; }
+    public BangumiClient Bangumi { get; }
+    /// <summary>豆瓣浏览（首页/点播页分类数据源）。</summary>
+    public DoubanBrowseSource DoubanBrowse { get; }
+    public SourceSpeedTester SpeedTester { get; }
+    public ConfigSubscriptionService Subscription { get; }
     public MpvEngine Player { get; private set; }
     public IPreferences Prefs => Store;
-    public LocalControlServer LocalControl { get; }
+    public LocalMediaServer MediaServer { get; }
 
     /// <summary>默认数据目录走平台规范（XDG / macOS ~/Library / Windows LocalApplicationData）。</summary>
     public AppServices() : this(AppPaths.DataDirectory)
@@ -24,12 +33,16 @@ public sealed class AppServices : IDisposable
     {
         DataDir = overrideDataDir;
         Directory.CreateDirectory(DataDir);
-        LocalControl=new LocalControlServer(Path.Combine(DataDir,"media-inbox"));
+        MediaServer=new LocalMediaServer(Path.Combine(DataDir,"media-cache"));
         Store = new LibraryStore(Path.Combine(DataDir, "library.db"));
-        // 默认产品只使用 C# 原生 provider：不再启动 JVM，JavaHost/JAR/DEX 已从源码与打包中移除。
-        // 未迁移的 csp_ 入口会被过滤并由 SourceRegistry 逐项报告，
-        // 不把缺少实现的站点伪装成可运行——包括按用户要求跳过的网盘入口。
-        Registry = new SourceRegistry(Store, configCacheDirectory: Path.Combine(DataDir, "config-cache"));
+        // 播放源解析参照 LunaTV：订阅 config.json（api_site 苹果 CMS 采集源）+ 豆瓣数据浏览 + 聚合搜索换源。
+        SourceConfig = new SourceConfigStore(Path.Combine(DataDir, "source-config.json"));
+        Catalog = new VodCatalog(SourceConfig);
+        Douban = new DoubanClient(() => SourceConfig.Settings);
+        Bangumi = new BangumiClient();
+        DoubanBrowse = new DoubanBrowseSource(Douban, Bangumi, () => SourceConfig.EnabledCategories);
+        SpeedTester = new SourceSpeedTester();
+        Subscription = new ConfigSubscriptionService(SourceConfig);
         // GUI 模式 + 等渲染面：loadfile 不早于 render-context 创建，消除静默丢画面竞态。
         Player = new MpvEngine(waitForVideoSurface: true);
     }
@@ -57,13 +70,6 @@ public sealed class AppServices : IDisposable
         }
     }
 
-    /// <summary>当前活跃点播配置 URL。</summary>
-    public string? CurrentVodConfig
-    {
-        get => Prefs.GetString("config_vod");
-        set => Prefs.Set("config_vod", value ?? "");
-    }
-
     public string? CurrentLiveConfig
     {
         get => Prefs.GetString("config_live");
@@ -73,9 +79,13 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         if(Interlocked.Exchange(ref _disposed,1)!=0)return;
-        LocalControl.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        LocalControl.Proxy.Dispose();
-        Registry.Dispose();
+        MediaServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        MediaServer.Proxy.Dispose();
+        Catalog.Dispose();
+        Douban.Dispose();
+        Bangumi.Dispose();
+        SpeedTester.Dispose();
+        Subscription.Dispose();
         Player.DisposeAsync().AsTask().GetAwaiter().GetResult();
         Store.Dispose();
     }

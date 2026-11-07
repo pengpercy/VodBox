@@ -1,33 +1,16 @@
 namespace VodBox.Core;
 
-/// <summary>内容源提供器：所有站点（MacCMS/脚本/本地）的统一访问契约。</summary>
+/// <summary>内容源提供器：豆瓣浏览等分类/分页内容的统一访问契约。</summary>
 public interface IContentSource
 {
     string Key { get; }
     string Name { get; }
-    string? ParseEndpoint=>null;
     Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<FilterGroup>> GetFiltersAsync(string categoryId,CancellationToken ct=default)=>Task.FromResult<IReadOnlyList<FilterGroup>>([]);
     Task<MediaPage> GetHomeAsync(CancellationToken ct = default);
     Task<MediaPage> GetItemsAsync(string categoryId, int page, IReadOnlyDictionary<string, string>? filters, CancellationToken ct = default);
     Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default);
     Task<MediaPage> SearchAsync(string query, int page, CancellationToken ct = default);
-}
-
-/// <summary>非视频内容入口的说明；不通过虚构分类或视频条目呈现导航/提示信息。</summary>
-public interface IInformationalContentSource : IContentSource
-{
-    string Notice { get; }
-}
-
-/// <summary>导航目录源：只列片单，卡片点击转为全局搜索（<see cref="TvBoxLinks"/>），不作默认首页源。</summary>
-public interface INavigationContentSource : IContentSource;
-
-/// <summary>播放地址解析器（对应 TVBox Parse 的 type 1 JSON 接口）。</summary>
-public interface IPlayResolver
-{
-    string Name { get; set; }
-    Task<PlaybackRequest?> ResolveAsync(PlaybackRequest request, CancellationToken ct = default);
 }
 
 /// <summary>播放引擎抽象（libmpv 实现；留出后续内核扩展位）。</summary>
@@ -103,13 +86,3 @@ public interface IPreferences
     void Set(string key, double value);
 }
 
-/// <summary>
-/// 需要即时解析播放地址的内容源（对应 TVBox 的 csp_ 爬虫类型站点）。
-/// 这类站点的媒体地址带签名/时效（如哔哩哔哩 CDN），不能预置在 <see cref="Episode.Uri"/>，
-/// 必须在用户点播时现取。不实现本接口的源（如 MacCMS）走 <see cref="Episode.Uri"/> 直连。
-/// </summary>
-public interface IResolvingContentSource : IContentSource
-{
-    /// <summary>解析某线路某一集的最终播放请求（含请求头、弹幕地址、续播位置）。</summary>
-    Task<PlaybackRequest> ResolvePlaybackAsync(string mediaId, string episodeId, CancellationToken ct = default);
-}

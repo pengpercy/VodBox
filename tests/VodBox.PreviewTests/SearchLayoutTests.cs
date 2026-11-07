@@ -19,6 +19,7 @@ public sealed class SearchLayoutTests
     public void ResizeRechunksWithoutLosingOrReorderingResults()
     {
         var search = DesignData.Main.Search;
+        search.Aggregate = false; // 设计数据只填了逐条结果
         var selected = search.SelectedSite;
         search.SelectedSite = null;
         var expected = search.AllResults.ToArray();
@@ -47,16 +48,17 @@ public sealed class SearchLayoutTests
         using var services = new AppServices(directory);
         var main = new MainViewModel(services, designTime: true);
         main.AttachDispatcher(Dispatcher.UIThread);
-        var a = new SourceInfo { Key = "a", Name = "甲站", Runtime = SourceRuntime.MacCms };
-        var b = new SourceInfo { Key = "b", Name = "乙站", Runtime = SourceRuntime.MacCms };
-        var bad = new SourceInfo { Key = "bad", Name = "坏站", Runtime = SourceRuntime.Node };
-        static MediaItem Item(string id) => new() { Id = id, Title = id, Year = "2024" };
-        async IAsyncEnumerable<AggregateSearchBatch> Stream(string _, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        var a = new ApiSite { Key = "a", Name = "甲站", Api = "https://a.example/api" };
+        var b = new ApiSite { Key = "b", Name = "乙站", Api = "https://b.example/api" };
+        var bad = new ApiSite { Key = "bad", Name = "坏站", Api = "https://bad.example/api" };
+        static VodResult Item(string id) => new() { Id = id, Title = id, Year = "2024", SourceKey = "a", SourceName = "甲站",
+            Lines = [new PlaybackLine("l", "l", [new Episode("1", "1", "https://example/1.m3u8"), new Episode("2", "2", "https://example/2.m3u8")])] };
+        async IAsyncEnumerable<SourceSearchBatch> Stream(string _, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
             await Task.Yield();
-            yield return new AggregateSearchBatch(a, Enumerable.Range(0, 9).Select(i => Item("a" + i)).ToArray());
-            yield return new AggregateSearchBatch(b, [Item("b0"), Item("b1")]);
-            yield return new AggregateSearchBatch(bad, [], "超时（90s）");
+            yield return new SourceSearchBatch(a, Enumerable.Range(0, 9).Select(i => Item("a" + i)).ToArray());
+            yield return new SourceSearchBatch(b, [Item("b0"), Item("b1")]);
+            yield return new SourceSearchBatch(bad, [], "超时（90s）");
         }
         main.Search.SetSearchStream(Stream, 3);
         main.Search.SearchHistory.Add("繁花");
@@ -76,7 +78,7 @@ public sealed class SearchLayoutTests
             Layout();
             Assert.True(Named<Border>("SiteSidebar").IsEffectivelyVisible);
             Assert.Equal("坏站", Assert.Single(main.Search.Failures).SiteName);
-            Assert.Equal("2 个站点 · 11 条结果", main.Search.Status);
+            Assert.Equal("2 个源 · 11 部影片 · 11 条结果", main.Search.Status);
             var list = window.GetVisualDescendants().OfType<ListBox>().Single(box => box.Name == "ResultsList");
             var cards = list.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("resultCard")).ToArray();
             var firstRow = cards.Where(card => Math.Abs(card.TranslatePoint(default, list)!.Value.Y - cards[0].TranslatePoint(default, list)!.Value.Y) < 1).ToArray();

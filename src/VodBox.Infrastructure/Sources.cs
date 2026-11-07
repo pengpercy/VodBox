@@ -7,153 +7,7 @@ using VodBox.Core;
 
 namespace VodBox.Infrastructure;
 
-/// <summary>苹果 CMS JSON/XML 采集站点源（api 形如 https://xx/api.php/provide/vod）。</summary>
-public sealed partial class MacCmsSource : IContentSource
-{
-    private readonly Func<string, CancellationToken, Task<string>> _fetch;
-    private readonly SourceInfo _site;
-
-    public string Key => _site.Key;
-    public string Name => _site.Name;
-    public string? ParseEndpoint=>_site.PlayUrl;
-
-    public MacCmsSource(SourceInfo site, DefaultHttp http)
-        : this(site, async (url, ct) => DefaultHttp.Decode(await http.GetBoundedAsync(url, 8 * 1024 * 1024, ct))) { }
-
-    internal MacCmsSource(SourceInfo site, Func<string, CancellationToken, Task<string>> fetch)
-    {
-        _site = site;
-        _fetch = fetch;
-    }
-
-    private static string NormalizeResponse(string response) => response.TrimStart('\uFEFF');
-    private static bool IsXml(string response) => response.TrimStart('\uFEFF', ' ', '\t', '\r', '\n').StartsWith('<');
-    private static MacCmsListResponse ParseList(string response) => IsXml(response)
-        ? MacCmsXml.Parse(NormalizeResponse(response))
-        : JsonSerializer.Deserialize(NormalizeResponse(response), Json.TypeInfo<MacCmsListResponse>())
-            ?? throw new InvalidDataException("列表响应解析失败");
-
-    private string Api(string action, IReadOnlyDictionary<string, string> args)
-    {
-        if (!Uri.TryCreate(_site.Api, UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https"))
-            throw new InvalidDataException("采集接口必须是有效的 HTTP(S) 地址。");
-        var builder = new UriBuilder(endpoint) { Fragment = "" };
-        // 保留站点自定义参数，但移除旧请求参数；列表/搜索/详情不能继承旧 ids、wd 或分类。
-        var controlled = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { "ac", "pg", "t", "ids", "wd", "year", "area", "lang", "class" };
-        var retained = endpoint.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Where(pair => !controlled.Contains(Uri.UnescapeDataString(pair.Split('=', 2)[0].Replace("+", " ")))).ToList();
-        retained.Add("ac=" + Uri.EscapeDataString(action));
-        retained.AddRange(args.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value)}"));
-        builder.Query = string.Join("&", retained);
-        return builder.Uri.AbsoluteUri;
-    }
-
-    public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken ct = default)
-    {
-        var url = Api("list", new Dictionary<string, string>());
-        var response = await _fetch(url, ct);
-        var classes = IsXml(response) ? MacCmsXml.Parse(NormalizeResponse(response)).Classes
-            : (JsonSerializer.Deserialize(NormalizeResponse(response), Json.TypeInfo<MacCmsCategoryResponse>())
-                ?? throw new InvalidDataException("分类响应解析失败")).Classes;
-        return (classes ?? [])
-            .Where(c => !string.IsNullOrWhiteSpace(c.TypeId))
-            .Select(c => new Category(c.TypeId, c.TypeName))
-            .ToList();
-    }
-
-    public async Task<MediaPage> GetHomeAsync(CancellationToken ct = default) => await GetItemsAsync("0", 1, null, ct);
-
-    public async Task<MediaPage> GetItemsAsync(string categoryId, int page, IReadOnlyDictionary<string, string>? filters, CancellationToken ct = default)
-    {
-        var args = new Dictionary<string, string> { ["pg"] = page.ToString(CultureInfo.InvariantCulture) };
-        if (categoryId != "0" && !string.IsNullOrEmpty(categoryId)) args["t"] = categoryId;
-        if (filters is not null)
-        {
-            if (filters.TryGetValue("year", out var year) && !string.IsNullOrEmpty(year)) args["year"] = year;
-            if (filters.TryGetValue("area", out var area) && !string.IsNullOrEmpty(area)) args["area"] = area;
-            if (filters.TryGetValue("lang", out var lang) && !string.IsNullOrEmpty(lang)) args["lang"] = lang;
-            if (filters.TryGetValue("class", out var cls) && !string.IsNullOrEmpty(cls)) args["class"] = cls;
-        }
-        var response = await _fetch(Api("videolist", args), ct);
-        var parsed = ParseList(response);
-        var page_ = parsed.Page <= 0 ? page : parsed.Page;
-        return new MediaPage((parsed.List ?? []).Where(vod => !string.IsNullOrWhiteSpace(vod.VodId)).Select(ToItem).ToList(), page_, Math.Max(page_, parsed.PageCount));
-    }
-
-    public async Task<MediaDetail> GetDetailAsync(string mediaId, CancellationToken ct = default)
-    {
-        var response = await _fetch(Api("videolist", new Dictionary<string, string> { ["ids"] = mediaId }), ct);
-        var parsed = ParseList(response);
-        var vod = (parsed.List ?? []).FirstOrDefault(item => item.VodId == mediaId) ?? throw new InvalidDataException($"未找到条目 {mediaId}");
-        return ToDetail(vod);
-    }
-
-    public async Task<MediaPage> SearchAsync(string query, int page, CancellationToken ct = default)
-    {
-        var args = new Dictionary<string, string> { ["wd"] = query, ["pg"] = page.ToString(CultureInfo.InvariantCulture) };
-        var response = await _fetch(Api("videolist", args), ct);
-        var parsed = ParseList(response);
-        return new MediaPage((parsed.List ?? []).Where(vod => !string.IsNullOrWhiteSpace(vod.VodId)).Select(ToItem).ToList(), parsed.Page <= 0 ? page : parsed.Page, Math.Max(Math.Max(1, parsed.Page), parsed.PageCount));
-    }
-
-    internal static MediaItem ToItem(MacCmsVod vod) => new()
-    {
-        Id = vod.VodId,
-        Title = string.IsNullOrWhiteSpace(vod.VodName) ? "(未命名)" : vod.VodName,
-        Poster = vod.VodPic,
-        Remarks = vod.VodRemarks,
-        Year = vod.VodYear,
-        Area = vod.VodArea,
-        TypeName = vod.TypeName,
-    };
-
-    /// <summary>拆分 vod_play_from / vod_play_url（$$$ 分隔线路、# 分隔集、$ 分隔名与地址）。</summary>
-    internal static MediaDetail ToDetail(MacCmsVod vod)
-    {
-        var lines = new List<PlaybackLine>();
-        var froms = (vod.VodPlayFrom ?? "").Split("$$$", StringSplitOptions.None);
-        var urls = (vod.VodPlayUrl ?? "").Split("$$$", StringSplitOptions.None);
-        for (var i = 0; i < urls.Length; i++)
-        {
-            var episodes = new List<Episode>();
-            var pairs = urls[i].Split('#', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var pair in pairs)
-            {
-                var sep = pair.IndexOf('$');
-                var title = sep > 0 ? pair[..sep].Trim() : $"第{episodes.Count + 1}集";
-                var uri = (sep >= 0 ? pair[(sep + 1)..] : pair).Trim();
-                // 不把 HTTP 以外的脚本或畸形值交给播放器；网页 HTTP 地址仍留给解析器。
-                if (Uri.TryCreate(uri, UriKind.Absolute, out var address) && address.Scheme is "http" or "https")
-                    episodes.Add(new Episode(uri, title, uri));
-            }
-            var name = i < froms.Length && !string.IsNullOrWhiteSpace(froms[i]) ? froms[i].Trim() : $"线路{i + 1}";
-            // 同名线路区分身份，常见唯一线路保留旧 ID 兼容历史。
-            var id = lines.Any(line => line.Id == name) ? name + ":" + i.ToString(CultureInfo.InvariantCulture) : name;
-            if (episodes.Count > 0) lines.Add(new PlaybackLine(id, name, episodes));
-        }
-        var content = (vod.VodContent ?? "").Trim();
-        if (content.StartsWith("<") || content.Contains("<p>")) content = StripTags(content);
-        return new MediaDetail
-        {
-            Item = ToItem(vod),
-            Description = content,
-            Director = vod.VodDirector,
-            Actor = vod.VodActor,
-            Lines = lines,
-        };
-    }
-
-    private static string StripTags(string html) => WebUtility.HtmlDecode(
-        DescriptionTags().Replace(DescriptionBreaks().Replace(html, "\n"), "")).Trim();
-
-    [GeneratedRegex(@"<\s*(?:br\s*/?|/p|/div)\s*>", RegexOptions.IgnoreCase)]
-    private static partial Regex DescriptionBreaks();
-    [GeneratedRegex(@"<[^>]*>")]
-    private static partial Regex DescriptionTags();
-}
-
-/// <summary>直播源工厂：把 TVBox lives 配置转为 LiveGroup 集合。</summary>
+/// <summary>直播源工厂：把 m3u/txt 播放列表或 LunaTV 配置里的 lives 转为 LiveGroup 集合。</summary>
 public sealed class LiveSources
 {
     private readonly Func<string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<string>> _fetch;
@@ -162,6 +16,7 @@ public sealed class LiveSources
     public LiveSources(Func<string, CancellationToken, Task<string>> fetch) : this((url, _, ct) => fetch(url, ct)) { }
     public LiveSources(Func<string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<string>> fetch) => _fetch = fetch;
 
+    /// <summary>加载单个地址：m3u/txt 直接解析；LunaTV 配置 JSON 则展开其中的 lives。</summary>
     public async Task<List<LiveGroup>> LoadAsync(string url, CancellationToken ct = default)
     {
         Warnings = [];
@@ -169,13 +24,22 @@ public sealed class LiveSources
             ? await File.ReadAllTextAsync(localFile, ct)
             : await _fetch(url, null, ct);
         if (!text.TrimStart().StartsWith('{')) return Parse(text);
-        var config = ConfigLoader.Parse(text) ?? throw new InvalidDataException("直播配置解析失败。");
+        var config = SourceConfigParser.Parse(text);
+        var sites = (config.Lives ?? []).Select(pair => new LiveSite { Key = pair.Key, Name = pair.Value.Name, Url = pair.Value.Url, Ua = pair.Value.Ua, Epg = pair.Value.Epg }).ToArray();
+        return await LoadSitesAsync(sites, url, ct);
+    }
+
+    /// <summary>并列加载多个直播源（LunaTV LiveConfig）；单个失败只记警告，全部失败才抛出。</summary>
+    public async Task<List<LiveGroup>> LoadSitesAsync(IReadOnlyList<LiveSite> sites, string? baseAddress = null, CancellationToken ct = default)
+    {
+        Warnings = [];
         var groups = new List<LiveGroup>();
         var failures = new List<string>();
-        foreach (var source in config.Lives.Take(32))
+        foreach (var source in sites.Where(site => !site.Disabled).Take(32))
         {
             if (string.IsNullOrWhiteSpace(source.Url)) continue;
             var address = source.Url;
+            var name = source.Name is { Length: > 0 } n ? n : "直播源";
             // 本地播放列表（绝对路径或 file:// URI）直接读盘，远程地址才走 HTTP。
             if (LocalMedia.TryResolveFile(address, out var localPath))
             {
@@ -183,39 +47,36 @@ public sealed class LiveSources
                 {
                     var localGroups = Parse(await File.ReadAllTextAsync(localPath, ct));
                     if (localGroups.Count > 0) groups.AddRange(localGroups);
-                    else failures.Add((source.Name is { Length: > 0 } n ? n : "本地播放列表") + ": 没有可播放频道");
+                    else failures.Add(name + ": 没有可播放频道");
                 }
-                catch (Exception error) when (error is not OperationCanceledException)
-                {
-                    failures.Add((source.Name is { Length: > 0 } n2 ? n2 : "本地播放列表") + ": " + error.Message);
-                }
+                catch (Exception error) when (error is not OperationCanceledException) { failures.Add(name + ": " + error.Message); }
                 continue;
             }
-            if (!Uri.TryCreate(address, UriKind.Absolute, out _))
-                address = Uri.TryCreate(url, UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"
-                    ? new Uri(baseUri, address).AbsoluteUri : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(url))!, address);
+            if (!Uri.TryCreate(address, UriKind.Absolute, out _) && baseAddress is not null)
+                address = Uri.TryCreate(baseAddress, UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"
+                    ? new Uri(baseUri, address).AbsoluteUri : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(baseAddress))!, address);
             try
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(TimeSpan.FromMilliseconds(source.Timeout > 0 ? Math.Clamp(source.Timeout, 100, 60000) : 12000));
+                timeout.CancelAfter(TimeSpan.FromSeconds(12));
                 var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 if (!string.IsNullOrWhiteSpace(source.Ua)) headers["User-Agent"] = source.Ua;
-                var content = File.Exists(address) ? await File.ReadAllTextAsync(address, timeout.Token) : await _fetch(address, headers, timeout.Token);
+                var content = await _fetch(address, headers, timeout.Token);
                 foreach (var group in Parse(content))
                 {
-                    var channels=group.Channels.Select(channel=>
+                    var channels = group.Channels.Select(channel =>
                     {
-                        var playbackHeaders=new Dictionary<string,string>(headers,StringComparer.OrdinalIgnoreCase);
-                        foreach(var (key,value) in channel.Headers)playbackHeaders[key]=value;
-                        return channel with {Headers=playbackHeaders};
+                        var playbackHeaders = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
+                        foreach (var (key, value) in channel.Headers) playbackHeaders[key] = value;
+                        return channel with { Headers = playbackHeaders };
                     }).ToArray();
-                    groups.Add(group with { Name = string.IsNullOrWhiteSpace(source.Name) ? group.Name : source.Name + " · " + group.Name,Channels=channels });
+                    groups.Add(group with { Name = sites.Count > 1 ? name + " · " + group.Name : group.Name, Channels = channels });
                 }
             }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { failures.Add(source.Name + ": 加载超时"); }
-            catch (Exception error) when (error is not OperationCanceledException) { failures.Add(source.Name + ": " + error.Message); }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { failures.Add(name + ": 加载超时"); }
+            catch (Exception error) when (error is not OperationCanceledException) { failures.Add(name + ": " + error.Message); }
         }
-        if (config.Lives.Count > 32) failures.Add("直播源超过32个，只加载前32个");
+        if (sites.Count > 32) failures.Add("直播源超过32个，只加载前32个");
         Warnings = failures.ToArray();
         if (groups.Count == 0 && failures.Count > 0) throw new InvalidDataException("全部直播源失败：" + string.Join("；", failures));
         var number = 0;

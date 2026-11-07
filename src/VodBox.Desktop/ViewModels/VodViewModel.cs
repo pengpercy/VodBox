@@ -6,7 +6,7 @@ using VodBox.Desktop.Services;
 
 namespace VodBox.Desktop.ViewModels;
 
-/// <summary>点播：分类 Tab + 海报网格 + 分页。</summary>
+/// <summary>点播（LunaTV 豆瓣浏览页）：电影/剧集/综艺/动漫/Top250/自定义分类 + 筛选 + 无限滚动；关键词聚合搜索全部采集源。</summary>
 public sealed partial class VodViewModel : ObservableObject
 {
     private readonly AppServices _services;
@@ -17,19 +17,28 @@ public sealed partial class VodViewModel : ObservableObject
     private long _generation;
     private bool _settingCategory;
     private string? _filterCategory;
-    public ObservableCollection<FilterGroup> DynamicFilters{get;}=[];
+    public ObservableCollection<FilterChipGroup> DynamicFilters{get;}=[];
     private readonly Dictionary<string,string> _dynamicValues=new();
     public void SelectFilter(string key,string value)
     {
         var group=DynamicFilters.FirstOrDefault(group=>group.Key==key);
-        if(group is null||!group.Values.Any(option=>option.Value==value))return;
+        if(group is null||!group.Chips.Any(option=>option.Value==value))return;
+        foreach(var chip in group.Chips)chip.IsSelected=chip.Value==value;
         _dynamicValues[key]=value;Page=1;_=ReloadAsync();
     }
 
-    /// <summary>聚合搜索入口（默认走注册表的流式聚合，测试可注入）；null = 当前无可用入口。</summary>
-    private Func<string, CancellationToken, IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>>? _searchStream;
-    /// <summary>搜索结果条目 → 来源站点键；网格里每条卡片都据此保留来源身份（含详情/播放）。</summary>
-    private readonly Dictionary<MediaItem, string> _resultSources = new(ReferenceEqualityComparer.Instance);
+    /// <summary>聚合搜索入口（默认走点播目录的流式聚合，测试可注入）；null = 当前无可用入口。</summary>
+    private Func<string, CancellationToken, IAsyncEnumerable<VodBox.Infrastructure.SourceSearchBatch>>? _searchStream;
+    /// <summary>搜索结果卡片 → 聚合组（同名同年同类型的全部源）；打开卡片时整组交给详情页换源。</summary>
+    private readonly Dictionary<MediaItem, IReadOnlyList<VodResult>> _resultGroups = new(ReferenceEqualityComparer.Instance);
+    private readonly List<VodResult> _searchResults = [];
+    private string? _pendingCategory;
+    /// <summary>首页「查看更多」：下次加载（或立即）切到指定分类。</summary>
+    public void SelectCategoryOnLoad(string categoryId)
+    {
+        if (Categories.FirstOrDefault(category => category.Id == categoryId) is { } existing) { SelectedCategory = existing; return; }
+        _pendingCategory = categoryId;
+    }
     private IReadOnlyList<MediaItem> _browseItems = [];
     private Category? _browseCategory;
     private int _browsePage = 1, _browsePageCount = 1;
@@ -57,22 +66,17 @@ public sealed partial class VodViewModel : ObservableObject
     [ObservableProperty] private string _filterArea = "";
     [ObservableProperty] private string _filterLanguage = "";
     [ObservableProperty] private string _filterClass = "";
-    public bool SupportsBasicFilters => _source is VodBox.Infrastructure.MacCmsSource;
+    public bool SupportsBasicFilters => false;
     [RelayCommand] private async Task ApplyFilters() { Page = 1; await ReloadAsync(); }
     [RelayCommand] private async Task ClearFilters()
     {
         FilterYear="";FilterArea="";FilterLanguage="";FilterClass="";
-        _dynamicValues.Clear();foreach(var group in DynamicFilters)_dynamicValues[group.Key]=group.Init;
+        _dynamicValues.Clear();foreach(var group in DynamicFilters){_dynamicValues[group.Key]=group.Init;foreach(var chip in group.Chips)chip.IsSelected=chip.Value==group.Init;}
         Page=1;await ReloadAsync();
     }
     [ObservableProperty] private string _sourceName = "未配置";
-    public IReadOnlyList<SourceInfo> AvailableSources => _services.Registry.SelectableSources;
-    public string SourceCountLabel => $"共 {AvailableSources.Count} 个站点";
-    public string SourceSelectionHint => AvailableSources.Count > 0 ? ""
-        // 只有「能运行但被隐藏」时才提示显示状态；列出了但没有一个能运行，是桌面运行时边界。
-        : _services.Registry.Sources.Any(source => _services.Registry.Get(source.Key) is not null) ? "没有可选站点，请到设置中检查站点显示状态"
-        : _services.Registry.ImportWarnings.Count > 0 ? "订阅中的站点暂无桌面运行时支持，请到设置中查看导入警告"
-        : "尚未配置内容源，请到设置中添加 TVBox 配置地址";
+    public string SourceCountLabel => $"{_services.SourceConfig.EnabledSources.Count} 个采集源";
+    public string SourceSelectionHint => "豆瓣数据加载失败";
 
     public ObservableCollection<Category> Categories { get; } = [];
     public ObservableCollection<MediaItem> Items { get; } = [];
@@ -131,7 +135,6 @@ public sealed partial class VodViewModel : ObservableObject
 
     /// <summary>已加载内容所属的站点键；null = 从未加载（导航复用据此判断是否重发请求）。</summary>
     private string? _loadedSourceKey;
-    private string? _selectedSourceKey;
     /// <summary>网格当前内容对应的页码。</summary>
     private int _loadedPage = 1;
     /// <summary>已加载条目的 id 集合：无限滚动 append 时按 id 去重，同一条目只保留一次。</summary>
@@ -146,10 +149,10 @@ public sealed partial class VodViewModel : ObservableObject
     {
         CancelPending();
         // 先退出搜索态再清关键词：避免 OnKeywordChanged 再触发一次「恢复浏览」的异步加载。
-        SearchMode = false; SearchSummary = ""; _resultSources.Clear(); ResetBrowseSnapshot();
+        SearchMode = false; SearchSummary = ""; _resultGroups.Clear(); _searchResults.Clear(); ResetBrowseSnapshot();
         Keyword = "";
         Categories.Clear(); ClearItems();
-        _source = null; _selectedSourceKey = null;
+        _source = null;
         _loadedSourceKey = null; _loadedPage = 1; SourceName = "未配置"; ItemsHint = "";
         FooterState = VodFooterState.Hidden; FooterMessage = "";
     }
@@ -169,26 +172,21 @@ public sealed partial class VodViewModel : ObservableObject
         if (!_settingCategory) _ = ReloadAsync();
     }
 
-    public VodViewModel(AppServices services, MainViewModel main) : this(services, main, services.Registry.Default)
+    public VodViewModel(AppServices services, MainViewModel main) : this(services, main, () => services.DoubanBrowse)
     {
-        // 点播搜索复用注册表的聚合入口：全部「启用搜索 + 实际注册」的站点、有限并发、逐源超时与部分失败保留。
-        _searchStream = services.Registry.SearchStreamAsync;
+        // 点播搜索复用点播目录的聚合入口：全部启用的采集源、有限并发、逐源超时与部分失败保留。
+        _searchStream = services.Catalog.SearchStreamAsync;
     }
 
-    /// <summary>测试/宿主注入聚合搜索入口（默认是注册表的流式聚合）。</summary>
-    internal void SetSearchStream(Func<string, CancellationToken, IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>> search) => _searchStream = search;
+    /// <summary>测试/宿主注入聚合搜索入口。</summary>
+    internal void SetSearchStream(Func<string, CancellationToken, IAsyncEnumerable<VodBox.Infrastructure.SourceSearchBatch>> search) => _searchStream = search;
 
     internal VodViewModel(AppServices services, MainViewModel main, Func<IContentSource?> getDefault)
     {
         _services = services;
         _main = main;
         _getDefault = getDefault;
-        services.Registry.SourcesChanged += () => _main.RunOnUi(() =>
-        {
-            OnPropertyChanged(nameof(AvailableSources));
-            OnPropertyChanged(nameof(SourceCountLabel));
-            OnPropertyChanged(nameof(SourceSelectionHint));
-        });
+        services.SourceConfig.Changed += () => _main.RunOnUi(() => OnPropertyChanged(nameof(SourceCountLabel)));
     }
 
     public void CancelPending()
@@ -197,19 +195,9 @@ public sealed partial class VodViewModel : ObservableObject
         FooterState=VodFooterState.Hidden;FooterMessage="";
     }
 
-    private IContentSource? GetSelectedSource() => _selectedSourceKey is { } key
-        && AvailableSources.Any(source => source.Key == key)
-        ? _services.Registry.Get(key) : _getDefault();
+    private IContentSource? GetSelectedSource() => _getDefault();
 
     public Task LoadAsync() => LoadSourceAsync(GetSelectedSource());
-
-    public Task SwitchSourceAsync(string key)
-    {
-        if (!AvailableSources.Any(source => source.Key == key) || _services.Registry.Get(key) is not { } source)
-            return Task.CompletedTask;
-        _selectedSourceKey = key;
-        return LoadSourceAsync(source);
-    }
 
     private async Task LoadSourceAsync(IContentSource? source)
     {
@@ -218,7 +206,7 @@ public sealed partial class VodViewModel : ObservableObject
         using var scope = new CancellationTokenSource();
         _request = scope;
         // 换源/重新加载属于浏览行为：先退出搜索态并丢掉结果与快照，避免搜索汇总盖在浏览网格上。
-        SearchMode = false; Searching = false; SearchSummary = ""; _resultSources.Clear(); ResetBrowseSnapshot();
+        SearchMode = false; Searching = false; SearchSummary = ""; _resultGroups.Clear(); _searchResults.Clear(); ResetBrowseSnapshot();
         if (Keyword.Length > 0) Keyword = "";
         _source = source;
         SourceName = source?.Name ?? "未配置";
@@ -250,7 +238,8 @@ public sealed partial class VodViewModel : ObservableObject
                 if (generation != _generation) return;
                 foreach (var category in categories) Categories.Add(category);
                 _settingCategory = true;
-                SelectedCategory = Categories.FirstOrDefault();
+                SelectedCategory = Categories.FirstOrDefault(category => category.Id == _pendingCategory) ?? Categories.FirstOrDefault();
+                _pendingCategory = null;
                 _settingCategory = false;
             });
             if (generation == _generation) await ReloadAsync();
@@ -285,7 +274,7 @@ public sealed partial class VodViewModel : ObservableObject
         if (source is null || category is null)
         {
             Loading = false; Paging = false; _request = null;
-            ItemsHint = source is null ? SourceSelectionHint : source is IInformationalContentSource notice ? notice.Notice : "该站点暂无分类";
+            ItemsHint = source is null ? SourceSelectionHint : "暂无分类";
             return;
         }
         var requestedPage = Page;
@@ -302,7 +291,7 @@ public sealed partial class VodViewModel : ObservableObject
                 {
                     if(generation!=_generation)return;
                     DynamicFilters.Clear();_dynamicValues.Clear();
-                    foreach(var group in groups){DynamicFilters.Add(group);_dynamicValues[group.Key]=group.Init;}
+                    foreach(var group in groups){DynamicFilters.Add(new FilterChipGroup(group));_dynamicValues[group.Key]=group.Init;}
                     _filterCategory=category.Id;
                 });
             }
@@ -415,8 +404,8 @@ public sealed partial class VodViewModel : ObservableObject
     [RelayCommand]
     private void OpenItem(MediaItem item)
     {
-        var key = _resultSources.TryGetValue(item, out var resultKey) ? resultKey : _source?.Key;
-        if (key is not null) _main.Detail.Open(key, item);
+        if (_resultGroups.TryGetValue(item, out var group)) { _main.Detail.OpenGroup(group); return; }
+        _main.Detail.Open(item.SourceKey ?? _source?.Key ?? MediaItem.DoubanSourceKey, item);
     }
 
     partial void OnKeywordChanged(string value)
@@ -454,7 +443,7 @@ public sealed partial class VodViewModel : ObservableObject
             if (generation != _generation) return;
             if (!SearchMode) SnapshotBrowse(); // 首次进入搜索才保留当前浏览，重复搜索不覆盖快照
             SearchMode = true; Searching = true; Paging = false; Loading = true;
-            _resultSources.Clear(); ClearItems();
+            _resultGroups.Clear(); _searchResults.Clear(); ClearItems();
             ItemsHint = "";
             SearchSummary = $"「{query}」搜索中…";
         });
@@ -465,7 +454,7 @@ public sealed partial class VodViewModel : ObservableObject
                 if (generation != _generation) return;
                 Searching = false; Loading = false;
                 SearchSummary = "";
-                ItemsHint = "没有可搜索的站点，请到设置中开启站点搜索";
+                ItemsHint = "没有可搜索的采集源，请到设置中添加订阅或启用采集源";
             });
             return;
         }
@@ -479,13 +468,18 @@ public sealed partial class VodViewModel : ObservableObject
                     if (generation != _generation) return;
                     sites++;
                     if (batch.Error is { } error) failed++;
-                    // 每张卡片都带上来源站点名：结果是跨站点的，卡片必须能看出它来自哪个站点。
-                    else foreach (var item in batch.Items)
+                    else if (batch.Results.Count > 0)
                     {
-                        var card = item with { SourceName = batch.Site.Name };
-                        _resultSources[card] = batch.Site.Key;
-                        Items.Add(card);
-                        succeeded++;
+                        // LunaTV 聚合：同名 + 同年 + 同类型的结果合成一张卡片，卡片显示源数量。
+                        _searchResults.AddRange(batch.Results);
+                        succeeded += batch.Results.Count;
+                        _resultGroups.Clear(); Items.Clear(); _loadedIds.Clear();
+                        foreach (var group in VodBox.Infrastructure.SearchAggregation.Group(_searchResults))
+                        {
+                            var card = VodBox.Infrastructure.SearchAggregation.ToCard(group);
+                            _resultGroups[card] = group;
+                            Items.Add(card);
+                        }
                     }
                     // 先到先得：有成功条目就撤掉骨架，后续批次继续往同一网格里追加。
                     if (Items.Count > 0) Loading = false;
@@ -513,7 +507,7 @@ public sealed partial class VodViewModel : ObservableObject
                 if (Items.Count == 0 && failed == 0)
                     ItemsHint = $"没有找到「{query}」，换个关键词试试";
                 else if (Items.Count == 0)
-                    ItemsHint = $"全部 {failed} 个站点搜索失败，请稍后重试";
+                    ItemsHint = $"全部 {failed} 个采集源搜索失败，请稍后重试";
                 SearchSummary = SearchSummaryFor(query, sites, succeeded, failed);
             });
         }
@@ -521,8 +515,8 @@ public sealed partial class VodViewModel : ObservableObject
 
     private static string SearchSummaryFor(string query, int sites, int hits, int failures) =>
         failures > 0
-            ? $"「{query}」在 {sites} 个站点找到 {hits} 条结果；{failures} 个站点失败"
-            : $"「{query}」在 {sites} 个站点找到 {hits} 条结果";
+            ? $"「{query}」在 {sites} 个源找到 {hits} 条结果；{failures} 个源失败"
+            : $"「{query}」在 {sites} 个源找到 {hits} 条结果";
 
     /// <summary>进入搜索前保留当前站点的浏览状态（分类/页码/条目），退出时原样还回去。</summary>
     private void SnapshotBrowse()
@@ -553,7 +547,7 @@ public sealed partial class VodViewModel : ObservableObject
         {
             if (generation != _generation) return;
             SearchMode = false; Searching = false; Loading = false; Paging = false;
-            SearchSummary = ""; _resultSources.Clear();
+            SearchSummary = ""; _resultGroups.Clear(); _searchResults.Clear();
             if (restore)
             {
                 _settingCategory = true;
@@ -619,4 +613,26 @@ public sealed class MediaRow
     public ObservableCollection<MediaItem> Items { get; } = [];
     public MediaRow() { }
     public MediaRow(IEnumerable<MediaItem> items) { foreach (var item in items) Items.Add(item); }
+}
+
+/// <summary>筛选组（带选中态的胶囊按钮）。</summary>
+public sealed class FilterChipGroup
+{
+    public string Key { get; }
+    public string Name { get; }
+    public string Init { get; }
+    public IReadOnlyList<FilterChip> Chips { get; }
+    public FilterChipGroup(FilterGroup group)
+    {
+        Key = group.Key; Name = group.Name; Init = group.Init;
+        Chips = group.Values.Select(value => new FilterChip(group.Key, value.Name, value.Value) { IsSelected = value.Value == group.Init }).ToArray();
+    }
+}
+
+public sealed partial class FilterChip(string key, string name, string value) : ObservableObject
+{
+    public string Key { get; } = key;
+    public string Name { get; } = name;
+    public string Value { get; } = value;
+    [ObservableProperty] private bool _isSelected;
 }

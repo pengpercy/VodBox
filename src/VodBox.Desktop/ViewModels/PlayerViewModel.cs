@@ -19,10 +19,6 @@ public sealed partial class PlayerViewModel : ObservableObject
     public bool IsMuted => Volume == 0;
     private readonly MainViewModel _main;
     private readonly PlaybackCoordinator _coordinator;
-    private Func<IReadOnlyList<TvBoxParse>> _getParses = () => [];
-    public IReadOnlyList<TvBoxParse> AvailableParsers => _getParses().Where(parse => parse.Type is 1 or 2).ToArray();
-    [ObservableProperty] private string _preferredParser = "";
-    partial void OnPreferredParserChanged(string value) => SavePreference(() => _preferences?.Set("player.preferred-parser", value));
     private long _intent;
     [ObservableProperty] private double _subtitleDelay;
     [ObservableProperty] private int _subtitleFontSize = 40;
@@ -261,9 +257,8 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     public PlayerViewModel(AppServices services, MainViewModel main) : this(services.Player, services.Store, main, services.Prefs)
     {
-        _getParses = () => services.Registry.Parses;
         // Cookie/Authorization 等引擎无法直传的媒体头，统一经受控代理转发（按来源隔离，无全局 Cookie 会话）。
-        _registerProxiedMedia = (url, headers, ct) => services.LocalControl.RegisterPlaybackMediaAsync(url, headers, ct);
+        _registerProxiedMedia = (url, headers, filterAds, ct) => services.MediaServer.RegisterPlaybackMediaAsync(url, headers, ct, filterAds);
     }
 
     internal PlayerViewModel(IPlaybackEngine engine, ILibraryStore store, MainViewModel main, IPreferences? preferences = null)
@@ -271,7 +266,6 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine = engine;
         _store = store;
         _preferences = preferences;
-        _preferredParser = preferences?.GetString("player.preferred-parser", "") ?? "";
         _subtitleDelay = preferences?.GetDouble("subtitle.delay", 0) ?? 0;
         if (!double.IsFinite(_subtitleDelay)) _subtitleDelay = 0;
         _subtitleDelay = Math.Clamp(_subtitleDelay, -120, 120);
@@ -373,7 +367,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     /// <summary>解析后、代理前的请求（含多地址），供「线路地址」切换复用；引擎实际打开的是代理改写后的请求。</summary>
     private PlaybackRequest? _resolvedRequest;
     /// <summary>把带特殊头的媒体注册到受控代理并返回本机地址；未接线（如预览/测试）时为 null。</summary>
-    private Func<string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<string>>? _registerProxiedMedia;
+    private Func<string, IReadOnlyDictionary<string, string>?, bool, CancellationToken, Task<string>>? _registerProxiedMedia;
     [ObservableProperty] private int _addressChoiceIndex = -1;
     /// <summary>当前集返回的多个地址（type4 等）；多于一个时由播放器设置菜单提供切换。</summary>
     public IReadOnlyList<PlaybackChoice> AddressChoices => _resolvedRequest?.Choices ?? Array.Empty<PlaybackChoice>();
@@ -384,7 +378,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     /// 引擎只能全局设置 UA/Referer；Cookie/Authorization 等其余媒体头必须经受控代理转发，
     /// 不落全局状态，也不放宽引擎的拒绝条件。
     /// </summary>
-    private static bool RequiresMediaProxy(PlaybackRequest request) => request.ProxyMedia ||
+    private static bool RequiresMediaProxy(PlaybackRequest request) => request.ProxyMedia || request.FilterAds ||
         request.Headers.Keys.Any(key => !key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
             && !key.Equals("Referer", StringComparison.OrdinalIgnoreCase));
 
@@ -392,9 +386,11 @@ public sealed partial class PlayerViewModel : ObservableObject
     private async Task<PlaybackRequest> RouteThroughMediaProxyAsync(PlaybackRequest request, CancellationToken ct)
     {
         if (!RequiresMediaProxy(request)) return request;
+        // 去广告只是增强：没有代理可用时直接播放原地址，不因此报错。
+        if (_registerProxiedMedia is null && !RequiresMediaProxy(request with { FilterAds = false })) return request;
         if (_registerProxiedMedia is null)
             throw new NotSupportedException($"媒体请求头 {string.Join("、", request.Headers.Keys)} 需要通过受控媒体代理转发，但当前没有可用代理。");
-        var proxied = await _registerProxiedMedia(request.Uri, request.Headers, ct).ConfigureAwait(false);
+        var proxied = await _registerProxiedMedia(request.Uri, request.Headers, request.FilterAds, ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
         return request with { Uri = proxied, Headers = new Dictionary<string, string>() };
     }
@@ -441,25 +437,6 @@ public sealed partial class PlayerViewModel : ObservableObject
                     ct.ThrowIfCancellationRequested();
                     // 解析前的请求：多地址切换要以它为基（解析后 Uri 已换成直连地址，不能再选别的地址）。
                     var originalRequest = request;
-                    if (request.Resolution == ResolutionKind.Json)
-                    {
-                        using var http = new VodBox.Infrastructure.DefaultHttp();
-                        PlaybackRequest? resolved = null;
-                        var failures = new List<string>();
-                        var parsers=AvailableParsers.OrderByDescending(parse=>parse.Url==PreferredParser).ToList();
-                        if(!string.IsNullOrWhiteSpace(request.ParseEndpoint))parsers.Insert(0,new TvBoxParse{Name="站点解析",Type=1,Url=request.ParseEndpoint});
-                        foreach (var parse in parsers.DistinctBy(parse=>parse.Url).Take(8))
-                        {
-                            try
-                            {
-                                resolved = await new VodBox.Infrastructure.JsonPlayResolver(parse, http).ResolveAsync(request, ct);
-                                if (resolved is not null) break;
-                            }
-                            catch (Exception error) when (error is not OperationCanceledException) { failures.Add(parse.Name + ": " + error.Message); }
-                        }
-                        request = resolved ?? throw new InvalidOperationException("JSON解析未返回媒体地址。" + string.Join("；", failures));
-                    }
-                    if (request.Resolution == ResolutionKind.Sniff) throw new NotSupportedException("此媒体需要网页嗅探，当前尚未实现。");
                     request = await RouteThroughMediaProxyAsync(request, ct);
                     await saved.WaitAsync(ct);
                     ct.ThrowIfCancellationRequested();

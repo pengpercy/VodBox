@@ -6,14 +6,18 @@ using VodBox.Desktop.Services;
 
 namespace VodBox.Desktop.ViewModels;
 
-/// <summary>首页：推荐位 + 最近观看（带进度）。</summary>
+/// <summary>首页（LunaTV 首页）：豆瓣热门横幅 + 最近观看 + 热门电影/剧集/综艺/新番放送。</summary>
 public sealed partial class HomeViewModel : ObservableObject
 {
-    private readonly Func<IContentSource?> _getSource;
+    /// <summary>首页分区：键 → 加载函数（豆瓣浏览源的分类 + 默认筛选）。</summary>
+    public static readonly (string Key, string Title, string Category)[] SectionDefinitions =
+    [
+        ("movie", "热门电影", "movie"), ("tv", "热门剧集", "tv"), ("show", "热门综艺", "show"), ("anime", "新番放送", "anime"),
+    ];
+    private readonly Func<string, CancellationToken, Task<IReadOnlyList<MediaItem>>> _loadSection;
     private readonly ILibraryStore _store;
     private CancellationTokenSource? _request;
     private long _generation;
-    private string _sourceKey = "";
     [ObservableProperty] private string _sourceName = "";
     private readonly MainViewModel _main;
 
@@ -81,11 +85,16 @@ public sealed partial class HomeViewModel : ObservableObject
     [ObservableProperty] private string _heroDescription = "";
     private MediaItem? _hero;
 
-    public HomeViewModel(AppServices services, MainViewModel main) : this(services.Registry.Default, services.Store, main) { }
+    /// <summary>首页分区（横向滚动的一行海报）。</summary>
+    public ObservableCollection<HomeSection> Sections { get; } = [];
 
-    internal HomeViewModel(Func<IContentSource?> getSource, ILibraryStore store, MainViewModel main)
+    public HomeViewModel(AppServices services, MainViewModel main) : this(async (category, ct) =>
+        (await services.DoubanBrowse.GetItemsAsync(category, 1, null, ct)).Items.Take(20).ToArray(), services.Store, main) { }
+
+    internal HomeViewModel(Func<string, CancellationToken, Task<IReadOnlyList<MediaItem>>> loadSection, ILibraryStore store, MainViewModel main)
     {
-        _getSource = getSource;
+        _loadSection = loadSection;
+        foreach (var (key, title, _) in SectionDefinitions) Sections.Add(new HomeSection(key, title));
         _store = store;
         _main = main;
         Recent.CollectionChanged += (_, _) => NotifyRecentState();
@@ -127,7 +136,6 @@ public sealed partial class HomeViewModel : ObservableObject
     public async Task LoadAsync()
     {
         CancellationTokenSource? scope = null;
-        IContentSource? source = null;
         long generation = 0;
         await _main.RunOnUiAsync(() =>
         {
@@ -135,13 +143,11 @@ public sealed partial class HomeViewModel : ObservableObject
             scope = new CancellationTokenSource();
             _request = scope;
             generation = ++_generation;
-            source = _getSource();
             Loading = true;
             Recommendations.Clear();
             RecentLoading = true;
             RecentHint = "";
             RecommendationsHint = "";
-            _sourceKey = "";
             SourceName = "";
             SetHero(null);
         });
@@ -149,7 +155,7 @@ public sealed partial class HomeViewModel : ObservableObject
         try
         {
             // 两个分区并行加载、独立收尾，慢站点不阻塞最近观看。
-            await Task.WhenAll(LoadRecentAsync(generation, ct), LoadRecommendationsAsync(source, generation, ct));
+            await Task.WhenAll(LoadRecentAsync(generation, ct), LoadSectionsAsync(generation, ct));
         }
         finally
         {
@@ -164,46 +170,73 @@ public sealed partial class HomeViewModel : ObservableObject
         }
     }
 
-    private async Task LoadRecommendationsAsync(IContentSource? source, long generation, CancellationToken ct)
+    /// <summary>各分区并行加载、独立失败；横幅取热门电影与热门剧集的前几张。</summary>
+    private async Task LoadSectionsAsync(long generation, CancellationToken ct)
     {
-        try
+        await _main.RunOnUiAsync(() =>
         {
-            if (source is null)
+            SourceName = "豆瓣";
+            foreach (var section in Sections) { section.Items.Clear(); section.Hint = ""; section.Loading = true; }
+        });
+        var tasks = SectionDefinitions.Select(async definition =>
+        {
+            var section = Sections.First(item => item.Key == definition.Key);
+            try
+            {
+                var items = await _loadSection(definition.Category, ct);
+                ct.ThrowIfCancellationRequested();
+                await _main.RunOnUiAsync(() =>
+                {
+                    if (generation != _generation || ct.IsCancellationRequested) return;
+                    foreach (var item in items) section.Items.Add(item);
+                    section.Hint = section.Items.Count == 0 ? "暂无内容" : "";
+                    if (definition.Key is "movie" or "tv") RefreshRecommendations();
+                });
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+            catch (Exception error)
             {
                 await _main.RunOnUiAsync(() =>
                 {
                     if (generation != _generation || ct.IsCancellationRequested) return;
-                    _main.StatusMessage = "尚未配置内容源，请到设置中添加 TVBox 配置地址";
-                    RecommendationsHint = _main.StatusMessage;
+                    section.Hint = $"加载失败：{error.Message}";
+                    VodBoxLog.Warn("home", $"{definition.Title} 加载失败：{error.Message}");
                 });
-                return;
             }
-            var page = await source.GetHomeAsync(ct);
-            ct.ThrowIfCancellationRequested();
-            await _main.RunOnUiAsync(() =>
+            finally
             {
-                if (generation != _generation || ct.IsCancellationRequested) return;
-                _sourceKey = source.Key;
-                SourceName = source.Name;
-                foreach (var item in page.Items.Take(24)) Recommendations.Add(item);
-                SelectHero(0);
-                RecommendationsHint = Recommendations.Count == 0 ? source is IInformationalContentSource notice ? notice.Notice : "该站点暂时没有返回推荐内容" : "";
-            });
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-        catch (Exception error)
+                await _main.RunOnUiAsync(() => { if (generation == _generation) section.Loading = false; });
+            }
+        });
+        await Task.WhenAll(tasks);
+        await _main.RunOnUiAsync(() =>
         {
-            await _main.RunOnUiAsync(() =>
-            {
-                if (generation != _generation || ct.IsCancellationRequested) return;
-                _main.StatusMessage = $"加载推荐失败：{error.Message}";
-                RecommendationsHint = _main.StatusMessage;
-            });
-        }
-        finally
-        {
-            await _main.RunOnUiAsync(() => { if (generation == _generation) Loading = false; });
-        }
+            if (generation != _generation || ct.IsCancellationRequested) return;
+            Loading = false;
+            RecommendationsHint = Sections.All(section => section.Items.Count == 0)
+                ? "豆瓣数据加载失败，请检查网络或到设置中更换豆瓣数据代理" : "";
+            if (RecommendationsHint.Length > 0) _main.StatusMessage = RecommendationsHint;
+        });
+    }
+
+    /// <summary>横幅候选：热门电影 + 热门剧集交替取前 6 张。</summary>
+    private void RefreshRecommendations()
+    {
+        var movies = Sections.First(section => section.Key == "movie").Items;
+        var shows = Sections.First(section => section.Key == "tv").Items;
+        var merged = movies.Take(3).Concat(shows.Take(3)).Concat(movies.Skip(3)).Take(24).ToArray();
+        Recommendations.Clear();
+        foreach (var item in merged) Recommendations.Add(item);
+        if (HeroSlides.Count > 0) SelectHero(0);
+    }
+
+    /// <summary>分区「查看更多」：跳到点播页对应分类。</summary>
+    [RelayCommand]
+    private void ShowSection(HomeSection section)
+    {
+        var category = SectionDefinitions.FirstOrDefault(definition => definition.Key == section.Key).Category;
+        _main.Vod.SelectCategoryOnLoad(category);
+        _main.Navigate(AppPage.Vod);
     }
 
     private async Task LoadRecentAsync(long generation, CancellationToken ct)
@@ -242,19 +275,30 @@ public sealed partial class HomeViewModel : ObservableObject
         HeroPoster = hero?.Poster;
         HeroTitle = hero?.Title ?? "";
         HeroRemarks = hero?.Remarks ?? "";
-        HeroDescription = string.Join(" · ", new[] { hero?.Year, hero?.Area, hero?.TypeName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        HeroRemarks = hero?.Rating is { Length: > 0 } rating ? $"豆瓣 {rating}" : hero?.Remarks ?? "";
+        HeroDescription = string.Join(" · ", new[] { hero?.Year, hero?.Kind switch { "movie" => "电影", "tv" => "剧集", _ => null }, hero?.SourceName }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
 
     [RelayCommand]
     private void OpenHero()
     {
-        if (_hero is not null) _main.Detail.Open(_sourceKey, _hero);
+        if (_hero is not null) _main.Detail.Open(_hero.SourceKey ?? MediaItem.DoubanSourceKey, _hero);
     }
 
     [RelayCommand]
-    private void OpenItem(MediaItem item) => _main.Detail.Open(_sourceKey, item);
+    private void OpenItem(MediaItem item) => _main.Detail.Open(item.SourceKey ?? MediaItem.DoubanSourceKey, item);
 
     [RelayCommand]
     private void Resume(HistoryEntry entry) => _main.ResumeEntry(entry);
 
+}
+
+/// <summary>首页一行分区。</summary>
+public sealed partial class HomeSection(string key, string title) : ObservableObject
+{
+    public string Key { get; } = key;
+    public string Title { get; } = title;
+    public ObservableCollection<MediaItem> Items { get; } = [];
+    [ObservableProperty] private bool _loading;
+    [ObservableProperty] private string _hint = "";
 }

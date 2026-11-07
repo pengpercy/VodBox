@@ -147,17 +147,6 @@
           </Border>
           <Border Classes="rowSep" />
 
-          <Border Padding="16,8" MinHeight="48">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Folder}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Classes="rowTitle" Text="清理上传收件箱" />
-              </StackPanel>
-              <Button Grid.Column="2" Classes="danger" Content="清理" Command="{Binding ClearMediaInboxCommand}" VerticalAlignment="Center" />
-            </Grid>
-          </Border>
-          <Border Classes="rowSep" />
 
           <Border Padding="16,8" MinHeight="48">
             <Grid ColumnDefinitions="Auto,*,Auto">

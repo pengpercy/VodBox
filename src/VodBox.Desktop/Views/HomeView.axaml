@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
+             xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              x:Class="VodBox.Desktop.Views.HomeView" x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
@@ -183,71 +184,72 @@
         </Panel>
       </StackPanel>
 
-      <!-- 推荐 -->
-      <StackPanel Spacing="14">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <PathIcon Data="{StaticResource Icon.Sparkles}" Width="18" Height="18" VerticalAlignment="Center" />
-          <TextBlock FontSize="16" FontWeight="SemiBold" Text="站点推荐" />
-          <TextBlock Text="{Binding SourceName}" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-          <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Cursor="Hand"
-                      PointerPressed="OnSwitchSource">
-            <TextBlock Text="换源" FontSize="12" VerticalAlignment="Center" />
-            <PathIcon Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" VerticalAlignment="Center" />
-          </StackPanel>
-        </StackPanel>
-        <Panel>
-        <ItemsControl ItemsSource="{Binding Recommendations}" IsVisible="{Binding !Loading}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <UniformGrid Columns="6" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <StackPanel Margin="0,0,16,0" Cursor="Hand" PointerPressed="OnOpenRecommend" Tag="{Binding}">
-                <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="210" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
-                  <Panel>
-                    <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <views:RemotePoster Url="{Binding Poster}" />
-                    <!-- 时长/备注角标：统一放海报左下角，中性灰文字（不用主题蓝），避免遮住右上区域。 -->
-                    <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Left"
-                            VerticalAlignment="Bottom" Margin="6">
-                      <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="{DynamicResource PosterBadgeTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="90" />
-                    </Border>
-                  </Panel>
-                </Border>
-                <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-                <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
-                  <Run Text="{Binding Year}" /><Run Text=" · " /><Run Text="{Binding Area}" />
-                </TextBlock>
+      <!-- 豆瓣分区：热门电影 / 热门剧集 / 热门综艺 / 新番放送（LunaTV 首页） -->
+      <ItemsControl ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="28" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:HomeSection">
+            <StackPanel Spacing="14">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="{StaticResource Icon.Sparkles}" Width="18" Height="18" VerticalAlignment="Center" />
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding Title}" />
+                <StackPanel Orientation="Horizontal" Spacing="4" TextElement.Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Cursor="Hand"
+                            PointerPressed="OnShowSection" Tag="{Binding}">
+                  <TextBlock Text="查看更多" FontSize="12" VerticalAlignment="Center" />
+                  <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12" VerticalAlignment="Center" />
+                </StackPanel>
               </StackPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Bottom" IsVisible="{Binding Loading}" />
-        <!-- 推荐区骨架：站点头屏加载中 -->
-        <ItemsControl ItemsSource="{x:Static views:SkeletonData.Cards}" IsVisible="{Binding Loading}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <UniformGrid Columns="6" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <StackPanel Margin="0,0,16,0">
-                <Border Classes="skeleton poster" Height="210" />
-                <Border Classes="skeleton" Height="13" Width="112" Margin="0,9,0,0" HorizontalAlignment="Left" />
-                <Border Classes="skeleton" Height="11" Width="78" Margin="0,6,0,0" HorizontalAlignment="Left" />
-              </StackPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <!-- 空态 / 错误态：非空文案覆盖网格位置，不留白屏 -->
-        <TextBlock Text="{Binding RecommendationsHint}" Margin="0,4,0,0" FontSize="12.5"
-                   Foreground="{DynamicResource TextTertiaryBrush}"
-                   IsVisible="{Binding RecommendationsHint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
-        </Panel>
-      </StackPanel>
+              <Panel MinHeight="40">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                  <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="16" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="core:MediaItem">
+                        <StackPanel Width="150" Cursor="Hand" PointerPressed="OnOpenRecommend" Tag="{Binding}">
+                          <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="214" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
+                            <Panel>
+                              <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                              <views:RemotePoster Url="{Binding Poster}" />
+                              <Border Background="#66000000" CornerRadius="5" Padding="7,2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6"
+                                      IsVisible="{Binding Remarks, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding Remarks}" FontSize="10.5" Foreground="{DynamicResource PosterBadgeTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="110" />
+                              </Border>
+                            </Panel>
+                          </Border>
+                          <TextBlock Text="{Binding Title}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Year}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+                <ItemsControl ItemsSource="{x:Static views:SkeletonData.Recent}" IsVisible="{Binding Loading}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="16" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Width="150">
+                        <Border Classes="skeleton poster" Height="214" />
+                        <Border Classes="skeleton" Height="13" Width="112" Margin="0,9,0,0" HorizontalAlignment="Left" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Hint}" FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center"
+                           IsVisible="{Binding Hint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+              </Panel>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="{Binding RecommendationsHint}" Margin="0,4,0,0" FontSize="12.5" TextWrapping="Wrap"
+                 Foreground="{DynamicResource TextTertiaryBrush}"
+                 IsVisible="{Binding RecommendationsHint, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

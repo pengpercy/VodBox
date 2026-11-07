@@ -92,8 +92,8 @@ public partial class HomeView : UserControl
         if (DataContext is MainViewModel main) main.GoHistoryCommand.Execute(null);
     }
 
-    private void OnSwitchSource(object? sender, PointerPressedEventArgs e)
+    private void OnShowSection(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is MainViewModel main) main.GoSettingsCommand.Execute(null);
+        if ((sender as Control)?.Tag is HomeSection section) VM.ShowSectionCommand.Execute(section);
     }
 }

@@ -144,61 +144,26 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm && Avalonia.Application.Current is App)
         {
             vm.AttachDispatcher(Avalonia.Threading.Dispatcher.UIThread);
-            // 启动时若有历史配置则自动加载
+            // 启动：首页（豆瓣数据）与直播立即加载；订阅配置开启自动更新时后台刷新，有变化再重载直播源。
             Loaded += async (_, _) =>
             {
-                // 直播源（多为本地 m3u）与点播配置互不依赖，并行加载。
-                var live = App.Services.CurrentLiveConfig is { Length: > 0 } ? vm.Live.LoadAsync() : Task.CompletedTask;
-                if (App.Services.CurrentVodConfig is { Length: > 0 } url)
-                    await LoadStartupConfigAsync(vm, url);
+                var live = vm.Live.EffectiveLiveAddress is not null ? vm.Live.LoadAsync() : Task.CompletedTask;
+                var home = vm.Home.LoadAsync();
+                vm.UpdateSourceName();
+                try
+                {
+                    if (await App.Services.Subscription.RefreshIfDueAsync())
+                    {
+                        VodBox.Core.VodBoxLog.Info("config", "订阅配置已更新");
+                        vm.UpdateSourceName();
+                        vm.Vod.Invalidate();
+                        if (vm.Live.EffectiveLiveAddress == LiveViewModel.ConfigLivesAddress) _ = vm.Live.LoadAsync();
+                    }
+                }
+                catch (Exception error) { VodBox.Core.VodBoxLog.Warn("config", $"订阅刷新失败：{error.Message}"); }
+                await home;
                 await live;
             };
-        }
-    }
-
-    /// <summary>
-    /// 冷启动加载点播配置：首页立即进入加载态；有本地副本时先用副本出首页，再后台向网络刷新，
-    /// 只有配置确实变了才重建源并重载首页。没有副本（首次使用）才等网络。
-    /// </summary>
-    private static async Task LoadStartupConfigAsync(MainViewModel vm, string url)
-    {
-        var registry = App.Services.Registry;
-        vm.Home.BeginStartupLoading();
-        try
-        {
-            if (await registry.TryLoadCachedConfigAsync(url))
-            {
-                vm.UpdateSourceName();
-                var home = vm.Home.LoadAsync();
-                await RefreshStartupConfigAsync(vm, url);
-                await home;
-                return;
-            }
-            await registry.LoadConfigAsync(url);
-            vm.UpdateSourceName();
-            await vm.Home.LoadAsync();
-        }
-        catch (Exception error)
-        {
-            VodBox.Core.VodBoxLog.Error("config", "启动加载配置失败", error);
-            vm.Home.CancelStartupLoading();
-            vm.StatusMessage = "上次配置加载失败，请到设置中重新配置";
-        }
-    }
-
-    private static async Task RefreshStartupConfigAsync(MainViewModel vm, string url)
-    {
-        try
-        {
-            if (!await App.Services.Registry.RefreshConfigAsync(url)) return;
-            VodBox.Core.VodBoxLog.Info("config", "远程配置已更新，重载首页");
-            vm.UpdateSourceName();
-            await vm.Home.LoadAsync();
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception error)
-        {
-            VodBox.Core.VodBoxLog.Warn("config", $"后台刷新配置失败，继续使用本地副本：{error.Message}");
         }
     }
 

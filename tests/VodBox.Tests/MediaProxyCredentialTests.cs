@@ -36,7 +36,7 @@ public sealed class MediaProxyCredentialTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
+            await using var server = new LocalMediaServer();
             var url = await server.RegisterPlaybackMediaAsync(upstream.Urls.Single() + "/media",
                 new Dictionary<string, string>
                 {
@@ -69,7 +69,7 @@ public sealed class MediaProxyCredentialTests
         await source.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
+            await using var server = new LocalMediaServer();
             var url = await server.RegisterPlaybackMediaAsync(source.Urls.Single() + "/redirect",
                 new Dictionary<string, string>
                 {
@@ -110,7 +110,7 @@ public sealed class MediaProxyCredentialTests
         await source.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
+            await using var server = new LocalMediaServer();
             var url = await server.RegisterPlaybackMediaAsync(source.Urls.Single() + "/main.m3u8",
                 new Dictionary<string, string>
                 {
@@ -122,7 +122,7 @@ public sealed class MediaProxyCredentialTests
             using var client = new HttpClient();
             var playlist = await client.GetStringAsync(url, TestContext.Current.CancellationToken);
             var segment = playlist.Split('\n').Single(line => line.StartsWith("/proxy/", StringComparison.Ordinal));
-            // 仅媒体代理模式：遥控服务器未启动，地址来自注册返回的基地址。
+            // 未显式启动：注册时按需启动，地址来自注册返回的基地址。
             var origin = new Uri(url).GetLeftPart(UriPartial.Authority);
             Assert.Equal("foreign-segment", await client.GetStringAsync(origin + segment, TestContext.Current.CancellationToken));
         }
@@ -146,7 +146,7 @@ public sealed class MediaProxyCredentialTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
+            await using var server = new LocalMediaServer();
             var url = await server.RegisterPlaybackMediaAsync(upstream.Urls.Single() + "/media",
                 new Dictionary<string, string>
                 {

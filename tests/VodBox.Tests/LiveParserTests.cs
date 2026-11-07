@@ -137,8 +137,8 @@ public class LiveParserTests
         await File.WriteAllTextAsync(file, "#EXTM3U\n#EXTINF:-1,频道A\nhttp://host/a.m3u8\n",
             TestContext.Current.CancellationToken);
         // 手写 JSON：JsonSerializer 在裁剪/AOT 下需要源生成，测试里没必要引入。
-        var json = "{\"lives\":[{\"name\":\"本地\",\"type\":0,\"url\":\""
-            + file.Replace("\\", "/") + "\"}]}";
+        var json = "{\"lives\":{\"local\":{\"name\":\"本地\",\"url\":\""
+            + file.Replace("\\", "/") + "\"}}}";
         try
         {
             var loader = new LiveSources((_, _) => Task.FromResult(json));
@@ -251,11 +251,11 @@ public class LiveParserTests
     }
 
     [Fact]
-    public async Task TvBoxMultipleLiveListsMergeWithUniqueNumbersAndRelativeUrls()
+    public async Task LunaConfigLivesMergeWithUniqueNumbersAndRelativeUrls()
     {
         var texts = new Dictionary<string, string>
         {
-            ["https://example.com/config.json"] = "{\"lives\":[{\"name\":\"一\",\"url\":\"one.m3u\"},{\"name\":\"二\",\"url\":\"https://example.com/two.txt\"}]}",
+            ["https://example.com/config.json"] = "{\"lives\":{\"a\":{\"name\":\"一\",\"url\":\"one.m3u\"},\"b\":{\"name\":\"二\",\"url\":\"https://example.com/two.txt\"}}}",
             ["https://example.com/one.m3u"] = "#EXTM3U\n#EXTINF:-1 group-title=\"央视\",CCTV1\nhttps://stream.example/1",
             ["https://example.com/two.txt"] = "卫视,#genre#\n频道2,https://stream.example/2",
         };
@@ -271,7 +271,7 @@ public class LiveParserTests
         var agents = new List<string>();
         var loader = new LiveSources((url, headers, _) =>
         {
-            if (url.EndsWith("config.json")) return Task.FromResult("{\"lives\":[{\"name\":\"好源\",\"url\":\"https://example.com/good\",\"ua\":\"TVClient\"},{\"name\":\"坏源\",\"url\":\"https://example.com/bad\"}]}");
+            if (url.EndsWith("config.json")) return Task.FromResult("{\"lives\":{\"g\":{\"name\":\"好源\",\"url\":\"https://example.com/good\",\"ua\":\"TVClient\"},\"b\":{\"name\":\"坏源\",\"url\":\"https://example.com/bad\"}}}");
             if (url.EndsWith("bad")) return Task.FromException<string>(new IOException("不可达"));
             agents.Add(headers!["User-Agent"]);
             return Task.FromResult("频道,https://stream.example/a");
@@ -294,7 +294,7 @@ public class LiveParserTests
     public async Task PerChannelUserAgentOverridesLiveSourceDefaultWithoutLeakingToOtherSource()
     {
         var loader=new LiveSources((url,headers,_)=>Task.FromResult(url.EndsWith("config")
-            ?"{\"lives\":[{\"name\":\"one\",\"url\":\"https://example.com/list\",\"ua\":\"SourceUA\"},{\"name\":\"two\",\"url\":\"https://example.com/other\"}]}"
+            ?"{\"lives\":{\"one\":{\"name\":\"one\",\"url\":\"https://example.com/list\",\"ua\":\"SourceUA\"},\"two\":{\"name\":\"two\",\"url\":\"https://example.com/other\"}}}"
             :url.EndsWith("list")?"#EXTM3U\n#EXTINF:-1,频道\n#EXTVLCOPT:http-user-agent=ChannelUA\nhttps://stream.example/a":"频道2,https://stream.example/b"));
         var groups=await loader.LoadAsync("https://example.com/config",TestContext.Current.CancellationToken);
         Assert.Equal("ChannelUA",groups[0].Channels[0].Headers["User-Agent"]);Assert.Empty(groups[1].Channels[0].Headers);

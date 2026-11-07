@@ -1,13 +1,16 @@
 # VodBox
 
-基于 [FongMi/TV](https://github.com/FongMi/TV) 重新设计的跨平台桌面影音应用。**Avalonia 12 + .NET 10（NativeAOT）+ libmpv**，覆盖 **macOS / Windows / Linux**（x64 + arm64，共 6 个 RID）。
+跨平台桌面影音应用，点播源解析方式参照 [LunaTV](https://github.com/MoonTechLab/LunaTV)（苹果CMS V10 采集源 + 豆瓣数据）。**Avalonia 12 + .NET 10（NativeAOT）+ libmpv**，覆盖 **macOS / Windows / Linux**（x64 + arm64，共 6 个 RID）。
 
 设计与交互稿见 [design/DESIGN.md](design/DESIGN.md)：Mica/Fluent 深色主题、左侧导航 Shell、影院式详情页、全局播放浮层。
 
 ## 已实现（0.2.4）
 
-- **TVBox 配置体系**：远程订阅加载、JS 变量包裹、`//` 行注释剥离、JPEG 尾部 base64 隐写（饭太硬 `in.bmp` 形态）、宽容字段解析（`type_id` 数字/字符串、`ext`/`style` 对象、`rules` 数组）——与 FongMi Gson 容错行为对齐。
-- **点播**：MacCMS（苹果CMS V10 JSON 采集）站点分类/分页/筛选/详情/搜索全链路；`vod_play_from$$$vod_play_url` 线路/选集拆分。
+- **配置订阅（LunaTV config.json）**：`api_site` / `custom_category` / `lives` / `cache_time`，JSON 或 base58 编码；重新拉取订阅时保留用户对源的启用状态与排序（refineConfig 合并语义），默认每小时最多自动检查一次。
+- **采集源维护**：启用/禁用、排序、添加/删除自定义源、批量启停、关键词有效性检测与一键禁用无效源。
+- **聚合搜索**：全部启用源并发流式搜索（多页、10 分钟缓存、黄色分类过滤），按「标题 + 年份 + 电影/剧集」合并；详情页列出同名影片在各源的播放源，可换源（保持集数），按分辨率/速度/延迟测速自动优选。
+- **豆瓣**：首页与点播页的热门/推荐/Top250/自定义分类均来自豆瓣；豆瓣数据代理与图片代理支持 LunaTV 的各模式；采集源缺海报时按片名+年份从豆瓣刮削。动漫「每日放送」来自 Bangumi。
+- **去广告**：本机媒体代理过滤 HLS 播放列表中插播的广告片段（可在设置中关闭）。
 - **直播**：M3U（group-title/tvg-logo/tvg-id）与 TXT（`分组,#genre#`）双格式解析、多线路、频道面板（分组/筛选）。`catchup` / `catchup-source` 回看属性尚未解析（计划 S4）。
 - **播放器**：libmpv 唯一内核，SafeHandle 生命周期 + 锁串行化 + 手工 NULL 结尾 UTF-8 argv；`LibraryImport` 源码生成 P/Invoke + `DllImportResolver` 按平台候选路径加载（`VODBOX_MPV_LIB` 可覆盖）；播放/暂停/Seek/倍速/音量、UA-Referer（引擎层可设，站点配置暂未透传）、断点续播、历史进度续播（含线路/选集/海报上下文）。
 - **视频渲染（S1 已落地）**：`mpv_render_context_*` OpenGL 渲染经 `OpenGlControlBase` 子类 `MpvVideoSurface` 上屏（16ms 脏标记驱动、`flip=1, block=0`、DPI 缩放、GL 丢失上报）；引擎等待渲染面握手（`waitForVideoSurface`）后才 loadfile，消除静默丢画面竞态。macOS 本机 JIT + NativeAOT 均验证真帧渲染（见 `tests/VodBox.Mpv.UiSmoke`）。
@@ -22,7 +25,8 @@
 - **轨道切换**：播放器设置菜单已支持音轨/字幕轨与关闭字幕；多轨真实媒体的完整原生交互仍待验收。
 - **不记录播放历史**：播放器设置菜单可开关并持久化；开启后不写新的切集/结束/关闭历史，不删除已有历史、不隐藏网络请求。
 - **历史进度**：只在关闭播放浮层或播放结束/失败时落库（无周期性保存）；且播完（`Ended`）时快照位置为 0，该集不会保留续播点。
-- `csp_`（Java jar 爬虫）站点已过滤——桌面端无 JVM，等待后续适配层。
+- 只支持苹果CMS V10 采集接口；不再支持 TVBox / FongMi 配置中的 jar/js 爬虫、type4 与解析接口。
+- 网页播放页（`.html` 分享页、云播放器页面）线路会被丢弃，因为 mpv 无法播放网页。
 
 ## 开发
 
@@ -34,13 +38,13 @@
 bash build/dev-natives.sh          # 自动识别 RID，也接受 osx-x64 / linux-arm64 / win-x64 等
 ```
 
-脚本把 libmpv、脚本运行库（QuickJS 桥）与其依赖闭包放入 `.cache/dev-natives/<rid>/`，并同步到已有 `bin` 目录；Desktop 项目在构建时也会自动复制，因此 IDE 里改完直接跑即可。首次准备可指定来源：
+脚本把 libmpv 与其依赖闭包放入 `.cache/dev-natives/<rid>/`，并同步到已有 `bin` 目录；Desktop 项目在构建时也会自动复制，因此 IDE 里改完直接跑即可。首次准备可指定来源：
 
 ```sh
 bash build/dev-natives.sh osx-x64 --from artifacts/publish/osx-x64
 ```
 
-也可以继续用环境变量覆盖：`VODBOX_MPV_LIB` / `VODBOX_QUICKJS_LIB` 指向具体库文件。
+也可以继续用环境变量覆盖：`VODBOX_MPV_LIB` 指向具体库文件。
 
 ```sh
 dotnet restore VodBox.slnx
@@ -51,7 +55,7 @@ dotnet run --project src/VodBox.Desktop
 
 **排查播放问题**：设置 → 诊断 可开关日志、打开日志目录并查看最后若干行；日志位于 `<数据目录>/logs/vodbox-YYYYMMDD.log`（macOS 为 `~/Library/Application Support/VodBox/logs`）。日志记录选台、线路、mpv 打开/载入/结束原因与失败异常，地址中的 `key`/`authid`/`token` 会自动脱敏。需要 mpv 原始日志时设 `VODBOX_LOG_VERBOSE=1`。
 
-首次启动 → 设置 → 填入 TVBox 配置地址（如 `https://example.com/tvbox.json`）加载；直播页填 m3u 地址。
+首次启动 → 设置 → 播放源 → 填入 LunaTV 配置订阅地址（如 `https://example.com/config.json`），或直接粘贴配置内容；直播默认使用配置中的 `lives`，也可手动填 m3u 地址。
 
 ## 打包与发布
 
@@ -60,8 +64,7 @@ dotnet run --project src/VodBox.Desktop
 ```sh
 # 本机 AOT 发布（macOS x64 示例）
 bash build/publish-aot.sh osx-x64 artifacts/publish/osx-x64
-# 脚本先按 Release + RID restore，再以相同参数 --no-restore publish，并构建/复制钉定的 QuickJS 桥。
-# 需要 CMake 和本机 C 编译器；仅托管编译检查可设 VODBOX_SKIP_QUICKJS_BUILD=1。
+# 脚本先按 Release + RID restore，再以相同参数 --no-restore publish。
 # 普通 solution/Debug restore 不产生 net10.0/osx-x64 的 AOT 资产；不能直接复用。
 python3 build/bundle.py osx-x64 artifacts/publish/osx-x64
 python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --version 0.2.4
@@ -70,11 +73,11 @@ python3 build/package.py osx-x64 artifacts/publish/osx-x64 artifacts/packages --
 ## 结构
 
 ```
-src/VodBox.Core           领域模型 + TVBox/MacCMS 契约（零依赖，JSON 源码生成）
-src/VodBox.Infrastructure 配置加载/隐写解码、MacCMS 适配、直播解析、SQLite 存储、聚合搜索
+src/VodBox.Core           领域模型 + LunaTV 配置/MacCMS 契约（零依赖，JSON 源码生成）
+src/VodBox.Infrastructure 配置订阅、MacCMS 采集、聚合搜索、豆瓣、测速、HLS 去广告、直播解析、SQLite 存储
 src/VodBox.Playback.Mpv   libmpv P/Invoke（LibraryImport）+ DllImportResolver + SafeHandle 客户端 + OpenGL 渲染面
 src/VodBox.Desktop        Avalonia Shell + 8 页面 + 播放浮层（CommunityToolkit.Mvvm）
-tests/VodBox.Tests        领域回归测试：配置/隐写/IDN/MacCMS/直播/存储/续播上下文/MpvEngine（含饭太硬真实样本全链路锚点测试）
+tests/VodBox.Tests        领域回归测试：配置/MacCMS/聚合/豆瓣/去广告/测速/直播/存储/续播上下文/MpvEngine
 tests/VodBox.Mpv.Smoke    真 libmpv headless 传输层 + 引擎冒烟（需 VODBOX_MPV_LIB + ≥3s 视频 fixture）
 tests/VodBox.Mpv.UiSmoke  真 libmpv OpenGL 渲染冒烟：断言 RenderedFrames>0、位置推进、UI 树内叠加控件
 build/                    mpv 资产捆绑、打包、冒烟、归档脚本

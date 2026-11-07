@@ -30,14 +30,16 @@ public sealed class MacCmsVod
     [JsonPropertyName("vod_director")] [JsonConverter(typeof(LenientStringConverter))] public string? VodDirector { get; set; }
     [JsonPropertyName("vod_actor")] [JsonConverter(typeof(LenientStringConverter))] public string? VodActor { get; set; }
     [JsonPropertyName("vod_play_from")] [JsonConverter(typeof(LenientStringConverter))] public string? VodPlayFrom { get; set; }
+    [JsonPropertyName("vod_class")] [JsonConverter(typeof(LenientStringConverter))] public string? VodClass { get; set; }
+    [JsonPropertyName("vod_douban_id")] [JsonConverter(typeof(LenientStringConverter))] public string? VodDoubanId { get; set; }
     [JsonPropertyName("vod_play_url")] [JsonConverter(typeof(LenientStringConverter))] public string? VodPlayUrl { get; set; }
 }
 
 public sealed class MacCmsListResponse
 {
-    public int Page { get; set; } = 1;
-    [JsonPropertyName("pagecount")] public int PageCount { get; set; } = 1;
-    public int Total { get; set; }
+    [JsonPropertyName("page")] [JsonConverter(typeof(LenientIntConverter))] public int Page { get; set; } = 1;
+    [JsonPropertyName("pagecount")] [JsonConverter(typeof(LenientIntConverter))] public int PageCount { get; set; } = 1;
+    [JsonPropertyName("total")] [JsonConverter(typeof(LenientIntConverter))] public int Total { get; set; }
     public List<MacCmsVod> List { get; set; } = [];
     [JsonPropertyName("class")] public List<MacCmsClass> Classes { get; set; } = [];
 }

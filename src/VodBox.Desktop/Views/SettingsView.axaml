@@ -36,10 +36,6 @@
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=5}">
             <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="{StaticResource Icon.ContentSave}" Width="18" Height="18" /><TextBlock Text="数据" /></StackPanel>
           </Button>
-          <Button Click="OnSelectSection" Tag="6" HorizontalContentAlignment="Left" Padding="13,9"
-                  Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=6}">
-            <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" /><TextBlock Text="推送与遥控" /></StackPanel>
-          </Button>
           <Button Click="OnSelectSection" Tag="7" HorizontalContentAlignment="Left" Padding="13,9"
                   Background="{Binding Section, Converter={x:Static views:SectionConverters.NavBackground}, ConverterParameter=7}">
             <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="{StaticResource Icon.Information}" Width="18" Height="18" /><TextBlock Text="关于" /></StackPanel>
@@ -62,7 +58,7 @@
             <StackPanel Margin="20,4,20,4">
               <Grid ColumnDefinitions="*,Auto" MinHeight="64">
                 <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
-                  <TextBlock Text="点播配置（TVBox JSON）" FontSize="13.5" />
+                  <TextBlock Text="点播订阅（LunaTV config.json）" FontSize="13.5" />
                   <TextBlock Text="{Binding VodConfigUrl}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}"
                              TextTrimming="CharacterEllipsis" MaxWidth="420" />
                 </StackPanel>
@@ -86,32 +82,6 @@
             </StackPanel>
           </Border>
 
-          <TextBlock Text="站点列表" FontSize="20" FontWeight="SemiBold" />
-          <Border CornerRadius="{DynamicResource AppPanelCornerRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" MinHeight="120">
-            <ItemsControl ItemsSource="{Binding Sites}" Margin="20,12">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                      <TextBlock Text="{Binding Name}" FontSize="13" />
-                      <Border CornerRadius="5" Background="{DynamicResource CardHoverBrush}" Padding="6,1">
-                        <TextBlock Text="{Binding Runtime}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      </Border>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                      <Button Content="显示/隐藏" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.ToggleSiteHiddenCommand}" CommandParameter="{Binding}" />
-                      <Button Content="搜索开关" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.ToggleSiteSearchCommand}" CommandParameter="{Binding}" />
-                      <Button Content="换源开关" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.ToggleSiteChangeCommand}" CommandParameter="{Binding}" />
-                      <Button Content="星标" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.ToggleSiteStarCommand}" CommandParameter="{Binding}" />
-                      <Button Content="上移" Command="{Binding $parent[views:SettingsView].((vm:MainViewModel)DataContext).Settings.MoveSiteUpCommand}" CommandParameter="{Binding}" />
-                    </StackPanel>
-                    <TextBlock IsVisible="False" Grid.Column="1" Text="{Binding Api}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
-                               TextTrimming="CharacterEllipsis" MaxWidth="380" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </Border>
 
           <StackPanel Orientation="Horizontal" Spacing="8"><TextBox Text="{Binding EpgSubscriptionUrl}" PlaceholderText="XMLTV订阅地址" Width="300" /><Button Content="刷新节目订阅" Command="{Binding RefreshEpgSubscriptionCommand}" /></StackPanel>
           <Button Content="查看直播订阅历史" Command="{Binding LoadLiveConfigHistoryCommand}" />
@@ -172,15 +142,8 @@
             <TextBlock Text="数据" FontSize="20" />
             <Button Content="导出备份" Click="OnExportBackup" /><Button Content="合并恢复备份" Click="OnRestoreBackup" />
             <Button Content="清理下载字幕缓存" Command="{Binding ClearSubtitleCacheCommand}" />
-            <Button Content="清空媒体缓存" Command="{Binding ClearMediaCacheCommand}" /><Button Content="清理上传收件箱" Command="{Binding ClearMediaInboxCommand}" />
+            <Button Content="清空媒体缓存" Command="{Binding ClearMediaCacheCommand}" />
             <Button Content="清空观看历史与已看记录" Command="{Binding ClearHistoryCommand}" />
-          </StackPanel>
-          <StackPanel x:Name="RemoteSection" Spacing="12" IsVisible="{Binding IsRemoteSection}">
-            <TextBlock Text="推送与遥控" FontSize="20" /><CheckBox Content="允许可信局域网（需要配对）" IsChecked="{Binding LanControl}" /><TextBlock Text="{Binding PairingInformation}" TextWrapping="Wrap" /><Image Source="{Binding PairingQrImage}" Width="220" Height="220" HorizontalAlignment="Left" /><CheckBox Content="推送媒体使用本机代理" IsChecked="{Binding ProxyPushedMedia}" />
-            <Button Content="启动本机遥控" Command="{Binding StartLocalControlCommand}" /><Button Content="关闭本机遥控" Command="{Binding StopLocalControlCommand}" />
-            <Button Content="打开上传媒体收件箱" Command="{Binding OpenMediaInboxCommand}" />
-            <TextBlock Text="上传只接受媒体类型，单文件64 MiB；收件箱最多100项、总计256 MiB。" TextWrapping="Wrap" />
-            <TextBlock Text="默认只监听本机；局域网模式需先停服务再重启，配对码10分钟有效。请仅在可信网络使用。" TextWrapping="Wrap" />
           </StackPanel>
           <StackPanel x:Name="AboutSection" Spacing="12" IsVisible="{Binding IsAboutSection}">
             <TextBlock Text="关于" FontSize="20" />
@@ -217,7 +180,7 @@
       </ScrollViewer>
     </Grid>
 
-    <!-- 更改点播配置弹窗（亚克力黑 + 圆角 12 + 历史配置 + 扫码推送，设计稿 ②③） -->
+    <!-- 更改点播配置弹窗（亚克力黑 + 圆角 12 + 历史配置，设计稿 ②③） -->
     <Panel IsVisible="{Binding Settings.ConfigDialogOpen}">
       <Rectangle Fill="#88000000" />
       <Border Width="560" CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource SurfaceBrush}" BorderBrush="#26FFFFFF" BorderThickness="1"
@@ -237,10 +200,10 @@
           </Grid>
           <!-- 弹窗体 -->
           <StackPanel Grid.Row="1" Margin="20,4,20,12" Spacing="12">
-            <TextBlock Text="输入 TVBox 配置地址，或从剪贴板读取" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" />
+            <TextBlock Text="输入 LunaTV / MoonTV 订阅地址（config.json，JSON 或 base58），或从剪贴板读取" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" />
             <Grid ColumnDefinitions="*,Auto">
               <TextBox Grid.Column="0" Text="{Binding Settings.DialogUrl}" Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}"
-                       PlaceholderText="https://…/tvbox.json" />
+                       PlaceholderText="https://…/config.json" />
               <Button Grid.Column="1" Command="{Binding Settings.PasteFromClipboardCommand}"
                       CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,6" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
                       BorderThickness="0" Margin="8,0,0,0" FontSize="12" Cursor="Hand">
@@ -283,13 +246,6 @@
           <!-- 弹窗脚 -->
           <Border Grid.Row="2" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="20,12">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <Button Grid.Column="0" Command="{Binding Settings.OpenRemoteSettingsCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
-                      BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,7" FontSize="12" Cursor="Hand">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" VerticalAlignment="Center" />
-                  <TextBlock Text="手机扫码推送" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                 <Button Content="取消" Command="{Binding Settings.CancelConfigDialogCommand}" Background="{DynamicResource CardHoverBrush}"
                         Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="16,7" FontSize="12.5" Cursor="Hand" />

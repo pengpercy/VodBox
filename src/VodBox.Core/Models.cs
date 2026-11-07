@@ -3,99 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace VodBox.Core;
 
-// ---------- TVBox 兼容配置模型（字段与 FongMi/TV Gson 模型对齐） ----------
-
-/// <summary>TVBox 订阅配置根（site.json）。</summary>
-public sealed class TvBoxConfig
-{
-    [JsonPropertyName("sites")] public List<TvBoxSite> Sites { get; set; } = [];
-    [JsonPropertyName("lives")] public List<TvBoxLive> Lives { get; set; } = [];
-    [JsonPropertyName("parses")] public List<TvBoxParse> Parses { get; set; } = [];
-    [JsonPropertyName("flags")] public List<string> Flags { get; set; } = [];
-    [JsonPropertyName("wallpaper")] public string? Wallpaper { get; set; }
-    [JsonPropertyName("rules")] public JsonElement? Rules { get; set; }
-    [JsonPropertyName("ads")] public List<string> Ads { get; set; } = [];
-    [JsonPropertyName("warningText")] public string? WarningText { get; set; }
-}
-
-/// <summary>TVBox lives 条目：{name, type, url}（type 0=文本 1=接口；桌面版统一按 url 拉文本解析）。</summary>
-public sealed class TvBoxLive
-{
-    [JsonConverter(typeof(LenientStringConverter))] public string Name { get; set; } = "";
-    public int Type { get; set; }
-    public string? Url { get; set; }
-    [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
-    public string? Epg { get; set; }
-    public string? Ua { get; set; }
-    public int Timeout { get; set; }
-}
-
-/// <summary>TVBox 站点定义。字段名对应原 JSON（Gson @SerializedName）。</summary>
-public sealed class TvBoxSite
-{
-    [JsonConverter(typeof(LenientStringConverter))] public string Key { get; set; } = "";
-    [JsonConverter(typeof(LenientStringConverter))] public string Name { get; set; } = "";
-    public string Api { get; set; } = "";
-    [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
-    public string? PlayUrl { get; set; }
-    public int Type { get; set; }
-    public int Searchable { get; set; } = 1;
-    public int QuickSearch { get; set; } = 1;
-    public int Changeable { get; set; } = 1;
-    public List<string> Categories { get; set; } = [];
-    public int Timeout { get; set; }
-    public JsonElement? Style { get; set; }
-    /// <summary>
-    /// 站点在配置里的原始字段（未建模的键，如 <c>logo</c>/<c>playerType</c> 等）。
-    /// </summary>
-    [JsonExtensionData] public Dictionary<string, JsonElement>? Raw { get; set; }
-
-    public SourceRuntime Runtime => Api.Contains(".js", StringComparison.OrdinalIgnoreCase) ? SourceRuntime.QuickJs
-        : Api.Contains(".py", StringComparison.OrdinalIgnoreCase) ? SourceRuntime.Python
-        : Api.StartsWith("csp_", StringComparison.Ordinal) ? SourceRuntime.Node /* 桌面端 csp_ 暂不支持，标记为 Node 待适配层提示 */
-        : Type == 4 ? SourceRuntime.Type4 /* TVBox type4：原生 HTTP + play/flag 回调 */
-        : SourceRuntime.MacCms;
-}
-
-/// <summary>TVBox 解析器定义（type: 0=web嗅探 1=json 2=jsonExt 3=jsonMix 4=超级解析）。</summary>
-public sealed class TvBoxParse
-{
-    [JsonConverter(typeof(LenientStringConverter))] public string Name { get; set; } = "";
-    [JsonConverter(typeof(LenientStringConverter))] public string Url { get; set; } = "";
-    public int Type { get; set; }
-    /// <summary>
-    /// 解析器扩展：TVBox 里是多态 Object（可能是字符串，也可能是 {"header":...,"flag":[...]} 对象），
-    /// 与 Gson 宽容行为对齐用 JsonElement 承载。宝盒真实配置 17 个 parses 中 11 个 ext 是对象——
-    /// 若声明为 string 会导致整份配置反序列化失败（严格 System.Text.Json 与 Gson 的关键差异）。
-    /// </summary>
-    [JsonPropertyName("ext")] public JsonElement? Ext { get; set; }
-    public Dictionary<string, string>? Header { get; set; }
-    public List<string> Flag { get; set; } = [];
-}
-
 // ---------- VodBox 桌面版运行时模型 ----------
-
-/// <summary>内容源（运行时视图，来自 TVBox site 或本地目录源）。</summary>
-public sealed record SourceInfo
-{
-    public required string Key { get; init; }
-    public required string Name { get; init; }
-    public required SourceRuntime Runtime { get; init; }
-    public string? Api { get; init; }
-    public string? Ext { get; init; }
-    public string? PlayUrl {get;init;}
-    public int Type { get; init; }
-    public bool Searchable { get; init; } = true;
-    public bool Changeable { get; init; } = true;
-    public List<string> Categories { get; init; } = [];
-    /// <summary>订阅的最终 origin（跟随重定向后的地址），相对 ext 以此为基准解析。</summary>
-    public string? Origin { get; init; }
-    /// <summary>
-    /// 站点级请求头（<c>site.header</c> 原值原样保留）。type4 等原生 HTTP 站点靠它带 Cookie/UA/Referer
-    /// 访问接口与上游媒体；不臆造缺失字段，也不把它改成全局会话。
-    /// </summary>
-    public IReadOnlyDictionary<string, string>? Header { get; init; }
-}
 
 /// <summary>分类（Class）。</summary>
 public sealed record Category(string Id, string Name);
@@ -119,6 +27,19 @@ public sealed record MediaItem
     /// 卡片据此显示「来源：××」——跨站点结果必须能一眼看出每条来自哪个站点。
     /// </summary>
     public string? SourceName { get; init; }
+    /// <summary>来源键：采集源键，豆瓣条目为 <see cref="MediaItem.DoubanSourceKey"/>。</summary>
+    public string? SourceKey { get; init; }
+    /// <summary>豆瓣条目 id（豆瓣卡片或采集源返回的 vod_douban_id）。</summary>
+    public string? DoubanId { get; init; }
+    /// <summary>豆瓣评分。</summary>
+    public string? Rating { get; init; }
+    /// <summary>movie / tv（豆瓣分类卡片已知，聚合换源时据此区分电影与剧集）。</summary>
+    public string? Kind { get; init; }
+    /// <summary>聚合卡片：提供该影片的源数量（0 = 非聚合卡片）。</summary>
+    public int SourceCount { get; init; }
+
+    /// <summary>豆瓣浏览卡片的伪来源键：打开时按片名聚合搜索全部采集源。</summary>
+    public const string DoubanSourceKey = "douban";
 }
 
 /// <summary>剧集。</summary>
@@ -173,19 +94,14 @@ public sealed record PlaybackRequest
     /// </summary>
     public IReadOnlyList<PlaybackChoice> Choices { get; init; } = [];
     public string Title { get; init; } = "媒体";
-    public ResolutionKind Resolution { get; init; }
-    public string? ParseEndpoint {get;init;}
-    /// <summary>
-    /// 解析器标识（CatVod playerContent 的 <c>jx</c> / parse flag）。保留宿主返回的原始值，
-    /// 让上层能区分「用哪个解析器」而不是丢成一个布尔。
-    /// </summary>
-    public string? Jx { get; init; }
     public Dictionary<string, string> Headers { get; init; } = [];
     /// <summary>
     /// 源站已知媒体必须经本机代理改写才能播放（如 TS 片段伪装成图片）。与请求头无关，
     /// 置位后即使只有 UA/Referer 也走代理。
     /// </summary>
     public bool ProxyMedia { get; init; }
+    /// <summary>经本机代理过滤 HLS 插播广告分段（隐含走代理）。</summary>
+    public bool FilterAds { get; init; }
     public long StartPositionMs { get; init; }
     public string SourceKey { get; init; } = "local";
     /// <summary>来源显示名（写历史用）。本地文件为「本地」，点播为站点名。</summary>

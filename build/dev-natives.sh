@@ -36,9 +36,9 @@ if [[ -z "$rid" ]]; then
 fi
 
 case "$rid" in
-  osx-*)   mpv_name=libmpv.dylib;    qjs_name=libvodbox_quickjs.dylib;;
-  linux-*) mpv_name=libmpv.so.2;     qjs_name=libvodbox_quickjs.so;;
-  win-*)   mpv_name=libmpv-2.dll;    qjs_name=vodbox_quickjs.dll;;
+  osx-*)   mpv_name=libmpv.dylib;;
+  linux-*) mpv_name=libmpv.so.2;;
+  win-*)   mpv_name=libmpv-2.dll;;
   *) echo "未知 RID：$rid" >&2; exit 2;;
 esac
 
@@ -48,7 +48,7 @@ mkdir -p "$stage"
 # 候选来源：显式目录 → 已构建的原生目录 → 之前的开发缓存。
 search_dirs=()
 [[ -n "$from_dir" ]] && search_dirs+=("$from_dir")
-search_dirs+=("$root/artifacts/publish/$rid" "$root/artifacts/native/$rid" "$root/artifacts/quickjs/$rid" "$root/.cache/quickjs-build" "$stage")
+search_dirs+=("$root/artifacts/publish/$rid" "$root/artifacts/native/$rid" "$stage")
 
 copy_first() {
   local name="$1" dest="$2"
@@ -69,7 +69,6 @@ copy_first() {
 echo "准备原生库：rid=$rid 目标=$stage"
 missing=0
 copy_first "$mpv_name" "$stage" || { echo "  ✗ 缺少 $mpv_name（可用 --from 指定目录，或先构建媒体运行时）"; missing=1; }
-copy_first "$qjs_name" "$stage" || { echo "  ✗ 缺少 $qjs_name（先执行 python3 build/quickjs/build.py $rid <输出目录>）"; missing=1; }
 
 if [[ $missing -ne 0 ]]; then
   echo
@@ -89,5 +88,5 @@ done
 cat <<EOF
 
 完成。$([[ $copied -gt 0 ]] && echo "已同步到 $copied 个开发输出目录。" || echo "尚无开发输出目录，下次构建会自动复制。")
-临时替代方案：设置 VODBOX_MPV_LIB 与 VODBOX_QUICKJS_LIB 指向库文件。
+临时替代方案：设置 VODBOX_MPV_LIB 指向库文件。
 EOF

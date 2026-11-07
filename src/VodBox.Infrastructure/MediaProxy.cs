@@ -7,18 +7,18 @@ namespace VodBox.Infrastructure;
 /// <summary>仅代理应用主动注册的媒体，随机句柄不可枚举；支持HLS相对片段/密钥与Range。</summary>
 public sealed class MediaProxy : IDisposable
 {
-    private sealed record Entry(Uri Uri, IReadOnlyDictionary<string, string> Headers, DateTimeOffset Expires);
+    private sealed record Entry(Uri Uri, IReadOnlyDictionary<string, string> Headers, DateTimeOffset Expires, bool FilterAds = false);
     private readonly ConcurrentDictionary<string, Entry> _entries = new();
     private readonly Dictionary<string,string> _registrations = new(StringComparer.Ordinal);
     private readonly MediaCache? _cache;
     public MediaProxy(string? cacheDirectory=null) { if(cacheDirectory is not null)_cache=new MediaCache(cacheDirectory); }
     private readonly object _registrationGate = new();
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(30) };
-    public string Register(string url, IReadOnlyDictionary<string, string>? headers = null)
+    public string Register(string url, IReadOnlyDictionary<string, string>? headers = null, bool filterAds = false)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new InvalidDataException("代理地址必须为HTTP(S)。");
         var safeHeaders = NormalizeHeaders(headers);
-        var registrationKey=uri.AbsoluteUri+"\n"+string.Join("\n",safeHeaders.OrderBy(header=>header.Key,StringComparer.OrdinalIgnoreCase).Select(header=>header.Key.ToLowerInvariant()+":"+header.Value));
+        var registrationKey=(filterAds?"ads\n":"")+uri.AbsoluteUri+"\n"+string.Join("\n",safeHeaders.OrderBy(header=>header.Key,StringComparer.OrdinalIgnoreCase).Select(header=>header.Key.ToLowerInvariant()+":"+header.Value));
         lock(_registrationGate)
         {
             if(_registrations.TryGetValue(registrationKey,out var existing)&&_entries.TryGetValue(existing,out var entry)&&entry.Expires>DateTimeOffset.UtcNow)
@@ -30,7 +30,7 @@ public sealed class MediaProxy : IDisposable
             foreach(var stale in _registrations.Where(item=>!_entries.ContainsKey(item.Value)).Select(item=>item.Key).ToArray())_registrations.Remove(stale);
             if(_entries.Count>=4096)throw new InvalidOperationException("代理媒体注册已达上限。");
             var id=Guid.NewGuid().ToString("N");
-            _entries[id]=new Entry(uri,safeHeaders,DateTimeOffset.UtcNow.AddHours(4));
+            _entries[id]=new Entry(uri,safeHeaders,DateTimeOffset.UtcNow.AddHours(4),filterAds);
             _registrations[registrationKey]=id;
             return "/proxy/"+id;
         }
@@ -123,9 +123,11 @@ public sealed class MediaProxy : IDisposable
                 var target = new Uri(url);
                 // 清单指向别的源站时只保留 UA，不携带 Cookie/Authorization/Referer，避免跨源泄露凭据。
                 var headers = SameOrigin(target, entry.Uri) ? entry.Headers : CrossOriginHeaders(entry.Headers);
-                return Register(url, headers);
+                return Register(url, headers, entry.FilterAds);
             }
-            var rewritten = dash ? RewriteDash(text.ToString(), effectiveUri, RegisterChild) : RewriteHls(text.ToString(), effectiveUri, RegisterChild);
+            var manifest = text.ToString();
+            if (!dash && entry.FilterAds) manifest = HlsAdFilter.Filter(manifest, effectiveUri);
+            var rewritten = dash ? RewriteDash(manifest, effectiveUri, RegisterChild) : RewriteHls(manifest, effectiveUri, RegisterChild);
             await context.Response.WriteAsync(rewritten, context.RequestAborted);
             return;
         }

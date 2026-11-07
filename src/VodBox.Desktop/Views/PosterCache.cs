@@ -341,7 +341,7 @@ internal sealed class PosterCache : IDisposable
     private static async Task<byte[]> FetchPosterBytesAsync(Uri uri,CancellationToken cancellationToken)
     {
         // TVBox 图片地址可带 @Referer=…@User-Agent=… 后缀（如豆瓣图床无 Referer 返回 418）：拆成请求头。
-        var (address,headers)=TvBoxLinks.SplitImageHeaders(uri.OriginalString);
+        var (address,headers)=ImageAddress.SplitHeaders(uri.OriginalString);
         using var request=new HttpRequestMessage(HttpMethod.Get,headers.Count==0?uri:new Uri(address));
         foreach(var (name,value) in headers)request.Headers.TryAddWithoutValidation(name,value);
         using var response=await Client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,cancellationToken).ConfigureAwait(false);

@@ -142,11 +142,6 @@ internal static partial class MacMenus
                     Settings(label => label.StartsWith("线路地址") || label.StartsWith("优先解析"));
                     Add("下一条播放线路", () => _ = vm.SelectAddressAsync((vm.AddressChoiceIndex + 1) % vm.AddressChoices.Count),
                         vm.AddressChoices.Count > 1, PlaybackKey(Key.L, KeyModifiers.Alt));
-                    Add("下一条优先解析线路（下次播放生效）", () =>
-                    {
-                        var parsers = new[] { "" }.Concat(vm.AvailableParsers.Select(parser => parser.Url)).ToArray();
-                        vm.PreferredParser = parsers[(Array.IndexOf(parsers, vm.PreferredParser) + 1) % parsers.Length];
-                    }, vm.AvailableParsers.Count > 0, PlaybackKey(Key.P, KeyModifiers.Alt));
                 }
                 else if (title == "音频")
                 {

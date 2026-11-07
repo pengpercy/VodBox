@@ -28,8 +28,8 @@ if (args.Length == 2 && args[0] is "--proxy-hls" or "--proxy-dash")
     await upstream.StartAsync();
     try
     {
-        await using var proxy = new LocalControlServer();
-        await proxy.StartAsync(_ => Task.CompletedTask, _ => Task.CompletedTask);
+        await using var proxy = new LocalMediaServer();
+        await proxy.StartAsync();
         var manifest = args[0] == "--proxy-dash" ? "/main.mpd" : "/main.m3u8";
         var address = proxy.RegisterMedia(upstream.Urls.Single() + manifest);
         await using var playback = new MpvEngine(headless: true);

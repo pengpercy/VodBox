@@ -580,22 +580,6 @@ public partial class PlayerOverlay : UserControl
         var danmaku = new MenuItem { Header = vm.DanmakuEnabled ? "弹幕：开" : "弹幕：关" };
         danmaku.Click += (_, _) => vm.DanmakuEnabled = !vm.DanmakuEnabled;
         menu.Items.Add(danmaku);
-        if (vm.AvailableParsers.Count > 0)
-        {
-            var parsers = new MenuItem { Header = "优先解析线路（下次播放生效）" };
-            var options = new List<MenuItem>();
-            var automatic = new MenuItem { Header = vm.PreferredParser.Length == 0 ? "当前 · 自动" : "自动" };
-            automatic.Click += (_, _) => vm.PreferredParser = "";
-            options.Add(automatic);
-            foreach (var parse in vm.AvailableParsers)
-            {
-                var option = new MenuItem { Header = (vm.PreferredParser == parse.Url ? "当前 · " : "") + parse.Name };
-                option.Click += (_, _) => vm.PreferredParser = parse.Url;
-                options.Add(option);
-            }
-            parsers.ItemsSource = options;
-            menu.Items.Add(parsers);
-        }
         if (vm.AddressChoices.Count > 1)
         {
             var addresses = new MenuItem { Header = "线路地址" };

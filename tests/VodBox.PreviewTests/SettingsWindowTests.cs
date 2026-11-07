@@ -26,11 +26,11 @@ public sealed class SettingsWindowTests
     private static SettingsSectionItem[] Items(SettingsWindowViewModel vm) =>
     [
         vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface,
-        vm.Data, vm.Remote, vm.Diagnostics, vm.About,
+        vm.Data, vm.Diagnostics, vm.About,
     ];
 
     [AvaloniaFact]
-    public void WindowRendersTwoColumnsWithNineNavItemsInReusableNavItemView()
+    public void WindowRendersTwoColumnsWithEightNavItemsInReusableNavItemView()
     {
         var window = new SettingsWindow { Width = 940, Height = 680 };
         window.Show();
@@ -46,9 +46,9 @@ public sealed class SettingsWindowTests
 
             // 左栏必须复用现成的 NavItemView，而不是自己写一套导航项样式。
             var navItems = window.GetVisualDescendants().OfType<NavItemView>().ToArray();
-            Assert.Equal(9, navItems.Length);
+            Assert.Equal(8, navItems.Length);
             Assert.Equal(
-                new[] { "源与订阅", "播放", "弹幕", "字幕", "界面", "数据", "推送与遥控", "诊断", "关于" },
+                new[] { "源与订阅", "播放", "弹幕", "字幕", "界面", "数据", "诊断", "关于" },
                 navItems.Select(item => item.Label).ToArray());
 
             // 两栏布局：左栏固定宽度，且导航项确实排在左栏里。
@@ -115,7 +115,7 @@ public sealed class SettingsWindowTests
             Pump(window);
             var vm = (SettingsWindowViewModel)window.DataContext!;
             vm.Content = main.Settings;
-            foreach (var item in new[] { vm.Sources, vm.Playback, vm.Interface, vm.Remote, vm.About })
+            foreach (var item in new[] { vm.Sources, vm.Playback, vm.Interface, vm.Diagnostics, vm.About })
             {
                 item.SelectCommand.Execute(null);
                 Pump(window);
@@ -160,20 +160,20 @@ public sealed class SettingsWindowTests
     public void NewlyOpenedWindowLandsOnTheRequestedSection()
     {
         // 回归：右栏可见性由 IsSelected 驱动，新建窗口若只设 Content 不选分区，
-        // 「手机扫码推送」这类入口会停在默认分区。
+        // 外部入口（如字幕/关于）会停在默认分区。
         var directory = Path.Combine(Path.GetTempPath(), $"vodbox-focus-{Guid.NewGuid():N}");
         using var services = new VodBox.Desktop.Services.AppServices(directory);
         var main = new MainViewModel(services);
         main.AttachDispatcher(Dispatcher.UIThread);
-        main.Settings.Section = 6; // 推送与遥控
+        main.Settings.Section = 8; // 诊断
         var window = new SettingsWindow(main.Settings) { Width = 940, Height = 680 };
         window.Show();
         try
         {
             Pump(window);
             var vm = (SettingsWindowViewModel)window.DataContext!;
-            Assert.Equal("推送与遥控", vm.CurrentTitle);
-            Assert.True(vm.Remote.IsSelected);
+            Assert.Equal("诊断", vm.CurrentTitle);
+            Assert.True(vm.Diagnostics.IsSelected);
         }
         finally
         {
@@ -200,7 +200,7 @@ public sealed class SettingsWindowTests
             var vm = (SettingsWindowViewModel)window.DataContext!;
             vm.Content = main.Settings;
             var widths = new List<double>();
-            foreach (var item in new[] { vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface, vm.Data, vm.Remote, vm.Diagnostics, vm.About })
+            foreach (var item in new[] { vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface, vm.Data, vm.Diagnostics, vm.About })
             {
                 item.SelectCommand.Execute(null);
                 Pump(window);
@@ -343,13 +343,13 @@ public sealed class SettingsWindowTests
             main.GoSettingsCommand.Execute(null);
             Pump(shell);
             Assert.Same(window, shell.OpenSettingsWindow);
-            // 请求特定分区（远程入口会切到「推送与遥控」）时，已开窗口要跟着跳。
-            main.Settings.Section = 6;
+            // 请求特定分区（如诊断）时，已开窗口要跟着跳。
+            main.Settings.Section = 8;
             main.OpenSettings();
             Pump(shell);
             var vm = (SettingsWindowViewModel)window.DataContext!;
-            Assert.Equal("推送与遥控", vm.CurrentTitle);
-            Assert.True(vm.Remote.IsSelected);
+            Assert.Equal("诊断", vm.CurrentTitle);
+            Assert.True(vm.Diagnostics.IsSelected);
         }
         finally
         {

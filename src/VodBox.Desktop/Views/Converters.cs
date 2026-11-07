@@ -233,11 +233,17 @@ public static class SectionConverters
 public static class MediaConverters
 {
     public static readonly IValueConverter Meta = new FuncValueConverter<VodBox.Core.MediaItem?, string>(item =>
-        item is null ? "" : string.Join(" · ", new[] { item.Year, item.Area, item.TypeName }.Where(value => !string.IsNullOrWhiteSpace(value))));
+        item is null ? "" : string.Join(" · ", new[] { item.Year, item.Rating is { Length: > 0 } rating ? "豆瓣 " + rating : null, item.Area, item.TypeName }.Where(value => !string.IsNullOrWhiteSpace(value))));
 }
 
 /// <summary>数值 → 是否大于 0（例如尺寸为 0 时直接隐藏元素）。</summary>
 public static class NumberConverters
 {
     public static readonly IValueConverter IsPositive = new FuncValueConverter<double, bool>(value => value > 0);
+}
+
+/// <summary>启用 → 不透明度（禁用的行半透明）。</summary>
+public static class OpacityConverters
+{
+    public static readonly IValueConverter EnabledDim = new FuncValueConverter<bool, double>(enabled => enabled ? 1.0 : 0.5);
 }

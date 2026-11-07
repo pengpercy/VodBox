@@ -72,11 +72,7 @@ public partial class VodView : UserControl
 
     private void OnPickFilter(object? sender,RoutedEventArgs e)
     {
-        if(sender is Button{Tag:FilterValue value} button)
-        {
-            var group=button.GetVisualAncestors().OfType<Control>().Select(control=>control.DataContext).OfType<FilterGroup>().FirstOrDefault();
-            if(group is not null)VM.SelectFilter(group.Key,value.Value);
-        }
+        if(sender is Button{Tag:FilterChip chip})VM.SelectFilter(chip.Key,chip.Value);
     }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
@@ -86,27 +82,4 @@ public partial class VodView : UserControl
 
     /// <summary>点播搜索框的历史下拉选了一条：词已写回搜索框，按它做跨站搜索。</summary>
     private void OnSearchHistoryPicked(object? sender, string word) => VM.RunSearchCommand.Execute(null);
-
-    private void OnSwitchSource(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button) return;
-        // 复用 XAML 里定义的弹层（固定宽度省略号 + 中性色的站点名样式挂在那里）。
-        var menu = button.ContextMenu ?? this.FindControl<ContextMenu>("SourceMenu");
-        if (menu is null) return;
-        menu.Items.Clear();
-        // 与按钮同宽：弹层不比下拉框宽；高度上限在 XAML（MaxHeight），站点多时内部滚动。
-        menu.Width = button.Bounds.Width;
-        foreach (var source in VM.AvailableSources)
-        {
-            var item = new MenuItem { Header = source.Name };
-            ToolTip.SetTip(item, source.Name);
-            if (source.Key == VM.LoadedSourceKey) item.Classes.Add("current");
-            item.Click += async (_, _) => await VM.SwitchSourceAsync(source.Key);
-            menu.Items.Add(item);
-        }
-        if (menu.Items.Count == 0) menu.Items.Add(new MenuItem { Header = VM.SourceSelectionHint, IsEnabled = false });
-        // 固定在当前站点按钮下方展开（控件锚点），不跟随鼠标点位定位。
-        menu.PlacementTarget = button;
-        menu.Open(button);
-    }
 }

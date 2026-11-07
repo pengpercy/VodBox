@@ -235,11 +235,6 @@
         "resolved": "5.0.0",
         "contentHash": "dDoKi0PnDz31yAyETfRntsLArTlVAVzUzCIvvEDsDsucrl33Dl8pIJG06ePTJTI3tGpeyHS9Cq7Foc/s4EeKcg=="
       },
-      "ReusableTasks": {
-        "type": "Transitive",
-        "resolved": "4.0.0",
-        "contentHash": "6EKzscjq+Q+uxD0N5GWUBO2N34cuDiJ08ZxRs1lqS0Hwvnjp6AgimUIX/8dqIxRZbPOG4gcikTMo+PM4D9CfaQ=="
-      },
       "SkiaSharp": {
         "type": "Transitive",
         "resolved": "3.119.4",
@@ -378,7 +373,6 @@
           "Avalonia.Fonts.Inter": "[12.1.4, )",
           "Avalonia.Themes.Fluent": "[12.1.4, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "QRCoder": "[1.6.0, )",
           "VodBox.Core": "[0.3.10, )",
           "VodBox.Infrastructure": "[0.3.10, )",
           "VodBox.Playback.Mpv": "[0.3.10, )"
@@ -388,23 +382,14 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.13, )",
-          "Mono.Nat": "[3.0.4, )",
-          "MonoTorrent": "[3.0.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.3.10, )",
-          "VodBox.PluginHost": "[0.3.10, )"
+          "VodBox.Core": "[0.3.10, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.3.10, )"
-        }
-      },
-      "vodbox.pluginhost": {
-        "type": "Project",
-        "dependencies": {
           "VodBox.Core": "[0.3.10, )"
         }
       },
@@ -465,28 +450,6 @@
         "dependencies": {
           "SQLitePCLRaw.core": "2.1.13"
         }
-      },
-      "Mono.Nat": {
-        "type": "CentralTransitive",
-        "requested": "[3.0.4, )",
-        "resolved": "3.0.4",
-        "contentHash": "oodXnwdcML4qUaZ+J44gaC/hn0n3uZHkvxScdt8NOcBbmbNmA7z1t5FEvUvn8cOnYSha8F4ZS57FJuXSKYhqdw=="
-      },
-      "MonoTorrent": {
-        "type": "CentralTransitive",
-        "requested": "[3.0.2, )",
-        "resolved": "3.0.2",
-        "contentHash": "kWy0mLj2MKX9uUGe3lnNYfyQhthjUK4IAMNJO8llXP9yB3ZYfGaAy9ag20wMcjTz2YfhKOW/uZ5FR//BYZGeYA==",
-        "dependencies": {
-          "Mono.Nat": "3.0.0",
-          "ReusableTasks": "4.0.0"
-        }
-      },
-      "QRCoder": {
-        "type": "CentralTransitive",
-        "requested": "[1.6.0, )",
-        "resolved": "1.6.0",
-        "contentHash": "XmPA81eo+oRxBuyVdswsSkTGTE1d3thfF11Z1PdD7oB56A6HU4G4AAOdySmGRMb/cljwlFTMWUtosGEnwpS6GA=="
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {
         "type": "CentralTransitive",

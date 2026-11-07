@@ -23,11 +23,6 @@
         "resolved": "0.11.6",
         "contentHash": "NdNWGDiZ6eS/Mf/9+QHR91cj1K7Hy+PX9yrHI/zM7xFYuj9IWT2uxtB6sCHjrnxAeLV9fut1R6zHDUGKX6f9lQ=="
       },
-      "ReusableTasks": {
-        "type": "Transitive",
-        "resolved": "4.0.0",
-        "contentHash": "6EKzscjq+Q+uxD0N5GWUBO2N34cuDiJ08ZxRs1lqS0Hwvnjp6AgimUIX/8dqIxRZbPOG4gcikTMo+PM4D9CfaQ=="
-      },
       "SQLite": {
         "type": "Transitive",
         "resolved": "3.53.4",
@@ -61,23 +56,14 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.13, )",
-          "Mono.Nat": "[3.0.4, )",
-          "MonoTorrent": "[3.0.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.3.10, )",
-          "VodBox.PluginHost": "[0.3.10, )"
+          "VodBox.Core": "[0.3.10, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.3.10, )"
-        }
-      },
-      "vodbox.pluginhost": {
-        "type": "Project",
-        "dependencies": {
           "VodBox.Core": "[0.3.10, )"
         }
       },
@@ -99,22 +85,6 @@
         "contentHash": "Gge8XsSCOwcbkbdmt2UDAe6kIv9Q0vA6yb3wsTStjjexaMFLTWfc/1gH4kbhJ+zWiXRTRA4lG2sOQNVfir204w==",
         "dependencies": {
           "SQLitePCLRaw.core": "2.1.13"
-        }
-      },
-      "Mono.Nat": {
-        "type": "CentralTransitive",
-        "requested": "[3.0.4, )",
-        "resolved": "3.0.4",
-        "contentHash": "oodXnwdcML4qUaZ+J44gaC/hn0n3uZHkvxScdt8NOcBbmbNmA7z1t5FEvUvn8cOnYSha8F4ZS57FJuXSKYhqdw=="
-      },
-      "MonoTorrent": {
-        "type": "CentralTransitive",
-        "requested": "[3.0.2, )",
-        "resolved": "3.0.2",
-        "contentHash": "kWy0mLj2MKX9uUGe3lnNYfyQhthjUK4IAMNJO8llXP9yB3ZYfGaAy9ag20wMcjTz2YfhKOW/uZ5FR//BYZGeYA==",
-        "dependencies": {
-          "Mono.Nat": "3.0.0",
-          "ReusableTasks": "4.0.0"
         }
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {

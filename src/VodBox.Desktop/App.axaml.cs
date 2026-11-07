@@ -87,7 +87,7 @@ public class App : Application
                         searchWindow.Close();window.UpdateLayout();await Task.Delay(50);
                         // 设置已改为独立窗口：逐个分区在真实窗口里渲染一遍，确认没有空分区或绑定失败。
                         var settingsWindow=window.SettingsWindowForSmoke??throw new InvalidOperationException("设置窗口未创建。");
-                        for(var section=0;section<9;section++)
+                        foreach(var section in new[]{0,1,2,3,4,5,7,8})
                         {
                             main.Settings.Section=section;
                             settingsWindow.SyncSelectionFrom(main.Settings);

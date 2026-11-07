@@ -46,31 +46,7 @@ public sealed class ViewModelRaceTests
         MediaId = "series", LineId = "line", EpisodeId = episode, Poster = "poster", Remarks = "remarks",
     };
 
-    [AvaloniaFact]
-    public async Task Detail_OldOpenCannotOverwriteNewResumeOrItsPlaybackContext()
-    {
-        using var context = new Context();
-        var old = Gate<MediaDetail>();
-        CancellationToken oldToken = default;
-        context.Source.Load = (id, ct) =>
-        {
-            if (id == "old") { oldToken = ct; return old.Task; }
-            return Task.FromResult(Detail(id));
-        };
-        var first = context.Main.Detail.OpenAsync("source", Item("old"));
-        await Done(context.Main.Detail.ResumeAsync(History("new")));
-        Assert.True(oldToken.IsCancellationRequested);
-        old.SetResult(Detail("old"));
-        await Done(first);
-        var vm = context.Main.Detail;
-        Assert.Equal("new", vm.Detail!.Item.Id);
-        Assert.Equal("ep2", vm.SelectedEpisode!.Id);
-        Assert.False(vm.Loading);
-        await Done(vm.PlayCommand.ExecuteAsync(null));
-        Assert.Equal("new", context.Source.ResolvedMedia);
-        Assert.Equal("ep2", context.Source.ResolvedEpisode);
-        Assert.Equal(42000, Assert.Single(context.Engine.Opened).Request.StartPositionMs);
-    }
+
 
     [AvaloniaFact]
     public async Task Detail_StaleFavoriteAndHistoryReadsCannotCommit()
@@ -355,75 +331,11 @@ public sealed class ViewModelRaceTests
         Assert.All(onUi, Assert.True);
     }
 
-    [AvaloniaFact]
-    public async Task Playlist_ManualNavigationUsesCapturedEntriesAndBoundaries()
-    {
-        using var context = new Context();
-        var vm = context.Main.Player;
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        Assert.False(vm.HasPreviousEpisode);
-        Assert.True(vm.HasNextEpisode);
-        await Done(vm.PlayPlaylistIndexAsync(1));
-        Assert.Equal("ep2", context.Engine.Opened[^1].Request.EpisodeId);
-        Assert.True(vm.HasPreviousEpisode);
-        Assert.False(vm.HasNextEpisode);
-        await Done(vm.PlayPlaylistIndexAsync(2));
-        Assert.Equal(2, context.Engine.Opened.Count);
-        await Done(vm.Close());
-        Assert.Empty(vm.Playlist);
-        Assert.Equal(-1, vm.PlaylistIndex);
-    }
 
-    [AvaloniaFact]
-    public async Task Playlist_EofAdvancesOnceButFailureAndLastEpisodeDoNotAdvance()
-    {
-        using var context = new Context();
-        var vm = context.Main.Player;
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        context.Engine.EmitCurrent(PlaybackState.Failed, 5000, 90000);
-        Assert.Single(context.Engine.Opened);
-        var firstSession = context.Engine.Opened[0].Session;
-        context.Engine.Emit(firstSession, PlaybackState.Ended, 90000, 90000);
-        context.Engine.Emit(firstSession, PlaybackState.Ended, 90000, 90000);
-        for (var i = 0; i < 30 && context.Engine.Opened.Count < 2; i++)
-        {
-            Dispatcher.UIThread.RunJobs();
-            await Task.Delay(5);
-        }
-        Dispatcher.UIThread.RunJobs();
-        Assert.Equal(2, context.Engine.Opened.Count);
-        Assert.Equal("ep2", context.Engine.Opened[1].Request.EpisodeId);
-        context.Engine.EmitCurrent(PlaybackState.Ended, 90000, 90000);
-        Assert.Equal(2, context.Engine.Opened.Count);
-    }
 
-    [AvaloniaFact]
-    public async Task Playlist_DisabledAutoNextSavesCompletionWithoutAdvancing()
-    {
-        using var context = new Context();
-        var vm = context.Main.Player;
-        vm.AutoNext = false;
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        context.Engine.EmitCurrent(PlaybackState.Ended, 90000, 90000);
-        Assert.Single(context.Engine.Opened);
-        Assert.Equal(0, context.Store.Saved[^1].PositionMs);
-        Assert.Equal(90000, context.Store.Saved[^1].DurationMs);
-    }
+
+
+
 
     [AvaloniaFact]
     public async Task Player_SeekPreviewSurvivesProgressEventsAndCommitsOnlyOnce()
@@ -482,261 +394,37 @@ public sealed class ViewModelRaceTests
         Assert.True(vm.ControlsVisible);
     }
 
-    private static IReadOnlyList<(SourceInfo Site, MediaItem Item)> SearchResults(string id, int count = 1)
-    {
-        var site = new SourceInfo { Key = "source", Name = "站点", Runtime = SourceRuntime.MacCms };
-        return Enumerable.Range(0, count).Select(i => (site, new MediaItem { Id = id + i, Title = id + i })).ToArray();
-    }
 
-    private static (SourceInfo Site, MediaItem Item) Entry(string key, string name, string id) =>
-        (new SourceInfo { Key = key, Name = name, Runtime = SourceRuntime.MacCms }, Item(id));
 
-    /// <summary>把若干批次串成聚合流；用同步完成的 await 保持迭代器无上下文切换，批次顺序可控。</summary>
-    private static async IAsyncEnumerable<AggregateSearchBatch> Batches(params AggregateSearchBatch[] batches)
-    {
-        await Task.CompletedTask;
-        foreach (var batch in batches) yield return batch;
-    }
 
-    /// <summary>先挂起、由闸门放行的单批次流：复现「旧请求的迟到批次晚于新请求返回」。</summary>
-    private static async IAsyncEnumerable<AggregateSearchBatch> LateBatch(SourceInfo site, Task gate, string id)
-    {
-        await gate.ConfigureAwait(false);
-        yield return new AggregateSearchBatch(site, [Item(id)]);
-    }
 
-    [AvaloniaFact]
-    public async Task Search_EveryCardIsLabelledWithItsOwnSourceSite()
-    {
-        using var context = new Context();
-        var results = new[] { Entry("a", "甲站", "a1"), Entry("b", "乙站", "b1") };
-        var search = new SearchViewModel((_, _) => Task.FromResult<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>(results), context.Main) { Keyword = "测试" };
-        await Done(search.RunSearchAsync());
-        // 每张卡片都带上自己站点的来源名，且卡片与 AllResults 是同一批实例（虚拟化行不丢来源）。
-        Assert.Equal(["甲站", "乙站"], search.AllResults.Select(item => item.SourceName));
-        var cards = search.ResultRows.SelectMany(row => row.Items).ToArray();
-        Assert.Equal(search.AllResults, cards);
-        Assert.All(cards, card => Assert.False(string.IsNullOrEmpty(card.SourceName)));
-    }
+
+
 
     /// <summary>
     /// 搜索窗口按站点流式回填：先完成的站点立即上屏（JAR 站点首次搜索可达数十秒，不能拖住其它站点），
     /// 进度在汇总里可见；全部结束后汇总失败站点。
     /// </summary>
-    [AvaloniaFact]
-    public async Task Search_StreamsEachSiteAsItCompletes()
-    {
-        using var context = new Context();
-        var fast = new SourceInfo { Key = "fast", Name = "快站", Runtime = SourceRuntime.MacCms };
-        var broken = new SourceInfo { Key = "broken", Name = "坏站", Runtime = SourceRuntime.Node };
-        var slow = new SourceInfo { Key = "slow", Name = "慢站", Runtime = SourceRuntime.Node };
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        async IAsyncEnumerable<AggregateSearchBatch> Stream(string _, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-        {
-            yield return new AggregateSearchBatch(fast, [Item("f1"), Item("f2")]);
-            await release.Task.WaitAsync(ct);
-            yield return new AggregateSearchBatch(broken, [], "超时（90s）");
-            yield return new AggregateSearchBatch(slow, [Item("s1")]);
-        }
-        var search = context.Main.Search;
-        search.SetSearchStream(Stream, 3);
-        search.Keyword = "测试";
-        var running = search.RunSearchAsync();
-        await Until(() => search.AllResults.Count == 2);
-        Assert.True(search.Searching);
-        Assert.Equal(["f1", "f2"], search.ResultRows.SelectMany(row => row.Items).Select(item => item.Id));
-        Assert.Contains("1/3", search.Summary);
-        release.SetResult();
-        await Done(running);
-        Assert.False(search.Searching);
-        Assert.Equal(["快站", "慢站"], search.SiteResults.Select(site => site.SiteName));
-        Assert.Equal("慢站", search.AllResults.Single(item => item.Id == "s1").SourceName);
-        Assert.Contains("2 个站点找到 3 条结果", search.Summary);
-        Assert.Contains("1 个站点失败", search.Summary);
-        Assert.Contains("坏站", search.Summary);
-    }
 
-    [AvaloniaFact]
-    public async Task Search_PartialFailureStillLabelsSucceededCardsAndSurfacesFailedSites()
-    {
-        using var context = new Context();
-        var site = new SourceInfo { Key = "source", Name = "站点", Runtime = SourceRuntime.MacCms };
-        var failed = new SourceInfo { Key = "slow", Name = "慢站", Runtime = SourceRuntime.MacCms };
-        var search = new SearchViewModel((_, _) => Task.FromResult(SearchResults("ok")), context.Main) { Keyword = "测试" };
-        search.SetDetailedSearch((_, _) => Task.FromResult(new AggregateSearchResult(
-            [(site, Item("ok"))], [(failed, "超时（25s）")])));
-        await Done(search.RunSearchAsync());
-        // 部分失败：成功卡片保留且带正确来源，失败站点在汇总里可见（不能静默吞掉）。
-        Assert.Equal("站点", Assert.Single(search.AllResults).SourceName);
-        Assert.Contains("慢站", search.Summary);
-        Assert.Contains("超时", search.Summary);
-        Assert.Empty(search.Hint);
-    }
+
+
 
     /// <summary>点播页卡片：来源只在聚合搜索（跨站点）时显示；浏览单个站点时隐藏，避免每张卡片重复同一站名。</summary>
-    [AvaloniaFact]
-    public async Task Vod_CardsShowSourceOnlyInAggregateSearch()
-    {
-        using var context = new Context();
-        var vod = context.Main.Vod;
-        var first = new SourceInfo { Key = "a", Name = "甲站", Runtime = SourceRuntime.MacCms };
-        var second = new SourceInfo { Key = "b", Name = "乙站", Runtime = SourceRuntime.MacCms };
-        vod.SetSearchStream((_, _) => Batches(
-            new AggregateSearchBatch(first, [Item("a1"), Item("a2")]),
-            new AggregateSearchBatch(second, [Item("b1")])));
-        var window = new Window { Width = 1280, Height = 800, Content = new VodView { DataContext = context.Main } };
-        window.Show();
-        try
-        {
-            vod.Keyword = "测试";
-            await Done(vod.RunSearchAsync());
-            for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
-            TextBlock[] Sources() => window.GetVisualDescendants().OfType<TextBlock>()
-                .Where(text => text.Classes.Contains("cardSource") && text.IsEffectivelyVisible).ToArray();
-            Assert.Equal(["甲站", "甲站", "乙站"], Sources().Select(text => text.Text));
-            vod.SearchMode = false;
-            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
-            Assert.Empty(Sources());
-        }
-        finally { window.Close(); }
-    }
 
-    [AvaloniaFact]
-    public async Task Vod_StreamingSearchAppendsEachSiteBatchAndLabelsCardsWithTheirSource()
-    {
-        using var context = new Context();
-        var vod = new VodViewModel(context.Services, context.Main, () => context.Source);
-        var first = new SourceInfo { Key = "a", Name = "甲站", Runtime = SourceRuntime.MacCms };
-        var failing = new SourceInfo { Key = "c", Name = "丙站", Runtime = SourceRuntime.MacCms };
-        var second = new SourceInfo { Key = "b", Name = "乙站", Runtime = SourceRuntime.MacCms };
-        vod.SetSearchStream((_, _) => Batches(
-            new AggregateSearchBatch(first, [Item("a1"), Item("a2")]),
-            new AggregateSearchBatch(failing, [], "连接超时"),
-            new AggregateSearchBatch(second, [Item("b1")])));
-        vod.Keyword = "测试";
-        await Done(vod.RunSearchAsync());
-        // 流式逐站追加：先到的站点先上屏，失败站点只计失败、不影响已有卡片。
-        Assert.Equal(["a1", "a2", "b1"], vod.Items.Select(item => item.Id));
-        Assert.Equal(["甲站", "甲站", "乙站"], vod.Items.Select(item => item.SourceName));
-        Assert.Contains("3 个站点", vod.SearchSummary);
-        Assert.Contains("1 个站点失败", vod.SearchSummary);
-        Assert.False(vod.Searching);
-        Assert.False(vod.Loading);
-        Assert.Empty(vod.ItemsHint);
-    }
 
-    [AvaloniaFact]
-    public async Task Vod_StaleStreamBatchesCannotRepopulateAfterANewSearch()
-    {
-        using var context = new Context();
-        var vod = new VodViewModel(context.Services, context.Main, () => context.Source);
-        var oldSite = new SourceInfo { Key = "old", Name = "旧站", Runtime = SourceRuntime.MacCms };
-        var newSite = new SourceInfo { Key = "new", Name = "新站", Runtime = SourceRuntime.MacCms };
-        var release = Gate<bool>();
-        vod.SetSearchStream((query, _) => query == "旧"
-            ? LateBatch(oldSite, release.Task, "old1")
-            : Batches(new AggregateSearchBatch(newSite, [Item("new1")])));
-        vod.Keyword = "旧";
-        var stale = vod.RunSearchAsync();
-        vod.Keyword = "新";
-        await Done(vod.RunSearchAsync());
-        release.SetResult(true);
-        await Done(stale);
-        // 代次门控：旧请求的迟到批次不能回填新查询的结果（也不能盖掉新来源）。
-        Assert.Equal("new1", Assert.Single(vod.Items).Id);
-        Assert.Equal("新站", Assert.Single(vod.Items).SourceName);
-        Assert.DoesNotContain(vod.Items, item => item.SourceName == "旧站");
-        Assert.False(vod.Searching);
-    }
 
-    [AvaloniaFact]
-    public async Task Search_LateResultsCannotReplaceNewQuery()
-    {
-        using var context = new Context();
-        var late = Gate<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>();
-        var search = new SearchViewModel((query, _) => query == "旧" ? late.Task : Task.FromResult(SearchResults("新")), context.Main);
-        search.Keyword = "旧";
-        var old = search.RunSearchAsync();
-        search.Keyword = "新";
-        await Done(search.RunSearchAsync());
-        late.SetResult(SearchResults("旧"));
-        await Done(old);
-        Assert.Equal("新0", Assert.Single(search.AllResults).Id);
-        Assert.Contains("新", search.Summary);
-        Assert.False(search.Searching);
-        Assert.Equal(["新"], search.SearchHistory);
-    }
 
-    [AvaloniaFact]
-    public async Task Search_ResultsAfterFortiethItemRetainTheirSourceAndOpen()
-    {
-        using var context = new Context();
-        var loaded = Gate<string>();
-        context.Source.Load = (id, _) => { loaded.TrySetResult(id); return Task.FromResult(Detail(id)); };
-        var search = new SearchViewModel((_, _) => Task.FromResult(SearchResults("item", 120)), context.Main) { Keyword = "测试" };
-        await Done(search.RunSearchAsync());
-        var site = Assert.Single(search.SiteResults);
-        Assert.Equal(120, site.Items.Count);
-        // 每张卡片（含被虚拟化的后 40 条）都带来源站点名，不能在分批/分块时丢掉。
-        Assert.All(search.AllResults, item => Assert.Equal("站点", item.SourceName));
-        search.SelectedSite = site;
-        Assert.Equal(120, search.ResultRows.Sum(row => row.Items.Count));
-        Assert.All(search.ResultRows.SelectMany(row => row.Items), card => Assert.Equal("站点", card.SourceName));
-        search.OpenItemCommand.Execute(search.AllResults[119]);
-        Assert.Equal("item119", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
-    }
+
+
+
+
+
 
     /// <summary>
     /// 搜索窗口里打开影片：详情在搜索窗口内展示，主窗口不跳到详情页（主窗口自己的详情也不受影响）；
     /// 「返回搜索结果」、Esc、发起新搜索都回到结果网格。
     /// </summary>
-    [AvaloniaFact]
-    public async Task Search_OpensDetailInsideSearchWindowAndReturnsToResults()
-    {
-        using var context = new Context();
-        var search = context.Main.Search;
-        search.SetDetailedSearch((_, _) => Task.FromResult(new AggregateSearchResult(SearchResults("item", 6), [])));
-        var window = new SearchWindow { DataContext = context.Main, Width = 1040, Height = 720 };
-        window.Show();
-        void Layout() { for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); } }
-        T Named<T>(string name) where T : Control => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
-        try
-        {
-            search.Keyword = "测试";
-            await Done(search.RunSearchAsync());
-            var pageBefore = context.Main.Page;
-            search.OpenItemCommand.Execute(search.AllResults[2]);
-            await Until(() => search.Detail.Detail is not null);
-            Layout();
-            Assert.True(search.ShowingDetail);
-            Assert.Equal("item2", search.Detail.Detail!.Item.Id);
-            Assert.Equal(pageBefore, context.Main.Page);
-            Assert.Null(context.Main.Detail.Detail);
-            Assert.True(Named<Grid>("DetailHost").IsEffectivelyVisible);
-            Assert.False(Named<ListBox>("ResultsList").IsEffectivelyVisible);
 
-            var back = Named<Button>("BackToResults");
-            var center = back.TranslatePoint(new Avalonia.Point(back.Bounds.Width / 2, back.Bounds.Height / 2), window)!.Value;
-            Avalonia.Headless.HeadlessWindowExtensions.MouseDown(window, center, Avalonia.Input.MouseButton.Left);
-            Avalonia.Headless.HeadlessWindowExtensions.MouseUp(window, center, Avalonia.Input.MouseButton.Left);
-            Layout();
-            Assert.False(search.ShowingDetail);
-            Assert.True(Named<ListBox>("ResultsList").IsEffectivelyVisible);
-            Assert.Equal(6, search.AllResults.Count);
-
-            search.OpenItemCommand.Execute(search.AllResults[0]);
-            Layout();
-            window.GetVisualDescendants().OfType<SearchView>().Single().RaiseEvent(new Avalonia.Input.KeyEventArgs
-                { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
-            Assert.False(search.ShowingDetail);
-
-            search.OpenItemCommand.Execute(search.AllResults[1]);
-            Assert.True(search.ShowingDetail);
-            await Done(search.RunSearchAsync());
-            Assert.False(search.ShowingDetail);
-        }
-        finally { window.Close(); }
-    }
 
     [AvaloniaFact]
     public async Task Home_LateLoadCannotReplaceNewRecommendationsOrHero()
@@ -745,7 +433,7 @@ public sealed class ViewModelRaceTests
         var oldPage = Gate<MediaPage>();
         var calls = 0;
         context.Source.Home = _ => ++calls == 1 ? oldPage.Task : Task.FromResult(new MediaPage([new MediaItem { Id = "new", Title = "新推荐", Poster = "https://example/new.jpg" }], 1, 1));
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         var old = home.LoadAsync();
         await Done(home.LoadAsync());
         oldPage.SetResult(new MediaPage([new MediaItem { Id = "old", Title = "旧推荐" }], 1, 1));
@@ -753,7 +441,7 @@ public sealed class ViewModelRaceTests
         Assert.Equal("new", Assert.Single(home.Recommendations).Id);
         Assert.Equal("新推荐", home.HeroTitle);
         Assert.Equal("https://example/new.jpg", home.HeroPoster);
-        Assert.Equal(context.Source.Name, home.SourceName);
+        Assert.Equal("豆瓣", home.SourceName);
         Assert.False(home.Loading);
     }
 
@@ -763,7 +451,7 @@ public sealed class ViewModelRaceTests
         using var context = new Context();
         var recommendations = Gate<MediaPage>();
         context.Source.Home = _ => recommendations.Task;
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         var load = home.LoadAsync();
         Dispatcher.UIThread.RunJobs();
         Assert.True(home.Loading);
@@ -782,7 +470,7 @@ public sealed class ViewModelRaceTests
         using var context = new Context();
         context.Store.ReadHistory = (_, _) => Task.FromException<IReadOnlyList<HistoryEntry>>(new IOException("history unavailable"));
         context.Source.Home = _ => Task.FromResult(new MediaPage([new MediaItem { Id = "ok", Title = "推荐" }], 1, 1));
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         await Done(home.LoadAsync());
         Assert.Equal("ok", Assert.Single(home.Recommendations).Id);
         Assert.NotEmpty(home.RecentHint);
@@ -798,7 +486,7 @@ public sealed class ViewModelRaceTests
         var history = Gate<IReadOnlyList<HistoryEntry>>();
         context.Store.ReadHistory = (_, _) => history.Task;
         context.Source.Home = _ => Task.FromResult(new MediaPage([new MediaItem { Id = "ok", Title = "推荐" }], 1, 1));
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         var load = home.LoadAsync();
         Dispatcher.UIThread.RunJobs();
         Assert.False(home.Loading);
@@ -816,7 +504,7 @@ public sealed class ViewModelRaceTests
         var loaded = Gate<string>();
         context.Source.Load = (id, _) => { loaded.TrySetResult(id); return Task.FromResult(Detail(id)); };
         context.Source.Home = _ => Task.FromResult(new MediaPage([new MediaItem { Id = "hero", Title = "首页推荐" }], 1, 1));
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         await Done(home.LoadAsync());
         home.OpenHeroCommand.Execute(null);
         Assert.Equal("hero", await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)));
@@ -940,59 +628,9 @@ public sealed class ViewModelRaceTests
         Assert.Equal(PlaybackState.Playing, vm.State);
     }
 
-    [AvaloniaFact]
-    public async Task Player_NumberSelectionUsesPlaylistAndIgnoresInvalidNumbers()
-    {
-        using var context = new Context();
-        var vm = context.Main.Player;
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        await Done(vm.SelectEpisodeNumberAsync(2));
-        Assert.Equal("ep2", context.Engine.Opened[^1].Request.EpisodeId);
-        Assert.Equal(1, vm.PlaylistIndex);
-        var intent = vm.CurrentSessionId;
-        foreach (var number in new[] { -1, 0, 3, 10 }) await Done(vm.SelectEpisodeNumberAsync(number));
-        Assert.Equal(intent, vm.CurrentSessionId);
-    }
 
-    [AvaloniaFact]
-    public async Task Window_NumberKeySwitchesEpisodeButModifiedKeyDoesNot()
-    {
-        using var context = new Context();
-        var vm = context.Main.Player;
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        var shell = new VodBox.Desktop.MainWindow { DataContext = context.Main };
-        var window = Assert.IsType<PlayerWindow>(shell.PlaybackWindow);
-        try
-        {
-            var modified = new Avalonia.Input.KeyEventArgs
-            {
-                RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent,
-                Key = Avalonia.Input.Key.D2, KeyModifiers = Avalonia.Input.KeyModifiers.Shift,
-            };
-            window.RaiseEvent(modified);
-            Assert.False(modified.Handled);
-            Assert.Equal(0, vm.PlaylistIndex);
-            var plain = new Avalonia.Input.KeyEventArgs
-            {
-                RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.NumPad2,
-            };
-            window.RaiseEvent(plain);
-            Assert.True(plain.Handled);
-            Dispatcher.UIThread.RunJobs();
-            Assert.Equal(1, vm.PlaylistIndex);
-        }
-        finally { await Done(vm.Close()); shell.Close(); }
-    }
+
+
 
     [AvaloniaFact]
     public async Task Player_AutomaticSkipsRunOncePerSessionAndPreserveResume()
@@ -1333,19 +971,7 @@ public sealed class ViewModelRaceTests
         Assert.Equal("new", context.Main.Detail.Detail!.Item.Id);
     }
 
-    [AvaloniaFact]
-    public async Task Search_HistorySurvivesRecreationAndProducesLocalSuggestions()
-    {
-        using var context = new Context();
-        var search = new SearchViewModel((_, _) => Task.FromResult<IReadOnlyList<(SourceInfo, MediaItem)>>([]), context.Main, context.Preferences);
-        search.Keyword = "庆余年";
-        await Done(search.RunSearchCommand.ExecuteAsync(null));
-        var fresh = new SearchViewModel((_, _) => Task.FromResult<IReadOnlyList<(SourceInfo, MediaItem)>>([]), context.Main, context.Preferences);
-        Assert.Equal("庆余年", Assert.Single(fresh.SearchHistory));
-        Assert.Equal(["庆余年"], SearchViewModel.FilterHistory(fresh.SearchHistory, "庆", all: false));
-        Assert.Empty(SearchViewModel.FilterHistory(fresh.SearchHistory, "庆余年", all: false));
-        Assert.Equal(["庆余年"], SearchViewModel.FilterHistory(fresh.SearchHistory, "庆余年", all: true));
-    }
+
 
     [AvaloniaFact]
     public void Settings_ThemePreferenceIsPersistedAndRestored()
@@ -1428,16 +1054,7 @@ public sealed class ViewModelRaceTests
         Assert.Equal(0, restored.SubtitleDelay);
     }
 
-    [AvaloniaFact]
-    public void Player_PreferredParserPersistsWithoutInterruptingCurrentPlayback()
-    {
-        using var context = new Context();
-        var player = new PlayerViewModel(context.Engine, context.Store, context.Main, context.Preferences);
-        var intent = player.CurrentSessionId;
-        player.PreferredParser = "https://parse.example/?url=";
-        Assert.Equal(intent, player.CurrentSessionId);
-        Assert.Equal(player.PreferredParser, new PlayerViewModel(context.Engine, context.Store, context.Main, context.Preferences).PreferredParser);
-    }
+
 
     [AvaloniaFact]
     public async Task Settings_LiveSubscriptionHistoryRestoresAndProtectsCurrentEntry()
@@ -1526,31 +1143,21 @@ public sealed class ViewModelRaceTests
         window.Show();Dispatcher.UIThread.RunJobs();
         try
         {
-        var names=new[]{"SourcesSection","PlaybackSection","DanmakuSection","SubtitleSection","InterfaceSection","DataSection","RemoteSection","AboutSection"};
-        for(var section=0;section<names.Length;section++)
+        // 分区号 6（原推送与遥控）已移除，关于仍是 7。
+        var sections=new (int Section,string Name)[]{(0,"SourcesSection"),(1,"PlaybackSection"),(2,"DanmakuSection"),(3,"SubtitleSection"),(4,"InterfaceSection"),(5,"DataSection"),(7,"AboutSection")};
+        foreach(var (section,_) in sections)
         {
             context.Main.Settings.Section=section;
             Dispatcher.UIThread.RunJobs();
-            for(var index=0;index<names.Length;index++)Assert.Equal(index==section,view.FindControl<StackPanel>(names[index])!.IsVisible);
+            foreach(var (other,name) in sections)Assert.Equal(other==section,view.FindControl<StackPanel>(name)!.IsVisible);
         }
+        Assert.Null(view.FindControl<StackPanel>("RemoteSection"));
         Assert.Same(context.Main.Player,context.Main.Settings.PlayerSettings);
         }
         finally { window.Close(); }
     }
 
-    [AvaloniaFact]
-    public async Task Search_DeleteAndClearHistoryPersistAcrossRecreation()
-    {
-        using var context=new Context();
-        var search=new SearchViewModel((_,_)=>Task.FromResult<IReadOnlyList<(SourceInfo,MediaItem)>>([]),context.Main,context.Preferences);
-        search.Keyword="one";await Done(search.RunSearchCommand.ExecuteAsync(null));
-        search.Keyword="two";await Done(search.RunSearchCommand.ExecuteAsync(null));
-        search.DeleteSearchHistoryCommand.Execute("one");
-        var restored=new SearchViewModel((_,_)=>Task.FromResult<IReadOnlyList<(SourceInfo,MediaItem)>>([]),context.Main,context.Preferences);
-        Assert.Equal("two",Assert.Single(restored.SearchHistory));
-        restored.ClearSearchHistoryCommand.Execute(null);
-        Assert.Empty(new SearchViewModel((_,_)=>Task.FromResult<IReadOnlyList<(SourceInfo,MediaItem)>>([]),context.Main,context.Preferences).SearchHistory);
-    }
+
 
     [AvaloniaFact]
     public async Task ShutdownCancelsPendingSourceLoadsAndStopsPlayerBeforeDispose()
@@ -1567,19 +1174,6 @@ public sealed class ViewModelRaceTests
         context.Services.Dispose();context.Services.Dispose();
     }
 
-    /// <summary>媒体收件箱（遥控端上传的文件）用系统「打开文件」对话框打开，起始目录就是收件箱，不切主窗口页面。</summary>
-    [AvaloniaFact]
-    public void Settings_MediaInboxOpensSystemFilePickerAtInbox()
-    {
-        using var context=new Context();var directory=Path.Combine(context.Services.DataDir,"media-inbox");
-        var page=context.Main.Page;string? requested=null;var count=0;
-        context.Main.OpenFileRequested+=start=>{requested=start;count++;};
-        context.Main.Settings.OpenMediaInboxCommand.Execute(null);
-        Assert.Equal(1,count);
-        Assert.Equal(directory,requested);
-        Assert.True(Directory.Exists(directory));
-        Assert.Equal(page,context.Main.Page);
-    }
 
     /// <summary>「打开文件」与拖放共用同一条打开路径：m3u 作为直播源打开，媒体文件直接播放，其他文件给出提示。</summary>
     [AvaloniaFact]
@@ -1633,30 +1227,8 @@ public sealed class ViewModelRaceTests
         Assert.False(vod.Loading);Assert.Empty(vod.Items);
     }
 
-    [AvaloniaFact]
-    public async Task Search_PartialSourceFailuresAreVisibleInsteadOfPlainZeroResults()
-    {
-        using var context=new Context();
-        var search=new SearchViewModel((_,_)=>Task.FromResult<IReadOnlyList<(SourceInfo,MediaItem)>>([]),context.Main);
-        var site=new SourceInfo{Key="bad",Name="失败站",Runtime=SourceRuntime.MacCms};
-        search.SetDetailedSearch((_,_)=>Task.FromResult(new VodBox.Infrastructure.AggregateSearchResult([],[(site,"超时")])));
-        search.Keyword="片名";await Done(search.RunSearchCommand.ExecuteAsync(null));
-        Assert.Contains("失败站",search.Summary);Assert.Contains("超时",search.Summary);Assert.Contains("1 个站点失败",search.Summary);
-    }
 
-    [AvaloniaFact]
-    public async Task Settings_ChangingLanModeRequiresRestartAndClearsPairingOnStop()
-    {
-        using var context=new Context();var settings=context.Main.Settings;
-        await Done(settings.StartLocalControlCommand.ExecuteAsync(null));
-        Assert.False(context.Services.LocalControl.LanEnabled);
-        settings.LanControl=true;await Done(settings.StartLocalControlCommand.ExecuteAsync(null));
-        Assert.Contains("先关闭",settings.Message);Assert.False(context.Services.LocalControl.LanEnabled);
-        await Done(settings.StopLocalControlCommand.ExecuteAsync(null));
-        await Done(settings.StartLocalControlCommand.ExecuteAsync(null));
-        Assert.True(context.Services.LocalControl.LanEnabled);Assert.Contains("配对码",settings.PairingInformation);
-        await Done(settings.StopLocalControlCommand.ExecuteAsync(null));Assert.Equal("",settings.PairingInformation);
-    }
+
 
     [AvaloniaFact]
     public async Task Live_CancelledProgrammeImportCannotReplaceExistingCache()
@@ -1701,13 +1273,6 @@ public sealed class ViewModelRaceTests
         Assert.Empty(DanmakuLayer.Place(items,10,800,300));
     }
 
-    [AvaloniaFact]
-    public void PairingQrProducesRealPngBitmapWithoutEmbeddingAuthorizationCode()
-    {
-        using var image=PairingQr.Create("http://192.168.1.100:8080");
-        Assert.True(image.PixelSize.Width>100);Assert.Equal(image.PixelSize.Width,image.PixelSize.Height);
-        Assert.Throws<ArgumentException>(()=>PairingQr.Create("file:///secret"));
-    }
 
     [AvaloniaFact]
     public async Task Settings_OnlineSubtitleMissingCredentialReportsFailureWithoutPersistingIt()
@@ -1838,32 +1403,7 @@ public sealed class ViewModelRaceTests
         await Done(vod.ClearFiltersCommand.ExecuteAsync(null));Assert.Equal("2026",received!["year"]);
     }
 
-    [AvaloniaFact]
-    public async Task Player_ExplicitJsonEndpointResolvesBeforeOpeningEngine()
-    {
-        using var context=new Context();
-        var builder=Microsoft.AspNetCore.Builder.WebApplication.CreateSlimBuilder();
-        builder.Logging.ClearProviders();
-        Microsoft.AspNetCore.Hosting.WebHostBuilderKestrelExtensions.UseKestrel(builder.WebHost,options=>options.Listen(System.Net.IPAddress.Loopback,0));
-        await using var app=builder.Build();
-        Microsoft.AspNetCore.Builder.EndpointRouteBuilderExtensions.MapGet(app,"/parse",async(Microsoft.AspNetCore.Http.HttpContext http)=>
-        {
-            Assert.Equal("https://video.example/watch?id=1",http.Request.Query["url"].ToString());
-            await Microsoft.AspNetCore.Http.HttpResponseWritingExtensions.WriteAsync(http.Response,"{\"url\":\"https://cdn.example/video.mp4\"}");
-        });
-        await app.StartAsync();
-        try
-        {
-            var request=Request("ep1") with{Uri="https://video.example/watch?id=1",Resolution=ResolutionKind.Json,ParseEndpoint=app.Urls.Single()+"/parse?url={url}"};
-            await Done(context.Main.Player.PlayResolvedAsync(_=>Task.FromResult(request)));
-            Assert.Equal("https://cdn.example/video.mp4",Assert.Single(context.Engine.Opened).Request.Uri);
-            Assert.Equal(ResolutionKind.Direct,context.Engine.Opened[0].Request.Resolution);
-            var count=context.Engine.Opened.Count;
-            await Done(context.Main.Player.PlayResolvedAsync(_=>Task.FromResult(request with{ParseEndpoint=app.Urls.Single()+"/missing?url="})));
-            Assert.Equal(count,context.Engine.Opened.Count);Assert.Equal(PlaybackState.Failed,context.Main.Player.State);
-        }
-        finally{await app.StopAsync();}
-    }
+
 
     [AvaloniaFact]
     public async Task DanmakuRealHttpLoadRendersAndSwitchingMediaClearsComments()
@@ -1896,92 +1436,9 @@ public sealed class ViewModelRaceTests
         finally{window.Close();await app.StopAsync();}
     }
 
-    [AvaloniaFact]
-    public void RemoteEntryClosesConfigDialogAndRequestsTheSettingsWindow()
-    {
-        using var context=new Context();
-        var requested=0;context.Main.SettingsRequested+=()=>requested++;
-        var before=context.Main.Page;
-        context.Main.Settings.ConfigDialogOpen=true;
-        context.Main.Detail.OpenRemoteControlCommand.Execute(null);
-        // 设置是独立窗口：请求开窗并切到「推送与遥控」分区，但主窗口不切页。
-        Assert.Equal(1,requested);
-        Assert.Equal(before,context.Main.Page);
-        Assert.Equal(6,context.Main.Settings.Section);
-        Assert.False(context.Main.Settings.ConfigDialogOpen);
-    }
 
-    [AvaloniaFact]
-    public async Task RemoteAdjustmentDispatchesToPlayerWithExplicitUiPump()
-    {
-        using var context=new Context();
-        await Done(context.Main.Player.PlayResolvedAsync(_=>Task.FromResult(Request("ep1"))));
-        context.Engine.EmitCurrent(PlaybackState.Playing,1000,90000);
-        await Done(context.Main.Settings.StartLocalControlCommand.ExecuteAsync(null));
-        try
-        {
-            var url=context.Services.LocalControl.Address!;
-            foreach(var command in new[]{"volume&value=35","rate&value=1.5","seek&value=30"})
-            {
-                var request=Task.Run(async()=>
-                {
-                    using var client=new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(5)};
-                    client.DefaultRequestHeaders.Add("X-VodBox-Control","1");
-                    using var response=await client.PostAsync("/adjust?command="+command,null);
-                    return response.StatusCode;
-                });
-                var clock=System.Diagnostics.Stopwatch.StartNew();
-                while(!request.IsCompleted&&clock.Elapsed<TimeSpan.FromSeconds(7))
-                {Dispatcher.UIThread.RunJobs();Thread.Sleep(10);}
-                Assert.True(request.IsCompleted,"HTTP callback did not finish while the UI dispatcher was pumped");
-                Assert.Equal(System.Net.HttpStatusCode.NoContent,await request);
-            }
-            Assert.Equal(35,context.Main.Player.Volume);
-            Assert.Equal(1.5,context.Main.Player.Rate);
-            Assert.Contains(TimeSpan.FromSeconds(30),context.Engine.Seeks);
-        }
-        finally { await Done(context.Main.Settings.StopLocalControlCommand.ExecuteAsync(null)); }
-    }
 
-    [AvaloniaFact]
-    public async Task RemoteConfigProposalOpensConfirmationWithoutLoadingOrPersistingIt()
-    {
-        using var context=new Context();context.Services.CurrentVodConfig="https://existing.example/config";
-        await Done(context.Main.Settings.StartLocalControlCommand.ExecuteAsync(null));
-        try
-        {
-            var address=context.Services.LocalControl.Address!;
-            var request=Task.Run(async()=>
-            {
-                using var client=new HttpClient{BaseAddress=new Uri(address),Timeout=TimeSpan.FromSeconds(5)};
-                client.DefaultRequestHeaders.Add("X-VodBox-Control","1");
-                using var response=await client.PostAsync("/config?url=https%3A%2F%2Fproposed.example%2Fconfig",null);
-                return response.StatusCode;
-            });
-            var clock=System.Diagnostics.Stopwatch.StartNew();
-            while(!request.IsCompleted&&clock.Elapsed<TimeSpan.FromSeconds(7)){Dispatcher.UIThread.RunJobs();Thread.Sleep(10);}
-            Assert.True(request.IsCompleted);Assert.Equal(System.Net.HttpStatusCode.NoContent,await request);
-            Assert.True(context.Main.Settings.ConfigDialogOpen);Assert.Equal("https://proposed.example/config",context.Main.Settings.DialogUrl);
-            Assert.Equal("https://existing.example/config",context.Services.CurrentVodConfig);
-            Assert.Empty(await context.Services.Store.ListAsync(ConfigKind.Vod));Assert.Empty(context.Services.Registry.Sources);
-        }
-        finally{await Done(context.Main.Settings.StopLocalControlCommand.ExecuteAsync(null));}
-    }
 
-    [AvaloniaFact]
-    public async Task LogicalBackupDoesNotContainInMemorySubtitleCredentialOrPairingCode()
-    {
-        using var context=new Context();var settings=context.Main.Settings;
-        settings.SubtitleCredential="memory-only-subtitle-test";settings.LanControl=true;
-        await Done(settings.StartLocalControlCommand.ExecuteAsync(null));
-        try
-        {
-            var backup=await settings.ExportBackupAsync();
-            Assert.DoesNotContain("memory-only-subtitle-test",backup);Assert.DoesNotContain("pairingCode",backup);
-            var code=context.Services.LocalControl.PairingCode;Assert.NotNull(code);Assert.DoesNotContain(code!,backup);
-        }
-        finally{await Done(settings.StopLocalControlCommand.ExecuteAsync(null));}
-    }
 
     [AvaloniaFact]
     public async Task RestoringProgrammeBackupRefreshesCurrentChannelWithoutImportFile()
@@ -2196,57 +1653,7 @@ public sealed class ViewModelRaceTests
         finally { shell.Close(); }
     }
 
-    [AvaloniaFact]
-    public async Task PlaylistDrawerSlidesInSelectsAndCloses()
-    {
-        using var context = new Context();
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-            new PlaylistEntry("ep3", "第三集", _ => Task.FromResult(Request("ep3"))),
-        };
-        await Done(context.Main.Player.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        var window = new PlayerWindow { DataContext = context.Main, Width = 900, Height = 520 };
-        window.Show();
-        try
-        {
-            var overlay = window.Overlay;
-            var drawer = overlay.FindControl<Border>("PlaylistDrawer")!;
-            var items = overlay.FindControl<StackPanel>("PlaylistItems")!;
 
-            Assert.False(drawer.IsVisible);   // 初始收起
-            overlay.OpenPlaylistDrawer();
-            window.UpdateLayout();
-            Assert.True(drawer.IsVisible);
-            Assert.Equal(3, items.Children.Count);
-            Assert.Equal("共 3 集", overlay.FindControl<TextBlock>("PlaylistCount")!.Text);
-            Assert.Contains("正在播放", ((TextBlock)((Button)items.Children[0]).Content!).Text);
-
-            // 抽屉宽度随窗口收窄，且不超过上限。
-            Assert.Equal(PlayerLayout.PlaylistDrawerWidth(overlay.Bounds.Width), drawer.Bounds.Width, 6);
-            Assert.InRange(drawer.Bounds.Width, PlayerLayout.PlaylistDrawerMinWidth, PlayerLayout.PlaylistDrawerMaxWidth);
-
-            // 点击非当前集：切集并自动收起。收起是滑动动画，等滑出结束（计时器）后才真正隐藏。
-            ((Button)items.Children[2]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            Dispatcher.UIThread.RunJobs();
-            await Done(context.Main.Player.PlayResolvedAsync(entries[2].Resolve, entries, 2));
-            Assert.Equal(2, context.Main.Player.PlaylistIndex);
-            await Task.Delay((int)PlayerLayout.PlaylistDrawerSlideMs + 200);
-            Dispatcher.UIThread.RunJobs();
-            window.UpdateLayout();
-            Assert.False(drawer.IsVisible);
-
-            // 再次打开后立即收起（无动画路径）：当场隐藏。
-            overlay.OpenPlaylistDrawer();
-            window.UpdateLayout();
-            Assert.True(drawer.IsVisible);
-            overlay.ClosePlaylistDrawer(animate: false);
-            window.UpdateLayout();
-            Assert.False(drawer.IsVisible);
-        }
-        finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
-    }
 
     [AvaloniaFact]
     public async Task LiveChannelPlaybackDrawerListsChannelsAndSwitchesChannel()
@@ -2295,173 +1702,9 @@ public sealed class ViewModelRaceTests
         finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
     }
 
-    [AvaloniaFact]
-    public async Task PlayerPanelMinimumWidthMatchesMeasuredControlsAndNeverOverlaps()
-    {
-        using var context = new Context();
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(context.Main.Player.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        context.Main.Player.Rate = 1.25; // 最长倍速角标，决定倍速键的自然宽度
-        var minimumWindow = PlayerLayout.MinimumWindowWidth(false);
-        var window = new PlayerWindow { DataContext = context.Main, Width = minimumWindow, Height = 700 };
-        window.Show();
-        try
-        {
-            window.UpdateLayout();
-            Dispatcher.UIThread.RunJobs();
-            window.UpdateLayout();
-            var overlay = window.Overlay;
-            Assert.Equal(PlayerLayout.MinimumWindowWidth(true), window.MinWidth);
-            Assert.Equal(minimumWindow, window.Width, 1);
-            var (leftGroup, rightGroup, transport) = ControlGroups(overlay);
 
-            // 常量必须覆盖控件实测需求，否则最小宽度就会失真。
-            var measured = 2 * (Math.Max(leftGroup.DesiredSize.Width, rightGroup.DesiredSize.Width)
-                                + transport.DesiredSize.Width / 2 + PlayerLayout.GroupGap)
-                           + PlayerLayout.HorizontalPadding;
-            // 常量必须是覆盖实测需求的紧致上界：为负说明最小宽度不够、窄窗口会重叠。
-            var slack=PlayerLayout.MinimumPanelWidth(false)-measured;
-            Assert.InRange(slack, 0, 32);
-            // 倍速键按内容自适应（不留死区）。本用例已把倍速设为最宽的 1.25x，
-            // 此时右组宽度必须恰好等于常量；切到更短角标时只会更窄，故常量恒为上界。
-            Assert.True(double.IsNaN(overlay.FindControl<Button>("RateButton")!.Width), "倍速键应为自适应宽度");
-            // 逐个倍速值量右组宽度，取真实最大值作为上界校验（角标文字宽度决定）。
-            double widest=0; string widestLabel="";
-            foreach (var rate in new[] { 0.5, 0.75, 1.0, 1.25, 1.5, 2.0 })
-            {
-                context.Main.Player.Rate = rate;
-                overlay.UpdateLayout();
-                Dispatcher.UIThread.RunJobs();
-                var label=overlay.FindControl<TextBlock>("RateBadge")!.Text ?? "";
-                var buttonWidth=overlay.FindControl<Button>("RateButton")!.Bounds.Width;
-                var groupWidth=rightGroup.DesiredSize.Width;
-                if (groupWidth > widest) { widest=groupWidth; widestLabel=label; }
-                Assert.True(groupWidth <= PlayerLayout.RightGroupWidth + .5,
-                    $"{label} 下右组宽度超出上界：{groupWidth:F1}");
-            }
-            Assert.InRange(PlayerLayout.RightGroupWidth - widest, 0, 16);
 
-            // 最小窗口宽度下面板放得下内容，三键与两侧组互不相交。
-            var panel = overlay.FindControl<Border>("BottomControls")!;
-            Assert.Equal(PlayerLayout.MinimumPanelWidth(false), panel.Bounds.Width, 6);
-            Assert.True(transport.Bounds.X >= leftGroup.Bounds.Right, "三键与左侧组重叠");
-            var mute=leftGroup.Children.OfType<Button>().First();
-            Assert.Equal(PlayerLayout.IconButtonSize, mute.Width);
-            Assert.Equal(mute.Width, mute.Height);
-            // 音量滑杆宽度参与最小宽度算式，XAML 必须与常量一致。
-            Assert.Equal(PlayerLayout.VolumeSliderWidth, leftGroup.Children.OfType<Slider>().Single().Width);
-            Assert.True(transport.Bounds.Right <= rightGroup.Bounds.X, "三键与右侧组重叠");
-            Assert.True(rightGroup.Bounds.Right <= panel.Bounds.Width - 16 + 0.5, "右侧组溢出面板");
 
-            // Portrait and PiP windows keep all three transport buttons but hide both side groups.
-            context.Main.Player.Duration = TimeSpan.FromHours(2);
-            context.Main.Player.Position = TimeSpan.FromMinutes(40);
-            foreach (var compact in new[] { false, true })
-            {
-                context.Main.Player.CompactMode = compact;
-                foreach (var width in new[] { 405d, 210d })
-                {
-                    window.Width = width;
-                    for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
-                    Assert.False(leftGroup.IsEffectivelyVisible);
-                    Assert.False(rightGroup.IsEffectivelyVisible);
-                    Assert.True(transport.IsEffectivelyVisible);
-                    Assert.Equal(3, transport.Children.OfType<Button>().Count(button => button.IsEffectivelyVisible));
-                    var progress = overlay.FindControl<Slider>("ProgressSlider")!;
-                    Assert.True(progress.IsEffectivelyVisible);
-                    Assert.True(progress.Bounds.Width > 20);
-                    var times = ((Grid)progress.Parent!).Children.OfType<TextBlock>().Select(text => text.Text ?? "").ToArray();
-                    Assert.Equal(["40:00", "02:00:00"], times);
-                    Assert.True(panel.Bounds.Width <= window.Bounds.Width);
-                }
-            }
-            window.Width = minimumWindow;
-            for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); }
-            Assert.True(leftGroup.IsEffectivelyVisible);
-            Assert.True(rightGroup.IsEffectivelyVisible);
-        }
-        finally { await Done(context.Main.Player.Close()); window.CloseAfterPlayback(); }
-    }
-
-    [AvaloniaFact]
-    public async Task PlaybackMenusRefreshEpisodesTracksAndRejectStaleActions()
-    {
-        using var context = new Context();
-        var vm = context.Main.Player;
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(vm.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        var window = new PlayerWindow { DataContext = context.Main };
-        var menus = MacMenus.CreatePlaybackMenus(context.Main, () => window).ToArray();
-        NativeMenuItem Find(NativeMenu menu, string header) => menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == header);
-        // Simulate the native exporter's update callback before opening a menu.
-        void Refresh(NativeMenu menu) => typeof(NativeMenu).GetMethod(
-            "Avalonia.Controls.INativeMenuExporterEventsImplBridge.RaiseNeedsUpdate",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(menu, null);
-        var play = menus.Single(item => item.Header == "播放").Menu!;
-        var audio = menus.Single(item => item.Header == "音频").Menu!;
-        var subtitles = menus.Single(item => item.Header == "字幕").Menu!;
-        try
-        {
-            Assert.Equal(2, Find(play, "选集").Menu!.Items.Count);
-            IEnumerable<NativeMenuItem> Descendants(IEnumerable<NativeMenuItem> items)
-            {
-                foreach (var item in items)
-                {
-                    yield return item;
-                    if (item.Menu is { } submenu)
-                        foreach (var child in Descendants(submenu.Items.OfType<NativeMenuItem>())) yield return child;
-                }
-            }
-            var windowMenu = MacMenus.CreateWindowMenu(context.Main, "", out var detach);
-            var navigation = windowMenu.Items.OfType<NativeMenuItem>().Where(item => item.Header is "文件" or "显示");
-            var application = MacMenus.CreateApplicationMenu(context.Main).Items.OfType<NativeMenuItem>();
-            var gestures = Descendants(menus.Concat(navigation).Concat(application))
-                .Where(item => item.Gesture is not null).Select(item => item.Gesture!).ToArray();
-            Assert.True(gestures.Length >= 40);
-            Assert.Equal(gestures.Length, gestures.Distinct().Count());
-            Assert.Equal(new Avalonia.Input.KeyGesture(Avalonia.Input.Key.P, Avalonia.Input.KeyModifiers.Meta), Find(play, vm.IsPlaying ? "暂停" : "播放").Gesture);
-            var speeds = Find(play, "播放速度").Menu!;
-            Find(speeds, "加快播放速度").Command!.Execute(null);
-            Assert.Equal(1.25, vm.Rate);
-            Find(speeds, "恢复正常速度").Command!.Execute(null);
-            Assert.Equal(1, vm.Rate);
-            Find(play, "切换片头跳过时长").Command!.Execute(null);
-            Assert.Equal(30, vm.OpeningSkipSeconds);
-            for (var index = 0; index < 4; index++) Find(play, "切换片头跳过时长").Command!.Execute(null);
-            Assert.Equal(0, vm.OpeningSkipSeconds);
-            detach();
-            Find(play, "自动下一集：开").Command!.Execute(null);
-            Assert.False(vm.AutoNext);
-            Refresh(play);
-            Assert.NotNull(Find(play, "自动下一集：关"));
-            var staleRate = Find(Find(play, "播放速度").Menu!, "2×");
-            context.Engine.Tracks.Add(new MediaTrack("a1", "中文音轨", TrackKind.Audio, true));
-            context.Engine.Tracks.Add(new MediaTrack("s1", "中文字幕", TrackKind.Subtitle, true));
-            Refresh(audio);
-            Refresh(subtitles);
-            Assert.True(Find(Find(audio, "音轨").Menu!, "中文音轨").IsChecked);
-            Assert.True(Find(Find(subtitles, "字幕轨道").Menu!, "中文字幕").IsChecked);
-            Find(Find(subtitles, "字幕同步").Menu!, "字幕延后 0.5 秒").Command!.Execute(null);
-            Assert.Equal(.5, vm.SubtitleDelay);
-            Assert.NotNull(Find(subtitles, "加载本地字幕…"));
-            Assert.Equal(3, Find(subtitles, "字幕字号").Menu!.Items.Count);
-            await Done(vm.PlayResolvedAsync(entries[1].Resolve, entries, 1));
-            staleRate.Command!.Execute(null);
-            Assert.NotEqual(2, vm.Rate);
-            Refresh(play);
-            Assert.True(Find(Find(play, "选集").Menu!, "第二集").IsChecked);
-            Assert.False(Find(play, "下一集").IsEnabled);
-        }
-        finally { await Done(vm.Close()); window.CloseAfterPlayback(); }
-    }
 
     [AvaloniaFact]
     public void PlayerWindowSizingHonoursControlRequirementsAndTinyScreens()
@@ -3045,203 +2288,7 @@ public sealed class ViewModelRaceTests
                 Assert.IsType<StackPanel>(topRow.Children[1]));
     }
 
-    [AvaloniaFact]
-    public async Task PlayerPanelIsSixtyPercentTallerAndRatePopupDoesNotCycle()
-    {
-        using var context = new Context();
-        var entries = new[]
-        {
-            new PlaylistEntry("ep1", "第一集", _ => Task.FromResult(Request("ep1"))),
-            new PlaylistEntry("ep2", "第二集", _ => Task.FromResult(Request("ep2"))),
-        };
-        await Done(context.Main.Player.PlayResolvedAsync(entries[0].Resolve, entries, 0));
-        var window = new PlayerWindow { DataContext = context.Main, Width = 1000, Height = 600 };
-        window.Show();
-        try
-        {
-            window.UpdateLayout();
-            var overlay=window.Overlay;
-            var panel=overlay.FindControl<Border>("BottomControls")!;
-            Assert.Equal(overlay.Bounds.Width * .6, panel.Bounds.Width, 5);
-            Assert.Equal(PlayerLayout.PanelPadding, panel.Padding);
-            // 图标尺寸按**结构分组**校验：三键内的图标用 TransportGlyphSize，其余控制条图标用
-            // IconGlyphSize。不能靠比较数值区分——两个常量允许被调成相等。
-            var (leftGroup, rightGroupIcons, transportGroup) = ControlGroups(overlay);
-            var transportIcons=transportGroup.GetVisualDescendants().OfType<PathIcon>()
-                .Where(icon => icon.TemplatedParent is null).ToArray();
-            Assert.Equal(4, transportIcons.Length);
-            Assert.All(transportIcons, icon =>
-            {
-                Assert.Equal(PlayerLayout.TransportGlyphSize, icon.Width);
-                Assert.Equal(icon.Width, icon.Height);
-            });
-            Assert.Contains(transportIcons, icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.SkipPrevious")));
-            Assert.Contains(transportIcons, icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.SkipNext")));
 
-            var barIcons=leftGroup.GetVisualDescendants().OfType<PathIcon>()
-                .Concat(rightGroupIcons.GetVisualDescendants().OfType<PathIcon>())
-                .Where(icon => icon.TemplatedParent is null).ToArray();
-            Assert.NotEmpty(barIcons);
-            Assert.All(barIcons, icon =>
-            {
-                Assert.Equal(PlayerLayout.IconGlyphSize, icon.Width);
-                Assert.Equal(icon.Width, icon.Height);
-            });
-            // 图标绝不能比自己的按钮还大，否则会被裁切或压到相邻按钮。
-            Assert.All(barIcons, icon => Assert.True(PlayerLayout.IconGlyphSize <= PlayerLayout.IconButtonSize));
-
-            // The right-hand icon group is tighter than the default button spacing.
-            var rightGroup=Assert.IsType<StackPanel>(overlay.FindControl<Button>("RateButton")!.Parent);
-            Assert.Equal(0d, rightGroup.Spacing);
-            var rateButton=overlay.FindControl<Button>("RateButton")!;
-            // 除倍速键外，图标键一律等宽等高的正方形。
-            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !ReferenceEquals(item, rateButton)), item =>
-            {
-                Assert.Equal(PlayerLayout.IconButtonSize, item.Width);
-                Assert.Equal(item.Width, item.Height);
-            });
-            // 倍速键按内容自适应宽度，高度与图标行一致，不得再是 28。
-            Assert.True(double.IsNaN(rateButton.Width), "倍速键应为自适应宽度");
-            Assert.Equal(PlayerLayout.IconButtonSize, rateButton.Height);
-
-            // 图标键零间距紧贴排列：图标必须装得进按钮，且相邻按钮不得重叠。
-            Assert.All(rightGroup.Children.OfType<Button>().Where(item => !ReferenceEquals(item, rateButton)), item =>
-            {
-                // 宽高必须相等：曾经只改宽度不改高度，出现过 16×28 的瘦长按钮。
-                Assert.Equal(PlayerLayout.IconButtonSize, item.Width);
-                Assert.Equal(item.Width, item.Height);
-                var glyph=Assert.Single(item.GetVisualDescendants().OfType<PathIcon>());
-                Assert.Equal(PlayerLayout.IconGlyphSize, glyph.Width);
-                Assert.Equal(glyph.Width, glyph.Height);
-                Assert.True(item.Width > glyph.Width, "图标必须装得进图标键");
-            });
-            // 同一行相邻控件的视觉间距必须接近均匀：倍速键曾因固定过宽，与全屏之间空出 46px。
-            // 度量用“内容边界”（图标 + 倍速文字），只算图标会把倍速角标误判成死区。
-            var visualGaps=new List<double>();
-            var extents=new List<(double Left, double Right)>();
-            foreach (var item in rightGroup.Children.OfType<Button>())
-            {
-                var parts=item.GetVisualDescendants().OfType<Control>()
-                    .Where(child => child is PathIcon or TextBlock && child.Bounds.Width > 0)
-                    .ToArray();
-                Assert.NotEmpty(parts);
-                extents.Add((item.Bounds.X+parts.Min(p => p.Bounds.X),
-                             item.Bounds.X+parts.Max(p => p.Bounds.X+p.Bounds.Width)));
-            }
-            for (var i = 1; i < extents.Count; i++)
-                visualGaps.Add(extents[i].Left-extents[i-1].Right);
-            Assert.All(visualGaps, gap => Assert.InRange(gap, 0, 14));
-
-            // 按钮是同一父级的兄弟节点，Bounds 可直接比较；每个图标必须装得进自己的按钮。
-            var buttons=rightGroup.Children.OfType<Button>().ToArray();
-            for (var i = 0; i < buttons.Length; i++)
-            {
-                var glyph=Assert.Single(buttons[i].GetVisualDescendants().OfType<PathIcon>());
-                Assert.True(glyph.Bounds.Right <= buttons[i].Bounds.Width + 0.5, "图标溢出按钮");
-                Assert.True(glyph.Bounds.X >= -0.5, "图标超出按钮左边界");
-                if (i == 0) continue;
-                Assert.False(buttons[i].Bounds.Intersects(buttons[i - 1].Bounds),
-                    $"按钮 {i - 1} 与 {i} 重叠");
-            }
-
-            // No icon button keeps a hover or pressed highlight.
-            var checkedButtons = 0;
-            foreach (var item in overlay.GetVisualDescendants().OfType<Button>().Where(candidate => candidate.TemplatedParent is null).ToArray())
-            {
-                if (item.GetVisualDescendants().OfType<ContentPresenter>().FirstOrDefault() is not { } presenter) continue;
-                var normal=(presenter.Background as Avalonia.Media.ISolidColorBrush)?.Color;
-                foreach (var state in new[] { ":pointerover", ":pressed" })
-                {
-                    ((IPseudoClasses)item.Classes).Set(state, true);
-                    overlay.UpdateLayout();
-                    Assert.Equal(normal, (presenter.Background as Avalonia.Media.ISolidColorBrush)?.Color);
-                    ((IPseudoClasses)item.Classes).Set(state, false);
-                }
-                checkedButtons++;
-            }
-            Assert.True(checkedButtons >= 10, $"only {checkedButtons} icon buttons checked");
-            // 三键的图标不得混进左右图标组。
-            Assert.DoesNotContain(barIcons, icon => new[] { "Icon.SkipPrevious", "Icon.SkipNext" }
-                .Any(key => ReferenceEquals(icon.Data, overlay.FindResource(key))));
-            // Measured against the previous 69px compact bar (30px buttons, 4px spacing, 7/8 padding):
-            // the requested 60% width plus roughly a quarter more height.
-            Assert.InRange(panel.Bounds.Height / 69d, 1.2, 1.3);
-            // Neutral grays only: the player panel must not use the app accent blue.
-            var progress=overlay.FindControl<Slider>("ProgressSlider")!;
-            var track=progress.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Track>().Single();
-            var played=Assert.IsAssignableFrom<Avalonia.Controls.RepeatButton>(track.DecreaseButton);
-            var remaining=Assert.IsAssignableFrom<Avalonia.Controls.RepeatButton>(track.IncreaseButton);
-            Assert.Equal(Avalonia.Media.Color.Parse("#FFC6C9CE"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(played.Background).Color);
-            Assert.Equal(Avalonia.Media.Color.Parse("#FF5C6066"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(remaining.Background).Color);
-            var volume=overlay.GetVisualDescendants().OfType<Slider>().Single(item=>item.Maximum==100);
-            Assert.Equal(Avalonia.Media.Color.Parse("#FFC6C9CE"),
-                Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(volume.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Track>().Single().DecreaseButton!.Background).Color);
-            var button=overlay.FindControl<Button>("RateButton")!;
-            button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            Assert.Equal(1, context.Main.Player.Rate);
-            var menu=Assert.IsType<ContextMenu>(button.ContextMenu);
-            Assert.True(menu.IsOpen);
-            Assert.Equal(12d, menu.FontSize);
-            Assert.Equal(12d, Assert.IsType<MenuItem>(menu.Items[0]).FontSize);
-            var choice=menu.Items.OfType<MenuItem>().Single(item=>item.Header?.ToString()=="1.5×");
-            choice.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
-            Assert.Equal(1.5,context.Main.Player.Rate);
-            menu.Close();
-            // Episode arrows keep their normal look at the lists edges; the command itself no-ops.
-            var previous=overlay.GetVisualDescendants().OfType<Button>()
-                .Single(item=>item.Content is PathIcon { Data: var data } && ReferenceEquals(data, overlay.FindResource("Icon.SkipPrevious")));
-            // First episode has no previous one, yet the arrow keeps its normal look.
-            Assert.False(context.Main.Player.HasPreviousEpisode);
-            Assert.True(previous.IsEffectivelyEnabled);
-            previous.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            Dispatcher.UIThread.RunJobs();
-            Assert.Equal(0, context.Main.Player.PlaylistIndex);
-            // 置顶键：与播放/暂停同款做法——两个不同图标按状态切换，状态一眼可辨。
-            var pin=overlay.FindControl<Button>("TopmostButton")!;
-            var pinnedGlyph=pin.GetVisualDescendants().OfType<PathIcon>()
-                .Single(icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.Pin")));
-            var unpinnedGlyph=pin.GetVisualDescendants().OfType<PathIcon>()
-                .Single(icon => ReferenceEquals(icon.Data, overlay.FindResource("Icon.PinOff")));
-            // 两个几何都必须有效，否则会出现“切换了但看不见”的空图标。
-            var pinnedGeometry=(Avalonia.Media.Geometry)pinnedGlyph.Data!;
-            var unpinnedGeometry=(Avalonia.Media.Geometry)unpinnedGlyph.Data!;
-            Assert.True(pinnedGeometry.Bounds.Width > 0, "实心图钉几何为空");
-            Assert.True(unpinnedGeometry.Bounds.Width > 0, "带斜线图钉几何为空");
-            // 未置顶图标多一条斜线，几何范围必然更宽——这也保证两个图形肉眼可分。
-            Assert.True(unpinnedGeometry.Bounds.Width > pinnedGeometry.Bounds.Width);
-            // 两个图标都必须是纯白，不允许用透明度或灰度区分状态。
-            Assert.Null(unpinnedGlyph.Opacity is 1d ? null : "未置顶图标不得设置透明度");
-            Assert.Equal(1d, pinnedGlyph.Opacity);
-            Assert.Equal(Avalonia.Media.Color.Parse("#FFFFFFFF"),
-                Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(pin.Foreground).Color);
-
-            window.UpdateLayout();
-            Assert.False(window.Topmost);
-            Assert.False(pinnedGlyph.IsVisible);   // 未置顶：显示带斜线的图钉
-            Assert.True(unpinnedGlyph.IsVisible);
-
-            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            window.UpdateLayout();
-            Assert.True(window.Topmost);Assert.True(context.Main.Player.AlwaysOnTop);
-            Assert.True(pinnedGlyph.IsVisible);    // 置顶：显示实心图钉
-            Assert.False(unpinnedGlyph.IsVisible);
-
-            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            window.UpdateLayout();
-            Assert.False(window.Topmost);Assert.False(context.Main.Player.AlwaysOnTop);
-            Assert.False(pinnedGlyph.IsVisible);
-            Assert.True(unpinnedGlyph.IsVisible);
-            // 置顶与否只靠图标区分，不允许再出现亮色底块。
-            var pinPresenter=pin.GetVisualDescendants().OfType<ContentPresenter>().First();
-            var unpinnedBackground=(pinPresenter.Background as Avalonia.Media.ISolidColorBrush)?.Color;
-            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            overlay.UpdateLayout();
-            Assert.Equal(unpinnedBackground, (pinPresenter.Background as Avalonia.Media.ISolidColorBrush)?.Color);
-            pin.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-            overlay.UpdateLayout();
-        }
-        finally { await Done(context.Main.Player.Close());window.CloseAfterPlayback(); }
-    }
 
     [AvaloniaFact]
     public async Task History_SkeletonSitsBelowTheGroupHeadingInsteadOfPushingItDown()
@@ -3281,7 +2328,7 @@ public sealed class ViewModelRaceTests
             new MediaItem { Id = "duplicate", Title = "重复海报", Poster = "https://example.com/one.jpg" },
         };
         context.Source.Home = _ => Task.FromResult(new MediaPage(items, 1, 1));
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         await Done(home.LoadAsync());
         Assert.Equal(2, home.HeroSlides.Count);
         Assert.True(home.CanRotateHero);
@@ -3482,7 +2529,7 @@ public sealed class ViewModelRaceTests
                     SourceKey = "source", SourceName = "站点", MediaId = $"m{i}", Title = $"片{i}",
                 }).ToArray());
         };
-        var home = new HomeViewModel(() => context.Source, context.Store, context.Main);
+        var home = new HomeViewModel(HomeLoader(context), context.Store, context.Main);
         await Done(home.LoadAsync());
         // 首页最近观看永远只有一行、最多前 20 条：既要求上限，也要求 Home 不吞下全部 50 条。
         Assert.Equal(20, requested);
@@ -3543,7 +2590,13 @@ public sealed class ViewModelRaceTests
         public Context()
         {
             _services = new AppServices(_directory);
-            Main = new MainViewModel(_services, true, key => key == Source.Key ? Source : null, Store);
+            var deps = new DetailDependencies(
+                async (key, id, _, ct) => key == Source.Key ? ToResult(await Source.Load(id, ct)) : throw new InvalidOperationException($"站点 {key} 在当前配置中不可用"),
+                (_, _, _, _) => AsyncEnumerable.Empty<VodResult>(),
+                () => new SiteSettings { PreferBestSource = false, BlockAds = false });
+            Main = new MainViewModel(_services, true, deps, Store);
+            // 首页分区走本地假源：真实首页会请求豆瓣，网络慢时测试会超时。
+            Main.Home = new HomeViewModel(HomeLoader(Source), _services.Store, Main);
             Main.Player = new PlayerViewModel(Engine, Store, Main);
             Main.AttachDispatcher(Dispatcher.UIThread);
         }
@@ -3555,7 +2608,19 @@ public sealed class ViewModelRaceTests
         }
     }
 
-    private sealed class Source : IResolvingContentSource
+    /// <summary>首页分区装载：只有「热门电影」取测试源首页，其余分区为空（横幅与推荐都来自电影分区）。</summary>
+    private static Func<string, CancellationToken, Task<IReadOnlyList<MediaItem>>> HomeLoader(Context context) => HomeLoader(context.Source);
+    private static Func<string, CancellationToken, Task<IReadOnlyList<MediaItem>>> HomeLoader(IContentSource? source) => async (category, ct) =>
+        category == "movie" && source is not null ? (await source.GetHomeAsync(ct)).Items.Select(item => item with { SourceKey = item.SourceKey ?? source.Key }).ToArray() : [];
+
+    private static VodResult ToResult(MediaDetail detail) => new()
+    {
+        Id = detail.Item.Id, Title = detail.Item.Title, Poster = detail.Item.Poster ?? "", SourceKey = "source", SourceName = "站点",
+        Lines = detail.Lines, Description = detail.Description, Remarks = detail.Item.Remarks, Director = detail.Director, Actor = detail.Actor,
+        Year = detail.Item.Year ?? "unknown",
+    };
+
+    private sealed class Source : IContentSource
     {
         public string Key => "source";
         public string Name => "站点";

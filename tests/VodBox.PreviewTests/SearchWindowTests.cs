@@ -37,11 +37,9 @@ public sealed class SearchWindowTests
     }
 
     private static MediaItem Item(string id) => new() { Id = id, Title = id, Poster = "https://example/" + id + ".jpg" };
-    private static SourceInfo Site(string key, string name) => new() { Key = key, Name = name, Runtime = SourceRuntime.MacCms };
-    private static IReadOnlyList<(SourceInfo Site, MediaItem Item)> Hit(string siteKey, string siteName, string id)
-        => [(Site(siteKey, siteName), Item(id))];
-    private static AggregateSearchResult Result(string siteKey, string siteName, string id, IReadOnlyList<(SourceInfo Site, string Error)>? failures = null)
-        => new(Hit(siteKey, siteName, id), failures ?? []);
+    /// <summary>单源单条的搜索结果（测试桩）。</summary>
+    internal sealed record SearchStub(string SiteKey, string SiteName, string Id);
+    private static SearchStub Result(string siteKey, string siteName, string id) => new(siteKey, siteName, id);
 
     private sealed class Fixture : IDisposable
     {
@@ -283,7 +281,7 @@ public sealed class SearchWindowTests
     {
         using var fixture = new Fixture();
         var service = new SearchWindowService(fixture.Main);
-        var late = Gate<AggregateSearchResult>();
+        var late = Gate<SearchStub>();
         fixture.Main.Search.SetDetailedSearch((query, _) => query == "旧"
             ? late.Task
             : Task.FromResult(Result("new", "新站", "新")));
@@ -318,7 +316,7 @@ public sealed class SearchWindowTests
     {
         using var fixture = new Fixture();
         var service = new SearchWindowService(fixture.Main);
-        var late = Gate<AggregateSearchResult>();
+        var late = Gate<SearchStub>();
         fixture.Main.Search.SetDetailedSearch((query, _) => query == "甲"
             ? late.Task
             : Task.FromResult(Result("b", "乙站", "b1")));
@@ -393,5 +391,23 @@ public sealed class SearchWindowTests
             Assert.Null(window.OpenSearchWindow);
         }
         finally { window.Close(); }
+    }
+}
+
+internal static class SearchStubExtensions
+{
+    /// <summary>把「一次性返回一个结果」的测试桩接到流式聚合搜索上。</summary>
+    public static void SetDetailedSearch(this SearchViewModel search, Func<string, CancellationToken, Task<SearchWindowTests.SearchStub>> run) =>
+        search.SetSearchStream((query, ct) => Stream(run(query, ct)), 1);
+
+    private static async IAsyncEnumerable<SourceSearchBatch> Stream(Task<SearchWindowTests.SearchStub> pending)
+    {
+        var stub = await pending;
+        var site = new ApiSite { Key = stub.SiteKey, Name = stub.SiteName, Api = "https://example/api" };
+        yield return new SourceSearchBatch(site, [new VodResult
+        {
+            Id = stub.Id, Title = stub.Id, Poster = "https://example/" + stub.Id + ".jpg", SourceKey = stub.SiteKey, SourceName = stub.SiteName,
+            Lines = [new PlaybackLine("l", "l", [new Episode("1", "1", "https://example/1.m3u8")])],
+        }]);
     }
 }

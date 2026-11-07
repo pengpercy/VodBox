@@ -147,43 +147,6 @@ jobs:
           # ctypes can only load the x64 libmpv into an x64 process: the system Python is universal.
           if [ "${{ matrix.rosetta }}" = "true" ]; then python="arch -x86_64 /usr/bin/python3"; fi
           $python build/verify_mpv_bundle.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
-      - uses: actions/cache@v6
-        if: steps.reuse.outputs.skip != 'true'
-        with:
-          path: artifacts/quickjs/${{ matrix.rid }}
-          key: quickjs-${{ matrix.rid }}-${{ hashFiles('build/quickjs/CMakeLists.txt', 'build/quickjs/bridge.c', 'build/quickjs/patch_msvc.py') }}
-      - name: Build and bundle pinned QuickJS bridge
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        run: python3 build/quickjs/build.py ${{ matrix.rid }} artifacts/publish/${{ matrix.rid }}
-      # The JIT host is the runner's arm64 dotnet, which cannot load an x64 bridge; under Rosetta the
-      # NativeAOT smoke below runs the shipped x64 code path instead.
-      - name: Verify bundled QuickJS and drpy runtime
-        if: steps.reuse.outputs.skip != 'true' && !matrix.rosetta
-        shell: bash
-        run: |
-          case "${{ matrix.rid }}" in
-            win-*) native=vodbox_quickjs.dll ;;
-            osx-*) native=libvodbox_quickjs.dylib ;;
-            *) native=libvodbox_quickjs.so ;;
-          esac
-          export VODBOX_QUICKJS_LIB="$PWD/artifacts/publish/${{ matrix.rid }}/$native"
-          dotnet run --project tests/VodBox.QuickJs.Smoke -c Release
-          dotnet run --project tests/VodBox.Drpy.Smoke -c Release -- --offline
-      - name: Verify NativeAOT script runtime
-        if: steps.reuse.outputs.skip != 'true'
-        shell: bash
-        run: |
-          case "${{ matrix.rid }}" in
-            win-*) native=vodbox_quickjs.dll; suffix=.exe ;;
-            osx-*) native=libvodbox_quickjs.dylib; suffix= ;;
-            *) native=libvodbox_quickjs.so; suffix= ;;
-          esac
-          export VODBOX_QUICKJS_LIB="$PWD/artifacts/publish/${{ matrix.rid }}/$native"
-          dotnet publish tests/VodBox.QuickJs.Smoke -c Release -r ${{ matrix.rid }} -p:PublishAot=true -o artifacts/smoke/quickjs
-          dotnet publish tests/VodBox.Drpy.Smoke -c Release -r ${{ matrix.rid }} -p:PublishAot=true -o artifacts/smoke/drpy
-          "artifacts/smoke/quickjs/VodBox.QuickJs.Smoke$suffix"
-          "artifacts/smoke/drpy/VodBox.Drpy.Smoke$suffix" --offline
       - name: Archive build
         if: steps.reuse.outputs.skip != 'true'
         shell: bash

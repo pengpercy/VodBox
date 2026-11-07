@@ -16,34 +16,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     private readonly SemaphoreSlim _applyConfiguration = new(1,1);
     private readonly SemaphoreSlim _subscriptionChanges = new(1, 1);
 
-    public ObservableCollection<SourceInfo> Sites { get; } = [];
     public ObservableCollection<ConfigHistoryEntry> LiveConfigHistory { get; } = [];
-    public void RefreshSites()
-    {
-        Sites.Clear();
-        foreach (var site in _services.Registry.Sources) Sites.Add(site);
-        _main.UpdateSourceName();
-    }
-
-    [RelayCommand] private void ToggleSiteHidden(SourceInfo site) { _services.Registry.SetHidden(site.Key, !_services.Registry.IsHidden(site.Key)); RefreshSites(); Message = _services.Registry.IsHidden(site.Key) ? "站点已隐藏" : "站点已显示"; }
-    [RelayCommand] private void ToggleSiteSearch(SourceInfo site) { _services.Registry.SetSearchable(site.Key, !_services.Registry.CanSearch(site)); Message = _services.Registry.CanSearch(site) ? "站点搜索已开启" : "站点搜索已关闭"; }
-    [RelayCommand] private void ToggleSiteChange(SourceInfo site){_services.Registry.SetChangeable(site.Key,!_services.Registry.CanChange(site));Message=_services.Registry.CanChange(site)?"站点换源已开启":"站点换源已关闭";}
-    [RelayCommand] private void ToggleSiteStar(SourceInfo site) { _services.Registry.SetStarred(site.Key, !_services.Registry.IsStarred(site.Key)); RefreshSites(); }
-    [RelayCommand] private void MoveSiteUp(SourceInfo site) { _services.Registry.MoveUp(site.Key); RefreshSites(); }
-    [RelayCommand] private void MoveSiteToTop(SourceInfo site) { _services.Registry.MoveToTop(site.Key); RefreshSites(); }
 
     [ObservableProperty] private string _vodConfigUrl = "";
     [ObservableProperty] private string _liveConfigUrl = "";
     [ObservableProperty] private string _epgSubscriptionUrl = "";
-    [ObservableProperty] private bool _lanControl;
-    [ObservableProperty] private string _pairingInformation="";
-    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _pairingQrImage;
-    public void ClearPairingPresentation()
-    {
-        var image=PairingQrImage;PairingQrImage=null;image?.Dispose();PairingInformation="";
-    }
-    [ObservableProperty] private bool _proxyPushedMedia;
-    partial void OnProxyPushedMediaChanged(bool value) => _services.Prefs.Set("push.use-proxy", value);
     [ObservableProperty] private bool _applying;
     [ObservableProperty] private string _message = "";
     [ObservableProperty] private string _updateMessage = "尚未检查更新";
@@ -166,7 +143,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     public bool IsSubtitleSection=>Section==3;
     public bool IsInterfaceSection=>Section==4;
     public bool IsDataSection=>Section==5;
-    public bool IsRemoteSection=>Section==6;
     public bool IsAboutSection=>Section==7;
     public bool IsDiagnosticsSection=>Section==8;
     public PlayerViewModel PlayerSettings=>_main.Player;
@@ -281,7 +257,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
 
     partial void OnSectionChanged(int value)
     {
-        foreach(var property in new[]{nameof(IsSourcesSection),nameof(IsPlaybackSection),nameof(IsDanmakuSection),nameof(IsSubtitleSection),nameof(IsInterfaceSection),nameof(IsDataSection),nameof(IsRemoteSection),nameof(IsAboutSection),nameof(IsDiagnosticsSection),nameof(PlayerSettings)}) OnPropertyChanged(property);
+        foreach(var property in new[]{nameof(IsSourcesSection),nameof(IsPlaybackSection),nameof(IsDanmakuSection),nameof(IsSubtitleSection),nameof(IsInterfaceSection),nameof(IsDataSection),nameof(IsAboutSection),nameof(IsDiagnosticsSection),nameof(PlayerSettings)}) OnPropertyChanged(property);
     }
 
     // ---- 更改点播配置弹窗（设计稿 ②） ----
@@ -296,10 +272,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
         AutoCheckUpdates = services.Prefs.GetBool("updates.auto-check", true);
         _autoInstallUpdates = services.Prefs.GetBool("updates.auto-install", false);
         _main = main;
-        VodConfigUrl = services.CurrentVodConfig ?? "";
+        VodConfigUrl = services.SourceConfig.Data.Subscription.Url;
+        InitializeSourceSettings();
         LiveConfigUrl = services.CurrentLiveConfig ?? "";
         EpgSubscriptionUrl = services.Prefs.GetString("live.epg-url");
-        _proxyPushedMedia = services.Prefs.GetBool("push.use-proxy", false);
         _themeIndex = Math.Clamp(services.Prefs.GetInt("ui.theme", 0), 0, 2);
         _linuxDrawnTitleBar = services.Prefs.GetBool(WindowChrome.LinuxDrawnTitleBarKey, true);
         _posterDensity=Math.Clamp(services.Prefs.GetInt("ui.poster-density",1),0,2);
@@ -312,33 +288,29 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
         };
     }
 
+    /// <summary>拉取订阅（LunaTV 配置订阅）：JSON 或 base58，合并进源配置，刷新首页/点播/直播。</summary>
     [RelayCommand]
     public async Task ApplyVodConfig()
     {
         if (string.IsNullOrWhiteSpace(VodConfigUrl))
         {
-            Message = "请输入 TVBox 配置地址";
+            Message = "请输入订阅地址（LunaTV / MoonTV config.json）";
             return;
         }
-        var requestedUrl=VodConfigUrl;
+        var requestedUrl = VodConfigUrl.Trim();
         await _applyConfiguration.WaitAsync();
         Applying = true;
-        Message = "正在加载配置…";
+        Message = "正在拉取订阅…";
         try
         {
-            await _services.Registry.LoadConfigAsync(requestedUrl);
-            _services.CurrentVodConfig = requestedUrl;
-            RefreshSites();
-            _main.UpdateSourceName();
+            var result = await _services.Subscription.SubscribeAsync(requestedUrl, SubscriptionAutoUpdate);
             await RecordSubscriptionAsync(requestedUrl);
-            Message = $"加载成功：{_services.Registry.Sources.Count} 个站点"+(_services.Registry.ImportWarnings.Count>0?"；导入警告："+string.Join("；",_services.Registry.ImportWarnings):"");
-            // 换配置后旧的分类/海报属于已失效的站点，进点播页必须重新加载而不是复用缓存。
-            _main.Vod.Invalidate();
-            await _main.Home.LoadAsync();
+            Message = $"订阅已更新：{result.Sources} 个采集源" + (result.Lives > 0 ? $"，{result.Lives} 个直播源" : "") + (result.Categories > 0 ? $"，{result.Categories} 个自定义分类" : "");
+            AfterSourceConfigChanged(reloadLive: result.Lives > 0);
         }
         catch (Exception error)
         {
-            Message = $"配置加载失败：{error.Message}";
+            Message = $"订阅拉取失败：{error.Message}";
         }
         finally
         {
@@ -520,54 +492,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     }
 
     [RelayCommand]
-    public void OpenRemoteSettings()
-    {ConfigDialogOpen=false;_main.OpenSettings();Section=6;}
-
-    [RelayCommand]
-    private async Task StartLocalControl()
-    {
-        try
-        {
-            await _services.LocalControl.StartAsync(command => _main.RunOnUiAsync(() =>
-            {
-                var player = _main.Player;
-                switch (command)
-                {
-                    case "toggle": player.TogglePlayPauseCommand.Execute(null); break;
-                    case "stop": player.CloseCommand.Execute(null); break;
-                    case "previous": player.PreviousEpisodeCommand.Execute(null); break;
-                    case "next": player.NextEpisodeCommand.Execute(null); break;
-                    case "back": player.SeekBy(-10); break;
-                    case "forward": player.SeekBy(10); break;
-                }
-            }), url => _main.RunOnUiAsync(() => _main.Player.Play(new PlaybackRequest { Uri = ProxyPushedMedia ? _services.LocalControl.RegisterMedia(url) : url, SourceKey = "push", SourceName = "本机推送", MediaId = url })),allowLan:LanControl,adjust:(command,value)=>_main.RunOnUiAsync(()=>
-            {
-                var player=_main.Player;
-                switch(command)
-                {
-                    case "volume":player.Volume=(int)Math.Round(value);break;
-                    case "rate":player.Rate=value;break;
-                    case "seek":if(player.Duration>TimeSpan.Zero)player.Seek(TimeSpan.FromSeconds(Math.Clamp(value,0,player.Duration.TotalSeconds)));break;
-                }
-            }),configure:url=>_main.RunOnUiAsync(()=>
-            {
-                _main.OpenSettings();Section=0;DialogUrl=url;ConfigDialogOpen=true;
-                Message="收到配置地址，请在桌面确认加载";
-            }),status:async()=>
-            {
-                RemotePlaybackStatus? snapshot=null;
-                await _main.RunOnUiAsync(()=>{var player=_main.Player;snapshot=new RemotePlaybackStatus(player.Title,player.State.ToString(),player.Position.TotalSeconds,player.Duration.TotalSeconds,player.Volume,player.Rate);});
-                return snapshot!;
-            });
-            PairingInformation=_services.LocalControl.LanEnabled?string.Join("；",_services.LocalControl.LanAddresses)+" 配对码："+_services.LocalControl.PairingCode:"仅本机模式";
-            var address=_services.LocalControl.LanAddresses.FirstOrDefault();
-            var oldQr=PairingQrImage;PairingQrImage=address is null?null:VodBox.Desktop.Views.PairingQr.Create(address);oldQr?.Dispose();
-            Message = "遥控已启动：" + _services.LocalControl.Address;
-        }
-        catch (Exception error) { Message = $"遥控启动失败：{error.Message}"; }
-    }
-
-    [RelayCommand]
     private void ClearSubtitleCache()
     {
         if(_main.Player.Visible){Message="请关闭播放器后再清理字幕缓存";return;}
@@ -584,16 +508,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     [RelayCommand]
     private async Task ClearMediaCache()
     {
-        try{await _services.LocalControl.Proxy.ClearCacheAsync();Message="媒体缓存已清空";}
+        try{await _services.MediaServer.Proxy.ClearCacheAsync();Message="媒体缓存已清空";}
         catch(Exception error){Message=$"缓存清理失败：{error.Message}";}
-    }
-
-    [RelayCommand]
-    private async Task ClearMediaInbox()
-    {
-        if(_main.Player.Visible){Message="请先关闭播放器，再清理上传收件箱";return;}
-        try{await _services.LocalControl.ClearInboxAsync();Message="服务上传文件已清理，手动放入的文件保留";}
-        catch(Exception error){Message=$"收件箱清理失败：{error.Message}";}
     }
 
     public void SetWallpaper(string path)
@@ -605,26 +521,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     }
     [RelayCommand]private void ClearWallpaper(){_services.Prefs.Set("ui.wallpaper","");_main.WallpaperPath="";Message="壁纸已清除";}
 
-    [RelayCommand]
-    private void OpenMediaInbox()
-    {
-        // 遥控端上传的媒体落在收件箱目录：直接用系统「打开文件」对话框从该目录开始选，不再有自绘的文件浏览页。
-        var directory=Path.Combine(_services.DataDir,"media-inbox");Directory.CreateDirectory(directory);
-        _main.RequestOpenFile(directory);
-    }
-
-    [RelayCommand]
-    private async Task StopLocalControl()
-    {
-        await _services.LocalControl.DisposeAsync();
-        ClearPairingPresentation();Message = "遥控已关闭";
-    }
-
     public Task<string> ExportBackupAsync() => new VodBox.Infrastructure.LibraryBackupService(_services.Store).ExportAsync();
     public async Task RestoreBackupAsync(string json)
     {
         await new VodBox.Infrastructure.LibraryBackupService(_services.Store).ImportMergeAsync(json);
-        VodConfigUrl = _services.CurrentVodConfig ?? "";
+        VodConfigUrl = _services.SourceConfig.Data.Subscription.Url;
         LiveConfigUrl = _services.CurrentLiveConfig ?? "";
         await LoadConfigHistoryAsync();
         await LoadLiveConfigHistory();

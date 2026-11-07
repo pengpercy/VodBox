@@ -58,8 +58,6 @@
                                IsSelected="{Binding Interface.IsSelected, Mode=OneWay}" Command="{Binding Interface.SelectCommand}" />
             <views:NavItemView Icon="{StaticResource Icon.ContentSave}" Label="数据"
                                IsSelected="{Binding Data.IsSelected, Mode=OneWay}" Command="{Binding Data.SelectCommand}" />
-            <views:NavItemView Icon="{StaticResource Icon.Cellphone}" Label="推送与遥控"
-                               IsSelected="{Binding Remote.IsSelected, Mode=OneWay}" Command="{Binding Remote.SelectCommand}" />
 
             <!-- 组 C -->
             <views:NavItemView Icon="{StaticResource Icon.History}" Label="诊断" Margin="0,12,0,0"
@@ -94,13 +92,12 @@
           <settings:PlaybackSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Subtitles.IsSelected}" DataContext="{Binding Content}" Section="Subtitles" />
           <settings:InterfaceDataSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Interface.IsSelected}" DataContext="{Binding Content}" Section="Interface" />
           <settings:InterfaceDataSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Data.IsSelected}" DataContext="{Binding Content}" Section="Data" />
-          <settings:RemoteDiagnosticsSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Remote.IsSelected}" DataContext="{Binding Content}" Section="Remote" />
-          <settings:RemoteDiagnosticsSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Diagnostics.IsSelected}" DataContext="{Binding Content}" Section="Diagnostics" />
+          <settings:DiagnosticsSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Diagnostics.IsSelected}" DataContext="{Binding Content}" />
           <settings:AboutSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).About.IsSelected}" DataContext="{Binding Content}" />
         </StackPanel>
       </ScrollViewer>
 
-      <!-- 状态提示固定在右下角：Message 是所有分区共用的反馈（清缓存、开关遥控、字幕搜索、壁纸…），
+      <!-- 状态提示固定在右下角：Message 是所有分区共用的反馈（清缓存、字幕搜索、壁纸…），
            放在窗口层而非某个分区里，否则只有「源与订阅」能看到反馈。 -->
       <Border Grid.Row="1" Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Left"
               Margin="24,0,24,16" Padding="14,8" MaxWidth="720"
@@ -115,6 +112,33 @@
       <Border Grid.RowSpan="2" Grid.Column="0" Width="1" HorizontalAlignment="Right"
               Background="{DynamicResource StrokeBrush}" IsHitTestVisible="False" />
     </Grid>
+
+    <!-- 删除采集源二次确认（覆盖整个窗口） -->
+    <Panel Name="DeleteSitesDialog" IsVisible="{Binding Content.DeleteDialogOpen}">
+      <Rectangle Fill="#88000000" />
+      <Border Width="460" CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource SurfaceBrush}" BorderBrush="#26FFFFFF" BorderThickness="1"
+              VerticalAlignment="Center" HorizontalAlignment="Center" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,Auto">
+          <StackPanel Grid.Row="0" Margin="20,18,20,14" Spacing="10">
+            <TextBlock Text="删除采集源" FontSize="15.5" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Content.DeleteDialogMessage}" FontSize="13" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Content.DeleteDialogNames}" FontSize="11.5" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <TextBlock Text="{Binding Content.DeleteDialogNote}" FontSize="11.5" TextWrapping="Wrap" Foreground="{DynamicResource TextTertiaryBrush}" />
+          </StackPanel>
+          <Border Grid.Row="1" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <Button Name="CancelDeleteSitesButton" Content="取消" Command="{Binding Content.CancelDeleteSitesCommand}"
+                      Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0"
+                      CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="16,7" FontSize="12.5" Cursor="Hand" />
+              <Button Name="ConfirmDeleteSitesButton" Content="删除" Command="{Binding Content.ConfirmDeleteSitesCommand}"
+                      Background="#D13438" Foreground="White" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
+                      Padding="16,7" FontSize="12.5" FontWeight="SemiBold" Cursor="Hand" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+    </Panel>
 
     <!-- 更改点播配置弹窗（覆盖整个窗口，含左栏）：DataContext 是 SettingsWindowViewModel，
          所以一律经 Content. 前缀绑定到 SettingsViewModel 上的属性/命令 -->
@@ -137,10 +161,10 @@
           </Grid>
           <!-- 弹窗体 -->
           <StackPanel Grid.Row="1" Margin="20,4,20,12" Spacing="12">
-            <TextBlock Text="输入 TVBox 配置地址，或从剪贴板读取" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" />
+            <TextBlock Text="输入 LunaTV / MoonTV 订阅地址（config.json，JSON 或 base58），或从剪贴板读取" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" />
             <Grid ColumnDefinitions="*,Auto">
               <TextBox Grid.Column="0" Text="{Binding Content.DialogUrl}" Height="34" CornerRadius="{DynamicResource AppControlCornerRadius}"
-                       PlaceholderText="https://…/tvbox.json" />
+                       PlaceholderText="https://…/config.json" />
               <Button Grid.Column="1" Command="{Binding Content.PasteFromClipboardCommand}"
                       CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,6" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
                       BorderThickness="0" Margin="8,0,0,0" FontSize="12" Cursor="Hand">
@@ -183,13 +207,6 @@
           <!-- 弹窗脚 -->
           <Border Grid.Row="2" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="20,12">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <Button Grid.Column="0" Command="{Binding Content.OpenRemoteSettingsCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
-                      BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,7" FontSize="12" Cursor="Hand">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <PathIcon Data="{StaticResource Icon.Cellphone}" Width="18" Height="18" VerticalAlignment="Center" />
-                  <TextBlock Text="手机扫码推送" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                 <Button Content="取消" Command="{Binding Content.CancelConfigDialogCommand}" Background="{DynamicResource CardHoverBrush}"
                         Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="16,7" FontSize="12.5" Cursor="Hand" />

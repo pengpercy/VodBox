@@ -266,7 +266,10 @@ public sealed partial class LiveViewModel : ObservableObject
         {
             using var http = new VodBox.Infrastructure.DefaultHttp();
             var loader = new VodBox.Infrastructure.LiveSources(http);
-            var groups = await loader.LoadAsync(url, ct);
+            // 订阅配置里的 lives（LunaTV LiveConfig）：多个直播源合并加载，单个失败只记警告。
+            var groups = url == ConfigLivesAddress
+                ? await loader.LoadSitesAsync(services.SourceConfig.EnabledLives, null, ct)
+                : await loader.LoadAsync(url, ct);
             ImportWarnings = loader.Warnings;
             return groups;
         };
@@ -511,9 +514,16 @@ public sealed partial class LiveViewModel : ObservableObject
         GroupPassword="";GroupUnlockOpen=false;_unlockedGroups.Clear();++_loadGeneration;Interlocked.Increment(ref _epgImportGeneration);++_epgDownloadGeneration;_epgDownload?.Cancel();_loadRequest?.Cancel();_loadRequest=null;Loading=false;_epg.Cancel();
     }
 
+    /// <summary>合成地址：表示使用源配置里启用的直播源（订阅 config.json 的 lives）。</summary>
+    public const string ConfigLivesAddress = "vodbox:config-lives";
+
+    /// <summary>当前生效的直播地址：手动设置的 m3u 优先，否则用订阅配置里的直播源。</summary>
+    public string? EffectiveLiveAddress => _services.CurrentLiveConfig is { Length: > 0 } manual ? manual
+        : _services.SourceConfig.EnabledLives.Count > 0 ? ConfigLivesAddress : null;
+
     public async Task LoadAsync()
     {
-        await LoadConfigurationAsync(_services.CurrentLiveConfig, false);
+        await LoadConfigurationAsync(EffectiveLiveAddress, false);
         // 首次打开直播立即读缓存并发起内置刷新；与直播源加载互不阻塞、互不影响播放。
         _ = RefreshBuiltInEpgInBackgroundAsync();
     }

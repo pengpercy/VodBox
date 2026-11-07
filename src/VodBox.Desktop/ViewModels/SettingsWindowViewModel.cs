@@ -42,7 +42,6 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
     public SettingsSectionItem Subtitles { get; }
     public SettingsSectionItem Interface { get; }
     public SettingsSectionItem Data { get; }
-    public SettingsSectionItem Remote { get; }
     public SettingsSectionItem Diagnostics { get; }
     public SettingsSectionItem About { get; }
 
@@ -63,11 +62,10 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
         Subtitles = new(this, "字幕", 3);
         Interface = new(this, "界面", 4);
         Data = new(this, "数据", 5);
-        Remote = new(this, "推送与遥控", 6);
         // 规格把「诊断」排在「关于」之前，但 SettingsViewModel 里 Diagnostics=8 / About=7，这里做映射。
         Diagnostics = new(this, "诊断", 8);
         About = new(this, "关于", 7);
-        _items = [Sources, Playback, Danmaku, Subtitles, Interface, Data, Remote, Diagnostics, About];
+        _items = [Sources, Playback, Danmaku, Subtitles, Interface, Data, Diagnostics, About];
         Select(Sources);
     }
 

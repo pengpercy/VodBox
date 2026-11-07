@@ -34,15 +34,15 @@ public sealed class MediaProxyTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
-            await server.StartAsync(_ => Task.CompletedTask, _ => Task.CompletedTask, ct: TestContext.Current.CancellationToken);
+            await using var server = new LocalMediaServer();
+            await server.StartAsync(TestContext.Current.CancellationToken);
             var url = server.RegisterMedia(upstream.Urls.Single() + "/live/main.m3u8");
             using var client = new HttpClient();
             var playlist = await client.GetStringAsync(url, TestContext.Current.CancellationToken);
             var segment = playlist.Split('\n').Single(line => line.StartsWith("/proxy/"));
             Assert.Equal("segment-bytes", await client.GetStringAsync(server.Address + segment, TestContext.Current.CancellationToken));
             await server.DisposeAsync();
-            await server.StartAsync(_ => Task.CompletedTask, _ => Task.CompletedTask, ct: TestContext.Current.CancellationToken);
+            await server.StartAsync(TestContext.Current.CancellationToken);
             using var old = await client.GetAsync(server.Address + new Uri(url).AbsolutePath, TestContext.Current.CancellationToken);
             Assert.Equal(System.Net.HttpStatusCode.NotFound, old.StatusCode);
         }
@@ -83,7 +83,7 @@ public sealed class MediaProxyTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
+            await using var server = new LocalMediaServer();
             var url = await server.RegisterPlaybackMediaAsync(upstream.Urls.Single() + "/live/main.m3u8", ct: TestContext.Current.CancellationToken);
             Assert.EndsWith(".m3u8", url);
             using var client = new HttpClient();
@@ -124,8 +124,8 @@ public sealed class MediaProxyTests
         await source.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
-            await server.StartAsync(_ => Task.CompletedTask, _ => Task.CompletedTask, ct: TestContext.Current.CancellationToken);
+            await using var server = new LocalMediaServer();
+            await server.StartAsync(TestContext.Current.CancellationToken);
             var url = server.RegisterMedia(source.Urls.Single() + "/main.m3u8", new Dictionary<string, string>
             { ["Referer"] = "https://private-source.example/", ["User-Agent"] = "TVClient" });
             using var client = new HttpClient();
@@ -172,8 +172,8 @@ public sealed class MediaProxyTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
-            await server.StartAsync(_ => Task.CompletedTask, _ => Task.CompletedTask, ct: TestContext.Current.CancellationToken);
+            await using var server = new LocalMediaServer();
+            await server.StartAsync(TestContext.Current.CancellationToken);
             using var client = new HttpClient();
             var manifest = await client.GetStringAsync(server.RegisterMedia(upstream.Urls.Single() + "/main.mpd"), TestContext.Current.CancellationToken);
             var document = System.Xml.Linq.XDocument.Parse(manifest);
@@ -223,8 +223,8 @@ public sealed class MediaProxyTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server=new LocalControlServer();
-            await server.StartAsync(_=>Task.CompletedTask,_=>Task.CompletedTask,ct:TestContext.Current.CancellationToken);
+            await using var server=new LocalMediaServer();
+            await server.StartAsync(TestContext.Current.CancellationToken);
             using var client=new HttpClient();
             var playlist=await client.GetStringAsync(server.RegisterMedia(upstream.Urls.Single()+"/start"),TestContext.Current.CancellationToken);
             var segment=playlist.Split('\n').Single(line=>line.StartsWith("/proxy/"));
@@ -250,8 +250,8 @@ public sealed class MediaProxyTests
         await source.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server=new LocalControlServer();
-            await server.StartAsync(_=>Task.CompletedTask,_=>Task.CompletedTask,ct:TestContext.Current.CancellationToken);
+            await using var server=new LocalMediaServer();
+            await server.StartAsync(TestContext.Current.CancellationToken);
             var address=server.RegisterMedia(source.Urls.Single()+"/redirect",new Dictionary<string,string>{["Referer"]="https://private.example/"});
             using var client=new HttpClient();
             Assert.Equal("safe",await client.GetStringAsync(address,TestContext.Current.CancellationToken));
@@ -302,7 +302,7 @@ public sealed class MediaProxyTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server=new LocalControlServer();await server.StartAsync(_=>Task.CompletedTask,_=>Task.CompletedTask,ct:TestContext.Current.CancellationToken);
+            await using var server=new LocalMediaServer();await server.StartAsync(TestContext.Current.CancellationToken);
             using var client=new HttpClient();var url=server.RegisterMedia(upstream.Urls.Single()+"/main.mpd");
             async Task<string[]> Segments()
             {
@@ -334,8 +334,8 @@ public sealed class MediaProxyTests
         await upstream.StartAsync(TestContext.Current.CancellationToken);
         try
         {
-            await using var server = new LocalControlServer();
-            await server.StartAsync(_ => Task.CompletedTask, _ => Task.CompletedTask, ct: TestContext.Current.CancellationToken);
+            await using var server = new LocalMediaServer();
+            await server.StartAsync(TestContext.Current.CancellationToken);
             var url = server.RegisterMedia(upstream.Urls.Single() + "/media", new Dictionary<string, string> { ["Referer"] = "https://source.example/" });
             using var client = new HttpClient(); using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(2, 4);

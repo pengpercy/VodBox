@@ -3,20 +3,26 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VodBox.Core;
 using VodBox.Desktop.Services;
+using VodBox.Infrastructure;
 
 namespace VodBox.Desktop.ViewModels;
 
-/// <summary>搜索：多站点并发聚合 + 按站点切换结果。</summary>
+/// <summary>搜索（LunaTV 搜索页）：全部采集源流式聚合；「聚合」视图按片名+年份+类型合并，「全部」视图逐条展示；侧栏按源筛选。</summary>
 public sealed partial class SearchViewModel : ObservableObject
 {
-    private readonly Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> _search;
-    private Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>>? _detailedSearch;
-/// <summary>流式聚合：每个站点完成即回填，慢站点不阻塞快站点。</summary>
-    private Func<string,CancellationToken,IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>>? _streamSearch;
+    /// <summary>流式聚合：每个源完成即回填，慢源不阻塞快源。</summary>
+    private Func<string,CancellationToken,IAsyncEnumerable<SourceSearchBatch>>? _streamSearch;
     private Func<int> _targetCount = () => 0;
     /// <summary>结果总数上限（卡片网格与归属映射共用）。</summary>
     private const int ResultLimit = 500;
-    private readonly Dictionary<MediaItem, string> _sourceKeys = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<MediaItem, VodResult> _itemResults = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<MediaItem, IReadOnlyList<VodResult>> _cardGroups = new(ReferenceEqualityComparer.Instance);
+    private readonly List<VodResult> _results = [];
+    /// <summary>聚合卡片（同名同年同类型合并，LunaTV 默认视图）。</summary>
+    public ObservableCollection<MediaItem> AggregatedResults { get; } = [];
+    /// <summary>true = 聚合视图，false = 逐条（全部）视图。</summary>
+    [ObservableProperty] private bool _aggregate = true;
+    partial void OnAggregateChanged(bool value) { _preferences?.Set("search.aggregate", value); RebuildResultRows(); }
     private CancellationTokenSource? _request;
     private long _generation;
     private readonly MainViewModel _main;
@@ -76,22 +82,19 @@ public sealed partial class SearchViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowHistory));
     }
 
-    public SearchViewModel(AppServices services, MainViewModel main) : this(services.Registry.SearchAllAsync, main, services.Prefs)
+    public SearchViewModel(AppServices services, MainViewModel main) : this(main, services.Prefs)
     {
-        _detailedSearch=services.Registry.SearchWithFailuresAsync;
-        _streamSearch=services.Registry.SearchStreamAsync;
-        _targetCount=()=>services.Registry.SearchTargets.Count;
+        _streamSearch=services.Catalog.SearchStreamAsync;
+        _targetCount=()=>services.Catalog.SearchTargets.Count;
     }
-    /// <summary>注入一次性返回的聚合搜索（测试用）；会关闭流式路径。</summary>
-    internal void SetDetailedSearch(Func<string,CancellationToken,Task<VodBox.Infrastructure.AggregateSearchResult>> search){_detailedSearch=search;_streamSearch=null;}
-    /// <summary>注入流式聚合搜索与站点总数（测试用）。</summary>
-    internal void SetSearchStream(Func<string,CancellationToken,IAsyncEnumerable<VodBox.Infrastructure.AggregateSearchBatch>> search,int targets){_streamSearch=search;_targetCount=()=>targets;}
+    /// <summary>注入流式聚合搜索与源总数（测试用）。</summary>
+    internal void SetSearchStream(Func<string,CancellationToken,IAsyncEnumerable<SourceSearchBatch>> search,int targets){_streamSearch=search;_targetCount=()=>targets;}
 
-    internal SearchViewModel(Func<string, CancellationToken, Task<IReadOnlyList<(SourceInfo Site, MediaItem Item)>>> search, MainViewModel main, IPreferences? preferences = null)
+    internal SearchViewModel(MainViewModel main, IPreferences? preferences = null)
     {
-        _search = search;
         _main = main;
         _preferences = preferences;
+        _aggregate = preferences?.GetBool("search.aggregate", true) ?? true;
         SearchHistory.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowHistory));
         Failures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasFailures));
         try
@@ -174,50 +177,46 @@ public sealed partial class SearchViewModel : ObservableObject
             Failures.Clear();
             SiteResults.Clear();
             AllResults.Clear();
-            _sourceKeys.Clear();
+            AggregatedResults.Clear();
+            _itemResults.Clear(); _cardGroups.Clear(); _results.Clear();
             RebuildResultRows();
         });
         if (scope is null) return;
         var ct = scope.Token;
         try
         {
-            if (_streamSearch is { } stream)
+            if (_streamSearch is not { } stream)
             {
-                var failures = new List<(SourceInfo Site, string Error)>();
-                var total = _targetCount();
-                var done = 0;
-                await foreach (var batch in stream(query, ct))
-                {
-                    await _main.RunOnUiAsync(() =>
-                    {
-                        if (generation != _generation || ct.IsCancellationRequested) return;
-                        done++;
-                        if (batch.Error is { } error) { failures.Add((batch.Site, error)); Failures.Add(new SearchFailure(batch.Site.Name, error)); }
-                        else if (AddSiteResults(batch.Site, batch.Items)) RebuildResultRows();
-                        var all = Math.Max(done, total);
-                        Summary = $"「{query}」已搜索 {done}/{all} 个站点，{SiteResults.Count} 个站点找到 {AllResults.Count} 条结果…";
-                        Status = $"已搜索 {done}/{all} 个站点 · {AllResults.Count} 条结果";
-                        Progress = (double)done / all;
-                    });
-                }
-                ct.ThrowIfCancellationRequested();
+                await _main.RunOnUiAsync(() => { if (generation == _generation) { Hint = "没有可搜索的采集源，请到设置中添加订阅"; Status = "没有采集源"; } });
+                return;
+            }
+            var failures = new List<(ApiSite Site, string Error)>();
+            var total = _targetCount();
+            if (total == 0)
+            {
+                await _main.RunOnUiAsync(() => { if (generation == _generation) { Hint = "没有可搜索的采集源，请到设置中添加订阅或启用采集源"; Status = "没有采集源"; } });
+                return;
+            }
+            var done = 0;
+            await foreach (var batch in stream(query, ct))
+            {
                 await _main.RunOnUiAsync(() =>
                 {
                     if (generation != _generation || ct.IsCancellationRequested) return;
-                    FinishSearch(query, failures);
+                    done++;
+                    if (batch.Error is { } error) { failures.Add((batch.Site, error)); Failures.Add(new SearchFailure(batch.Site.Name, error)); }
+                    else if (AddSiteResults(batch.Site, batch.Results)) RebuildResultRows();
+                    var all = Math.Max(done, total);
+                    Summary = $"「{query}」已搜索 {done}/{all} 个源，{SiteResults.Count} 个源找到 {AllResults.Count} 条结果…";
+                    Status = $"已搜索 {done}/{all} 个源 · {AggregatedResults.Count} 部影片";
+                    Progress = (double)done / all;
                 });
-                return;
             }
-            var aggregate=_detailedSearch is null?null:await _detailedSearch(query,ct);
-            var results = aggregate?.Results??await _search(query, ct);
             ct.ThrowIfCancellationRequested();
             await _main.RunOnUiAsync(() =>
             {
                 if (generation != _generation || ct.IsCancellationRequested) return;
-                foreach (var group in results.GroupBy(r => r.Site.Key))
-                    AddSiteResults(group.First().Site, group.Select(r => r.Item));
-                RebuildResultRows();
-                FinishSearch(query, aggregate?.Failures ?? []);
+                FinishSearch(query, failures);
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -246,39 +245,40 @@ public sealed partial class SearchViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 把一个站点的结果并入：卡片、站点过滤与归属映射共用同一批实例，避免展示可见却打不开的卡片；
-    /// 入集合前给每条结果打上来源站点名。返回是否有新增。
+    /// 把一个源的结果并入：逐条卡片（侧栏按源筛选用）+ 重算聚合卡片。返回是否有新增。
     /// </summary>
-    private bool AddSiteResults(SourceInfo site, IEnumerable<MediaItem> items)
+    private bool AddSiteResults(ApiSite site, IReadOnlyList<VodResult> results)
     {
         var room = ResultLimit - AllResults.Count;
-        if (room <= 0) return false;
-        var tagged = items.Take(room).Select(item => item with { SourceName = site.Name }).ToArray();
-        if (tagged.Length == 0) return false;
+        if (room <= 0 || results.Count == 0) return false;
+        var accepted = results.Take(room).ToArray();
         var group = SiteResults.FirstOrDefault(result => result.SourceKey == site.Key);
         if (group is null) SiteResults.Add(group = new SearchSiteResult(site.Name, site.Key));
-        foreach (var item in tagged)
+        foreach (var result in accepted)
         {
+            var item = SearchAggregation.ToItem(result);
+            _itemResults[item] = result;
+            _results.Add(result);
             AllResults.Add(item);
-            _sourceKeys[item] = site.Key;
             group.Items.Add(item);
+        }
+        AggregatedResults.Clear(); _cardGroups.Clear();
+        foreach (var cardGroup in SearchAggregation.Group(_results))
+        {
+            var card = SearchAggregation.ToCard(cardGroup);
+            _cardGroups[card] = cardGroup;
+            AggregatedResults.Add(card);
         }
         return true;
     }
 
-    private void FinishSearch(string query, IReadOnlyList<(SourceInfo Site, string Error)> failures)
+    private void FinishSearch(string query, IReadOnlyList<(ApiSite Site, string Error)> failures)
     {
-        // 流式路径边到边加；一次性路径在这里补齐。
-        if (Failures.Count != failures.Count)
-        {
-            Failures.Clear();
-            foreach (var (site, error) in failures) Failures.Add(new SearchFailure(site.Name, error));
-        }
         Progress = 1;
-        Status = AllResults.Count == 0 ? "没有找到结果" : $"{SiteResults.Count} 个站点 · {AllResults.Count} 条结果";
-        Summary = $"「{query}」在 {SiteResults.Count} 个站点找到 {AllResults.Count} 条结果";
-        if (failures.Count > 0) Summary += $"；{failures.Count} 个站点失败：" + string.Join("；", failures.Take(5).Select(failure => failure.Site.Name + "：" + failure.Error));
-        Hint = AllResults.Count == 0 ? "没有找到匹配的结果，换个关键词或站点试试" : "";
+        Status = AllResults.Count == 0 ? "没有找到结果" : $"{SiteResults.Count} 个源 · {AggregatedResults.Count} 部影片 · {AllResults.Count} 条结果";
+        Summary = $"「{query}」在 {SiteResults.Count} 个源找到 {AggregatedResults.Count} 部影片（{AllResults.Count} 条结果）";
+        if (failures.Count > 0) Summary += $"；{failures.Count} 个源失败";
+        Hint = AllResults.Count == 0 ? "没有找到匹配的结果，换个关键词试试" : "";
         RecordSearchHistory(query);
     }
 
@@ -297,11 +297,13 @@ public sealed partial class SearchViewModel : ObservableObject
     [RelayCommand]
     private void OpenItem(MediaItem item)
     {
-        if (!_sourceKeys.TryGetValue(item, out var key))
-            key = SiteResults.FirstOrDefault(s => s.Items.Contains(item))?.SourceKey;
-        if (key is null) return;
+        if (_cardGroups.TryGetValue(item, out var group)) { ShowingDetail = true; Detail.OpenGroup(group); return; }
+        if (!_itemResults.TryGetValue(item, out var result)) return;
+        // 逐条视图点了具体某个源：同组其他源一起作为播放源，但先展示用户点的这个。
+        var key = SearchAggregation.GroupKey(result);
+        var siblings = _results.Where(other => SearchAggregation.GroupKey(other) == key).ToArray();
         ShowingDetail = true;
-        Detail.Open(key, item);
+        Detail.OpenGroup(siblings, result);
     }
 
     private int _columns = 5;
@@ -342,7 +344,7 @@ public sealed partial class SearchViewModel : ObservableObject
 
     private void RebuildResultRows()
     {
-        var items = SelectedSite is { } site ? site.Items.ToList() : AllResults.ToList();
+        var items = SelectedSite is { } site ? site.Items.ToList() : Aggregate ? AggregatedResults.ToList() : AllResults.ToList();
         ResultRows.Clear();
         for (var i = 0; i < items.Count; i += _columns)
             ResultRows.Add(new ResultRow(items.Skip(i).Take(_columns).ToList()));

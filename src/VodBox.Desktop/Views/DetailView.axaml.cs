@@ -36,6 +36,11 @@ public partial class DetailView : UserControl
         if ((sender as Control)?.Tag is PlaybackLine line) VM.SelectedLine = line;
     }
 
+    private void OnPickSource(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is DetailSource source) VM.PickSourceCommand.Execute(source);
+    }
+
     private void OnPickEpisode(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.Tag is Episode episode)

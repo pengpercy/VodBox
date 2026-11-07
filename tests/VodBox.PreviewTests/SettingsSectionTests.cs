@@ -41,8 +41,8 @@ public sealed class SettingsSectionTests : IDisposable
     /// <summary>注入一个可见站点；空站点列表会让站点行绑定测不出东西。</summary>
     private void SeedSite()
     {
-        _settings.Sites.Clear();
-        _settings.Sites.Add(new SourceInfo { Key = "seed", Name = "测试站点", Runtime = SourceRuntime.MacCms, Api = "csp_Seed" });
+        if (_services.SourceConfig.Find("seed") is null) _services.SourceConfig.AddSource("seed", "测试站点", "https://seed.example/api", null);
+        _settings.RefreshSites();
     }
 
     private static void Pump(Window window)
@@ -79,7 +79,7 @@ public sealed class SettingsSectionTests : IDisposable
         try
         {
             var buttons = view.GetVisualDescendants().OfType<Button>()
-                .Where(b => b.Command is not null && b.CommandParameter is SourceInfo).ToArray();
+                .Where(b => b.Command is not null && b.CommandParameter is SourceRow).ToArray();
             Assert.True(buttons.Length >= 5, $"站点行应至少 5 个带命令的按钮，实际 {buttons.Length}");
         }
         finally { window.Close(); }
@@ -91,19 +91,19 @@ public sealed class SettingsSectionTests : IDisposable
         SeedSite();
         var site = _settings.Sites.FirstOrDefault();
         Assert.NotNull(site);
-        var before = _services.Registry.IsHidden(site!.Key);
+        var before = site!.Disabled;
 
         var (window, view) = Host<SourcesSettingsView>(_settings);
         try
         {
             // $parent 绑定若失效，命令会是 null 或点了没反应；这里真的执行一次并观察状态。
             var button = view.GetVisualDescendants().OfType<Button>().First(b =>
-                ReferenceEquals(b.CommandParameter, site) && b.Content?.ToString() == "显示/隐藏");
+                ReferenceEquals(b.CommandParameter, site) && b.Content?.ToString() == site.ToggleLabel);
             Assert.NotNull(button.Command);
             button.Command!.Execute(button.CommandParameter);
             Pump(window);
-            Assert.NotEqual(before, _services.Registry.IsHidden(site.Key));
-            _services.Registry.SetHidden(site.Key, before);
+            Assert.NotEqual(before, _services.SourceConfig.Find(site.Key)!.Disabled);
+            _services.SourceConfig.SetSourceDisabled(site.Key, before);
         }
         finally { window.Close(); }
     }
@@ -207,19 +207,11 @@ public sealed class SettingsSectionTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void RemoteDiagnosticsSectionKeepsQrCodeAndLogPreview()
+    public void DiagnosticsSectionKeepsLogPreview()
     {
-        var (window, view) = Host<RemoteDiagnosticsSettingsView>(_settings,
-            v => v.Section = RemoteDiagnosticsSettingsView.RemoteDiagnosticsSettingsViewSection.Remote);
+        var (window, view) = Host<DiagnosticsSettingsView>(_settings);
         try
         {
-            Assert.True(view.IsRemote);
-            Assert.False(view.IsDiagnostics);
-            Assert.NotNull(view.GetVisualDescendants().OfType<Image>().FirstOrDefault(i => i.Width == 220));
-
-            view.Section = RemoteDiagnosticsSettingsView.RemoteDiagnosticsSettingsViewSection.Diagnostics;
-            Pump(window);
-            Assert.True(view.IsDiagnostics);
             // 日志预览：只读、等宽、保留最小高度。
             var preview = view.GetVisualDescendants().OfType<TextBox>()
                 .FirstOrDefault(t => t.IsReadOnly && t.MinHeight >= 200);
@@ -263,7 +255,7 @@ public sealed class SettingsSectionTests : IDisposable
             var items = new[]
             {
                 vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface,
-                vm.Data, vm.Remote, vm.Diagnostics, vm.About,
+                vm.Data, vm.Diagnostics, vm.About,
             };
             foreach (var item in items)
             {

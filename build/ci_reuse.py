@@ -32,7 +32,6 @@ NATIVE_BUILD_PATHS = (
     "src", "tests", "Directory.Build.*", "Directory.Packages.*",
     "global.json", "VodBox.slnx", "NuGet.Config", "VERSION", "**/packages*.lock.json",
     ".github/workflows/build.yml",
-    "build/quickjs",
     "build/bundle.py", "build/native-assets.json", "build/nativeverify.py",
     "build/verify_mpv_bundle.py",
     "build/archive.py", "build/licenses", "build/publish-aot.sh", "build/dev-natives.sh",

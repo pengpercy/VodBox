@@ -17,13 +17,8 @@ public static class Json
     };
 }
 
-[JsonSerializable(typeof(RemotePlaybackStatus))]
 [JsonSerializable(typeof(List<string>))]
 [JsonSerializable(typeof(LibraryBackup))]
-[JsonSerializable(typeof(TvBoxConfig))]
-[JsonSerializable(typeof(TvBoxSite))]
-[JsonSerializable(typeof(TvBoxLive))]
-[JsonSerializable(typeof(TvBoxParse))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(JsonElement))]
@@ -48,4 +43,8 @@ public static class Json
 [JsonSerializable(typeof(LiveGroup))]
 [JsonSerializable(typeof(LiveSource))]
 [JsonSerializable(typeof(ConfigSubscription))]
+[JsonSerializable(typeof(LunaConfigFile))]
+[JsonSerializable(typeof(SourceConfigData))]
+[JsonSerializable(typeof(VodResult))]
+[JsonSerializable(typeof(List<VodResult>))]
 public sealed partial class AppJsonContext : JsonSerializerContext;
