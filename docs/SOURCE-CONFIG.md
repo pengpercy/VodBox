@@ -1,13 +1,13 @@
 # 订阅源格式说明
 
-VodBox 的点播源沿用 [LunaTV](https://github.com/MoonTechLab/LunaTV)（MoonTV）的配置文件格式：一个 `config.json`，里面列出 **苹果CMS V10 采集接口**、豆瓣自定义分类和直播源。LunaTV 能用的配置，VodBox 基本可以直接用。
+VodBox 的点播源沿用 [LunaTV](https://github.com/MoonTechLab/LunaTV)（MoonTV）的配置文件格式：一个 `config.json`，里面列出 **苹果CMS V10 采集接口**、自定义分类和直播源。LunaTV 能用的配置，VodBox 基本可以直接用。
 
 > VodBox 不内置任何播放源。本文所有地址都是 `example.com` 占位示例，请换成你自己有权使用的接口。
 
 - [1. 快速开始](#1-快速开始)
 - [2. 配置文件结构](#2-配置文件结构)
 - [3. api_site：点播采集源](#3-api_site点播采集源)
-- [4. custom_category：豆瓣自定义分类](#4-custom_category豆瓣自定义分类)
+- [4. custom_category：自定义分类](#4-custom_category自定义分类)
 - [5. lives：直播源](#5-lives直播源)
 - [6. 制作订阅链接（base58）](#6-制作订阅链接base58)
 - [7. 更新订阅时如何合并](#7-更新订阅时如何合并)
@@ -56,7 +56,7 @@ VodBox 的点播源沿用 [LunaTV](https://github.com/MoonTechLab/LunaTV)（Moon
 | --- | --- | --- | --- |
 | `cache_time` | 数字（秒） | 否 | 采集接口搜索结果的缓存时间，缺省 `7200`。 |
 | `api_site` | 对象 | 三者至少一个 | 点播采集源，键为源 ID，见 [第 3 节](#3-api_site点播采集源)。 |
-| `custom_category` | 数组 | 三者至少一个 | 点播页额外的豆瓣分类，见 [第 4 节](#4-custom_category豆瓣自定义分类)。 |
+| `custom_category` | 数组 | 三者至少一个 | 点播页额外的分类，见 [第 4 节](#4-custom_category自定义分类)。 |
 | `lives` | 对象 | 三者至少一个 | 直播源，键为源 ID，见 [第 5 节](#5-lives直播源)。 |
 
 解析比较宽容：
@@ -95,9 +95,9 @@ VodBox 的点播源沿用 [LunaTV](https://github.com/MoonTechLab/LunaTV)（Moon
 
 搜索时，每个源默认最多拉 5 页（可在设置里调整），单页超时 8 秒；详情请求超时 10 秒。
 
-## 4. custom_category：豆瓣自定义分类
+## 4. custom_category：自定义分类
 
-点播页顶部的分类标签。数据来自豆瓣，和采集源无关。
+点播页顶部的分类标签，按标签或关键词展示片单，和采集源无关。
 
 ```json
 "custom_category": [
@@ -109,11 +109,11 @@ VodBox 的点播源沿用 [LunaTV](https://github.com/MoonTechLab/LunaTV)（Moon
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `query` | 是 | 发给豆瓣的标签或关键词。 |
+| `query` | 是 | 分类的标签或关键词。 |
 | `type` | 否 | `movie`（电影）或 `tv`（剧集）；其他值按 `movie` 处理。 |
 | `name` | 否 | 显示名；省略时用 `query`。 |
 
-同一分类由 `type + query` 唯一确定。豆瓣常见可用标签（LunaTV 文档列出的）：
+同一分类由 `type + query` 唯一确定。常见可用标签：
 
 - **movie**：热门、最新、经典、豆瓣高分、冷门佳片、华语、欧美、韩国、日本、动作、喜剧、爱情、科幻、悬疑、恐怖、治愈
 - **tv**：热门、美剧、英剧、韩剧、日剧、国产剧、港剧、日本动画、综艺、纪录片
