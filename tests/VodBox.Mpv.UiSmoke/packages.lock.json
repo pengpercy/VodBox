@@ -200,7 +200,7 @@
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.4.1, )"
+          "VodBox.Core": "[0.4.2, )"
         }
       },
       "Avalonia": {

@@ -57,14 +57,14 @@
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.13, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.4.1, )"
+          "VodBox.Core": "[0.4.2, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.4.1, )"
+          "VodBox.Core": "[0.4.2, )"
         }
       },
       "Avalonia": {
