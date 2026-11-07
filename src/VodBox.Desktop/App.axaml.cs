@@ -60,6 +60,14 @@ public class App : Application
                 MacMenus.InstallApplicationMenu(this,main);
                 MacMenus.Attach(window,main);
             }
+            // 首次播放前预热：本机媒体代理（Kestrel）与 libmpv 客户端都在后台建好，点播放时不再现场初始化。
+            window.Opened += (_, _) => _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                try { await Services.MediaServer.StartAsync(); }
+                catch (Exception error) { VodBox.Core.VodBoxLog.Warn("media", $"预热媒体代理失败：{error.Message}"); }
+                await Services.Player.WarmUpAsync();
+            });
             if (desktop.Args?.Contains("--ui-smoke") != true)
             {
                 window.Opened += async (_, _) =>
@@ -124,10 +132,16 @@ public class App : Application
                         if(network is not null)
                         {
                             var address=network[6..];
+                            // 界面卡顿探针：16ms 心跳的最大间隔即 UI 线程最长被占用的时间（打开播放窗口 + 网络加载全过程）。
+                            var heartbeat=System.Diagnostics.Stopwatch.StartNew();long lastBeat=0,maxStall=0;
+                            var beat=new Avalonia.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(16),Avalonia.Threading.DispatcherPriority.Input,(_,_)=>
+                            {var now=heartbeat.ElapsedMilliseconds;maxStall=Math.Max(maxStall,now-lastBeat);lastBeat=now;});
+                            beat.Start();
+                            var filterAds=desktop.Args.Contains("--filter-ads");
                             main.Player.Play(new VodBox.Core.PlaybackRequest
                             {
                                 Uri=address,Title="网络流验证",SourceKey="smoke",SourceName="验收",
-                                MediaId=address,IsLive=true,
+                                MediaId=address,IsLive=!filterAds,FilterAds=filterAds,
                             });
                             var deadline=DateTime.UtcNow.AddSeconds(30);
                             while(main.Player.State is VodBox.Core.PlaybackState.Resolving or VodBox.Core.PlaybackState.Loading&&DateTime.UtcNow<deadline)
@@ -138,7 +152,8 @@ public class App : Application
                             Console.WriteLine($"NETWORK STREAM: state={main.Player.State} error={main.Player.Error??"<none>"} "+
                                 $"position={main.Player.Position.TotalSeconds:F2}s duration={main.Player.Duration.TotalSeconds:F2}s "+
                                 $"frames={overlay2?.RenderedFrames??0} videoRatio={main.Player.VideoAspectRatio?.ToString("F3")??"<none>"} "+
-                                $"visible={main.Player.Visible}");
+                                $"visible={main.Player.Visible} maxUiStall={maxStall}ms");
+                            beat.Stop();
                             await main.ShutdownAsync();window.Close();return;
                         }
                         var media=desktop.Args.FirstOrDefault(argument=>argument.StartsWith("--media=",StringComparison.Ordinal));

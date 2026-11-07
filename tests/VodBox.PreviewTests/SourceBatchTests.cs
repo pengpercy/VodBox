@@ -185,6 +185,9 @@ public sealed class SourceBatchTests : IDisposable
         Assert.Equal(SourceValidity.Invalid, dead.Status);
         Assert.All(_settings.Sites.Where(row => row.Key != "dead"), row => Assert.Null(row.Status));
         Assert.StartsWith("1 / 1", _settings.ValidationSummary);
+        Assert.True(dead.IsBad);
+        Assert.False(dead.Checking);
+        Assert.Equal((0, 0, 1), (_settings.ValidCount, _settings.EmptyCount, _settings.InvalidCount));
 
         // 检测后按状态筛出无效的，全选后批量禁用。
         dead.IsSelected = false;
@@ -270,6 +273,46 @@ public sealed class SourceBatchTests : IDisposable
                 var bottom = button.Bounds.Height - top - text.Bounds.Height;
                 Assert.True(Math.Abs(top - bottom) <= 1.5, $"「{text.Text}」上 {top:0.#} 下 {bottom:0.#}，没有上下居中");
             }
+        }
+        finally { window.Close(); }
+    }
+    /// <summary>检测结果按颜色区分：快绿 / 一般黄 / 慢橙 / 无结果灰 / 无效红，延迟显示在胶囊里。</summary>
+    [AvaloniaFact]
+    public async Task ValidationResultsAreColorCodedByStatusAndLatency()
+    {
+        var rows = _settings.Sites.ToDictionary(row => row.Key);
+        (rows["lzzy"].LatencyMs, rows["lzzy"].Status) = (320, SourceValidity.Valid);
+        (rows["ffzy"].LatencyMs, rows["ffzy"].Status) = (1850, SourceValidity.Valid);
+        (rows["bfzy"].LatencyMs, rows["bfzy"].Status) = (4200, SourceValidity.Valid);
+        rows["dead"].Status = SourceValidity.Invalid;
+        Assert.True(rows["lzzy"].IsFast); Assert.Equal("320ms", rows["lzzy"].LatencyLabel);
+        Assert.True(rows["ffzy"].IsMedium); Assert.Equal("1.9s", rows["ffzy"].LatencyLabel);
+        Assert.True(rows["bfzy"].IsSlow);
+        Assert.True(rows["dead"].IsBad); Assert.Equal("", rows["dead"].LatencyLabel);
+        rows["bfzy"].Status = SourceValidity.NoResults;
+        Assert.True(rows["bfzy"].IsEmpty); Assert.False(rows["bfzy"].IsSlow);
+        rows["bfzy"].Status = SourceValidity.Valid;
+        _settings.ValidationProgress = "3 / 4"; _settings.ValidationFraction = 0.75;
+        (_settings.ValidCount, _settings.EmptyCount, _settings.InvalidCount) = (3, 0, 1);
+
+        var view = new SourcesSettingsView { DataContext = _settings };
+        var window = new Window { Width = 1100, Height = 900, Content = new ScrollViewer { Content = view } };
+        window.Show();
+        try
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            var pills = view.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("statusPill") && border.IsEffectivelyVisible).ToArray();
+            Assert.Equal(4, pills.Length);
+            string Color(string cls) => ((Avalonia.Media.ISolidColorBrush)pills.Single(pill => pill.Classes.Contains(cls))
+                .GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single().Fill!).Color.ToString();
+            Assert.Equal("#ff6ccb5f", Color("fast"));
+            Assert.Equal("#ffffc83d", Color("medium"));
+            Assert.Equal("#ffff9349", Color("slow"));
+            Assert.Equal("#ffff6b6b", Color("bad"));
+            var frame = await DetailSourcesTests.RenderAsync(window);
+            var dir = Path.Combine(Environment.CurrentDirectory, "preview-shots");
+            Directory.CreateDirectory(dir);
+            frame?.Save(Path.Combine(dir, "SourceValidation.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
         }
         finally { window.Close(); }
     }

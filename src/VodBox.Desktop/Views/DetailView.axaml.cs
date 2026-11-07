@@ -15,6 +15,12 @@ public partial class DetailView : UserControl
         // 防御：根元素持有本地值，不继承宿主的 DataContext（MainViewModel 若流进按 DetailViewModel 编译的绑定会强转失败）；
         // 实际由 OnDataContextChanged 赋值，DetailViewBindsCleanlyInBothHosts 覆盖两种宿主与两种赋值顺序。
         this.FindControl<ScrollViewer>("DetailRoot")!.DataContext = null;
+        // 剧集网格列数跟随可用宽度（等宽格子，不再按固定 10 集一行折行）。
+        var episodes = this.FindControl<ListBox>("EpisodeList")!;
+        episodes.SizeChanged += (_, e) =>
+        {
+            if (this.FindControl<ScrollViewer>("DetailRoot")?.DataContext is DetailViewModel detail) detail.SetEpisodeWidth(e.NewSize.Width - 4);
+        };
     }
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
@@ -31,10 +37,6 @@ public partial class DetailView : UserControl
 
     private DetailViewModel VM => (DetailViewModel)this.FindControl<ScrollViewer>("DetailRoot")!.DataContext!;
 
-    private void OnPickLine(object? sender, RoutedEventArgs e)
-    {
-        if ((sender as Control)?.Tag is PlaybackLine line) VM.SelectedLine = line;
-    }
 
     private void OnPickSource(object? sender, RoutedEventArgs e)
     {

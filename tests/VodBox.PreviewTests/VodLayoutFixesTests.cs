@@ -103,4 +103,60 @@ public sealed class VodLayoutFixesTests
             TempDataDirectory.TryDelete(directory);
         }
     }
+    /// <summary>筛选默认折叠成一行「筛选 · 当前值」，展开后才列出各组胶囊；改过的值显示在摘要里，可一键重置。</summary>
+    [AvaloniaFact]
+    public void Vod_FiltersAreCollapsedByDefaultAndSummarizeActiveValues()
+    {
+        var directory = TempDataDirectory.Create("vod-filters-collapsed");
+        using var services = new AppServices(directory);
+        var main = new MainViewModel(services, true);
+        main.AttachDispatcher(Dispatcher.UIThread);
+        foreach (var (key, name) in new[] { ("cat", "分类"), ("area", "地区"), ("type", "类型"), ("country", "国家"), ("year", "年代"), ("sort", "排序") })
+            main.Vod.DynamicFilters.Add(new FilterChipGroup(new FilterGroup(key, name,
+                [new FilterValue("全部", ""), new FilterValue(name + "A", "a"), new FilterValue(name + "B", "b")], "")));
+        foreach (var name in new[] { "电影", "电视剧", "综艺", "动漫", "Top250" }) main.Vod.Categories.Add(new Category(name, name));
+        main.Vod.Loading = false;
+        var view = new VodView { DataContext = main };
+        var window = new Window { Width = 1000, Height = 600, Content = view };
+        try
+        {
+            window.Show();
+            Pump(window);
+            var groups = view.FindControl<ItemsControl>("FilterGroups")!;
+            var toggle = view.FindControl<Button>("FiltersToggle")!;
+            Assert.True(toggle.IsEffectivelyVisible);
+            Assert.False(groups.IsEffectivelyVisible);
+            Assert.Equal("全部", main.Vod.FilterSummary);
+            Assert.False(view.FindControl<Button>("ResetFilters")!.IsVisible);
+            // 「更多筛选」就在分类条里，紧跟最后一个分类。
+            var strip = view.FindControl<ScrollViewer>("CategoryStrip")!;
+            Assert.Contains(toggle, strip.GetVisualDescendants());
+            Assert.Contains(toggle.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "更多筛选");
+
+            toggle.Command!.Execute(null);
+            Pump(window);
+            Assert.True(groups.IsEffectivelyVisible);
+            Assert.Contains("active", toggle.Classes);
+            Assert.Contains(groups.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "排序");
+
+            main.Vod.SelectFilter("area", "a");
+            main.Vod.SelectFilter("year", "b");
+            Pump(window);
+            Assert.Equal("地区A · 年代B", main.Vod.FilterSummary);
+            Assert.True(view.FindControl<Button>("ResetFilters")!.IsEffectivelyVisible);
+            Assert.True(view.FindControl<Border>("ActiveFilterBadge")!.IsEffectivelyVisible);
+            Assert.Equal(2, main.Vod.ActiveFilterCount);
+
+            toggle.Command!.Execute(null);
+            Pump(window);
+            Assert.False(groups.IsEffectivelyVisible);
+            Assert.DoesNotContain("active", toggle.Classes);
+        }
+        finally
+        {
+            window.Close();
+            services.Dispose();
+            TempDataDirectory.TryDelete(directory);
+        }
+    }
 }

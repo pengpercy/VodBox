@@ -1,3 +1,4 @@
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
 using Avalonia.Input;
@@ -20,6 +21,10 @@ public partial class SearchView : UserControl
             e.Handled = true;
         });
     }
+
+    /// <summary>折叠箭头：展开时转 90°（朝下），配合过渡平滑旋转。</summary>
+    public static readonly Avalonia.Data.Converters.IValueConverter ChevronRotation = new Avalonia.Data.Converters.FuncValueConverter<bool, Avalonia.Media.Transformation.TransformOperations>(
+        expanded => Avalonia.Media.Transformation.TransformOperations.Parse(expanded ? "rotate(90deg)" : "rotate(0deg)"));
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
@@ -46,6 +51,31 @@ public partial class SearchView : UserControl
     private void OnSearchHistoryPicked(object? sender, string word) => VM.RunSearchCommand.Execute(null);
 
     private void OnSearchClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => VM.RunSearchCommand.Execute(null);
+
+    /// <summary>
+    /// 流式到达的新卡片入场：淡入 + 轻微上移 + 微缩放，同批按顺序错开 28ms（最多错开 12 张），
+    /// 已有卡片不动。滚动回收、切站点、改列数时不播。
+    /// </summary>
+    private void OnCardAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is not Border { Tag: MediaItem item } card || DataContext is not MainViewModel main
+            || !main.Search.TakeEntrance(item, out var order)) return;
+        card.RenderTransform ??= new Avalonia.Media.TranslateTransform();
+        _ = EntranceAnimation(order).RunAsync(card);
+    }
+
+    private static Animation EntranceAnimation(int order) => new()
+    {
+        Duration = TimeSpan.FromMilliseconds(320),
+        Delay = TimeSpan.FromMilliseconds(Math.Min(order, 12) * 28),
+        Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+        FillMode = FillMode.Both,
+        Children =
+        {
+            new KeyFrame { Cue = new Cue(0), Setters = { new Avalonia.Styling.Setter(OpacityProperty, 0d), new Avalonia.Styling.Setter(Avalonia.Media.TranslateTransform.YProperty, 16d) } },
+            new KeyFrame { Cue = new Cue(1), Setters = { new Avalonia.Styling.Setter(OpacityProperty, 1d), new Avalonia.Styling.Setter(Avalonia.Media.TranslateTransform.YProperty, 0d) } },
+        },
+    };
 
     private void OnOpenItem(object? sender, PointerPressedEventArgs e)
     {

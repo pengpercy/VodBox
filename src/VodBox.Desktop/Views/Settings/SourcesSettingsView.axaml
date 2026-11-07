@@ -4,6 +4,32 @@
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              x:Class="VodBox.Desktop.Views.Settings.SourcesSettingsView" x:DataType="vm:SettingsViewModel">
+  <UserControl.Styles>
+    <!-- 状态胶囊：底色是同色 14% 的浅底，圆点与文字用实色；颜色随检测结果过渡。 -->
+    <Style Selector="Border.statusPill">
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="ClipToBounds" Value="True" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border.statusPill Border.tint">
+      <Setter Property="Opacity" Value="0.14" />
+      <Setter Property="Background" Value="{DynamicResource TextTertiaryBrush}" />
+    </Style>
+    <Style Selector="Border.statusPill Ellipse.dot"><Setter Property="Fill" Value="{DynamicResource TextTertiaryBrush}" /></Style>
+    <Style Selector="Border.statusPill TextBlock.state"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" /></Style>
+    <Style Selector="Border.statusPill.fast Border.tint"><Setter Property="Background" Value="{DynamicResource StatusFastBrush}" /></Style>
+    <Style Selector="Border.statusPill.fast Ellipse.dot"><Setter Property="Fill" Value="{DynamicResource StatusFastBrush}" /></Style>
+    <Style Selector="Border.statusPill.fast TextBlock.state"><Setter Property="Foreground" Value="{DynamicResource StatusFastBrush}" /></Style>
+    <Style Selector="Border.statusPill.medium Border.tint"><Setter Property="Background" Value="{DynamicResource StatusMediumBrush}" /></Style>
+    <Style Selector="Border.statusPill.medium Ellipse.dot"><Setter Property="Fill" Value="{DynamicResource StatusMediumBrush}" /></Style>
+    <Style Selector="Border.statusPill.medium TextBlock.state"><Setter Property="Foreground" Value="{DynamicResource StatusMediumBrush}" /></Style>
+    <Style Selector="Border.statusPill.slow Border.tint"><Setter Property="Background" Value="{DynamicResource StatusSlowBrush}" /></Style>
+    <Style Selector="Border.statusPill.slow Ellipse.dot"><Setter Property="Fill" Value="{DynamicResource StatusSlowBrush}" /></Style>
+    <Style Selector="Border.statusPill.slow TextBlock.state"><Setter Property="Foreground" Value="{DynamicResource StatusSlowBrush}" /></Style>
+    <Style Selector="Border.statusPill.bad Border.tint"><Setter Property="Background" Value="{DynamicResource StatusBadBrush}" /></Style>
+    <Style Selector="Border.statusPill.bad Ellipse.dot"><Setter Property="Fill" Value="{DynamicResource StatusBadBrush}" /></Style>
+    <Style Selector="Border.statusPill.bad TextBlock.state"><Setter Property="Foreground" Value="{DynamicResource StatusBadBrush}" /></Style>
+  </UserControl.Styles>
   <!-- 源与订阅：卡片式设置分区。样式见 Resources/SettingsCardStyles.axaml
        本控件 DataContext 即 SettingsViewModel；列表行内的命令需经 $parent[UserControl] 回到本控件再取 SettingsViewModel。 -->
   <StackPanel Spacing="20">
@@ -56,25 +82,62 @@
       </Grid>
       <Border Classes="card">
         <StackPanel>
-          <Border Padding="16,8" MinHeight="48">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <PathIcon Grid.Column="0" Data="{StaticResource Icon.Search}" Width="18" Height="18"
-                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Classes="rowTitle" Text="有效性检测" />
-                <TextBlock Classes="rowSubtitle" Text="用关键词搜索验证连通性：标题命中为有效，返回但无匹配为无结果，请求失败为无效。有勾选时只检测勾选的源，否则检测当前筛选出的源。" TextWrapping="Wrap" />
+          <!-- 有效性检测：第一行只放标题 + 一句短说明 + 关键词与按钮；判定规则与颜色含义收进 ⓘ 悬停提示。
+               检测开始后才出现第二行：细进度条 + 分色计数（与行内状态胶囊同色）。 -->
+          <Border Padding="16,10" MinHeight="48">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <PathIcon Grid.Column="0" Data="{StaticResource Icon.Search}" Width="18" Height="18"
+                          Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="rowTitle" Text="有效性检测" VerticalAlignment="Center" />
+                    <PathIcon x:Name="ValidationHelp" Data="{StaticResource Icon.Information}" Width="14" Height="14" Opacity="0.5"
+                              VerticalAlignment="Center" Background="Transparent" Cursor="Help">
+                      <ToolTip.Tip>
+                        <StackPanel Spacing="4" MaxWidth="300">
+                          <TextBlock Text="用关键词在各源搜索一次：" FontWeight="SemiBold" />
+                          <TextBlock TextWrapping="Wrap" Text="有效：标题命中关键词；无结果：能连通但没有匹配；无效：请求失败或超时。" />
+                          <TextBlock TextWrapping="Wrap" Text="延迟颜色：≤1 秒绿色，1–3 秒黄色，超过 3 秒橙色。" />
+                          <TextBlock TextWrapping="Wrap" Text="有勾选时只检测勾选的源，否则检测当前筛选出的源。" />
+                        </StackPanel>
+                      </ToolTip.Tip>
+                    </PathIcon>
+                  </StackPanel>
+                  <TextBlock Classes="rowSubtitle" Text="搜索关键词，检查各源连通性与延迟" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
+                  <TextBox x:Name="ValidateKeywordBox" Text="{Binding ValidateKeyword}" Width="120" Height="32" PlaceholderText="检测关键词"
+                           ToolTip.Tip="检测用的关键词" CornerRadius="{DynamicResource AppControlCornerRadius}" />
+                  <Button Classes="secondary" Command="{Binding ValidateSitesCommand}">
+                    <Panel>
+                      <TextBlock Text="{Binding ValidateButtonLabel}" IsVisible="{Binding !Validating}" />
+                      <TextBlock Text="停止检测" IsVisible="{Binding Validating}" />
+                    </Panel>
+                  </Button>
+                </StackPanel>
+              </Grid>
+              <StackPanel x:Name="ValidationCounts" Spacing="6" Margin="30,0,0,0" IsVisible="{Binding HasValidation}" ToolTip.Tip="{Binding ValidationSummary}">
+                <ProgressBar Value="{Binding ValidationFraction}" Minimum="0" Maximum="1" Height="3" MinHeight="3" CornerRadius="2" />
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Text="{Binding ValidationProgress, StringFormat='已检测 {0}'}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <Ellipse Width="7" Height="7" Fill="{DynamicResource StatusFastBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding ValidCount, StringFormat='有效 {0}'}" FontSize="11.5" Foreground="{DynamicResource StatusFastBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <Ellipse Width="7" Height="7" Fill="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding EmptyCount, StringFormat='无结果 {0}'}" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <Ellipse Width="7" Height="7" Fill="{DynamicResource StatusBadBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding InvalidCount, StringFormat='无效 {0}'}" FontSize="11.5" Foreground="{DynamicResource StatusBadBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
               </StackPanel>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="{Binding ValidationSummary}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                <TextBox Text="{Binding ValidateKeyword}" Width="120" Height="32" CornerRadius="{DynamicResource AppControlCornerRadius}" />
-                <Button Classes="secondary" Command="{Binding ValidateSitesCommand}">
-                  <Panel>
-                    <TextBlock Text="{Binding ValidateButtonLabel}" IsVisible="{Binding !Validating}" />
-                    <TextBlock Text="停止检测" IsVisible="{Binding Validating}" />
-                  </Panel>
-                </Button>
-              </StackPanel>
-            </Grid>
+            </StackPanel>
           </Border>
           <Border Classes="rowSep" />
           <!-- 过滤：模糊搜索 + 状态 -->
@@ -126,8 +189,22 @@
                       </StackPanel>
                       <TextBlock Classes="rowSubtitle" Text="{Binding Api}" TextTrimming="CharacterEllipsis" MaxWidth="360" HorizontalAlignment="Left" />
                     </StackPanel>
-                    <TextBlock Grid.Column="3" Text="{Binding StatusDetail}" FontSize="11" Margin="12,0" MaxWidth="160" TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding StatusDetail}" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                    <!-- 检测状态胶囊：圆点 + 状态 + 延迟，按结果着色（快绿 / 一般黄 / 慢橙 / 无结果灰 / 无效红），悬停看明细与错误原因。 -->
+                    <Panel Grid.Column="3" Margin="12,0" VerticalAlignment="Center" ToolTip.Tip="{Binding StatusDetail}">
+                      <TextBlock Text="检测中…" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding Checking}" VerticalAlignment="Center" />
+                      <Border Classes="statusPill" Classes.fast="{Binding IsFast}" Classes.medium="{Binding IsMedium}" Classes.slow="{Binding IsSlow}"
+                              Classes.empty="{Binding IsEmpty}" Classes.bad="{Binding IsBad}" IsVisible="{Binding HasStatus}">
+                        <Panel>
+                          <Border Classes="tint" />
+                          <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,2">
+                            <Ellipse Classes="dot" Width="6" Height="6" VerticalAlignment="Center" />
+                            <TextBlock Classes="state" Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Classes="state" Text="{Binding LatencyLabel}" FontSize="11" VerticalAlignment="Center"
+                                       IsVisible="{Binding LatencyLabel, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+                          </StackPanel>
+                        </Panel>
+                      </Border>
+                    </Panel>
                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                       <Button Classes="secondary" Padding="10,4" Content="{Binding ToggleLabel}"
                               Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteDisabledCommand}" CommandParameter="{Binding}" />

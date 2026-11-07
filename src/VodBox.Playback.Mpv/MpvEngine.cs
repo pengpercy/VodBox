@@ -139,9 +139,12 @@ public sealed class MpvEngine : IPlaybackEngine
                 && !header.Key.Equals("Referer", StringComparison.OrdinalIgnoreCase))
                 throw new NotSupportedException($"请求头 {header.Key} 需要通过媒体代理传递（S7 实现）。");
         }
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        long initializedMs = 0, surfaceMs = 0;
         if (_waitForVideoSurface)
         {
             await ExecuteAsync(Initialize, token).ConfigureAwait(false);
+            initializedMs = clock.ElapsedMilliseconds;
             // loadfile 早于 render-context 创建时 libmpv 会静默丢视频。
             try
             {
@@ -157,6 +160,7 @@ public sealed class MpvEngine : IPlaybackEngine
                 VodBoxLog.Error("mpv", "OpenGL 渲染面创建失败", error);
                 throw;
             }
+            surfaceMs = clock.ElapsedMilliseconds;
         }
         await ExecuteAsync(() =>
         {
@@ -186,7 +190,16 @@ public sealed class MpvEngine : IPlaybackEngine
                 throw;
             }
         }, token);
-        VodBoxLog.Info("mpv", $"已提交 loadfile session={sessionId}");
+        // 分段耗时：打开慢时能看出是卡在 libmpv 初始化、等渲染面还是命令本身。
+        VodBoxLog.Info("mpv", $"已提交 loadfile session={sessionId} init={initializedMs}ms surface={surfaceMs}ms total={clock.ElapsedMilliseconds}ms");
+    }
+
+    /// <summary>后台预先创建 libmpv 客户端（首次播放不再等初始化）；失败不抛，留给真正播放时报告。</summary>
+    public async Task WarmUpAsync()
+    {
+        try { await ExecuteAsync(Initialize, CancellationToken.None).ConfigureAwait(false); }
+        catch (Exception error) when (error is not ObjectDisposedException) { VodBoxLog.Warn("mpv", $"预热 libmpv 失败：{error.Message}"); }
+        catch (ObjectDisposedException) { }
     }
 
     public Task PlayAsync(CancellationToken token = default) =>

@@ -6,7 +6,9 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Headless.XUnit;
+using Avalonia;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using VodBox.Core;
 using VodBox.Desktop.Services;
 using VodBox.Desktop.ViewModels;
@@ -132,6 +134,79 @@ public sealed class DetailSourcesTests
         for (var i = 0; i < 20 && fixture.Detail.Detail!.Item.Poster != "https://img.example/scraped.jpg"; i++) { Dispatcher.UIThread.RunJobs(); await Task.Delay(10); }
         Assert.Equal("https://img.example/scraped.jpg", fixture.Detail.Detail!.Item.Poster);
         Assert.Equal("34874646", fixture.Detail.Detail.Item.DoubanId);
+    }
+
+    internal static async Task<Avalonia.Media.Imaging.Bitmap?> RenderAsync(Avalonia.Controls.Window window)
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            Avalonia.Headless.AvaloniaHeadlessPlatform.ForceRenderTimerTick(1); Dispatcher.UIThread.RunJobs();
+            if (Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(window) is { } frame && i > 3) return frame;
+            await Task.Delay(20);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 详情页排版：没有「试看」占位；剧集是等宽网格（每行填满当前列数、格子同宽，不再 7+3 折行），列数随宽度变化；
+    /// 当前播放源 / 线路 / 选集都有选中态。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task DetailPageLaysEpisodesOutAsEvenGrid()
+    {
+        static VodResult Long(string source, string name) => new()
+        {
+            Id = source, Title = "庆余年 第二季", Year = "2024", SourceKey = source, SourceName = name, Remarks = "更新至36集",
+            Area = "中国大陆", TypeName = "古装", Director = "孙皓", Actor = "张若昀 / 李沁 / 陈道明 / 吴刚 / 郭麒麟",
+            Description = "该剧改编自猫腻同名畅销小说，承接上季，范闲率领使团回归途中，二皇子以费介、范思辙以及滕家遗孤的安危来威胁范闲，逼他向自己俯首称臣。",
+            Lines = [new PlaybackLine("m3u8", "量子m3u8", Enumerable.Range(1, 36).Select(i => new Episode($"{source}-{i}", i == 36 ? "第36集完结" : $"第{i:00}集", $"https://{source}.example/{i}.m3u8")).ToArray()),
+                     new PlaybackLine("yun", "云播", Enumerable.Range(1, 36).Select(i => new Episode($"{source}-y{i}", $"第{i:00}集", $"https://{source}.example/y{i}.m3u8")).ToArray())],
+        };
+        using var fixture = new Fixture([Long("a", "量子资源"), Long("b", "非凡影视资源站"), Long("c", "暴风"), Long("d", "红牛资源网")]);
+        await fixture.Detail.OpenAsync(MediaItem.DoubanSourceKey, DoubanCard());
+        var window = new Avalonia.Controls.Window { Width = 1100, Height = 860, Content = new VodBox.Desktop.Views.DetailView { DataContext = fixture.Detail } };
+        window.Show();
+        try
+        {
+            var frame = await RenderAsync(window);
+            Assert.NotNull(frame);
+            var dir = Path.Combine(Environment.CurrentDirectory, "preview-shots");
+            Directory.CreateDirectory(dir);
+            frame!.Save(Path.Combine(dir, "Detail.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
+
+            var texts = window.GetVisualDescendants().OfType<Avalonia.Controls.TextBlock>().Select(text => text.Text ?? "").ToArray();
+            Assert.DoesNotContain(texts, text => text.Contains("试看"));
+
+            void AssertEvenGrid()
+            {
+                var columns = fixture.Detail.EpisodeColumns;
+                var cells = window.GetVisualDescendants().OfType<Avalonia.Controls.Button>().Where(button => button.Classes.Contains("episode")).ToArray();
+                Assert.Equal(36, cells.Length);
+                var widths = cells.Select(cell => Math.Round(cell.Bounds.Width)).Distinct().ToArray();
+                Assert.Single(widths);
+                var rows = cells.GroupBy(cell => Math.Round(cell.TranslatePoint(default, window)!.Value.Y)).OrderBy(group => group.Key).ToArray();
+                Assert.All(rows.SkipLast(1), row => Assert.Equal(columns, row.Count()));
+                Assert.Equal(36 - columns * (rows.Length - 1), rows[^1].Count());
+            }
+            AssertEvenGrid();
+            var wide = fixture.Detail.EpisodeColumns;
+            window.Width = 760;
+            await RenderAsync(window);
+            Assert.True(fixture.Detail.EpisodeColumns < wide, $"窄窗口列数应减少：{fixture.Detail.EpisodeColumns} / {wide}");
+            AssertEvenGrid();
+
+            var current = window.GetVisualDescendants().OfType<Avalonia.Controls.Button>().Where(button => button.Classes.Contains("current")).ToArray();
+            Assert.Contains(current, button => button.Classes.Contains("episode") && (button.Tag as Episode)?.Id == "a-1");
+            Assert.Single(current, button => button.Tag is DetailSource);
+            fixture.Detail.SelectedEpisode = fixture.Detail.SelectedLine!.Episodes[4];
+            Assert.Single(window.GetVisualDescendants().OfType<Avalonia.Controls.Button>(), button => button.Classes.Contains("episode") && button.Classes.Contains("current") && (button.Tag as Episode)?.Id == "a-5");
+            var lineTabs = window.GetVisualDescendants().OfType<Avalonia.Controls.ListBox>().Single(box => box.Name == "LineTabs");
+            Assert.True(lineTabs.IsEffectivelyVisible);
+            lineTabs.SelectedIndex = 1;
+            Assert.Equal("yun", fixture.Detail.SelectedLine!.Id);
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

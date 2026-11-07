@@ -68,6 +68,22 @@
     <Style Selector="Border.resultCard:pointerover TextBlock.cardTitle">
       <Setter Property="TextDecorations" Value="Underline" />
     </Style>
+    <!-- 侧栏新出现的采集源 / 失败源：从左侧轻推入并淡入，跟随结果流式到达，不再生硬地蹦出来。 -->
+    <Style Selector="ListBox.siteList ListBoxItem, ItemsControl#FailedSites ContentPresenter">
+      <Setter Property="RenderTransform"><TranslateTransform /></Setter>
+      <Style.Animations>
+        <Animation Duration="0:0:0.26" Easing="CubicEaseOut" FillMode="Both">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="TranslateTransform.X" Value="-12" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="TranslateTransform.X" Value="0" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
     <Style Selector="Border.historyChip:pointerover">
       <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
     </Style>
@@ -105,8 +121,21 @@
           </ListBox>
           <!-- 失败/超时/插件不受支持的站点单独一组，原因放悬停提示，不再挤在汇总行里。 -->
           <StackPanel IsVisible="{Binding HasFailures}">
-            <TextBlock Classes="sectionLabel" Text="{Binding Failures.Count, StringFormat='未返回结果 · {0}'}" />
-            <ItemsControl x:Name="FailedSites" ItemsSource="{Binding Failures}">
+            <!-- 默认折叠：失败源只是参考信息，不和有结果的站点抢位置；点标题展开/收起。 -->
+            <Button x:Name="FailuresToggle" Classes="siteRow" Command="{Binding ToggleFailuresCommand}" Padding="10,7" Margin="0,8,0,0"
+                    chrome:WindowDecorationProperties.ElementRole="User" ToolTip.Tip="展开/收起未返回结果的采集源">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <PathIcon Data="{StaticResource Icon.ChevronRight}" Width="12" Height="12" Opacity="0.6" VerticalAlignment="Center"
+                          RenderTransformOrigin="50%,50%" RenderTransform="{Binding FailuresExpanded, Converter={x:Static views:SearchView.ChevronRotation}}">
+                  <PathIcon.Transitions>
+                    <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut" /></Transitions>
+                  </PathIcon.Transitions>
+                </PathIcon>
+                <TextBlock Text="{Binding Failures.Count, StringFormat='未返回结果 · {0}'}" FontSize="11"
+                           Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <ItemsControl x:Name="FailedSites" ItemsSource="{Binding Failures}" IsVisible="{Binding FailuresExpanded}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:SearchFailure">
                   <TextBlock Text="{Binding SiteName}" ToolTip.Tip="{Binding Error}" FontSize="12" Margin="10,4"
@@ -165,7 +194,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="core:MediaItem">
-                    <Border Classes="resultCard" Background="Transparent" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}"
+                    <Border Classes="resultCard" Background="Transparent" Cursor="Hand" PointerPressed="OnOpenItem" Tag="{Binding}" AttachedToVisualTree="OnCardAttached"
                             Width="{Binding $parent[views:SearchView].((vm:MainViewModel)DataContext).Search.CardWidth}" Margin="0,0,18,22">
                       <StackPanel>
                         <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True"

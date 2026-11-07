@@ -75,8 +75,7 @@
                         HorizontalAlignment="Left" VerticalAlignment="Center" Opacity="0.6" IsHitTestVisible="False" />
               <views:SearchHistoryPopup x:Name="GlobalSearchHistory" TargetBox="{Binding #GlobalSearch}" History="{Binding Search}" Picked="OnSearchHistoryPicked" />
             </Grid>
-            <!-- 顶部不再显示品牌 logo 与名称，只保留当前源状态；收紧留白让菜单整体上移。 -->
-            <TextBlock Grid.Row="1" Text="{Binding CurrentSourceName}" FontSize="11" Opacity="0.55" Margin="22,0,22,6" />
+            <!-- 顶部不显示品牌与采集源数量：搜索框下面直接是菜单。 -->
 
             <views:NavItemView Grid.Row="2" Icon="{StaticResource Icon.Home}" Label="首页" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsHome}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoHomeCommand}" />
             <views:NavItemView Grid.Row="3" Icon="{StaticResource Icon.Movie}" Label="点播" IsSelected="{Binding Page, Converter={x:Static views:PageConverters.IsVod}, ConverterParameter=0, Mode=OneWay}" Command="{Binding GoVodCommand}" />

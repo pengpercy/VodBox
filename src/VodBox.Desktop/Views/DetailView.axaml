@@ -3,13 +3,94 @@
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
              xmlns:design="clr-namespace:VodBox.Desktop.Design"
+             xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              x:Class="VodBox.Desktop.Views.DetailView" x:DataType="vm:DetailViewModel">
   <Design.DataContext>
     <x:Static Member="design:DesignData.MainForDesign" />
   </Design.DataContext>
   <UserControl.Styles>
-    <Style Selector="Button.sourceChip.current">
+    <!-- 播放源 / 剧集共用的选择块：外观全部走样式（不写本地值，选中态才能覆盖）。 -->
+    <Style Selector="Button.chip">
+      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.chip.current">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.episode">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
+    <Style Selector="Button.episode.watched">
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+    </Style>
+    <Style Selector="Button.episode.current">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.action">
+      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.action.primary">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Padding" Value="18,0" />
+    </Style>
+    <Style Selector="TextBlock.sectionTitle">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.sectionNote">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- 线路：分段选择（ListBox 自带选中态） -->
+    <Style Selector="ListBox.lines">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.lines > ListBoxItem">
+      <Setter Property="Margin" Value="0,0,8,8" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
+      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ListBox.lines > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="ListBox.lines > ListBoxItem:selected">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
   </UserControl.Styles>
 
@@ -18,26 +99,20 @@
     <Panel Margin="28,12,28,28">
     <!-- 详情骨架：加载中占位（海报 + 元信息 + 线路 + 选集），避免整页白屏 -->
     <StackPanel Spacing="22" IsVisible="{Binding ShowSkeleton}">
-      <Grid ColumnDefinitions="200,36,*,28,280">
-        <Border Grid.Column="0" Classes="skeleton poster" Height="300" />
+      <Grid ColumnDefinitions="180,32,*">
+        <Border Grid.Column="0" Classes="skeleton poster" Height="252" />
         <StackPanel Grid.Column="2" Spacing="12">
-          <Border Classes="skeleton" Height="26" Width="280" HorizontalAlignment="Left" />
-          <Border Classes="skeleton" Height="13" Width="140" HorizontalAlignment="Left" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Border Classes="skeleton" Height="26" Width="64" />
-            <Border Classes="skeleton" Height="26" Width="64" />
-            <Border Classes="skeleton" Height="26" Width="80" />
-          </StackPanel>
+          <Border Classes="skeleton" Height="28" Width="280" HorizontalAlignment="Left" />
+          <Border Classes="skeleton" Height="14" Width="200" HorizontalAlignment="Left" />
           <Border Classes="skeleton" Height="12" Width="360" HorizontalAlignment="Left" />
           <Border Classes="skeleton" Height="12" Width="420" HorizontalAlignment="Left" />
           <Border Classes="skeleton" Height="12" Width="300" HorizontalAlignment="Left" />
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
             <Border Classes="skeleton" Height="38" Width="126" />
-            <Border Classes="skeleton" Height="38" Width="96" />
-            <Border Classes="skeleton" Height="38" Width="112" />
+            <Border Classes="skeleton" Height="38" Width="88" />
+            <Border Classes="skeleton" Height="38" Width="104" />
           </StackPanel>
         </StackPanel>
-        <Border Grid.Column="4" Classes="skeleton poster" Height="158" />
       </Grid>
       <StackPanel Spacing="10">
         <Border Classes="skeleton" Height="18" Width="80" HorizontalAlignment="Left" />
@@ -64,126 +139,87 @@
     </StackPanel>
 
     <!-- 详情内容：拿到数据后显示（加载中为 null，由上面的骨架接管） -->
-    <StackPanel Spacing="22" IsVisible="{Binding ShowContent}">
+    <StackPanel Spacing="26" IsVisible="{Binding ShowContent}">
 
-      <Grid ColumnDefinitions="200,36,*,28,280">
-        <!-- 海报 -->
-        <Border Grid.Column="0" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="300" Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
+      <!-- 头部：海报 + 片名/元信息/简介/操作 -->
+      <Grid ColumnDefinitions="180,32,*">
+        <Border Grid.Column="0" CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="252" VerticalAlignment="Top"
+                Background="{DynamicResource CardHoverBrush}" ClipToBounds="True">
           <Panel>
             <PathIcon Data="{StaticResource Icon.Movie}" Width="48" Height="48" Opacity="0.25" HorizontalAlignment="Center" VerticalAlignment="Center" />
             <views:RemotePoster Url="{Binding Detail.Item.Poster}" />
           </Panel>
         </Border>
 
-        <!-- 元信息 -->
-        <StackPanel Grid.Column="2" Spacing="12" VerticalAlignment="Top">
-          <TextBlock Text="{Binding Detail.Item.Title}" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
-          <!-- 元信息行：站源 + 年份 + 地区 + 类型 + 时长（对齐设计稿 p-detail） -->
+        <StackPanel Grid.Column="2" Spacing="10" VerticalAlignment="Top">
+          <TextBlock x:Name="DetailTitle" Text="{Binding Detail.Item.Title}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" />
           <WrapPanel Orientation="Horizontal">
-            <TextBlock FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}">
-              <Run Text="播放源：" /><Run Text="{Binding SourceName}" Foreground="{DynamicResource TextSecondaryBrush}" />
-            </TextBlock>
-            <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
-              <TextBlock Text="{Binding Detail.Item.Year}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+            <Border Background="{DynamicResource AccentSoftBrush}" CornerRadius="4" Padding="8,3" Margin="0,0,10,4" VerticalAlignment="Center"
+                    IsVisible="{Binding Detail.Item.Remarks, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding Detail.Item.Remarks}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" />
             </Border>
-            <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
-              <TextBlock Text="{Binding Detail.Item.Area}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-            </Border>
-            <Border Background="{DynamicResource CardHoverBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="5" Padding="10,4" Margin="0,0,8,8">
-              <TextBlock Text="{Binding Detail.Item.TypeName}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-            </Border>
+            <TextBlock Text="{Binding MetaLine}" FontSize="13" Margin="0,0,0,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
           </WrapPanel>
-          <TextBlock FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap">
-            <Run Text="导演：" /><Run Text="{Binding Detail.Director}" Foreground="{DynamicResource TextSecondaryBrush}" />
-          </TextBlock>
-          <TextBlock FontSize="12.5" Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap">
-            <Run Text="主演：" /><Run Text="{Binding Detail.Actor}" Foreground="{DynamicResource TextSecondaryBrush}" />
-          </TextBlock>
-          <TextBlock Text="{Binding Detail.Description}" FontSize="12.5" Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.9"
-                     TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
-          <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
-            <!-- 主按钮智能显示续播集数（读取历史进度，S2 接运行时逻辑；设计稿为「续播 第12集」） -->
-            <Button Command="{Binding PlayCommand}" Background="#0078D4"
-                    Foreground="White" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,2,0,0">
+            <TextBlock Grid.Row="0" Text="导演" FontSize="12.5" Margin="0,0,12,6" Foreground="{DynamicResource TextTertiaryBrush}"
+                       IsVisible="{Binding Detail.Director, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Detail.Director}" FontSize="12.5" Margin="0,0,0,6" TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       IsVisible="{Binding Detail.Director, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Grid.Row="1" Text="主演" FontSize="12.5" Margin="0,0,12,0" Foreground="{DynamicResource TextTertiaryBrush}"
+                       IsVisible="{Binding Detail.Actor, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Detail.Actor}" FontSize="12.5" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       IsVisible="{Binding Detail.Actor, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+          </Grid>
+          <TextBlock Text="{Binding Detail.Description}" FontSize="13" LineHeight="21" MaxWidth="760" HorizontalAlignment="Left"
+                     Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding Detail.Description}"
+                     IsVisible="{Binding Detail.Description, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+            <!-- 主按钮：有续播进度时显示「续播 第N集」 -->
+            <Button x:Name="PlayButton" Classes="action primary" Command="{Binding PlayCommand}">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Play}" Width="18" Height="18" />
-                <TextBlock Text="{Binding PlayLabel}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding PlayLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
               </StackPanel>
             </Button>
-            <Button Command="{Binding ToggleFavoriteCommand}" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
-                    BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+            <Button Classes="action" Command="{Binding ToggleFavoriteCommand}">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Star}" Width="18" Height="18" />
                 <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Command="{Binding SearchOtherSourcesCommand}" ToolTip.Tip="用片名在搜索窗口聚合搜索全部采集源" Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}"
-                    CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,9" Margin="0,0,8,8" Cursor="Hand">
+            <Button Classes="action" Command="{Binding SearchOtherSourcesCommand}" ToolTip.Tip="用片名在搜索窗口聚合搜索全部采集源">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource Icon.Search}" Width="18" Height="18" />
                 <TextBlock Text="跨站搜索" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-          </WrapPanel>
-        </StackPanel>
-
-        <!-- 播放器窗 -->
-        <!-- TODO(S5 影院模式)：若需要内嵌小窗播放，此处可挂第二个 MpvVideoSurface（需独立 MpvClient，mpv 单实例只能一个 render context 时共享渲染面）。
-             当前产品决策：播放统一走全局浮层，此窗只作提示。 -->
-        <StackPanel Grid.Column="4" Spacing="10">
-          <!-- 内嵌试看播放器（影院模式占位：S5 接第二个 MpvVideoSurface；当前产品决策为全局浮层） -->
-          <Border CornerRadius="{DynamicResource AppPosterCornerRadius}" Height="158" ClipToBounds="True" Cursor="Hand">
-            <Border.Background>
-              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                <GradientStop Color="#1E3A5F" Offset="0" />
-                <GradientStop Color="#2D1B4E" Offset="1" />
-              </LinearGradientBrush>
-            </Border.Background>
-            <Panel>
-              <!-- 中央播放按钮 -->
-              <Border CornerRadius="28" Width="56" Height="56" Background="#66000000" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <StackPanel TextElement.Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center">
-                  <PathIcon Data="{StaticResource Icon.Play}" Width="24" Height="24" />
-                </StackPanel>
-              </Border>
-              <!-- 右上清晰度标 -->
-              <Border CornerRadius="4" Background="#66000000" Padding="7,3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
-                <TextBlock Text="1080P" FontSize="10" Foreground="#E6FFFFFF" FontWeight="SemiBold" />
-              </Border>
-              <!-- 左下试看提示 -->
-              <Border Background="#66000000" Padding="10,5" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,10" CornerRadius="0,8,8,0">
-                <TextBlock Text="试看模式 · 点击全屏播放" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" />
-              </Border>
-            </Panel>
-          </Border>
-          <TextBlock Text="鼠标双击画面 / 按 Enter 进入全屏播放窗口" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}"
-                     HorizontalAlignment="Center" />
+          </StackPanel>
         </StackPanel>
       </Grid>
 
       <!-- 播放源（LunaTV 换源）：同名影片在各采集源上的结果；测速后按分辨率/速度/延迟排序 -->
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="12">
         <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="播放源" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding SourcesStatus}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+          <TextBlock Classes="sectionTitle" Text="播放源" />
+          <TextBlock Classes="sectionNote" Text="{Binding SourcesStatus}" />
           <ProgressBar IsIndeterminate="True" Width="40" Height="3" VerticalAlignment="Center" IsVisible="{Binding SourcesBusy}" />
-          <Button Command="{Binding RetestSourcesCommand}" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="{DynamicResource CardHoverBrush}"
-                  Padding="10,3" FontSize="11.5" Cursor="Hand" Content="重新测速" IsVisible="{Binding !SourcesBusy}" />
+          <Button Classes="chip" Command="{Binding RetestSourcesCommand}" Padding="10,3" FontSize="11.5" Content="重新测速" IsVisible="{Binding !SourcesBusy}" />
         </StackPanel>
-        <ScrollViewer MaxHeight="150" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <ItemsControl ItemsSource="{Binding Sources}">
+        <ScrollViewer MaxHeight="156" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl x:Name="SourceChips" ItemsSource="{Binding Sources}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:DetailSource">
-                <Button Classes="sourceChip" Classes.current="{Binding IsCurrent}" Click="OnPickSource" Tag="{Binding}" Margin="0,0,8,8" Width="176"
-                        CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="12,6" Cursor="Hand" HorizontalContentAlignment="Stretch"
-                        Background="{DynamicResource CardHoverBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}">
-                  <StackPanel Spacing="2">
+                <Button Classes="chip" Classes.current="{Binding IsCurrent}" Click="OnPickSource" Tag="{Binding}" Margin="0,0,8,8" Width="188" Height="50"
+                        Padding="12,0" HorizontalContentAlignment="Stretch" ToolTip.Tip="{Binding Name}">
+                  <StackPanel Spacing="3" VerticalAlignment="Center">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="1" Text="{Binding EpisodeLabel}" FontSize="10.5" Margin="6,0,0,0" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
                     </Grid>
                     <TextBlock Text="{Binding SpeedLabel}" FontSize="10.5" Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis"
@@ -196,64 +232,50 @@
         </ScrollViewer>
       </StackPanel>
 
-      <!-- 线路（当前播放源的 vod_play_from 拆分；多于一条时显示） -->
-      <StackPanel Spacing="10" IsVisible="{Binding HasMultipleLines}">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="线路" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="同一播放源内的不同线路" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-        </StackPanel>
-        <ItemsControl ItemsSource="{Binding Lines}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <WrapPanel Orientation="Horizontal" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Button Content="{Binding Name}" Click="OnPickLine" Tag="{Binding}" Margin="0,0,8,8"
-                      CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="14,6" FontSize="12.5" Cursor="Hand"
-                      Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </StackPanel>
-
-      <!-- 剧集：分块行虚拟化，单集按钮操作 -->
-      <StackPanel Spacing="10">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="剧集" FontSize="14" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding EpisodeCountLabel}" FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-          <Panel />
-          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button Command="{Binding ToggleEpisodeOrderCommand}" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="{DynamicResource CardHoverBrush}" Padding="10,4" Cursor="Hand">
-              <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource TextSecondaryBrush}">
-                <PathIcon Data="{StaticResource Icon.SwapVertical}" Width="18" Height="18" VerticalAlignment="Center" />
-                <TextBlock Text="倒序" FontSize="11.5" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-
-          </StackPanel>
-        </StackPanel>
-        <!-- 剧集网格：分块行虚拟化（长剧 500+ 集只渲染可见行）；独立滚动区 260 高 -->
-        <ListBox Classes="virtualRows" ItemsSource="{Binding EpisodeRows}" Background="Transparent" BorderThickness="0"
-                 MaxHeight="260" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+      <!-- 选集：线路分段（多于一条时）+ 等宽网格（列数随宽度，长剧只渲染可见行） -->
+      <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+          <TextBlock Classes="sectionTitle" Text="选集" />
+          <TextBlock Grid.Column="1" Classes="sectionNote" Text="{Binding EpisodeCountLabel}" Margin="10,0,0,0" />
+          <Button Grid.Column="3" Classes="chip" Command="{Binding ToggleEpisodeOrderCommand}" Padding="10,4">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource Icon.SwapVertical}" Width="18" Height="18" VerticalAlignment="Center" />
+              <TextBlock Text="倒序" FontSize="11.5" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <ListBox x:Name="LineTabs" Classes="lines" ItemsSource="{Binding Lines}" SelectedItem="{Binding SelectedLine}" IsVisible="{Binding HasMultipleLines}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
-            <DataTemplate>
-              <ItemsControl ItemsSource="{Binding Items}">
+            <DataTemplate x:DataType="core:PlaybackLine">
+              <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <ListBox x:Name="EpisodeList" Classes="virtualRows" ItemsSource="{Binding EpisodeRows}" Background="Transparent" BorderThickness="0"
+                 MaxHeight="356" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:EpisodeRow">
+              <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,4,0">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal" />
+                    <UniformGrid Rows="1" Columns="{Binding Columns}" />
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Grid Margin="0,0,8,10" Width="132">
-                      <Button Click="OnPickEpisode" Tag="{Binding Episode}" ToolTip.Tip="{Binding Title}"
-                              CornerRadius="{DynamicResource AppControlCornerRadius}" Padding="10,9" FontSize="12.5" Cursor="Hand"
-                              Background="{DynamicResource CardHoverBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrokeBrush}">
-                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-                      </Button>
-                    </Grid>
+                  <DataTemplate x:DataType="vm:EpisodePresentation">
+                    <Button Classes="chip episode" Classes.current="{Binding IsCurrent}" Classes.watched="{Binding IsWatched}"
+                            Click="OnPickEpisode" Tag="{Binding Episode}" ToolTip.Tip="{Binding Tip}" Margin="0,0,8,8">
+                      <Panel>
+                        <!-- 已看：右上角小圆点（文字同时变弱），不再往标题里塞「已看 ·」把格子撑乱 -->
+                        <Ellipse x:Name="WatchedDot" Width="5" Height="5" Fill="{DynamicResource OkBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                 Margin="0,5,-3,0" IsVisible="{Binding IsWatched}" />
+                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Panel>
+                    </Button>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>

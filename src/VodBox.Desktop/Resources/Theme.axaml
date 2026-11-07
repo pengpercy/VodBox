@@ -5,6 +5,7 @@
       <SolidColorBrush x:Key="SurfaceBrush" Color="#161616" />
       <SolidColorBrush x:Key="CardBrush" Color="#0FFFFFFF" />
       <SolidColorBrush x:Key="CardHoverBrush" Color="#12FFFFFF" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#332B8FE8" />
       <SolidColorBrush x:Key="StrokeBrush" Color="#FFFFFF" Opacity="0.09" />
       <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF" />
       <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
@@ -20,6 +21,11 @@
       <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#33FFFFFF" />
       <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#52FFFFFF" />
       <!-- 聚焦底色：Fluent 默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；改成略亮一档的半透明白。 -->
+      <!-- 源检测状态色：快 / 一般 / 慢 / 无效（深色主题用亮色，保证对比度）。 -->
+      <SolidColorBrush x:Key="StatusFastBrush" Color="#6CCB5F" />
+      <SolidColorBrush x:Key="StatusMediumBrush" Color="#FFC83D" />
+      <SolidColorBrush x:Key="StatusSlowBrush" Color="#FF9349" />
+      <SolidColorBrush x:Key="StatusBadBrush" Color="#FF6B6B" />
       <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#14FFFFFF" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Light">
@@ -27,6 +33,7 @@
       <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
       <SolidColorBrush x:Key="CardBrush" Color="#09000000" />
       <SolidColorBrush x:Key="CardHoverBrush" Color="#12000000" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#1A0078D4" />
       <SolidColorBrush x:Key="StrokeBrush" Color="#000000" Opacity="0.12" />
       <SolidColorBrush x:Key="TextPrimaryBrush" Color="#202020" />
       <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7202020" />
@@ -40,6 +47,10 @@
       <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#7A000000" />
       <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#29000000" />
       <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#45000000" />
+      <SolidColorBrush x:Key="StatusFastBrush" Color="#0F7B0F" />
+      <SolidColorBrush x:Key="StatusMediumBrush" Color="#9D6A00" />
+      <SolidColorBrush x:Key="StatusSlowBrush" Color="#C24E00" />
+      <SolidColorBrush x:Key="StatusBadBrush" Color="#C42B1C" />
       <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFFFF" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Default">
@@ -62,6 +73,11 @@
       <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#33FFFFFF" />
       <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#52FFFFFF" />
       <!-- 聚焦底色：Fluent 默认 #B31E1E1E 近乎纯黑，与半透明卡片/页面底色反差太大；改成略亮一档的半透明白。 -->
+      <!-- 源检测状态色：快 / 一般 / 慢 / 无效（深色主题用亮色，保证对比度）。 -->
+      <SolidColorBrush x:Key="StatusFastBrush" Color="#6CCB5F" />
+      <SolidColorBrush x:Key="StatusMediumBrush" Color="#FFC83D" />
+      <SolidColorBrush x:Key="StatusSlowBrush" Color="#FF9349" />
+      <SolidColorBrush x:Key="StatusBadBrush" Color="#FF6B6B" />
       <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#14FFFFFF" />
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>

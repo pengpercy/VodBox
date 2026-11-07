@@ -29,9 +29,30 @@ public partial class VodView : UserControl
     /// <summary>距底部不足该像素时预取下一页；VM 内部再按代次/去重/终点门控，重复触发是安全的。</summary>
     private const double PrefetchDistance = 320;
 
+    private static readonly Avalonia.Animation.Animation FilterReveal = new()
+    {
+        Duration = TimeSpan.FromMilliseconds(240),
+        Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+        FillMode = Avalonia.Animation.FillMode.Both,
+        Children =
+        {
+            new Avalonia.Animation.KeyFrame { Cue = new Avalonia.Animation.Cue(0), Setters = { new Avalonia.Styling.Setter(OpacityProperty, 0d), new Avalonia.Styling.Setter(Avalonia.Media.TranslateTransform.YProperty, -10d) } },
+            new Avalonia.Animation.KeyFrame { Cue = new Avalonia.Animation.Cue(1), Setters = { new Avalonia.Styling.Setter(OpacityProperty, 1d), new Avalonia.Styling.Setter(Avalonia.Media.TranslateTransform.YProperty, 0d) } },
+        },
+    };
+
     public VodView()
     {
         InitializeComponent();
+        // 「更多筛选」展开：筛选组从上方淡入下滑，不是瞬间撑开。
+        if (this.FindControl<ItemsControl>("FilterGroups") is { } filters)
+        {
+            filters.RenderTransform = new Avalonia.Media.TranslateTransform();
+            filters.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == IsVisibleProperty && e.NewValue is true) _ = FilterReveal.RunAsync(filters);
+            };
+        }
         // 网格宽度决定列数；宿主铺到右边缘，扣除移入内容层的 28 留白。
         // 网格与骨架互斥显示，两个宿主都上报宽度：
         // 首次加载时只有骨架可见，靠 GridHost 也能算出正确列数（SetGridWidth 忽略 0 宽度）。

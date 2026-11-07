@@ -64,6 +64,9 @@ public sealed partial class SearchViewModel : ObservableObject
     /// <summary>侧栏「全部」是否为当前选择。</summary>
     public bool IsAllSelected => SelectedSite is null;
     public bool HasFailures => Failures.Count > 0;
+    /// <summary>侧栏「未返回结果」分组是否展开（默认折叠，每次新搜索重新折叠）。</summary>
+    [ObservableProperty] private bool _failuresExpanded;
+    [RelayCommand] private void ToggleFailures() => FailuresExpanded = !FailuresExpanded;
     /// <summary>空态（尚未搜索或没有结果）且有历史时展示最近搜索，结果页本身不再挂历史条。</summary>
     public bool ShowHistory => !Searching && ResultRows.Count == 0 && SearchHistory.Count > 0;
 
@@ -175,6 +178,7 @@ public sealed partial class SearchViewModel : ObservableObject
             Hint = "";
             SelectedSite = null;
             Failures.Clear();
+            FailuresExpanded = false;
             SiteResults.Clear();
             AllResults.Clear();
             AggregatedResults.Clear();
@@ -205,7 +209,7 @@ public sealed partial class SearchViewModel : ObservableObject
                     if (generation != _generation || ct.IsCancellationRequested) return;
                     done++;
                     if (batch.Error is { } error) { failures.Add((batch.Site, error)); Failures.Add(new SearchFailure(batch.Site.Name, error)); }
-                    else if (AddSiteResults(batch.Site, batch.Results)) RebuildResultRows();
+                    else if (AddSiteResults(batch.Site, batch.Results)) SyncResultRows();
                     var all = Math.Max(done, total);
                     Summary = $"「{query}」已搜索 {done}/{all} 个源，{SiteResults.Count} 个源找到 {AllResults.Count} 条结果…";
                     Status = $"已搜索 {done}/{all} 个源 · {AggregatedResults.Count} 部影片";
@@ -262,13 +266,20 @@ public sealed partial class SearchViewModel : ObservableObject
             AllResults.Add(item);
             group.Items.Add(item);
         }
-        AggregatedResults.Clear(); _cardGroups.Clear();
+        // 重算聚合卡片，但内容没变的卡片沿用原实例：网格只为新卡片创建控件，已有卡片原地不动（不闪、不重载海报）。
+        var previous = AggregatedResults.ToArray();
+        _cardGroups.Clear();
+        var index = 0;
         foreach (var cardGroup in SearchAggregation.Group(_results))
         {
             var card = SearchAggregation.ToCard(cardGroup);
+            if (index < previous.Length && previous[index].Equals(card)) card = previous[index];
             _cardGroups[card] = cardGroup;
-            AggregatedResults.Add(card);
+            if (index < AggregatedResults.Count) { if (!ReferenceEquals(AggregatedResults[index], card)) AggregatedResults[index] = card; }
+            else AggregatedResults.Add(card);
+            index++;
         }
+        while (AggregatedResults.Count > index) AggregatedResults.RemoveAt(AggregatedResults.Count - 1);
         return true;
     }
 
@@ -342,14 +353,52 @@ public sealed partial class SearchViewModel : ObservableObject
         RebuildResultRows();
     }
 
+    private List<MediaItem> VisibleItems() => SelectedSite is { } site ? site.Items.ToList() : Aggregate ? AggregatedResults.ToList() : AllResults.ToList();
+
     private void RebuildResultRows()
     {
-        var items = SelectedSite is { } site ? site.Items.ToList() : Aggregate ? AggregatedResults.ToList() : AllResults.ToList();
+        _entering.Clear();
+        var items = VisibleItems();
         ResultRows.Clear();
         for (var i = 0; i < items.Count; i += _columns)
-            ResultRows.Add(new ResultRow(items.Skip(i).Take(_columns).ToList()));
+            ResultRows.Add(new ResultRow(items.Skip(i).Take(_columns)));
         NotifyResultState();
     }
+
+    /// <summary>
+    /// 流式到达的新结果：按位置增量同步行，已有卡片保持原控件；首次出现的卡片记入入场队列，
+    /// 视图在卡片挂上时按顺序错开播放淡入上移（<see cref="TakeEntrance"/>）。
+    /// </summary>
+    private void SyncResultRows()
+    {
+        var shown = new HashSet<MediaItem>(ResultRows.SelectMany(row => row.Items), ReferenceEqualityComparer.Instance);
+        var items = VisibleItems();
+        _entering.Clear();
+        var order = 0;
+        foreach (var item in items)
+            if (!shown.Contains(item) && !_entering.ContainsKey(item)) _entering[item] = order++;
+        var rows = (items.Count + _columns - 1) / _columns;
+        for (var r = 0; r < rows; r++)
+        {
+            var chunk = items.Skip(r * _columns).Take(_columns).ToArray();
+            if (r >= ResultRows.Count) { ResultRows.Add(new ResultRow(chunk)); continue; }
+            var target = ResultRows[r].Items;
+            for (var c = 0; c < chunk.Length; c++)
+            {
+                if (c >= target.Count) target.Add(chunk[c]);
+                else if (!ReferenceEquals(target[c], chunk[c])) target[c] = chunk[c];
+            }
+            while (target.Count > chunk.Length) target.RemoveAt(target.Count - 1);
+        }
+        while (ResultRows.Count > rows) ResultRows.RemoveAt(ResultRows.Count - 1);
+        NotifyResultState();
+    }
+
+    /// <summary>本批新出现的卡片 → 入场顺序（错开动画用）；只在流式追加时填充，切站点/改列数不播动画。</summary>
+    private readonly Dictionary<MediaItem, int> _entering = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>卡片控件挂上时调用：本批新卡片返回 true 与错开序号（取出即失效，滚动回收不会重播）。</summary>
+    public bool TakeEntrance(MediaItem item, out int order) => _entering.Remove(item, out order);
 
 }
 
@@ -385,6 +434,7 @@ public sealed partial class SuggestItem : ObservableObject
 /// <summary>结果网格行（动态列数）。</summary>
 public sealed class ResultRow
 {
-    public IReadOnlyList<MediaItem> Items { get; }
-    public ResultRow(IReadOnlyList<MediaItem> items) => Items = items;
+    /// <summary>可变集合：流式追加时原地补卡，不重建整行。</summary>
+    public ObservableCollection<MediaItem> Items { get; }
+    public ResultRow(IEnumerable<MediaItem> items) => Items = new ObservableCollection<MediaItem>(items);
 }

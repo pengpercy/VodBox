@@ -66,7 +66,11 @@ public sealed partial class DetailViewModel : ObservableObject
     public bool HasMultipleLines => Lines.Count > 1;
 
     partial void OnLoadingChanged(bool value) => NotifyDetailState();
-    partial void OnDetailChanged(MediaDetail? value) => NotifyDetailState();
+    partial void OnDetailChanged(MediaDetail? value) { NotifyDetailState(); OnPropertyChanged(nameof(MetaLine)); }
+
+    /// <summary>标题下的一行元信息：年份 · 地区 · 类型（缺项自动省略）。</summary>
+    public string MetaLine => Detail?.Item is not { } item ? ""
+        : string.Join(" · ", new[] { item.Year, item.Area, item.TypeName }.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim()));
     partial void OnHintChanged(string value) => NotifyDetailState();
 
     private void NotifyDetailState()
@@ -85,7 +89,7 @@ public sealed partial class DetailViewModel : ObservableObject
         : (_resumePositionMs > 0 && MediaDetail.ResumePositionApplies(_resumeLineId, _resumeEpisodeId, SelectedLine?.Id ?? "", episode.Id)
             ? $"续播 {episode.Title}" : $"播放 {episode.Title}");
     partial void OnIsFavoriteChanged(bool value) => OnPropertyChanged(nameof(FavoriteLabel));
-    partial void OnSelectedEpisodeChanged(Episode? value) => OnPropertyChanged(nameof(PlayLabel));
+    partial void OnSelectedEpisodeChanged(Episode? value) { OnPropertyChanged(nameof(PlayLabel)); MarkCurrentEpisode(); }
     partial void OnEpisodesReversedChanged(bool value) => RebuildEpisodeRows();
     [RelayCommand] private void ToggleEpisodeOrder() => EpisodesReversed = !EpisodesReversed;
 
@@ -125,13 +129,35 @@ public sealed partial class DetailViewModel : ObservableObject
         _ = RefreshWatchedAsync();
     }
 
+    /// <summary>剧集格最小宽度与间距（与 DetailView 的格子一致）。</summary>
+    public const double EpisodeCellMinWidth = 96, EpisodeCellGap = 8;
+    private int _episodeColumns = 8;
+    public int EpisodeColumns => _episodeColumns;
+
+    /// <summary>剧集区宽度变化：按最小格宽算列数，列数变了才重排。</summary>
+    public void SetEpisodeWidth(double width)
+    {
+        if (width <= 0) return;
+        var columns = Math.Clamp((int)Math.Floor((width + EpisodeCellGap) / (EpisodeCellMinWidth + EpisodeCellGap)), 2, 16);
+        if (columns == _episodeColumns) return;
+        _episodeColumns = columns;
+        OnPropertyChanged(nameof(EpisodeColumns));
+        RebuildEpisodeRows();
+    }
+
     private void RebuildEpisodeRows()
     {
         EpisodeRows.Clear();
         if (SelectedLine is null) return;
         var episodes = (EpisodesReversed ? SelectedLine.Episodes.Reverse() : SelectedLine.Episodes).ToList();
-        for (var i = 0; i < episodes.Count; i += 10)
-            EpisodeRows.Add(new EpisodeRow(episodes.Skip(i).Take(10).ToList(), _watched));
+        for (var i = 0; i < episodes.Count; i += _episodeColumns)
+            EpisodeRows.Add(new EpisodeRow(episodes.Skip(i).Take(_episodeColumns).ToList(), _watched, _episodeColumns, SelectedEpisode?.Id));
+    }
+
+    private void MarkCurrentEpisode()
+    {
+        var id = SelectedEpisode?.Id;
+        foreach (var row in EpisodeRows) foreach (var item in row.Items) item.IsCurrent = item.Episode.Id == id;
     }
 
     private string CurrentKey => CurrentSource?.Result.SourceKey ?? "";
@@ -549,15 +575,25 @@ public sealed partial class DetailSource(VodResult result) : ObservableObject
     }
 }
 
-/// <summary>剧集网格行（10 集）。</summary>
+/// <summary>剧集网格的一行：列数随可用宽度变化，最后一行不足时按同样列宽左对齐。</summary>
 public sealed class EpisodeRow
 {
     public IReadOnlyList<EpisodePresentation> Items { get; }
-    public EpisodeRow(IReadOnlyList<Episode> items, IReadOnlySet<string>? watched = null) => Items = items.Select(episode => new EpisodePresentation(episode, watched?.Contains(episode.Id) ?? false)).ToArray();
+    public int Columns { get; }
+    public EpisodeRow(IReadOnlyList<Episode> items, IReadOnlySet<string>? watched = null, int columns = 10, string? currentId = null)
+    {
+        Columns = Math.Max(1, columns);
+        Items = items.Select(episode => new EpisodePresentation(episode, watched?.Contains(episode.Id) ?? false) { IsCurrent = episode.Id == currentId }).ToArray();
+    }
 }
 
-public sealed record EpisodePresentation(Episode Episode, bool IsWatched)
+public sealed partial class EpisodePresentation(Episode episode, bool isWatched) : ObservableObject
 {
+    public Episode Episode { get; } = episode;
+    public bool IsWatched { get; } = isWatched;
+    /// <summary>当前选中（或续播）的这一集。</summary>
+    [ObservableProperty] private bool _isCurrent;
     public string Title => Episode.Title;
-    public string Label => IsWatched ? "已看 · " + Episode.Title : Episode.Title;
+    public string Label => Episode.Title;
+    public string Tip => IsWatched ? Episode.Title + "（已看）" : Episode.Title;
 }

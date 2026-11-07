@@ -95,6 +95,15 @@ public sealed partial class SettingsViewModel
     [ObservableProperty] private bool _validating;
     partial void OnValidatingChanged(bool value) => OnPropertyChanged(nameof(ValidateButtonLabel));
     [ObservableProperty] private string _validationSummary = "";
+    /// <summary>检测进度与分类计数（检测条上分色显示）。</summary>
+    [ObservableProperty] private string _validationProgress = "";
+    [ObservableProperty] private int _validCount;
+    [ObservableProperty] private int _emptyCount;
+    [ObservableProperty] private int _invalidCount;
+    public bool HasValidation => ValidationProgress.Length > 0;
+    /// <summary>检测进度 0~1（第二行细进度条）。</summary>
+    [ObservableProperty] private double _validationFraction;
+    partial void OnValidationProgressChanged(string value) => OnPropertyChanged(nameof(HasValidation));
     private CancellationTokenSource? _validation;
 
     // 站点设置
@@ -380,9 +389,10 @@ public sealed partial class SettingsViewModel
         using var scope = new CancellationTokenSource();
         _validation = scope;
         Validating = true;
-        foreach (var row in targets) { row.Status = null; row.StatusDetail = "检测中…"; }
+        foreach (var row in targets) { row.Status = null; row.LatencyMs = null; row.Checking = true; row.StatusDetail = "检测中…"; }
         int valid = 0, empty = 0, invalid = 0;
         ValidationSummary = $"0 / {targets.Length}";
+        ValidationProgress = $"0 / {targets.Length}"; ValidCount = EmptyCount = InvalidCount = 0; ValidationFraction = 0;
         try
         {
             await foreach (var result in _services.Catalog.ValidateStreamAsync(keyword, targets.Select(row => row.Site).ToArray(), scope.Token))
@@ -390,15 +400,20 @@ public sealed partial class SettingsViewModel
                 await _main.RunOnUiAsync(() =>
                 {
                     if (Sites.FirstOrDefault(row => row.Key == result.Site.Key) is not { } row) return;
+                    row.Checking = false;
+                    row.LatencyMs = result.Status == SourceValidity.Invalid ? null : (int)Math.Round(result.Elapsed.TotalMilliseconds);
                     row.Status = result.Status;
                     row.StatusDetail = result.Status switch
                     {
-                        SourceValidity.Valid => $"有效 · {result.Elapsed.TotalMilliseconds:0}ms",
-                        SourceValidity.NoResults => $"无结果 · {result.Elapsed.TotalMilliseconds:0}ms",
+                        SourceValidity.Valid => $"有效 · 延迟 {result.Elapsed.TotalMilliseconds:0}ms（{SourceRow.SpeedLabel(row.LatencyMs)}）",
+                        SourceValidity.NoResults => $"无结果 · 延迟 {result.Elapsed.TotalMilliseconds:0}ms：能连通，但没搜到含关键词的影片",
                         _ => "无效 · " + result.Error,
                     };
                     switch (result.Status) { case SourceValidity.Valid: valid++; break; case SourceValidity.NoResults: empty++; break; default: invalid++; break; }
                     ValidationSummary = $"{valid + empty + invalid} / {targets.Length} · 有效 {valid} · 无结果 {empty} · 无效 {invalid}";
+                    ValidationProgress = $"{valid + empty + invalid} / {targets.Length}";
+                    ValidCount = valid; EmptyCount = empty; InvalidCount = invalid;
+                    ValidationFraction = (double)(valid + empty + invalid) / targets.Length;
                 });
             }
             Message = $"检测完成：有效 {valid}，无结果 {empty}，无效 {invalid}";
@@ -407,7 +422,7 @@ public sealed partial class SettingsViewModel
         catch (Exception error) { Message = $"检测失败：{error.Message}"; }
         finally
         {
-            foreach (var row in targets.Where(row => row.Status is null)) row.StatusDetail = "";
+            foreach (var row in targets.Where(row => row.Status is null)) { row.StatusDetail = ""; row.Checking = false; }
             Validating = false;
             _validation = null;
             if (SiteStatusFilterIndex >= 3) ApplySiteFilter();
@@ -500,9 +515,30 @@ public sealed partial class SourceRow(ApiSite site, int index) : ObservableObjec
     public bool IsCustom => Site.From == SourceOrigin.Custom;
     public string OriginLabel => IsCustom ? "自定义" : "订阅";
     public string ToggleLabel => Site.Disabled ? "启用" : "禁用";
-    [ObservableProperty] private SourceValidity? _status;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusLabel), nameof(HasStatus), nameof(IsFast), nameof(IsMedium), nameof(IsSlow), nameof(IsEmpty), nameof(IsBad))]
+    private SourceValidity? _status;
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private string _statusDetail = "";
+    /// <summary>检测耗时（无效时为 null）。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LatencyLabel), nameof(IsFast), nameof(IsMedium), nameof(IsSlow))]
+    private int? _latencyMs;
+    /// <summary>正在检测（行上显示「检测中」）。</summary>
+    [ObservableProperty] private bool _checking;
+
+    /// <summary>延迟分档阈值：≤1s 快（绿），≤3s 一般（黄），更慢（橙）。</summary>
+    public const int FastMs = 1000, MediumMs = 3000;
+    public static string SpeedLabel(int? ms) => ms switch { <= FastMs => "快", <= MediumMs => "一般", _ => "慢" };
+
+    public bool HasStatus => Status is not null;
+    public string StatusLabel => Status switch { SourceValidity.Valid => "有效", SourceValidity.NoResults => "无结果", SourceValidity.Invalid => "无效", _ => "" };
+    public string LatencyLabel => LatencyMs is { } ms ? (ms >= 1000 ? $"{ms / 1000d:0.0}s" : $"{ms}ms") : "";
+    public bool IsFast => Status == SourceValidity.Valid && LatencyMs <= FastMs;
+    public bool IsMedium => Status == SourceValidity.Valid && LatencyMs is > FastMs and <= MediumMs;
+    public bool IsSlow => Status == SourceValidity.Valid && LatencyMs > MediumMs;
+    public bool IsEmpty => Status == SourceValidity.NoResults;
+    public bool IsBad => Status == SourceValidity.Invalid;
 }
 
 /// <summary>源列表的模糊匹配：空格分隔的每个词都要命中（名称/键/地址包含，或名称按字符顺序出现，如「量子」匹配「量子资源站」、「lz」匹配「lzzy」）。</summary>

@@ -11,6 +11,67 @@
     <Style Selector="StackPanel.posterCard:pointerover TextBlock.cardTitle">
       <Setter Property="TextDecorations" Value="Underline" />
     </Style>
+    <!-- 「更多筛选」：与分类胶囊同尺寸；展开态主题浅底 + 主题色描边，颜色与箭头翻转都带过渡；按下缩到 0.94 再回弹。 -->
+    <Style Selector="Button.moreFilters">
+      <Setter Property="CornerRadius" Value="{DynamicResource AppControlCornerRadius}" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+      <Setter Property="RenderTransform" Value="scale(1)" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" Easing="BackEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.moreFilters:pressed">
+      <Setter Property="RenderTransform" Value="scale(0.94)" />
+    </Style>
+    <Style Selector="Button.moreFilters /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.2" />
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.moreFilters.active /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Button.moreFilters.active">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.moreFilters PathIcon.chevron">
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+      <Setter Property="RenderTransform" Value="rotate(0deg)" />
+      <Setter Property="Transitions">
+        <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.moreFilters.active PathIcon.chevron">
+      <Setter Property="RenderTransform" Value="rotate(180deg)" />
+    </Style>
+    <Style Selector="Border.filterBadge">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="MinWidth" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.filterBadge TextBlock">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
     <Style Selector="Button.filterChip:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
     </Style>
@@ -49,8 +110,10 @@
                  VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" IsVisible="{Binding SearchMode}" />
     </StackPanel>
 
-    <!-- 豆瓣筛选（LunaTV 选择器）：每组一行胶囊，当前值高亮；搜索结果视图下让位给结果网格。 -->
-    <ItemsControl Grid.Row="2" ItemsSource="{Binding DynamicFilters}" Margin="0,0,28,10" IsVisible="{Binding !SearchMode}">
+    <!-- 豆瓣筛选（LunaTV 选择器）：默认折叠，由分类条末尾的「更多筛选」展开（展开时淡入下滑），不再挤占海报区；
+         搜索结果视图下让位给结果网格。 -->
+    <StackPanel Grid.Row="2" Margin="0,0,28,10" IsVisible="{Binding !SearchMode}">
+    <ItemsControl x:Name="FilterGroups" ItemsSource="{Binding DynamicFilters}" IsVisible="{Binding FiltersExpanded}">
       <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:FilterChipGroup">
@@ -70,6 +133,7 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
+    </StackPanel>
 
     <!-- 分类 Tab（来自当前站点 Class 列表，横向滚动）；搜索时隐藏（结果是跨站点的，不属于任一分类）。
          分类通常多于一行放不下的宽度，显示实际横向滚动条让「可以横滑」可见、可拖。 -->
@@ -91,6 +155,21 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <!-- 更多筛选：紧跟在最后一个分类（如 Top250）后面；展开时高亮、箭头翻转，按下有轻微缩放回弹。 -->
+        <Button x:Name="FiltersToggle" Classes="moreFilters" Classes.active="{Binding FiltersExpanded}" Command="{Binding ToggleFiltersCommand}"
+                IsVisible="{Binding HasFilters}" ToolTip.Tip="{Binding FilterSummary, StringFormat='当前筛选：{0}'}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource Icon.Tune}" Width="14" Height="14" VerticalAlignment="Center" />
+            <TextBlock Text="更多筛选" VerticalAlignment="Center" />
+            <Border x:Name="ActiveFilterBadge" Classes="filterBadge" IsVisible="{Binding HasActiveFilters}">
+              <TextBlock Text="{Binding ActiveFilterCount}" />
+            </Border>
+            <PathIcon Classes="chevron" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" Opacity="0.7" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="ResetFilters" Content="重置" Command="{Binding ClearFiltersCommand}" IsVisible="{Binding HasActiveFilters}"
+                Background="Transparent" BorderThickness="0" Padding="6,6" FontSize="12.5" Cursor="Hand" VerticalAlignment="Center"
+                Foreground="{DynamicResource AccentBrush}" CornerRadius="{DynamicResource AppControlCornerRadius}" ToolTip.Tip="恢复全部筛选为默认值" />
       </StackPanel>
     </ScrollViewer>
 

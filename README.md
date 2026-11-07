@@ -2,6 +2,8 @@
 
 跨平台桌面影音应用，点播源解析方式参照 [LunaTV](https://github.com/MoonTechLab/LunaTV)（苹果CMS V10 采集源 + 豆瓣数据）。**Avalonia 12 + .NET 10（NativeAOT）+ libmpv**，覆盖 **macOS / Windows / Linux**（x64 + arm64，共 6 个 RID）。
 
+订阅源怎么写、格式说明与示例见 **[订阅源格式说明](docs/SOURCE-CONFIG.md)**。
+
 设计与交互稿见 [design/DESIGN.md](design/DESIGN.md)：Mica/Fluent 深色主题、左侧导航 Shell、影院式详情页、全局播放浮层。
 
 ## 已实现（0.2.4）
@@ -55,7 +57,7 @@ dotnet run --project src/VodBox.Desktop
 
 **排查播放问题**：设置 → 诊断 可开关日志、打开日志目录并查看最后若干行；日志位于 `<数据目录>/logs/vodbox-YYYYMMDD.log`（macOS 为 `~/Library/Application Support/VodBox/logs`）。日志记录选台、线路、mpv 打开/载入/结束原因与失败异常，地址中的 `key`/`authid`/`token` 会自动脱敏。需要 mpv 原始日志时设 `VODBOX_LOG_VERBOSE=1`。
 
-首次启动 → 设置 → 播放源 → 填入 LunaTV 配置订阅地址（如 `https://example.com/config.json`），或直接粘贴配置内容；直播默认使用配置中的 `lives`，也可手动填 m3u 地址。
+首次启动 → 设置 → 播放源 → 填入 LunaTV 配置订阅地址（如 `https://example.com/config.json`），或直接粘贴配置内容；直播默认使用配置中的 `lives`，也可手动填 m3u 地址。配置文件格式、base58 订阅链接制作和采集接口要求见 [订阅源格式说明](docs/SOURCE-CONFIG.md)。
 
 ## 打包与发布
 

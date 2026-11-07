@@ -24,7 +24,22 @@ public sealed partial class VodViewModel : ObservableObject
         var group=DynamicFilters.FirstOrDefault(group=>group.Key==key);
         if(group is null||!group.Chips.Any(option=>option.Value==value))return;
         foreach(var chip in group.Chips)chip.IsSelected=chip.Value==value;
-        _dynamicValues[key]=value;Page=1;_=ReloadAsync();
+        _dynamicValues[key]=value;NotifyFilterSummary();Page=1;_=ReloadAsync();
+    }
+
+    /// <summary>筛选面板是否展开：默认折叠，只占一行，把空间留给海报网格。</summary>
+    [ObservableProperty] private bool _filtersExpanded;
+    [RelayCommand] private void ToggleFilters() => FiltersExpanded = !FiltersExpanded;
+    public bool HasFilters => DynamicFilters.Count > 0;
+    /// <summary>折叠时一行显示当前生效的筛选值（只列改过默认值的组），都是默认则为「全部」。</summary>
+    public string FilterSummary => DynamicFilters.SelectMany(group => group.Chips.Where(chip => chip.IsSelected && chip.Value != group.Init).Take(1))
+        .Select(chip => chip.Name).ToArray() is { Length: > 0 } names ? string.Join(" · ", names) : "全部";
+    public bool HasActiveFilters => ActiveFilterCount > 0;
+    /// <summary>改过默认值的筛选组数（「更多筛选」按钮上的角标）。</summary>
+    public int ActiveFilterCount => DynamicFilters.Count(group => group.Chips.Any(chip => chip.IsSelected && chip.Value != group.Init));
+    private void NotifyFilterSummary()
+    {
+        OnPropertyChanged(nameof(HasFilters)); OnPropertyChanged(nameof(FilterSummary)); OnPropertyChanged(nameof(HasActiveFilters)); OnPropertyChanged(nameof(ActiveFilterCount));
     }
 
     /// <summary>聚合搜索入口（默认走点播目录的流式聚合，测试可注入）；null = 当前无可用入口。</summary>
@@ -72,7 +87,7 @@ public sealed partial class VodViewModel : ObservableObject
     {
         FilterYear="";FilterArea="";FilterLanguage="";FilterClass="";
         _dynamicValues.Clear();foreach(var group in DynamicFilters){_dynamicValues[group.Key]=group.Init;foreach(var chip in group.Chips)chip.IsSelected=chip.Value==group.Init;}
-        Page=1;await ReloadAsync();
+        NotifyFilterSummary();Page=1;await ReloadAsync();
     }
     [ObservableProperty] private string _sourceName = "未配置";
     public string SourceCountLabel => $"{_services.SourceConfig.EnabledSources.Count} 个采集源";
@@ -186,6 +201,7 @@ public sealed partial class VodViewModel : ObservableObject
         _services = services;
         _main = main;
         _getDefault = getDefault;
+        DynamicFilters.CollectionChanged += (_, _) => NotifyFilterSummary();
         services.SourceConfig.Changed += () => _main.RunOnUi(() => OnPropertyChanged(nameof(SourceCountLabel)));
     }
 
