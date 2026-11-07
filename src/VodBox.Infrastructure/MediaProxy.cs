@@ -26,15 +26,44 @@ public sealed class MediaProxy : IDisposable
                 _entries[existing]=entry with { Expires=DateTimeOffset.UtcNow.AddHours(4) };
                 return "/proxy/"+existing;
             }
-            foreach(var expired in _entries.Where(item=>item.Value.Expires<=DateTimeOffset.UtcNow).ToArray())_entries.TryRemove(expired.Key,out _);
-            foreach(var stale in _registrations.Where(item=>!_entries.ContainsKey(item.Value)).Select(item=>item.Key).ToArray())_registrations.Remove(stale);
-            if(_entries.Count>=4096)throw new InvalidOperationException("代理媒体注册已达上限。");
+            if(_entries.Count>=Capacity)Trim();
             var id=Guid.NewGuid().ToString("N");
             _entries[id]=new Entry(uri,safeHeaders,DateTimeOffset.UtcNow.AddHours(4),filterAds);
             _registrations[registrationKey]=id;
             return "/proxy/"+id;
         }
     }
+
+    /// <summary>
+    /// 句柄上限。HLS 清单里的每个片段都占一个句柄，一部长片就可能上千个，所以上限要远大于单个清单的片段数。
+    /// </summary>
+    internal const int Capacity = 32768;
+
+    /// <summary>
+    /// 达到上限时先清掉过期句柄，仍然太多就按到期时间淘汰最旧的，降到上限的 3/4，而不是拒绝新的注册。
+    /// 片段被请求时会续期（见 <see cref="Touch"/>），正在播放的内容不会先被淘汰。调用方需持有 _registrationGate。
+    /// </summary>
+    private void Trim()
+    {
+        var now=DateTimeOffset.UtcNow;
+        foreach(var expired in _entries.Where(item=>item.Value.Expires<=now).Select(item=>item.Key).ToArray())_entries.TryRemove(expired,out _);
+        var excess=_entries.Count-Capacity*3/4;
+        if(excess>0)
+            foreach(var oldest in _entries.OrderBy(item=>item.Value.Expires).Take(excess).Select(item=>item.Key).ToArray())_entries.TryRemove(oldest,out _);
+        foreach(var stale in _registrations.Where(item=>!_entries.ContainsKey(item.Value)).Select(item=>item.Key).ToArray())_registrations.Remove(stale);
+    }
+
+    /// <summary>句柄被实际请求时续期，避免正在播放的片段因注册得早而过期或被淘汰。</summary>
+    private Entry Touch(string id, Entry entry)
+    {
+        var renewed=DateTimeOffset.UtcNow.AddHours(4);
+        if(renewed-entry.Expires<TimeSpan.FromMinutes(5))return entry;
+        var updated=entry with { Expires=renewed };
+        _entries.TryUpdate(id,updated,entry);
+        return updated;
+    }
+
+    internal int Count => _entries.Count;
 
     /// <summary>逐跳/帧长度请求头：代理自己计算，不能由调用方注入（避免请求走私/长度错乱）。</summary>
     private static readonly HashSet<string> RestrictedProxyHeaders = new(StringComparer.OrdinalIgnoreCase)
@@ -82,6 +111,7 @@ public sealed class MediaProxy : IDisposable
     {
         var id=HandleId(context);
         if(_cache is null||!_entries.TryGetValue(id,out var entry)||entry.Expires<=DateTimeOffset.UtcNow){context.Response.StatusCode=404;return;}
+        entry=Touch(id,entry);
         // 清单保持实时重写，不缓存直播清单；Range走原始流式代理。
         if(context.Request.Headers.ContainsKey("Range")||entry.Uri.AbsolutePath.EndsWith(".m3u8",StringComparison.OrdinalIgnoreCase)||entry.Uri.AbsolutePath.EndsWith(".mpd",StringComparison.OrdinalIgnoreCase))
         {await ServeAsync(context);return;}
@@ -94,6 +124,7 @@ public sealed class MediaProxy : IDisposable
     {
         var id = HandleId(context);
         if (!_entries.TryGetValue(id, out var entry) || entry.Expires <= DateTimeOffset.UtcNow) { context.Response.StatusCode = 404; return; }
+        entry = Touch(id, entry);
         if(context.Request.Headers.TryGetValue("Range",out var requestedRange)&&!System.Net.Http.Headers.RangeHeaderValue.TryParse(requestedRange.ToString(),out _))
         {context.Response.StatusCode=400;return;}
         // FFmpeg 默认带 "Range: bytes=0-" 打开片段；这等同整段请求，按整段取回才能检查伪装前缀。

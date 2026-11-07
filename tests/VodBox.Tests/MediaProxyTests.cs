@@ -9,6 +9,19 @@ namespace VodBox.Tests;
 
 public sealed class MediaProxyTests
 {
+    /// <summary>长片 HLS 每个片段占一个句柄：注册数超过上限时淘汰最旧的，而不是拒绝新播放。</summary>
+    [Fact]
+    public void RegisterEvictsOldestInsteadOfFailingWhenCapacityIsReached()
+    {
+        using var proxy = new MediaProxy();
+        var first = proxy.Register("https://example.com/seg/0.ts");
+        string last = "";
+        for (var i = 1; i <= MediaProxy.Capacity + 100; i++) last = proxy.Register($"https://example.com/seg/{i}.ts");
+        Assert.True(proxy.Count <= MediaProxy.Capacity);
+        Assert.Equal(last, proxy.Register($"https://example.com/seg/{MediaProxy.Capacity + 100}.ts"));
+        Assert.NotEqual(first, proxy.Register("https://example.com/seg/0.ts"));
+    }
+
     [Fact]
     public void HlsRewriteCoversRelativeSegmentsKeyAndNestedPlaylist()
     {
