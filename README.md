@@ -1,8 +1,23 @@
-# VodBox
+<p align="center"><img alt="VodBox" src="docs/images/logo.png" width="128"></p>
 
-一款跨平台的桌面影音应用：订阅点播源后即可聚合搜索、追剧、看直播，支持 **macOS / Windows / Linux**。
+<h1 align="center">VodBox</h1>
+
+<p align="center">一款跨平台的桌面影音应用：订阅点播源后即可聚合搜索、追剧，也能看电视直播、播放本地视频，支持 <b>macOS / Windows / Linux</b>。<br>原生界面，No WebView，No Electron：启动快、占用低。</p>
+
+<p align="center">
+  <a href="https://github.com/pengpercy/VodBox/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/pengpercy/VodBox?style=flat&label=release"></a>
+  <a href="https://github.com/pengpercy/VodBox/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/pengpercy/VodBox?style=flat&label=stars"></a>
+  <a href="https://github.com/pengpercy/VodBox/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/pengpercy/VodBox/total?style=flat&label=downloads"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/pengpercy/VodBox/releases/latest"><img alt="macOS" src="https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white"></a>
+  <a href="https://github.com/pengpercy/VodBox/releases/latest"><img alt="Windows" src="https://img.shields.io/badge/Windows-0078D4?style=flat&logo=windows&logoColor=white"></a>
+  <a href="https://github.com/pengpercy/VodBox/releases/latest"><img alt="Linux" src="https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black"></a>
+</p>
 
 点播源格式与 [LunaTV](https://github.com/MoonTechLab/LunaTV) 兼容，LunaTV 能用的配置可以直接导入。VodBox 不内置任何播放源。
+
+<p align="center"><img alt="VodBox 首页" src="docs/images/home.jpg" width="860"></p>
 
 ## 功能
 
