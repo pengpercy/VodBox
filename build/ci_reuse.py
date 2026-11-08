@@ -34,8 +34,7 @@ NATIVE_BUILD_PATHS = (
     ".github/workflows/build.yml",
     "build/bundle.py", "build/native-assets.json", "build/nativeverify.py",
     "build/verify_mpv_bundle.py",
-    "build/archive.py", "build/licenses", "build/publish-aot.sh", "build/dev-natives.sh",
-    "build/smoke.py", "build/test-desktop-smoke.sh",
+    "build/archive.py", "build/licenses", "build/dev-natives.sh",
     "build/media-fixtures", "build/generate-icons.py",
     "build/test_bundle.py", "build/test_nativeverify.py", "build/test_archive.py",
 )

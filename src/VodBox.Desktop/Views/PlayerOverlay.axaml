@@ -84,7 +84,7 @@
     <Panel x:Name="VideoHost" />
     <v:DanmakuLayer x:Name="DanmakuCanvas" IsHitTestVisible="False" ClipToBounds="True" />
 
-    <!-- 状态提示层（规格 docs/PLAYBACK-LOADING-SPEC.md）：独立于 IsVisible="{Binding Visible}" 的控制层，
+    <!-- 状态提示层：独立于 IsVisible="{Binding Visible}" 的控制层，
          只由播放状态驱动，落在中间弹性行，不遮挡底部控制条。整体不命中测试，双击全屏/拖拽窗口照常可用。 -->
     <Grid x:Name="StatusLayer" x:DataType="vm:PlayerViewModel" RowDefinitions="Auto,*,Auto" IsHitTestVisible="False">
 
