@@ -58,6 +58,12 @@ public sealed partial class DoubanClient : IDisposable
 
     public string Image(string? url) => ProcessImage(url, _settings());
 
+    /// <summary>
+    /// 同一张豆瓣海报的大图地址（s/m 规格 → l，约 1080px 宽），用于整宽横幅；非豆瓣规格路径原样返回。
+    /// 代理改写后的地址（换域名或整段转义）同样适用。
+    /// </summary>
+    public static string LargeImage(string? url) => string.IsNullOrEmpty(url) ? url ?? "" : DoubanPhotoSize().Replace(url, "$1view$1photo$1l$3$1");
+
     private async Task<string> GetAsync(string target, CancellationToken ct)
     {
         var settings = _settings();
@@ -176,6 +182,7 @@ public sealed partial class DoubanClient : IDisposable
     private static string FirstYear(string text) => FourDigits().Match(text) is { Success: true } match ? match.Value : "";
 
     [GeneratedRegex(@"img\d+\.doubanio\.com")] private static partial Regex DoubanImageHost();
+    [GeneratedRegex(@"(/|%2F)view\1photo\1(s|m)(_ratio_poster)?\1", RegexOptions.IgnoreCase)] private static partial Regex DoubanPhotoSize();
     [GeneratedRegex(@"(\d{4})")] private static partial Regex FourDigits();
     [GeneratedRegex(@"<div class=""item"">[\s\S]*?<a[^>]+href=""https?://movie\.douban\.com/subject/(\d+)/""[\s\S]*?<img[^>]+alt=""([^""]+)""[^>]*src=""([^""]+)""[\s\S]*?<span class=""rating_num""[^>]*>([^<]*)</span>[\s\S]*?</div>")]
     private static partial Regex Top250Item();

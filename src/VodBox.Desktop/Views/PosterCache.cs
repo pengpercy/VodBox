@@ -15,6 +15,9 @@ internal sealed class PosterCache : IDisposable
     internal static readonly PosterCache ChannelLogos = new(LoadLogoBitmapAsync,
         maxBytes: 32 * 1024 * 1024, maxImages: 256, maxConcurrentLoads: 2,
         abandonDelay: TimeSpan.FromMilliseconds(100), failureMemory: TimeSpan.FromMinutes(10));
+    // 首页横幅：整宽显示，按 1080px 宽解码（一张约 7MB），只需装下轮播的几张。
+    internal static readonly PosterCache Hero = new(LoadHeroBitmapAsync,
+        maxBytes: 48 * 1024 * 1024, maxImages: 6, maxConcurrentLoads: 2);
     private static readonly VodBox.Infrastructure.PosterDiskCache Disk=new(
         Path.Combine(VodBox.Infrastructure.AppPaths.DataDirectory,"posters"),FetchPosterBytesAsync);
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
@@ -321,6 +324,7 @@ internal sealed class PosterCache : IDisposable
     }
 
     private static Task<Bitmap> LoadBitmapAsync(Uri uri, CancellationToken cancellationToken) => DecodeAsync(uri, 460, cancellationToken);
+    private static Task<Bitmap> LoadHeroBitmapAsync(Uri uri, CancellationToken cancellationToken) => DecodeAsync(uri, 1080, cancellationToken);
     private static Task<Bitmap> LoadLogoBitmapAsync(Uri uri, CancellationToken cancellationToken) => DecodeAsync(uri, 200, cancellationToken);
 
     private static async Task<Bitmap> DecodeAsync(Uri uri, int width, CancellationToken cancellationToken)

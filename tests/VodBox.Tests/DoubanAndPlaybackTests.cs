@@ -16,6 +16,14 @@ public sealed class DoubanProxyTests
     public void RewritesDataRequests(string type, string custom, string expected) =>
         Assert.Equal(expected, DoubanClient.ProxyUrl("https://m.douban.com/rexxar/api/v2/x?a=1", type, custom));
 
+    [Theory]
+    [InlineData("https://img.doubanio.cmliussss.net/view/photo/s_ratio_poster/public/p1.jpg", "https://img.doubanio.cmliussss.net/view/photo/l_ratio_poster/public/p1.jpg")]
+    [InlineData("https://img3.doubanio.com/view/photo/m_ratio_poster/public/p1.jpg@Referer=https://movie.douban.com/", "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p1.jpg@Referer=https://movie.douban.com/")]
+    [InlineData("https://img3.doubanio.com/view/photo/s/public/p1.jpg", "https://img3.doubanio.com/view/photo/l/public/p1.jpg")]
+    [InlineData("https://p.example/?u=https%3A%2F%2Fimg3.doubanio.com%2Fview%2Fphoto%2Fs_ratio_poster%2Fpublic%2Fp1.jpg", "https://p.example/?u=https%3A%2F%2Fimg3.doubanio.com%2Fview%2Fphoto%2Fl_ratio_poster%2Fpublic%2Fp1.jpg")]
+    [InlineData("https://other.example/s_ratio_poster/a.jpg", "https://other.example/s_ratio_poster/a.jpg")]
+    public void LargeImageUpgradesDoubanPosterSize(string url, string expected) => Assert.Equal(expected, DoubanClient.LargeImage(url));
+
     [Fact]
     public void RewritesOnlyDoubanImages()
     {

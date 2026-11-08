@@ -12,6 +12,16 @@ public sealed class RemotePoster : Image
     public static readonly StyledProperty<string?> UrlProperty =
         AvaloniaProperty.Register<RemotePoster, string?>(nameof(Url));
 
+    /// <summary>大图（<see cref="Url"/>）尚未就绪时先显示、加载失败时改用的地址，按普通海报尺寸解码。</summary>
+    public static readonly StyledProperty<string?> FallbackUrlProperty =
+        AvaloniaProperty.Register<RemotePoster, string?>(nameof(FallbackUrl));
+    public string? FallbackUrl { get => GetValue(FallbackUrlProperty); set => SetValue(FallbackUrlProperty, value); }
+
+    /// <summary>整宽横幅：<see cref="Url"/> 按大尺寸解码，避免小图被放大发糊。</summary>
+    public static readonly StyledProperty<bool> LargeProperty =
+        AvaloniaProperty.Register<RemotePoster, bool>(nameof(Large));
+    public bool Large { get => GetValue(LargeProperty); set => SetValue(LargeProperty, value); }
+
     public static readonly StyledProperty<string?> ChannelNameProperty =
         AvaloniaProperty.Register<RemotePoster, string?>(nameof(ChannelName));
     public string? ChannelName { get => GetValue(ChannelNameProperty); set => SetValue(ChannelNameProperty, value); }
@@ -79,7 +89,8 @@ public sealed class RemotePoster : Image
             }
             else if (_attached && !HasImage && !string.IsNullOrWhiteSpace(ChannelName)) StartLoad();
         }
-        if ((change.Property == UrlProperty || change.Property == ChannelNameProperty) && _attached) StartLoad();
+        if ((change.Property == UrlProperty || change.Property == FallbackUrlProperty || change.Property == LargeProperty
+             || change.Property == ChannelNameProperty) && _attached) StartLoad();
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -129,7 +140,9 @@ public sealed class RemotePoster : Image
             LoadingTask = Task.CompletedTask;
             return;
         }
-        var cache = isLogo && _useSharedLogoCache ? PosterCache.ChannelLogos : _cache;
+        var cache = isLogo && _useSharedLogoCache ? PosterCache.ChannelLogos : Large && _useSharedLogoCache ? PosterCache.Hero : _cache;
+        Uri? fallbackPoster = !isLogo && Uri.TryCreate(FallbackUrl, UriKind.Absolute, out var fallbackCandidate)
+            && fallbackCandidate.Scheme is "https" or "http" && fallbackCandidate != primary ? fallbackCandidate : null;
         // M3U 台标近期已失败时按没有台标处理：直接用内置索引（已解码则同步上屏，滚动中也不闪占位），
         // 不再每次停下滚动都先请求一遍坏地址。
         if (isLogo && primary is not null && cache.HasRecentlyFailed(primary)) primary = null;
@@ -149,6 +162,19 @@ public sealed class RemotePoster : Image
             LoadingTask = Task.CompletedTask;
             return;
         }
+        // 大图还没解码：已缓存的原海报先顶上（同步上屏，不闪空），大图到了再替换。
+        if (fallbackPoster is not null && _cache.TryAcquireCached(fallbackPoster) is { } small)
+        {
+            _lease = small;
+            Source = small.Bitmap;
+            HasImage = true;
+            Opacity = 1;
+            if (primary is null)
+            {
+                LoadingTask = Task.CompletedTask;
+                return;
+            }
+        }
         if (isLogo && ChannelIsScrolling)
         {
             LoadingTask = Task.CompletedTask;
@@ -156,28 +182,29 @@ public sealed class RemotePoster : Image
         }
         var scope = new CancellationTokenSource();
         _load = scope;
-        LoadingTask = LoadAsync(primary, channelName, scope);
+        LoadingTask = LoadAsync(primary, channelName, cache, HasImage ? null : fallbackPoster, scope);
     }
 
-    private async Task LoadAsync(Uri? primary, string? channelName, CancellationTokenSource scope)
+    private async Task LoadAsync(Uri? primary, string? channelName, PosterCache cache, Uri? fallbackPoster, CancellationTokenSource scope)
     {
         try
         {
             var isLogo = !string.IsNullOrWhiteSpace(channelName);
             // 快速滚动/虚拟化复用时，取消尚未开始的台标任务；下载与解码继续在后台执行。
             if (isLogo) await Task.Delay(100, scope.Token).ConfigureAwait(false);
-            var cache = isLogo && _useSharedLogoCache ? PosterCache.ChannelLogos : _cache;
-            var fallback = isLogo ? Services.BuiltInChannelLogos.Find(channelName) : null;
-            // M3U 地址优先；缺失、下载失败、超时或图片解码失败时，尝试内置索引 URL。
+            var fallback = isLogo ? Services.BuiltInChannelLogos.Find(channelName) : fallbackPoster;
+            // 主地址优先；缺失、下载失败、超时或图片解码失败时，台标改用内置索引 URL，海报改用原尺寸地址。
             foreach (var uri in new[] { primary, fallback }.Where(uri => uri is not null).Distinct())
             {
+                var source = uri == fallbackPoster ? _cache : cache;
                 PosterCache.Lease? lease = null;
                 try
                 {
-                    lease = await cache.AcquireAsync(uri!, scope.Token).ConfigureAwait(false);
+                    lease = await source.AcquireAsync(uri!, scope.Token).ConfigureAwait(false);
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         if (!_attached || scope.IsCancellationRequested || !ReferenceEquals(_load, scope)) return;
+                        var previous = _lease;
                         _lease = lease;
                         Source = lease.Bitmap;
                         HasImage = true;
@@ -188,6 +215,8 @@ public sealed class RemotePoster : Image
                             _logoFadeTimer.Start();
                         }
                         else Opacity = 1;
+                        // 先换上新图再归还占位的小图租约（位图只由缓存释放）。
+                        previous?.Dispose();
                         lease = null;
                     });
                     return;

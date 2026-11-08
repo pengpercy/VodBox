@@ -27,7 +27,18 @@
               </LinearGradientBrush>
             </Border.Background>
           </Border>
-          <views:RemotePoster Url="{Binding HeroPoster}" />
+          <views:RemotePoster Url="{Binding HeroPoster}" FallbackUrl="{Binding HeroPosterFallback}" Large="True" />
+          <!-- 纵向暗色渐变：压暗整幅海报（竖图截取中段放大后的颗粒感不再显眼），上沿衬标题栏、下沿衬文字。 -->
+          <Border IsHitTestVisible="False">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                <GradientStop Color="#800E0E14" Offset="0" />
+                <GradientStop Color="#400E0E14" Offset="0.35" />
+                <GradientStop Color="#590E0E14" Offset="0.65" />
+                <GradientStop Color="#D90E0E14" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+          </Border>
           <!-- 左侧文字可读性遮罩 -->
           <Border>
             <Border.Background>

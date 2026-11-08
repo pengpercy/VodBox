@@ -80,6 +80,8 @@ public sealed partial class HomeViewModel : ObservableObject
     /// <summary>推荐区空态/错误态文案（非空时显示在网格位置，避免白屏）。</summary>
     [ObservableProperty] private string _recommendationsHint = "";
     [ObservableProperty] private string? _heroPoster;
+    /// <summary>横幅大图未就绪或加载失败时先显示的原海报（通常已在推荐网格里解码过）。</summary>
+    [ObservableProperty] private string? _heroPosterFallback;
     [ObservableProperty] private string _heroTitle = "";
     [ObservableProperty] private string _heroRemarks = "";
     [ObservableProperty] private string _heroDescription = "";
@@ -272,7 +274,10 @@ public sealed partial class HomeViewModel : ObservableObject
     private void SetHero(MediaItem? hero)
     {
         _hero = hero;
-        HeroPoster = hero?.Poster;
+        var poster = hero?.Poster;
+        var large = poster is null ? null : VodBox.Infrastructure.DoubanClient.LargeImage(poster);
+        HeroPoster = large;
+        HeroPosterFallback = poster is not null && poster != large ? poster : null;
         HeroTitle = hero?.Title ?? "";
         HeroRemarks = hero?.Remarks ?? "";
         HeroRemarks = hero?.Rating is { Length: > 0 } rating ? $"豆瓣 {rating}" : hero?.Remarks ?? "";
