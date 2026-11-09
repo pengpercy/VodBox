@@ -15,6 +15,39 @@ public sealed class LibraryStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ConcurrentCallsShareTheConnectionSafely()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await Task.WhenAll(Enumerable.Range(0, 400).Select(i => Task.Run(async () =>
+        {
+            var media = $"m{i % 8}";
+            await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = media, Title = media, PositionMs = i }, ct);
+            _store.Set($"k{i % 8}", i);
+            Assert.NotNull(await _store.FindHistoryAsync("s", media, ct));
+            Assert.InRange(_store.GetInt($"k{i % 8}", -1), 0, 399);
+            Assert.False(await _store.IsFavoriteAsync("s", media, ct));
+        }, ct)));
+        Assert.Equal(8, (await _store.GetHistoryAsync(ct: ct)).Count);
+    }
+
+    [Fact]
+    public async Task DisposeWaitsForRunningCallsAndLaterCallsFailCleanly()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        for (var round = 0; round < 30; round++)
+        {
+            var store = new LibraryStore(Path.Combine(_directory, $"dispose-{round}.db"));
+            var calls = Enumerable.Range(0, 32).Select(_ => Task.Run(async () =>
+            {
+                try { await store.GetHistoryAsync(ct: ct); }
+                catch (InvalidOperationException) { } // 关闭之后才开始的调用
+            }, ct)).ToArray();
+            store.Dispose();
+            await Task.WhenAll(calls);
+        }
+    }
+
+    [Fact]
     public async Task ActiveSubscriptionCannotSelectAnotherKindOrClearOnInvalidId()
     {
         await _store.AddAsync(new ConfigSubscription { Url = "vod", Name = "点播", Kind = ConfigKind.Vod }, ct: TestContext.Current.CancellationToken);

@@ -9,6 +9,8 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
 {
     private const int SchemaVersion = 5;
     private readonly SqliteConnection _db;
+    // SqliteConnection 不是线程安全的：_db 上的命令执行、结果读取和关闭都要持有此锁。
+    private readonly Lock _gate = new();
 
     public LibraryStore(string path)
     {
@@ -222,11 +224,21 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         return command;
     }
 
+    private Task RunLocked(Action work, CancellationToken ct) => Task.Run(() =>
+    {
+        lock (_gate) work();
+    }, ct);
+
+    private Task<T> RunLocked<T>(Func<T> work, CancellationToken ct) => Task.Run(() =>
+    {
+        lock (_gate) return work();
+    }, ct);
+
     // ---------- 历史 ----------
 
     public async Task SaveHistoryAsync(HistoryEntry entry, CancellationToken ct = default)
     {
-        await Task.Run(() =>
+        await RunLocked(() =>
         {
             using var command = Query("""
                 INSERT INTO history(source_key, source_name, media_id, title, poster, remarks, line_id, episode_id,
@@ -244,7 +256,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         }, ct);
     }
 
-    public Task MarkEpisodeWatchedAsync(string sourceKey,string mediaId,string lineId,string episodeId,CancellationToken ct=default) => Task.Run(() =>
+    public Task MarkEpisodeWatchedAsync(string sourceKey,string mediaId,string lineId,string episodeId,CancellationToken ct=default) => RunLocked(() =>
     {
         if (string.IsNullOrWhiteSpace(episodeId)) return;
         using var command=Query("INSERT INTO watched(source_key,media_id,line_id,episode_id,watched_at) VALUES($s,$m,$l,$e,$t) ON CONFLICT(source_key,media_id,line_id,episode_id) DO UPDATE SET watched_at=excluded.watched_at",
@@ -252,7 +264,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         command.ExecuteNonQuery();
     },ct);
 
-    public Task<IReadOnlyList<WatchedEpisode>> ExportWatchedAsync(CancellationToken ct=default) => Task.Run<IReadOnlyList<WatchedEpisode>>(()=>
+    public Task<IReadOnlyList<WatchedEpisode>> ExportWatchedAsync(CancellationToken ct=default) => RunLocked<IReadOnlyList<WatchedEpisode>>(()=>
     {
         using var command=Query("SELECT source_key,media_id,line_id,episode_id,watched_at FROM watched");
         using var reader=command.ExecuteReader();var result=new List<WatchedEpisode>();
@@ -260,14 +272,14 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         return result;
     },ct);
 
-    public Task<IReadOnlySet<string>> GetWatchedEpisodesAsync(string sourceKey,string mediaId,string lineId,CancellationToken ct=default) => Task.Run<IReadOnlySet<string>>(() =>
+    public Task<IReadOnlySet<string>> GetWatchedEpisodesAsync(string sourceKey,string mediaId,string lineId,CancellationToken ct=default) => RunLocked<IReadOnlySet<string>>(() =>
     {
         using var command=Query("SELECT episode_id FROM watched WHERE source_key=$s AND media_id=$m AND line_id=$l",("$s",sourceKey),("$m",mediaId),("$l",lineId));
         using var reader=command.ExecuteReader();var result=new HashSet<string>();
         while(reader.Read()) result.Add(reader.GetString(0));return result;
     },ct);
 
-    public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default) => Task.Run<IReadOnlyList<HistoryEntry>>(() =>
+    public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(int limit = 200, CancellationToken ct = default) => RunLocked<IReadOnlyList<HistoryEntry>>(() =>
     {
         using var command = Query($"SELECT * FROM history ORDER BY updated_at DESC LIMIT {limit}");
         using var reader = command.ExecuteReader();
@@ -276,7 +288,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         return list;
     }, ct);
 
-    public Task<HistoryEntry?> FindHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.Run(() =>
+    public Task<HistoryEntry?> FindHistoryAsync(string sourceKey, string mediaId, CancellationToken ct = default) => RunLocked(() =>
     {
         using var command = Query("SELECT * FROM history WHERE source_key=$k AND media_id=$m", ("$k", sourceKey), ("$m", mediaId));
         using var reader = command.ExecuteReader();
@@ -313,11 +325,11 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         transaction.Commit();
     },ct);
 
-    public Task ClearHistoryAsync(CancellationToken ct = default) => Task.Run(() => Exec("DELETE FROM history; DELETE FROM watched"), ct);
+    public Task ClearHistoryAsync(CancellationToken ct = default) => RunLocked(() => Exec("DELETE FROM history; DELETE FROM watched"), ct);
 
     // ---------- 收藏 ----------
 
-    public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken ct = default) => Task.Run(() =>
+    public Task SetFavoriteAsync(FavoriteEntry entry, bool favorite, CancellationToken ct = default) => RunLocked(() =>
     {
         if (favorite)
         {
@@ -338,7 +350,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         }
     }, ct);
 
-    public Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(FavoriteKind kind, CancellationToken ct = default) => Task.Run<IReadOnlyList<FavoriteEntry>>(() =>
+    public Task<IReadOnlyList<FavoriteEntry>> GetFavoritesAsync(FavoriteKind kind, CancellationToken ct = default) => RunLocked<IReadOnlyList<FavoriteEntry>>(() =>
     {
         using var command = Query("SELECT * FROM favorite WHERE kind=$kind ORDER BY created_at DESC", ("$kind", (int)kind));
         using var reader = command.ExecuteReader();
@@ -347,7 +359,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         return list;
     }, ct);
 
-    public Task<bool> IsFavoriteAsync(string sourceKey, string mediaId, CancellationToken ct = default) => Task.Run(() =>
+    public Task<bool> IsFavoriteAsync(string sourceKey, string mediaId, CancellationToken ct = default) => RunLocked(() =>
     {
         using var command = Query("SELECT COUNT(1) FROM favorite WHERE kind=$kind AND source_key=$k AND media_id=$m",
             ("$kind", (int)FavoriteKind.Vod), ("$k", sourceKey), ("$m", mediaId));
@@ -368,7 +380,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
 
     // ---------- 配置订阅 ----------
 
-    public Task<IReadOnlyList<ConfigSubscription>> ListAsync(ConfigKind kind, CancellationToken ct = default) => Task.Run<IReadOnlyList<ConfigSubscription>>(() =>
+    public Task<IReadOnlyList<ConfigSubscription>> ListAsync(ConfigKind kind, CancellationToken ct = default) => RunLocked<IReadOnlyList<ConfigSubscription>>(() =>
     {
         using var command = Query("SELECT * FROM config WHERE kind=$kind ORDER BY created_at DESC", ("$kind", (int)kind));
         using var reader = command.ExecuteReader();
@@ -388,7 +400,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         return list;
     }, ct);
 
-    public Task AddAsync(ConfigSubscription subscription, CancellationToken ct = default) => Task.Run(() =>
+    public Task AddAsync(ConfigSubscription subscription, CancellationToken ct = default) => RunLocked(() =>
     {
         using var command = Query("INSERT INTO config(url, name, kind, created_at, active) VALUES($u,$n,$kind,$time,0)",
             ("$u", subscription.Url), ("$n", subscription.Name), ("$kind", (int)subscription.Kind),
@@ -396,13 +408,13 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         command.ExecuteNonQuery();
     }, ct);
 
-    public Task RemoveAsync(long id, CancellationToken ct = default) => Task.Run(() =>
+    public Task RemoveAsync(long id, CancellationToken ct = default) => RunLocked(() =>
     {
         using var command = Query("DELETE FROM config WHERE id=$id", ("$id", id));
         command.ExecuteNonQuery();
     }, ct);
 
-    public Task SetActiveAsync(ConfigKind kind, long id, CancellationToken ct = default) => Task.Run(() =>
+    public Task SetActiveAsync(ConfigKind kind, long id, CancellationToken ct = default) => RunLocked(() =>
     {
         using var check = Query("SELECT COUNT(*) FROM config WHERE id=$id AND kind=$kind", ("$id", id), ("$kind", (int)kind));
         if (Convert.ToInt64(check.ExecuteScalar()) != 1) throw new InvalidOperationException("订阅不存在或类型不匹配。");
@@ -468,7 +480,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         transaction.Commit();
     }, ct);
 
-    public Task<Dictionary<string, string>> ExportPreferencesAsync(CancellationToken ct = default) => Task.Run(() =>
+    public Task<Dictionary<string, string>> ExportPreferencesAsync(CancellationToken ct = default) => RunLocked(() =>
     {
         using var command = Query("SELECT key,value FROM prefs");
         using var reader = command.ExecuteReader();
@@ -481,8 +493,11 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
 
     private string? ReadPref(string key)
     {
-        using var command = Query("SELECT value FROM prefs WHERE key=$k", ("$k", key));
-        return command.ExecuteScalar() as string;
+        lock (_gate)
+        {
+            using var command = Query("SELECT value FROM prefs WHERE key=$k", ("$k", key));
+            return command.ExecuteScalar() as string;
+        }
     }
 
     public string GetString(string key, string fallback = "") => ReadPref(key) ?? fallback;
@@ -513,12 +528,18 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
 
     private void WritePref(string key, string value)
     {
-        using var command = Query("""
-            INSERT INTO prefs(key, value) VALUES($k,$v)
-            ON CONFLICT(key) DO UPDATE SET value=$v
-            """, ("$k", key), ("$v", value));
-        command.ExecuteNonQuery();
+        lock (_gate)
+        {
+            using var command = Query("""
+                INSERT INTO prefs(key, value) VALUES($k,$v)
+                ON CONFLICT(key) DO UPDATE SET value=$v
+                """, ("$k", key), ("$v", value));
+            command.ExecuteNonQuery();
+        }
     }
 
-    public void Dispose() => _db.Dispose();
+    public void Dispose()
+    {
+        lock (_gate) _db.Dispose();
+    }
 }
