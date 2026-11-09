@@ -21,6 +21,9 @@ public sealed class MainWindowPreviewTests
     // Avalonia 的平台 chrome 命中测试是 internal；用反射验证实际拖动角色，避免只断言附加属性。
     private static WindowDecorationsElementRole? HitTestChrome(Window window, Point point)
     {
+        // 命中测试读的是合成器已提交的状态，先推一帧，否则最新布局可能还没进渲染线程而返回 null。
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick(1);
+        Dispatcher.UIThread.RunJobs();
         const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
         var inputRoot = typeof(TopLevel).GetProperty("InputRoot", flags)!.GetValue(window);
