@@ -16,7 +16,7 @@ public static class DesignData
     /// <summary>设计器专用入口：以 object 类型公开同一实例，匹配 Design.DataContext 附加属性。</summary>
     public static object? MainForDesign => Main;
 
-    private static MainViewModel CreateMain()
+    internal static MainViewModel CreateMain()
     {
         // 设计时安全路径：空 MpvEngine（永不 P/Invoke）、临时目录 SQLite、Files 停在空根目录。
         var main = new MainViewModel(AppServices.CreateDesignTime(), designTime: true);

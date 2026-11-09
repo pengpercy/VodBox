@@ -103,9 +103,8 @@ public sealed class MainWindowPreviewTests
     [AvaloniaFact]
     public void HomeScrollsUnderTransparentTitleBarThatFrostsOnceScrolled()
     {
-        var main = DesignData.Main;
-        var previousPage = main.Page;
-        var previousPlayerVisible = main.Player.Visible;
+        // 独立实例：页面、播放器和滚动状态都不与其他测试共用的 DesignData.Main 互相影响。
+        var main = DesignData.CreateMain();
         var window = new MainWindow { DataContext = main, Width = 1280, Height = 800 };
         void Layout() { for (var i = 0; i < 3; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); } }
         try
@@ -158,9 +157,6 @@ public sealed class MainWindowPreviewTests
         }
         finally
         {
-            main.Home.ScrolledUnderTitleBar = false;
-            main.Page = previousPage;
-            main.Player.Visible = previousPlayerVisible;
             window.Close();
         }
     }
