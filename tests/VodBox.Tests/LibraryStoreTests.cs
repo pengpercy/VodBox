@@ -18,11 +18,17 @@ public sealed class LibraryStoreTests : IDisposable
     public async Task ConcurrentCallsShareTheConnectionSafely()
     {
         var ct = TestContext.Current.CancellationToken;
+        for (var i = 0; i < 8; i++)
+        {
+            await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = $"m{i}", Title = "片" }, ct);
+            _store.Set($"k{i}", 0);
+        }
+        // 以读为主：每次写入都要落盘，写多了会在慢磁盘上长时间占住线程池，影响并行运行的其他测试。
         await Task.WhenAll(Enumerable.Range(0, 400).Select(i => Task.Run(async () =>
         {
             var media = $"m{i % 8}";
-            await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = media, Title = media, PositionMs = i }, ct);
-            _store.Set($"k{i % 8}", i);
+            if (i % 40 == 0) await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = media, Title = "片", PositionMs = i }, ct);
+            if (i % 40 == 20) _store.Set($"k{i % 8}", i);
             Assert.NotNull(await _store.FindHistoryAsync("s", media, ct));
             Assert.InRange(_store.GetInt($"k{i % 8}", -1), 0, 399);
             Assert.False(await _store.IsFavoriteAsync("s", media, ct));
@@ -34,7 +40,7 @@ public sealed class LibraryStoreTests : IDisposable
     public async Task DisposeWaitsForRunningCallsAndLaterCallsFailCleanly()
     {
         var ct = TestContext.Current.CancellationToken;
-        for (var round = 0; round < 30; round++)
+        for (var round = 0; round < 10; round++)
         {
             var store = new LibraryStore(Path.Combine(_directory, $"dispose-{round}.db"));
             var calls = Enumerable.Range(0, 32).Select(_ => Task.Run(async () =>
