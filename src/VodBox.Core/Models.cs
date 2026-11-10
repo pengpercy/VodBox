@@ -217,3 +217,30 @@ public sealed record FavoriteEntry
 public sealed record MediaTrack(string Id, string Name, TrackKind Kind, bool IsSelected);
 public sealed record PlaybackSnapshot(PlaybackState State, TimeSpan Position, TimeSpan Duration, bool CanSeek, string? Error = null,double? VideoAspectRatio=null);
 public sealed record PlaybackEvent(long SessionId, PlaybackSnapshot Snapshot);
+
+/// <summary>
+/// 播放器「统计信息」面板的一次采样。每个字段都可能缺失（引擎不支持、媒体还没解析出来、纯音频等），
+/// 速率单位：码率与网速为 bit/s，缓冲为秒。
+/// </summary>
+public sealed record PlaybackStats
+{
+    public int? VideoWidth { get; init; }
+    public int? VideoHeight { get; init; }
+    public double? FramesPerSecond { get; init; }
+    public string? VideoCodec { get; init; }
+    public string? AudioCodec { get; init; }
+    public string? PixelFormat { get; init; }
+    public string? ColorMatrix { get; init; }
+    public string? ColorPrimaries { get; init; }
+    public string? HardwareDecoder { get; init; }
+    public int? AudioSampleRate { get; init; }
+    public int? AudioChannels { get; init; }
+    public double? VideoBitrate { get; init; }
+    public double? AudioBitrate { get; init; }
+    public long? DroppedFrames { get; init; }
+    public long? DecoderDroppedFrames { get; init; }
+    public long? FrameNumber { get; init; }
+    public double? NetworkSpeed { get; init; }
+    public double? BufferSeconds { get; init; }
+    public string? Container { get; init; }
+}

@@ -29,6 +29,17 @@
     <!-- 悬浮子面板（ContextMenu）统一小一号字号，减少遮挡 -->
     <Style Selector="ContextMenu"><Setter Property="FontSize" Value="12" /></Style>
     <Style Selector="ContextMenu MenuItem"><Setter Property="FontSize" Value="12" /></Style>
+    <!-- 毛玻璃菜单（GlassMenu）：菜单项悬停高亮做成圆角块，与圆角面板呼应。 -->
+    <Style Selector="ContextMenu.glass MenuItem /template/ Border#PART_LayoutRoot">
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <!-- Fluent 默认菜单项内边距上小下大（偏西文基线），中文在高亮块里会偏上：改成上下对称。 -->
+    <Style Selector="ContextMenu.glass MenuItem">
+      <Setter Property="Padding" Value="12,6" />
+    </Style>
+    <Style Selector="ContextMenu.glass Separator">
+      <Setter Property="Margin" Value="10,4" />
+    </Style>
     <Style Selector="Window"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /></Style>
     <!-- 自绘标题栏（Windows / Linux 自绘时）的窗口按钮：三个 46 宽的直角按钮紧挨着，
          与 MainViewModel.CaptionButtonsWidth（138）一致。按钮面板的 Spacing/内缩由 WindowChrome 清掉。 -->

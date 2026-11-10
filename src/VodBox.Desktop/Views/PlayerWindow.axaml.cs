@@ -79,6 +79,8 @@ public partial class PlayerWindow : Window
             case Key.Up: player.Volume = Math.Clamp(player.Volume + 5, 0, 100); break;
             case Key.Down: player.Volume = Math.Clamp(player.Volume - 5, 0, 100); break;
             case Key.A: player.AudioOnly = !player.AudioOnly; break;
+            case Key.I: player.StatsVisible = !player.StatsVisible; break;
+            case Key.S: _ = player.SaveScreenshotAsync(); break;
             case Key.F:
             case Key.Enter:
                 WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;

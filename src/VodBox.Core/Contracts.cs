@@ -36,6 +36,11 @@ public interface IPlaybackEngine : IAsyncDisposable
         Task.FromException(new NotSupportedException("当前引擎不支持字幕样式。"));
     IReadOnlyList<MediaTrack> GetTracks(TrackKind kind);
     Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default);
+    /// <summary>统计信息面板的一次采样；媒体未加载或引擎不支持时返回 null。</summary>
+    Task<PlaybackStats?> GetStatsAsync(CancellationToken ct = default) => Task.FromResult<PlaybackStats?>(null);
+    /// <summary>把当前画面（不含字幕与界面）保存为图片文件。</summary>
+    Task SaveScreenshotAsync(string path, CancellationToken ct = default) =>
+        Task.FromException(new NotSupportedException("当前引擎不支持截图。"));
 }
 
 /// <summary>本地库存储（历史/收藏/配置订阅/偏好）。</summary>

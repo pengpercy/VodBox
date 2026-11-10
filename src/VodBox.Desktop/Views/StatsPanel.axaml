@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="clr-namespace:VodBox.Desktop.Views"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             x:DataType="vm:PlayerViewModel"
+             x:Class="VodBox.Desktop.Views.StatsPanel"
+             HorizontalAlignment="Left" VerticalAlignment="Top">
+  <!-- 统计信息：类似 YouTube「详细统计信息」的半透明面板。数据每 500ms 采样一次（StatsPanel.Sample）。 -->
+  <UserControl.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#F2FFFFFF" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="Foreground" Value="#E6FFFFFF" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.metric">
+      <Setter Property="Foreground" Value="#E6FFFFFF" />
+      <Setter Property="Margin" Value="12,0,0,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="FontFeatures" Value="+tnum" />
+    </Style>
+    <Style Selector="Button#CloseButton">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Transitions">
+        <Transitions><BrushTransition Property="Background" Duration="0:0:0.15" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button#CloseButton /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1AFFFFFF" />
+    </Style>
+    <Style Selector="Button#CloseButton:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#33FFFFFF" />
+      <Setter Property="Foreground" Value="#FFFFFFFF" />
+    </Style>
+    <Style Selector="Button#CloseButton:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="#4DFFFFFF" />
+    </Style>
+  </UserControl.Styles>
+  <Border x:Name="Card" Background="#B8141414" CornerRadius="8" Padding="16,10,10,12" MaxWidth="660"
+          BoxShadow="0 6 24 0 #59000000">
+    <Grid ColumnDefinitions="*,Auto">
+      <Grid x:Name="Rows" ColumnDefinitions="Auto,*,Auto" RowSpacing="3" TextElement.FontSize="12.5"
+            RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+        <TextBlock Classes="label" Grid.Row="0" Text="视频 / 来源" />
+        <TextBlock Classes="value" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="MediaText" />
+        <TextBlock Classes="label" Grid.Row="1" Text="地址" />
+        <TextBlock Classes="value" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="UriText"
+                   FontFamily="Menlo, Consolas, monospace" FontSize="11.5" TextTrimming="PrefixCharacterEllipsis" />
+        <TextBlock Classes="label" Grid.Row="2" Text="视口 / 丢帧" />
+        <TextBlock Classes="value" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ViewportText" />
+        <TextBlock Classes="label" Grid.Row="3" Text="分辨率 / 帧率" />
+        <TextBlock Classes="value" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ResolutionText" />
+        <TextBlock Classes="label" Grid.Row="4" Text="音量 / 倍速" />
+        <TextBlock Classes="value" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" x:Name="VolumeText" />
+        <TextBlock Classes="label" Grid.Row="5" Text="编码" />
+        <TextBlock Classes="value" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CodecText" />
+        <TextBlock Classes="label" Grid.Row="6" Text="色彩" />
+        <TextBlock Classes="value" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ColorText" />
+        <TextBlock Classes="label" Grid.Row="7" Text="码率" />
+        <TextBlock Classes="value" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" x:Name="BitrateText" />
+        <TextBlock Classes="label" Grid.Row="8" Text="网络速度" />
+        <v:StatsGraph Grid.Row="8" Grid.Column="1" x:Name="SpeedGraph" Height="14" MinWidth="200"
+                      Fill="#FF5FC8A3" Peak="#FFB4EBC8" />
+        <TextBlock Classes="metric" Grid.Row="8" Grid.Column="2" x:Name="SpeedText" />
+        <TextBlock Classes="label" Grid.Row="9" Text="缓冲时长" />
+        <v:StatsGraph Grid.Row="9" Grid.Column="1" x:Name="BufferGraph" Height="14" MinWidth="200"
+                      Fill="#FFFFA45C" Peak="#FFFFD29E" />
+        <TextBlock Classes="metric" Grid.Row="9" Grid.Column="2" x:Name="BufferText" />
+        <TextBlock Classes="label" Grid.Row="10" Text="容器 / 状态" />
+        <TextBlock Classes="value" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ContainerText" />
+        <TextBlock Classes="label" Grid.Row="11" Text="时间" />
+        <TextBlock Classes="value" Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" x:Name="DateText" />
+      </Grid>
+      <Button x:Name="CloseButton" Grid.Column="1" VerticalAlignment="Top" Margin="10,-2,-2,0"
+              Width="24" Height="24" Padding="0" CornerRadius="12" BorderThickness="0" Cursor="Hand"
+              ToolTip.Tip="关闭统计信息" Command="{Binding ToggleStatsCommand}"
+              TextElement.Foreground="#CCFFFFFF">
+        <PathIcon Data="{DynamicResource Icon.Close}" Width="12" Height="12"
+                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>

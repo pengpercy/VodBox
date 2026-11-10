@@ -285,6 +285,71 @@ public sealed class MpvEngine : IPlaybackEngine
         return ExecuteAsync(() => _client?.Command("set", property, trackId), token);
     }
 
+    public Task SaveScreenshotAsync(string path, CancellationToken token = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return ExecuteAsync(() =>
+        {
+            if (!_loaded || _client is null) throw new InvalidOperationException("媒体尚未加载完成，不能截图。");
+            // video：只取视频画面，不带字幕与 OSD。
+            _client.Command("screenshot-to-file", path, "video");
+        }, token);
+    }
+
+    /// <summary>
+    /// 统计信息采样。只读属性、客户端自身加锁，不排在命令队列后面（打开媒体期间面板也能刷新）；
+    /// 单个属性读不到（不存在/暂不可用）只让那一项缺失，不影响其它项。
+    /// </summary>
+    public Task<PlaybackStats?> GetStatsAsync(CancellationToken token = default)
+    {
+        if (Volatile.Read(ref _disposed) != 0 || !_loaded || Volatile.Read(ref _client) is not { } client)
+            return Task.FromResult<PlaybackStats?>(null);
+        return Task.Run(() =>
+        {
+            try { return (PlaybackStats?)ReadStats(client); }
+            catch (ObjectDisposedException) { return null; }
+        }, token);
+    }
+
+    private static PlaybackStats ReadStats(IMpvClient client)
+    {
+        double? Number(string property)
+        {
+            try { return client.GetDouble(property) is { } value && double.IsFinite(value) ? value : null; }
+            catch (MpvException) { return null; }
+        }
+        string? Text(string property)
+        {
+            try { return client.GetString(property) is { Length: > 0 } value ? value : null; }
+            catch (MpvException) { return null; }
+        }
+        int? Int(string property) => Number(property) is { } value && value > 0 ? (int)Math.Min(value, int.MaxValue) : null;
+        long? Count(string property) => Number(property) is { } value && value >= 0 ? (long)value : null;
+        return new PlaybackStats
+        {
+            VideoWidth = Int("video-params/w"),
+            VideoHeight = Int("video-params/h"),
+            FramesPerSecond = Number("estimated-vf-fps") is > 0 and var fps ? fps : Number("container-fps"),
+            VideoCodec = Text("video-format"),
+            AudioCodec = Text("audio-codec-name"),
+            PixelFormat = Text("video-params/pixelformat"),
+            ColorMatrix = Text("video-params/colormatrix"),
+            ColorPrimaries = Text("video-params/primaries"),
+            HardwareDecoder = Text("hwdec-current"),
+            AudioSampleRate = Int("audio-params/samplerate"),
+            AudioChannels = Int("audio-params/channel-count"),
+            VideoBitrate = Number("video-bitrate"),
+            AudioBitrate = Number("audio-bitrate"),
+            DroppedFrames = Count("frame-drop-count"),
+            DecoderDroppedFrames = Count("decoder-frame-drop-count"),
+            FrameNumber = Count("estimated-frame-number"),
+            // cache-speed 是字节/秒。
+            NetworkSpeed = Number("cache-speed") is { } speed ? speed * 8 : null,
+            BufferSeconds = Number("demuxer-cache-duration"),
+            Container = Text("file-format"),
+        };
+    }
+
     private async Task PumpAsync()
     {
         try

@@ -144,6 +144,57 @@ public sealed partial class PlayerViewModel : ObservableObject
     };
     partial void OnErrorChanged(string? value) => OnPropertyChanged(nameof(AudioStatusText));
 
+    /// <summary>「统计信息」面板（右键菜单 / I 键）。关闭播放器后收起。</summary>
+    [ObservableProperty] private bool _statsVisible;
+    [RelayCommand] private void ToggleStats() => StatsVisible = !StatsVisible;
+
+    /// <summary>当前媒体的原始地址（未经本机媒体代理改写），供复制与统计面板显示。</summary>
+    public string? MediaUri => _resolvedRequest?.Uri ?? _current?.Uri;
+    public string? SourceName => _current?.SourceName;
+
+    public Task<PlaybackStats?> GetStatsAsync(CancellationToken ct = default) =>
+        _current is null ? Task.FromResult<PlaybackStats?>(null) : _engine.GetStatsAsync(ct);
+
+    /// <summary>截图目录：图片文件夹下的 VodBox。</summary>
+    internal static string ScreenshotDirectory()
+    {
+        var pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        if (string.IsNullOrEmpty(pictures)) pictures = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Pictures");
+        return Path.Combine(pictures, "VodBox");
+    }
+
+    /// <summary>截图文件名：片名 + 播放位置 + 时间戳，去掉文件系统不允许的字符。</summary>
+    internal static string ScreenshotFileName(string title, TimeSpan position, DateTime now)
+    {
+        var invalid = Path.GetInvalidFileNameChars().Concat(['/', '\\', ':', '*', '?', '"', '<', '>', '|']).ToHashSet();
+        var name = new string(title.Select(c => invalid.Contains(c) || char.IsControl(c) ? '_' : c).ToArray()).Trim().Trim('.');
+        if (name.Length > 60) name = name[..60];
+        if (name.Length == 0) name = "VodBox";
+        var at = position.TotalHours >= 1 ? position.ToString(@"h\-mm\-ss") : position.ToString(@"mm\-ss");
+        return $"{name} {at} {now:yyyyMMdd-HHmmss}.png";
+    }
+
+    [RelayCommand]
+    public async Task SaveScreenshotAsync()
+    {
+        if (_current is null) return;
+        if (AudioOnly) { FlashToast("听视频模式下没有画面可截"); return; }
+        var session = _intent;
+        try
+        {
+            var directory = ScreenshotDirectory();
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, ScreenshotFileName(Title, Position, DateTime.Now));
+            await _engine.SaveScreenshotAsync(path);
+            if (session == _intent) FlashToast($"截图已保存到 {path}");
+            VodBox.Core.VodBoxLog.Info("player", $"截图已保存：{path}");
+        }
+        catch (Exception error)
+        {
+            if (session == _intent) FlashToast($"截图失败：{error.Message}");
+        }
+    }
+
     /// <summary>播放窗口处于全屏（由 PlayerOverlay 跟随宿主窗口状态写入）。</summary>
     [ObservableProperty] private bool _isFullscreen;
     [ObservableProperty] private bool _controlsVisible = true;
@@ -668,6 +719,7 @@ public sealed partial class PlayerViewModel : ObservableObject
             Playlist.Clear();
             PlaylistIndex = -1;
             _fallback = null;
+            StatsVisible = false;
             AudioOnly = false; // _current 已清空，不会再去改引擎；下次打开按看视频设 vid。
             stop = _coordinator.CloseAsync(); // 立即取消解析，不等待历史写入。
         });

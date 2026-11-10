@@ -133,6 +133,8 @@ internal static partial class MacMenus
                     menu.Add(Choice("听视频", () => vm.AudioOnly = !vm.AudioOnly, vm.AudioOnly, PlaybackKey(Key.A, KeyModifiers.Shift)));
                     menu.Add(Choice("画中画", () => { if (window is not null) overlay?.ToggleCompactWindow(window); }, vm.CompactMode, PlaybackKey(Key.P, KeyModifiers.Shift)));
                     menu.Add(Choice("始终置顶", () => { vm.AlwaysOnTop = !vm.AlwaysOnTop; if (window is not null) window.Topmost = vm.AlwaysOnTop; }, vm.AlwaysOnTop, PlaybackKey(Key.T, KeyModifiers.Control)));
+                    Add("截图", () => _ = vm.SaveScreenshotAsync(), !vm.AudioOnly, PlaybackKey(Key.S, KeyModifiers.Control));
+                    menu.Add(Choice("统计信息", () => vm.StatsVisible = !vm.StatsVisible, vm.StatsVisible, PlaybackKey(Key.I, KeyModifiers.Control)));
                     Separator();
                     var ratios = Submenu("画面比例");
                     var ratioKey = (int)Key.D0;

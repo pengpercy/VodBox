@@ -107,6 +107,7 @@ public partial class PlayerOverlay : UserControl
         };
         AttachedToVisualTree += OnAttached;
         DetachedFromVisualTree += OnDetached;
+        SizeChanged += (_, _) => Dispatcher.UIThread.Post(() => this.FindControl<StatsPanel>("Stats")?.KeepInside(), DispatcherPriority.Background);
     }
 
     private static bool IsSeekKey(Key key) => key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown;
@@ -219,10 +220,22 @@ public partial class PlayerOverlay : UserControl
     private void OnVideoPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         RevealControls();
-        if (e.Handled || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed ||
-            TopLevel.GetTopLevel(this) is not Window window) return;
+        if (e.Handled) return;
+        var point = e.GetCurrentPoint(this).Properties;
         if (e.Source is Avalonia.Visual visual &&
-            (visual is Button or Slider or MenuItem || visual.GetVisualAncestors().Any(v => v is Button or Slider or MenuItem))) return;
+            (visual is Button or Slider or MenuItem or StatsPanel ||
+             visual.GetVisualAncestors().Any(v => v is Button or Slider or MenuItem or StatsPanel))) return;
+        // 右键：视频画面的快捷菜单（播放列表抽屉里不弹）。
+        if (point.IsRightButtonPressed)
+        {
+            if (VM?.Visible == true && !IsInsidePlaylistDrawer(e.Source as Avalonia.Visual))
+            {
+                OpenVideoMenu();
+                e.Handled = true;
+            }
+            return;
+        }
+        if (!point.IsLeftButtonPressed || TopLevel.GetTopLevel(this) is not Window window) return;
         if (_drawerOpen && !IsInsidePlaylistDrawer(e.Source as Avalonia.Visual))
         {
             ClosePlaylistDrawer();

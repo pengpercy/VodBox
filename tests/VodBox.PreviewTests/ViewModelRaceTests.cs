@@ -1599,6 +1599,102 @@ public sealed class ViewModelRaceTests
     }
 
     [AvaloniaFact]
+    public async Task RightClickMenuOffersCommonActionsAndTogglesStats()
+    {
+        using var context = new Context();
+        var overlay = new PlayerOverlay { DataContext = context.Main };
+        var window = new Window { Width = 1280, Height = 720, Content = overlay };
+        window.Show();
+        try
+        {
+            context.Main.Player.Play(new PlaybackRequest { Uri = "https://example.com/a.m3u8", Title = "片", SourceKey = "s", MediaId = "m", SourceName = "站" });
+            await WaitFor(() => context.Main.Player.State == PlaybackState.Playing);
+            var menu = overlay.BuildVideoMenu();
+            Assert.Contains("glass", menu.Classes);
+            var items = menu.Items.OfType<MenuItem>().ToDictionary(item => (string)item.Header!);
+            foreach (var header in new[] { "暂停", "倍速", "画面比例", "播放设置", "听视频", "弹幕", "窗口置顶", "画中画", "全屏", "截图", "复制视频地址", "统计信息" })
+                Assert.True(items.ContainsKey(header), header);
+            Assert.NotEmpty(((IEnumerable<object>)items["播放设置"].ItemsSource!));
+            Assert.False(items["统计信息"].IsChecked);
+
+            items["统计信息"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.True(context.Main.Player.StatsVisible);
+            Assert.True(overlay.BuildVideoMenu().Items.OfType<MenuItem>().Single(item => (string)item.Header! == "统计信息").IsChecked);
+
+            items["截图"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            await WaitFor(() => context.Engine.Screenshots.Count == 1);
+            Assert.StartsWith(PlayerViewModel.ScreenshotDirectory(), context.Engine.Screenshots[0]);
+            Assert.EndsWith(".png", context.Engine.Screenshots[0]);
+
+            // 听视频时不提供画面比例，截图置灰。
+            context.Main.Player.AudioOnly = true;
+            var audio = overlay.BuildVideoMenu().Items.OfType<MenuItem>().ToDictionary(item => (string)item.Header!);
+            Assert.False(audio.ContainsKey("画面比例"));
+            Assert.False(audio["截图"].IsEnabled);
+            Assert.True(audio["听视频"].IsChecked);
+        }
+        finally { await Done(context.Main.Player.Close()); window.Close(); }
+        Assert.False(context.Main.Player.StatsVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task StatsPanelSamplesEngineAndStaysInsideTheVideoWhenDragged()
+    {
+        using var context = new Context();
+        context.Engine.Stats = new PlaybackStats
+        {
+            VideoWidth = 1920, VideoHeight = 1080, FramesPerSecond = 30, VideoCodec = "h264", HardwareDecoder = "videotoolbox",
+            AudioCodec = "aac", AudioSampleRate = 48000, AudioChannels = 2, NetworkSpeed = 10_219_000, BufferSeconds = 16.57,
+            DroppedFrames = 9, FrameNumber = 1216, Container = "hls",
+        };
+        var overlay = new PlayerOverlay { DataContext = context.Main };
+        var window = new Window { Width = 1280, Height = 720, Content = overlay };
+        window.Show();
+        try
+        {
+            context.Main.Player.Play(new PlaybackRequest { Uri = "https://example.com/a.m3u8", Title = "片", SourceKey = "s", MediaId = "m", SourceName = "站" });
+            await WaitFor(() => context.Main.Player.State == PlaybackState.Playing);
+            var panel = overlay.FindControl<StatsPanel>("Stats")!;
+            Assert.False(panel.IsVisible);
+            context.Main.Player.StatsVisible = true;
+            Assert.True(panel.IsVisible);
+            await panel.SampleAsync();
+            window.UpdateLayout();
+            string Text(string name) => panel.FindControl<TextBlock>(name)!.Text!;
+            Assert.Equal("片 / 站", Text("MediaText"));
+            Assert.Equal("https://example.com/a.m3u8", Text("UriText"));
+            Assert.Equal("1920×1080@30", Text("ResolutionText"));
+            Assert.Equal("h264（硬解 videotoolbox） / aac（48 kHz 2 声道）", Text("CodecText"));
+            Assert.Equal("10.2 Mbps", Text("SpeedText"));
+            Assert.Equal("16.57 s", Text("BufferText"));
+            Assert.Contains("丢弃 9 帧，共 1216 帧", Text("ViewportText"));
+            Assert.InRange(panel.FindControl<StatsGraph>("SpeedGraph")!.Count, 1, 2);
+
+            panel.MoveTo(-500, 99999);
+            window.UpdateLayout();
+            Assert.Equal(0, panel.Margin.Left);
+            Assert.Equal(overlay.Bounds.Height - panel.Bounds.Height, panel.Margin.Top, 1);
+            panel.MoveTo(99999, -10);
+            Assert.Equal(overlay.Bounds.Width - panel.Bounds.Width, panel.Margin.Left, 1);
+            Assert.Equal(0, panel.Margin.Top);
+
+            context.Main.Player.StatsVisible = false;
+            Assert.False(panel.IsVisible);
+            Assert.Equal(0, panel.FindControl<StatsGraph>("SpeedGraph")!.Count);
+        }
+        finally { await Done(context.Main.Player.Close()); window.Close(); }
+    }
+
+    [Fact]
+    public void ScreenshotNamesAreSafeFileNames()
+    {
+        var name = PlayerViewModel.ScreenshotFileName("第1集: 开端/重启?", TimeSpan.FromSeconds(3725), new DateTime(2026, 11, 11, 0, 39, 16));
+        Assert.Equal("第1集_ 开端_重启_ 1-02-05 20261111-003916.png", name);
+        Assert.Equal("VodBox 00-05 20261111-003916.png", PlayerViewModel.ScreenshotFileName("  ", TimeSpan.FromSeconds(5), new DateTime(2026, 11, 11, 0, 39, 16)));
+        Assert.Equal("850 Kbps", StatsFormatter.Rate(850_000));
+    }
+
+    [AvaloniaFact]
     public void FullscreenShowsClockAndHidesTopmostButton()
     {
         using var context = new Context();
@@ -2846,6 +2942,10 @@ public sealed class ViewModelRaceTests
         { SubtitleDelay = delaySeconds; SubtitleFontSize = fontSize; return Task.CompletedTask; }
         public List<string> Subtitles { get; } = [];
         public Exception? SubtitleError { get; set; }
+        public PlaybackStats? Stats { get; set; }
+        public Task<PlaybackStats?> GetStatsAsync(CancellationToken ct = default) => Task.FromResult(Stats);
+        public List<string> Screenshots { get; } = [];
+        public Task SaveScreenshotAsync(string path, CancellationToken ct = default) { Screenshots.Add(path); return Task.CompletedTask; }
         public Task LoadSubtitleAsync(string path, long sessionId, CancellationToken ct = default)
         {
             if (SubtitleError is not null) return Task.FromException(SubtitleError);

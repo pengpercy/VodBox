@@ -140,6 +140,9 @@
       </StackPanel>
     </Grid>
 
+    <!-- 统计信息（右键菜单 / I 键）：左上角半透明面板，避开标题栏。 -->
+    <v:StatsPanel x:Name="Stats" Margin="16,64,16,0" />
+
     <!-- 控制层：参考主流播放器（Earth 图）一比一布局 -->
     <Grid RowDefinitions="Auto,*,Auto" ClipToBounds="True" IsVisible="{Binding Visible}">
 
