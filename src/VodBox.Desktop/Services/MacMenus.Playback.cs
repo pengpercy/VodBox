@@ -130,6 +130,7 @@ internal static partial class MacMenus
                 else if (title == "视频")
                 {
                     menu.Add(Choice("全屏", () => { if (window is not null) window.WindowState = window.WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen; }, window?.WindowState == WindowState.FullScreen, PlaybackKey(Key.F, KeyModifiers.Control)));
+                    menu.Add(Choice("听视频", () => vm.AudioOnly = !vm.AudioOnly, vm.AudioOnly, PlaybackKey(Key.A, KeyModifiers.Shift)));
                     menu.Add(Choice("画中画", () => { if (window is not null) overlay?.ToggleCompactWindow(window); }, vm.CompactMode, PlaybackKey(Key.P, KeyModifiers.Shift)));
                     menu.Add(Choice("始终置顶", () => { vm.AlwaysOnTop = !vm.AlwaysOnTop; if (window is not null) window.Topmost = vm.AlwaysOnTop; }, vm.AlwaysOnTop, PlaybackKey(Key.T, KeyModifiers.Control)));
                     Separator();

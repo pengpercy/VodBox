@@ -13,13 +13,13 @@ public static class PlayerLayout
     /// <summary>顶栏置顶键边长（正方形）。</summary>
     public const double TitleBarButtonSize = 28;
 
-    // ── 图标键（比例/小窗/插件/列表/倍速/全屏/设置/静音）────────────────────
+    // ── 图标键（比例/小窗/听视频/列表/倍速/全屏/设置/静音）──────────────────
     /// <summary>图标键边长，宽高必须相等。22px 图标居中，四周各留 4px。</summary>
     public const double IconButtonSize = 22;
     /// <summary>图标键内的图标尺寸。</summary>
     public const double IconGlyphSize = 14;
-    /// <summary>图标键之间的间距；0 表示按键宽紧贴排列。</summary>
-    public const double IconButtonSpacing = 0;
+    /// <summary>右侧图标键之间的间距。</summary>
+    public const double IconButtonSpacing = 6;
     /// <summary>
     /// 倍速键在全倍速档位下的最大宽度（实测：0.5x~2x 遍历取最大值）。
     /// 倍速键本身按内容自适应（这样图标不会离邻键太远），此值仅作为最小宽度算式的最坏情况上界，
@@ -48,8 +48,8 @@ public static class PlayerLayout
     // ── 由上述尺寸推导的布局约束 ────────────────────────────────────────────
     /// <summary>左侧组：静音键 + 间距 + 音量滑杆。</summary>
     public const double LeftGroupWidth = IconButtonSize + VolumeSpacing + VolumeSliderWidth;
-    /// <summary>右侧组：六个等宽图标键 + 自适应的倍速键。</summary>
-    public const double RightGroupWidth = 6 * IconButtonSize + RateButtonMaxWidth;
+    /// <summary>右侧组：六个等宽图标键 + 自适应的倍速键，七键之间六个间距。</summary>
+    public const double RightGroupWidth = 6 * IconButtonSize + RateButtonMaxWidth + 6 * IconButtonSpacing;
     /// <summary>中央三键整组宽度。</summary>
     public const double TransportWidth = 3 * TransportButtonSize + 2 * TransportSpacing;
     /// <summary>窄面板宽度：保留三键及长视频的两端时间标签与可拖动进度条。</summary>

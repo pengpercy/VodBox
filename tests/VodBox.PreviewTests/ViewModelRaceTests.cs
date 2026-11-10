@@ -1502,6 +1502,144 @@ public sealed class ViewModelRaceTests
         Assert.True(fit.Maximum.Width<=(compact?960:1920)&&fit.Maximum.Height<=(compact?720:1080));
     }
 
+    private static VodResult FallbackSource(string key, int episodes = 3, params string[] lines) => new()
+    {
+        Id = key, Title = "繁花", Year = "2023", SourceKey = key, SourceName = key + "资源",
+        Lines = (lines.Length == 0 ? ["m3u8"] : lines).Select(line => new PlaybackLine(line, line,
+            Enumerable.Range(1, episodes).Select(i => new Episode($"{key}-{line}-{i}", $"第{i}集", $"https://{key}.example/{line}/{i}.m3u8")).ToArray())).ToArray(),
+    };
+
+    private static async Task WaitFor(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++) { Dispatcher.UIThread.RunJobs(); await Task.Delay(10); }
+        Assert.True(condition());
+    }
+
+    [AvaloniaFact]
+    public async Task VodPlaybackFailureSwitchesToNextSourceKeepingEpisodeAndPosition()
+    {
+        using var context = new Context();
+        context.Engine.Open = request => request.Uri.Contains("b.example") ? Task.CompletedTask : throw new InvalidOperationException("连接失败");
+        await Done(context.Main.Detail.OpenGroupAsync([FallbackSource("a", 3, "m3u8", "backup"), FallbackSource("b", episodes: 1), FallbackSource("c")]));
+        context.Main.Detail.SelectedEpisode = context.Main.Detail.SelectedLine!.Episodes[1];
+        await Done(context.Main.Detail.PlayCommand.ExecuteAsync(null));
+        // a 主线路失败 → 先换 a 的备用线路 → b 没有第 2 集跳过 → c 失败 → 全部失败。
+        await WaitFor(() => context.Main.Player.Error?.Contains("已尝试全部播放源") == true);
+        Assert.Equal(["https://a.example/m3u8/2.m3u8", "https://a.example/backup/2.m3u8", "https://c.example/m3u8/2.m3u8"],
+            context.Engine.Opened.Select(item => item.Request.Uri));
+        Assert.Equal("c", context.Main.Detail.CurrentSource!.Result.SourceKey);
+        Assert.Equal("第2集", context.Main.Detail.SelectedEpisode!.Title);
+
+        // 播放中途失败：换到下一个源同一集，并从失败处续播。
+        context.Engine.Opened.Clear();
+        context.Engine.Open = _ => Task.CompletedTask;
+        await Done(context.Main.Detail.PickSourceCommand.ExecuteAsync(context.Main.Detail.Sources[0]));
+        context.Main.Detail.SelectedEpisode = context.Main.Detail.SelectedLine!.Episodes[0];
+        await Done(context.Main.Detail.PlayCommand.ExecuteAsync(null));
+        context.Engine.EmitCurrent(PlaybackState.Playing, 42_000, 600_000);
+        Dispatcher.UIThread.RunJobs();
+        context.Engine.EmitCurrent(PlaybackState.Failed, 42_000, 600_000);
+        await WaitFor(() => context.Engine.Opened.Count == 2 && context.Main.Player.State == PlaybackState.Playing);
+        Assert.Equal("https://a.example/backup/1.m3u8", context.Engine.Opened[1].Request.Uri);
+        Assert.Equal(42_000, context.Engine.Opened[1].Request.StartPositionMs);
+        Assert.Equal("a", context.Main.Detail.CurrentSource!.Result.SourceKey);
+        Assert.Equal("backup", context.Main.Detail.SelectedLine!.Name);
+    }
+
+    [AvaloniaFact]
+    public async Task AudioOnlyDisablesVideoTrackAndDrivesTheAudioPage()
+    {
+        using var context = new Context();
+        var overlay = new PlayerOverlay { DataContext = context.Main };
+        var window = new Window { Width = 1280, Height = 720, Content = overlay };
+        window.Show();
+        try
+        {
+            var player = context.Main.Player;
+            await Done(player.PlayResolvedAsync(_ => Task.FromResult(Request("ep1") with { Poster = "https://img.example/p.jpg" })));
+            Assert.Equal((TrackKind.Video, "auto"), context.Engine.Selected[^1]);
+            var page = overlay.FindControl<AudioModeView>("AudioMode")!;
+            Assert.False(page.IsVisible);
+
+            player.ToggleAudioOnlyCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            await WaitFor(() => context.Engine.Selected[^1] == (TrackKind.Video, "no"));
+            Assert.True(page.IsVisible && page.IsActive);
+            Assert.False(overlay.FindControl<Grid>("StatusLayer")!.IsVisible);
+            Assert.Equal("https://img.example/p.jpg", player.Poster);
+
+            // 播放中：唱片逐渐加速转动；暂停后惯性减速到停。
+            for (var i = 0; i < 120; i++) page.Step(1 / 60d);
+            Assert.InRange(page.SpinSpeed, 50, 61);
+            Assert.Equal("正在收听", player.AudioStatusText);
+            context.Engine.EmitCurrent(PlaybackState.Paused, 1000, 60_000);
+            Dispatcher.UIThread.RunJobs();
+            for (var i = 0; i < 60; i++) page.Step(1 / 60d);
+            Assert.InRange(page.SpinSpeed, 1, 40);
+            Assert.True(page.Step(10));
+            Assert.Equal("已暂停", player.AudioStatusText);
+
+            // 新会话沿用听视频；关闭后恢复画面。
+            await Done(player.PlayResolvedAsync(_ => Task.FromResult(Request("ep2"))));
+            Assert.Contains((TrackKind.Video, "no"), context.Engine.Selected.TakeLast(2));
+            player.AudioOnly = false;
+            Dispatcher.UIThread.RunJobs();
+            await WaitFor(() => context.Engine.Selected[^1] == (TrackKind.Video, "auto"));
+            Assert.False(page.IsActive);
+            Assert.True(overlay.FindControl<Grid>("StatusLayer")!.IsVisible);
+
+            // 不记住：关闭播放器后下次打开默认看视频。
+            player.AudioOnly = true;
+            await Done(player.CloseCommand.ExecuteAsync(null));
+            Assert.False(player.AudioOnly);
+            await Done(player.PlayResolvedAsync(_ => Task.FromResult(Request("ep3"))));
+            Assert.Equal((TrackKind.Video, "auto"), context.Engine.Selected[^1]);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void FullscreenShowsClockAndHidesTopmostButton()
+    {
+        using var context = new Context();
+        var overlay = new PlayerOverlay { DataContext = context.Main };
+        var window = new Window { Width = 1280, Height = 720, Content = overlay };
+        window.Show();
+        try
+        {
+            var clock = overlay.FindControl<TextBlock>("FullscreenClock")!;
+            var topmost = overlay.FindControl<Button>("TopmostButton")!;
+            var top = overlay.FindControl<Grid>("TopControls")!;
+            var normalMargin = top.Margin;
+            Assert.False(clock.IsVisible);
+            Assert.True(topmost.IsVisible);
+            window.WindowState = WindowState.FullScreen;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(clock.IsVisible);
+            Assert.Matches(@"^\d{2}:\d{2}$", clock.Text);
+            Assert.False(topmost.IsVisible);
+            Assert.Equal(new Thickness(16, normalMargin.Top, normalMargin.Right, normalMargin.Bottom), top.Margin);
+            Assert.True(context.Main.Player.IsFullscreen);
+            window.WindowState = WindowState.Normal;
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(clock.IsVisible);
+            Assert.True(topmost.IsVisible);
+            Assert.Equal(normalMargin, top.Margin);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void AudioPageLaysOutSideBySideOnWideWindowsAndStackedOnNarrowOnes()
+    {
+        var page = new AudioModeView();
+        page.ApplyLayout(new Size(1280, 720));
+        Assert.Equal(Avalonia.Layout.Orientation.Horizontal, page.FindControl<StackPanel>("Layout")!.Orientation);
+        page.ApplyLayout(new Size(480, 800));
+        Assert.Equal(Avalonia.Layout.Orientation.Vertical, page.FindControl<StackPanel>("Layout")!.Orientation);
+        Assert.InRange(page.FindControl<Viewbox>("DeckBox")!.Width, 120 * 360 / 280d, 420 * 360 / 280d);
+    }
+
     [AvaloniaFact]
     public void PlayerWindowSizeRejectsInvalidMetadataAndScreenBounds()
     {
@@ -2441,7 +2579,7 @@ public sealed class ViewModelRaceTests
         var entries = Enumerable.Range(0, 35).Select(i => new HistoryEntry
         {
             SourceKey = i is 0 or 20 ? "live" : "source", SourceName = "站点", MediaId = $"old-{i}",
-            Title = i is 0 or 20 ? "CCTV-1综合" : $"历史-{i}",
+            Title = i is 0 or 20 ? $"CCTV-{i}综合" : $"历史-{i}",
             UpdatedAt = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.Now.AddDays(-2).AddMinutes(-i).ToUnixTimeMilliseconds()),
         }).ToArray();
         foreach (var entry in entries) await Done(context.Services.Store.SaveHistoryAsync(entry));
@@ -2716,7 +2854,8 @@ public sealed class ViewModelRaceTests
         }
         public List<MediaTrack> Tracks { get; } = [];
         public IReadOnlyList<MediaTrack> GetTracks(TrackKind kind) => Tracks.Where(track => track.Kind == kind).ToArray();
-        public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default) => Task.CompletedTask;
+        public List<(TrackKind Kind, string Id)> Selected { get; } = [];
+        public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken ct = default) { Selected.Add((kind, trackId)); return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

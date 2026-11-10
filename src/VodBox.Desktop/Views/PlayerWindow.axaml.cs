@@ -78,6 +78,7 @@ public partial class PlayerWindow : Window
             case Key.Right: player.SeekBy(5); break;
             case Key.Up: player.Volume = Math.Clamp(player.Volume + 5, 0, 100); break;
             case Key.Down: player.Volume = Math.Clamp(player.Volume - 5, 0, 100); break;
+            case Key.A: player.AudioOnly = !player.AudioOnly; break;
             case Key.F:
             case Key.Enter:
                 WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;

@@ -58,6 +58,8 @@
     </Style>
     <!-- 置顶与未置顶的图标都是纯白，仅靠图形区分状态。 -->
     <Style Selector="Button.pin"><Setter Property="Foreground" Value="#FFFFFFFF" /></Style>
+    <!-- 听视频开启时耳机图标用暖色点亮。 -->
+    <Style Selector="Button#AudioOnlyButton.active"><Setter Property="Foreground" Value="#FFFFB36B" /></Style>
     <!-- 抽屉里的频道行：列表本身不做选中态，正在播放的一行由 IsCurrent 高亮。 -->
     <Style Selector="ListBox#DrawerChannels ListBoxItem">
       <Setter Property="Padding" Value="0" />
@@ -83,10 +85,13 @@
     <Rectangle Fill="#000000" />
     <Panel x:Name="VideoHost" />
     <v:DanmakuLayer x:Name="DanmakuCanvas" IsHitTestVisible="False" ClipToBounds="True" />
+    <!-- 听视频：盖住视频面的音频播放页（自带淡入淡出）。 -->
+    <v:AudioModeView x:Name="AudioMode" />
 
     <!-- 状态提示层：独立于 IsVisible="{Binding Visible}" 的控制层，
          只由播放状态驱动，落在中间弹性行，不遮挡底部控制条。整体不命中测试，双击全屏/拖拽窗口照常可用。 -->
-    <Grid x:Name="StatusLayer" x:DataType="vm:PlayerViewModel" RowDefinitions="Auto,*,Auto" IsHitTestVisible="False">
+    <Grid x:Name="StatusLayer" x:DataType="vm:PlayerViewModel" RowDefinitions="Auto,*,Auto" IsHitTestVisible="False"
+          IsVisible="{Binding !AudioOnly}">
 
       <!-- 首次加载（Resolving/Loading）：黑窗期唯一视觉主体，窗口一出现即在位、无入场动画。
            Resolving 与 Loading 共用这一个容器，只换主文案，进度条不重来。 -->
@@ -139,13 +144,17 @@
     <Grid RowDefinitions="Auto,*,Auto" ClipToBounds="True" IsVisible="{Binding Visible}">
 
       <!-- 标题背景可拖拽；原生关闭按钮结束独立播放窗口，无返回按钮。 -->
-      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="*,Auto"
+      <Grid x:Name="TopControls" IsVisible="{Binding ControlsVisible}" Grid.Row="0" ColumnDefinitions="*,Auto,*,Auto"
             Background="Transparent" Margin="{OnPlatform Default='16,10,132,0', macOS='90,10,16,0'}">
-        <StackPanel VerticalAlignment="Center" Spacing="1" IsHitTestVisible="False">
+        <!-- 标题平时独占左侧三列；全屏时让出中列给时钟（PlayerOverlay.ApplyFullscreenChrome）。 -->
+        <StackPanel x:Name="TitleBlock" Grid.ColumnSpan="3" VerticalAlignment="Center" Spacing="1" IsHitTestVisible="False">
           <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
           <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#80FFFFFF" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <Button x:Name="TopmostButton" Grid.Column="1" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
+        <!-- 全屏时钟：居中显示当前时间，防止看入迷忘了时间。 -->
+        <TextBlock x:Name="FullscreenClock" Grid.Column="1" IsVisible="False" IsHitTestVisible="False" Margin="16,0"
+                   FontSize="15" FontWeight="SemiBold" Foreground="#E6FFFFFF" VerticalAlignment="Center" HorizontalAlignment="Center" />
+        <Button x:Name="TopmostButton" Grid.Column="3" Classes="pin" Classes.pinned="{Binding AlwaysOnTop}"
                 Click="OnToggleTopmost" Background="#66000000" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                 Width="{x:Static v:PlayerLayout.TitleBarButtonSize}" Height="{x:Static v:PlayerLayout.TitleBarButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="窗口置顶 / 取消置顶">
           <!-- 与播放/暂停同款做法：置顶态与未置顶态用两个不同图标，状态一眼可辨。 -->
@@ -204,7 +213,7 @@
                 <Slider Classes="player" Theme="{StaticResource PlayerSlider}" Minimum="0" Maximum="100" Value="{Binding Volume}" Width="{x:Static v:PlayerLayout.VolumeSliderWidth}" />
               </StackPanel>
 
-              <!-- 右：比例/PiP/拼图/列表/倍速/全屏/设置（参考图顺序） -->
+              <!-- 右：比例/PiP/听视频/列表/倍速/全屏/设置 -->
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{x:Static v:PlayerLayout.IconButtonSpacing}" VerticalAlignment="Center"
                           HorizontalAlignment="Right">
                 <Button Click="OnToggleAspectRatio" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
@@ -215,9 +224,9 @@
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="置顶小窗 / 恢复窗口">
                   <PathIcon Data="{DynamicResource Icon.PiP}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OnTogglePlugin" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
-                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="插件">
-                  <PathIcon Data="{DynamicResource Icon.Puzzle}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Button x:Name="AudioOnlyButton" Command="{Binding ToggleAudioOnlyCommand}" Classes.active="{Binding AudioOnly}" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
+                        Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="听视频（只播放声音）">
+                  <PathIcon Data="{DynamicResource Icon.Headphones}" Width="{x:Static v:PlayerLayout.IconGlyphSize}" Height="{x:Static v:PlayerLayout.IconGlyphSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <Button Click="OnTogglePlaylist" Background="Transparent" BorderThickness="0" CornerRadius="{DynamicResource AppControlCornerRadius}"
                         Width="{x:Static v:PlayerLayout.IconButtonSize}" Height="{x:Static v:PlayerLayout.IconButtonSize}" Padding="0" Cursor="Hand" ToolTip.Tip="播放列表">

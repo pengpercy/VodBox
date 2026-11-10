@@ -273,7 +273,7 @@ public sealed class MpvEngine : IPlaybackEngine
 
     public Task SelectTrackAsync(TrackKind kind, string trackId, CancellationToken token = default)
     {
-        if (trackId != "no" && (!long.TryParse(trackId, NumberStyles.None, CultureInfo.InvariantCulture, out long id) || id <= 0))
+        if (trackId is not ("no" or "auto") && (!long.TryParse(trackId, NumberStyles.None, CultureInfo.InvariantCulture, out long id) || id <= 0))
             throw new InvalidDataException("mpv 轨道编号无效。");
         var property = kind switch
         {

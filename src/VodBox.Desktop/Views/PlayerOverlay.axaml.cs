@@ -84,7 +84,7 @@ public partial class PlayerOverlay : UserControl
             progress.LostFocus += (_, _) => VM?.CancelSeek();
         }
 
-        _controlsTimer.Tick += (_, _) => UpdateControls(TimeSpan.FromMilliseconds(Environment.TickCount64 - _lastActivity));
+        _controlsTimer.Tick += (_, _) => { UpdateControls(TimeSpan.FromMilliseconds(Environment.TickCount64 - _lastActivity)); UpdateClock(); };
         AddHandler(PointerMovedEvent, (_, _) => RevealControls(), RoutingStrategies.Tunnel, true);
         AddHandler(PointerPressedEvent, OnVideoPointerPressed, RoutingStrategies.Tunnel, true);
         PointerEntered += (_, _) => { _pointerOutside = false; RevealControls(); };
@@ -184,6 +184,12 @@ public partial class PlayerOverlay : UserControl
             _observedEngine=App.Services.Player;_observedEngine.Initialized+=OnEngineInitialized;
         }
         TryInstallSurface();
+        if (TopLevel.GetTopLevel(this) is Window host)
+        {
+            _stateWindow = host;
+            host.PropertyChanged += OnHostWindowPropertyChanged;
+            ApplyFullscreenChrome(host.WindowState == WindowState.FullScreen);
+        }
         FitWindowToVideo();
         UpdateLoadingLayer();
         UpdateBufferingLayer();
@@ -256,6 +262,8 @@ public partial class PlayerOverlay : UserControl
 
     private void OnDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        if (_stateWindow is not null) _stateWindow.PropertyChanged -= OnHostWindowPropertyChanged;
+        _stateWindow = null;
         if(_observedEngine is not null)_observedEngine.Initialized-=OnEngineInitialized;
         _observedEngine=null;
         if (_observedPlayer is not null) _observedPlayer.PropertyChanged -= OnPlayerChanged;
@@ -326,6 +334,45 @@ public partial class PlayerOverlay : UserControl
         if (change.Property == IsVisibleProperty && !IsVisible) { RestoreWindow();RestorePlayerWindow(); }
     }
 
+    private void OnHostWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != Window.WindowStateProperty || sender is not Window window) return;
+        var fullscreen = window.WindowState == WindowState.FullScreen;
+        ApplyFullscreenChrome(fullscreen);
+        // 全屏期间换集可能换了画面比例：回到普通窗口再按当前视频补一次。
+        if (window.WindowState == WindowState.Normal) FitWindowToVideo();
+    }
+
+    private const double FullscreenTitleInset = 16;
+    private Thickness? _topControlsMargin;
+
+    /// <summary>全屏：标题贴左上角并让出中列，居中显示当前时间；隐藏置顶键。</summary>
+    private void ApplyFullscreenChrome(bool fullscreen)
+    {
+        if (VM is { } vm) vm.IsFullscreen = fullscreen;
+        if (this.FindControl<Control>("TitleBlock") is { } title) Grid.SetColumnSpan(title, fullscreen ? 1 : 3);
+        // 平时左侧为 macOS 红绿灯让位；全屏没有红绿灯，标题贴近左上角。
+        if (this.FindControl<Control>("TopControls") is { } top)
+        {
+            _topControlsMargin ??= top.Margin;
+            var normal = _topControlsMargin.Value;
+            top.Margin = fullscreen ? new Thickness(FullscreenTitleInset, normal.Top, normal.Right, normal.Bottom) : normal;
+        }
+        if (this.FindControl<TextBlock>("FullscreenClock") is { } clock) clock.IsVisible = fullscreen;
+        // 全屏下置顶没有意义：隐藏置顶键。
+        if (this.FindControl<Control>("TopmostButton") is { } topmost) topmost.IsVisible = !fullscreen;
+        UpdateClock();
+    }
+
+    private void UpdateClock()
+    {
+        if (this.FindControl<TextBlock>("FullscreenClock") is not { IsVisible: true } clock) return;
+        var text = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
+        if (clock.Text != text) clock.Text = text;
+    }
+
+    private Window? _stateWindow;
+
     private void FitWindowToVideo()
     {
         if(VM is not {Visible:true,VideoAspectRatio: >0} vm||TopLevel.GetTopLevel(this) is not Window window||window.WindowState!=WindowState.Normal)return;
@@ -347,7 +394,8 @@ public partial class PlayerOverlay : UserControl
         var fit=PlayerWindowSizing.Fit(ratio,width,height,compact);
         window.MinWidth=0;window.MinHeight=0;window.MaxWidth=double.PositiveInfinity;window.MaxHeight=double.PositiveInfinity;
         window.Width=fit.Size.Width;window.Height=fit.Size.Height;
-        window.MinWidth=fit.Minimum.Width;window.MinHeight=fit.Minimum.Height;window.MaxWidth=fit.Maximum.Width;window.MaxHeight=fit.Maximum.Height;
+        // 不设最大尺寸：macOS 全屏/各平台最大化都受窗口最大尺寸约束，设了会让全屏停在视频尺寸。
+        window.MinWidth=fit.Minimum.Width;window.MinHeight=fit.Minimum.Height;
         if(screen is not null)window.Position=ClampRestoredPosition(window.Position,screen.WorkingArea,fit.Size.Width,fit.Size.Height,screen.Scaling);
     }
 
@@ -426,11 +474,6 @@ public partial class PlayerOverlay : UserControl
     private void OnTogglePip(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is Window window) ToggleCompactWindow(window);
-    }
-
-    private void OnTogglePlugin(object? sender, RoutedEventArgs e)
-    {
-        if (VM is { } vm) vm.FlashToast("插件（S3 接）");
     }
 
     internal void OnTogglePlaylist(object? sender, RoutedEventArgs e)

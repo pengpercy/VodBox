@@ -498,28 +498,125 @@ public sealed partial class DetailViewModel : ObservableObject
             return;
         }
         var resumeMs = MediaDetail.ResumePositionApplies(_resumeLineId, _resumeEpisodeId, SelectedLine.Id, SelectedEpisode.Id) ? _resumePositionMs : 0;
-        var detail = Detail;
-        var line = SelectedLine;
-        var result = CurrentSource.Result;
-        var blockAds = _deps.Settings().BlockAds;
-        var selectedId = SelectedEpisode.Id;
+        var index = IndexOf(SelectedLine, SelectedEpisode);
+        var session = new FallbackSession(_generation, Detail.Item.Title, Detail.Item.Poster, _deps.Settings().BlockAds)
+        {
+            Current = CurrentSource.Result, LineName = SelectedLine.Name, CurrentLine = SelectedLine, EpisodeIndex = index,
+        };
+        session.Tried.Add(Key(CurrentSource.Result, SelectedLine));
+        foreach (var source in Sources) session.Candidates.Add(source.Result);
+        await StartPlaybackAsync(session, CurrentSource.Result, SelectedLine, index, resumeMs);
+    }
+
+    private static (string, string) Key(VodResult result) => (result.SourceKey, result.Id);
+    private static (string, string, string) Key(VodResult result, PlaybackLine line) => (result.SourceKey, result.Id, line.Id);
+
+    /// <summary>一次「播放」发起的换源上下文：候选源、当前集已失败的源。切到别的集时失败记录重新计。</summary>
+    private sealed class FallbackSession(long generation, string title, string? poster, bool blockAds)
+    {
+        public long Generation { get; } = generation;
+        public string Title { get; } = title;
+        public string? Poster { get; } = poster;
+        public bool BlockAds { get; } = blockAds;
+        public List<VodResult> Candidates { get; } = [];
+        /// <summary>当前集已失败的（源, 线路）。</summary>
+        public HashSet<(string, string, string)> Tried { get; } = [];
+        public required VodResult Current { get; set; }
+        public required string LineName { get; set; }
+        public PlaybackLine? CurrentLine { get; set; }
+        public int EpisodeIndex { get; set; }
+    }
+
+    private Task StartPlaybackAsync(FallbackSession session, VodResult result, PlaybackLine line, int index, long resumeMs)
+    {
         var entries = line.Episodes.Select(episode => new PlaylistEntry(episode.Id, episode.Title, _ =>
         {
             if (episode.Uri is null) throw new InvalidOperationException("没有可播放的地址");
             var hls = Uri.TryCreate(episode.Uri, UriKind.Absolute, out var address) && address.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);
             return Task.FromResult(new PlaybackRequest
             {
-                Uri = episode.Uri, Title = detail.Item.Title, SourceKey = result.SourceKey, SourceName = result.SourceName,
-                MediaId = result.Id, LineId = line.Id, EpisodeId = episode.Id, Poster = detail.Item.Poster,
-                Remarks = episode.Title, FilterAds = blockAds && hls,
+                Uri = episode.Uri, Title = session.Title, SourceKey = result.SourceKey, SourceName = result.SourceName,
+                MediaId = result.Id, LineId = line.Id, EpisodeId = episode.Id, Poster = session.Poster,
+                Remarks = episode.Title, FilterAds = session.BlockAds && hls,
             });
         })).ToArray();
-        var index = Array.FindIndex(entries, entry => entry.Id == selectedId);
-        await _main.Player.PlayResolvedAsync(async ct =>
+        return _main.Player.PlayResolvedAsync(async ct =>
         {
             var request = await entries[index].Resolve(ct);
             return request with { StartPositionMs = resumeMs };
-        }, entries, index);
+        }, entries, index, (failedIndex, positionMs, sessionId) => FallbackAsync(session, failedIndex, positionMs, sessionId));
+    }
+
+    /// <summary>
+    /// 播放失败自动换源：先试当前源的其他线路，再按播放源列表顺序换源（优先同名线路），只选有同一集的线路，沿用播放进度重开；
+    /// 详情页仍是这部影片时同步切换界面上的当前源。所有源都失败返回 false。
+    /// </summary>
+    private async Task<bool> FallbackAsync(FallbackSession session, int index, long positionMs, long sessionId)
+    {
+        VodResult? next = null;
+        PlaybackLine? nextLine = null;
+        await _main.RunOnUiAsync(() =>
+        {
+            if (_main.Player.CurrentSessionId != sessionId || index < 0) return;
+            if (index != session.EpisodeIndex)
+            {
+                session.EpisodeIndex = index;
+                session.Tried.Clear();
+            }
+            if (session.CurrentLine is { } failedLine) session.Tried.Add(Key(session.Current, failedLine));
+            // 详情页还是这部影片：把后来搜到的源也纳入候选（顺序跟随界面，测速排序后即按优劣）。
+            if (session.Generation == _generation)
+            {
+                var known = session.Candidates.Select(Key).ToHashSet();
+                foreach (var source in Sources) if (known.Add(Key(source.Result))) session.Candidates.Add(source.Result);
+                var order = Sources.Select(source => Key(source.Result)).ToList();
+                session.Candidates.Sort((a, b) => Rank(order, a).CompareTo(Rank(order, b)));
+            }
+            // 当前源排第一：先换线路，再换源。
+            var ordered = session.Candidates.Where(candidate => Key(candidate) == Key(session.Current))
+                .Concat(session.Candidates.Where(candidate => Key(candidate) != Key(session.Current)));
+            foreach (var candidate in ordered)
+            {
+                var lines = candidate.Lines.Where(line => line.Name == session.LineName).Concat(candidate.Lines.Where(line => line.Name != session.LineName));
+                var line = lines.FirstOrDefault(item => item.Episodes.Count > index && !session.Tried.Contains(Key(candidate, item)));
+                if (line is null) continue;
+                session.Tried.Add(Key(candidate, line));
+                next = candidate; nextLine = line;
+                break;
+            }
+            if (next is null || nextLine is null)
+            {
+                VodBoxLog.Error("detail", $"全部播放源均播放失败：{session.Title}（{session.Candidates.Count} 个源）");
+                return;
+            }
+            var sameSource = Key(next) == Key(session.Current);
+            VodBoxLog.Warn("detail", $"播放失败自动换{(sameSource ? "线路" : "源")}：{session.Title} {session.Current.SourceName}/{session.CurrentLine?.Name} → {next.SourceName}/{nextLine.Name}");
+            session.Current = next;
+            session.CurrentLine = nextLine;
+            if (session.Generation == _generation && Sources.FirstOrDefault(source => ReferenceEquals(source.Result, next)) is { } detailSource
+                && (sameSource ? ReferenceEquals(CurrentSource, detailSource) : ApplySource(detailSource, _generation, userAction: true)))
+            {
+                SelectedLine = Lines.FirstOrDefault(line => ReferenceEquals(line, nextLine)) ?? SelectedLine;
+                if (SelectedLine is { } selected && index < selected.Episodes.Count) SelectedEpisode = selected.Episodes[index];
+                if (!sameSource) _ = RefreshFavoriteAsync(detailSource, _generation);
+            }
+            _main.Player.FlashToast(sameSource ? $"播放失败，已自动切换到线路「{nextLine.Name}」" : $"播放失败，已自动切换到「{next.SourceName} · {nextLine.Name}」");
+        });
+        if (next is null || nextLine is null) return false;
+        _ = StartPlaybackAsync(session, next, nextLine, index, positionMs);
+        return true;
+    }
+
+    private static int Rank(List<(string, string)> order, VodResult result) => order.IndexOf(Key(result)) is var i && i >= 0 ? i : int.MaxValue;
+
+    private async Task RefreshFavoriteAsync(DetailSource source, long generation)
+    {
+        try
+        {
+            var favorite = await _store.IsFavoriteAsync(source.Result.SourceKey, source.Result.Id);
+            await _main.RunOnUiAsync(() => { if (generation == _generation && ReferenceEquals(CurrentSource, source)) IsFavorite = favorite; });
+        }
+        catch (Exception error) { VodBoxLog.Warn("detail", $"读取收藏失败：{error.Message}"); }
     }
 
 

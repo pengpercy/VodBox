@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
+             xmlns:v="clr-namespace:VodBox.Desktop.Views"
+             x:Class="VodBox.Desktop.Views.AudioModeView" x:DataType="vm:PlayerViewModel"
+             IsHitTestVisible="False" ClipToBounds="True">
+  <!-- 听视频：盖住视频面的音频播放页。所有持续动画（唱片转速、唱臂、光晕、频谱、背景漂移）
+       由 AudioModeView 的逐帧循环驱动并带惯性缓动，暂停/播放之间平滑过渡而不是硬切。 -->
+  <Panel>
+    <!-- 背景：海报大幅模糊 + 缓慢漂移；没有海报时只剩渐变底。 -->
+    <Rectangle>
+      <Rectangle.Fill>
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+          <GradientStop Color="#FF1B1F2A" Offset="0" />
+          <GradientStop Color="#FF0B0C10" Offset="1" />
+        </LinearGradientBrush>
+      </Rectangle.Fill>
+    </Rectangle>
+    <v:RemotePoster x:Name="Backdrop" Url="{Binding Poster}" Stretch="UniformToFill" Opacity=".55"
+                    RenderTransformOrigin="50%,50%">
+      <v:RemotePoster.Effect>
+        <BlurEffect Radius="70" />
+      </v:RemotePoster.Effect>
+      <v:RemotePoster.RenderTransform>
+        <ScaleTransform ScaleX="1.2" ScaleY="1.2" />
+      </v:RemotePoster.RenderTransform>
+    </v:RemotePoster>
+    <Rectangle>
+      <Rectangle.Fill>
+        <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+          <GradientStop Color="#99000000" Offset="0" />
+          <GradientStop Color="#55000000" Offset=".45" />
+          <GradientStop Color="#E0000000" Offset="1" />
+        </LinearGradientBrush>
+      </Rectangle.Fill>
+    </Rectangle>
+
+    <!-- 内容：宽窗口唱片在左、信息在右；窄窗口上下排列（AudioModeView.ApplyLayout）。 -->
+    <Panel x:Name="Stage" RenderTransformOrigin="50%,50%" Margin="24,56,24,120">
+      <StackPanel x:Name="Layout" Orientation="Horizontal" Spacing="44"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+
+        <!-- 唱片 + 唱臂：按 280 设计、四周留 40 给光晕与唱臂，Viewbox 随窗口整体缩放 -->
+        <Viewbox x:Name="DeckBox" Width="360" Height="360" Stretch="Uniform">
+        <Panel Width="360" Height="360">
+        <Panel x:Name="Deck" Width="280" Height="280">
+          <!-- 光晕：随「能量」呼吸 -->
+          <Ellipse x:Name="Glow" Margin="-38" Opacity="0" RenderTransformOrigin="50%,50%">
+            <Ellipse.Fill>
+              <RadialGradientBrush>
+                <GradientStop Color="#66FFB36B" Offset="0" />
+                <GradientStop Color="#22FF7A59" Offset=".55" />
+                <GradientStop Color="#00FF7A59" Offset="1" />
+              </RadialGradientBrush>
+            </Ellipse.Fill>
+            <Ellipse.RenderTransform><ScaleTransform /></Ellipse.RenderTransform>
+          </Ellipse>
+
+          <!-- 旋转的盘面 -->
+          <Panel x:Name="Disc" RenderTransformOrigin="50%,50%">
+            <Panel.RenderTransform><RotateTransform /></Panel.RenderTransform>
+            <Ellipse>
+              <Ellipse.Fill>
+                <RadialGradientBrush>
+                  <GradientStop Color="#FF202227" Offset="0" />
+                  <GradientStop Color="#FF0E0F12" Offset=".7" />
+                  <GradientStop Color="#FF050506" Offset="1" />
+                </RadialGradientBrush>
+              </Ellipse.Fill>
+            </Ellipse>
+            <!-- 纹路 -->
+            <Ellipse Margin="10" Stroke="#14FFFFFF" StrokeThickness="1" />
+            <Ellipse Margin="22" Stroke="#0FFFFFFF" StrokeThickness="1" />
+            <Ellipse Margin="34" Stroke="#14FFFFFF" StrokeThickness="1" />
+            <Ellipse Margin="46" Stroke="#0CFFFFFF" StrokeThickness="1" />
+            <Ellipse Margin="58" Stroke="#12FFFFFF" StrokeThickness="1" />
+            <Ellipse Margin="70" Stroke="#0FFFFFFF" StrokeThickness="1" />
+            <!-- 中心贴标：海报；没有海报时是暖色渐变 + 音符 -->
+            <Border x:Name="Label" Width="124" Height="124" CornerRadius="62" ClipToBounds="True"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" BorderBrush="#33000000" BorderThickness="2">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                  <GradientStop Color="#FFFFB36B" Offset="0" />
+                  <GradientStop Color="#FFE5536B" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <Panel TextElement.Foreground="#CCFFFFFF">
+                <PathIcon Data="{DynamicResource Icon.Headphones}" Width="48" Height="48"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <v:RemotePoster Url="{Binding Poster}" Stretch="UniformToFill" />
+              </Panel>
+            </Border>
+            <Ellipse Width="12" Height="12" Fill="#FF0B0B0D" Stroke="#40FFFFFF" StrokeThickness="1"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Panel>
+
+          <!-- 固定高光：盘面在其下转动，读出黑胶质感 -->
+          <Ellipse IsHitTestVisible="False">
+            <Ellipse.Fill>
+              <LinearGradientBrush StartPoint="15%,0%" EndPoint="85%,100%">
+                <GradientStop Color="#1FFFFFFF" Offset="0" />
+                <GradientStop Color="#00FFFFFF" Offset=".38" />
+                <GradientStop Color="#00FFFFFF" Offset=".62" />
+                <GradientStop Color="#14FFFFFF" Offset="1" />
+              </LinearGradientBrush>
+            </Ellipse.Fill>
+          </Ellipse>
+
+          <!-- 唱臂：绕右上角枢轴摆动，播放时落到盘面上 -->
+          <Canvas x:Name="ArmCanvas" Width="280" Height="280" ClipToBounds="False">
+            <Panel x:Name="Arm" Canvas.Left="226" Canvas.Top="-26" Width="40" Height="200"
+                   RenderTransformOrigin="20,20">
+              <Panel.RenderTransform><RotateTransform Angle="-26" /></Panel.RenderTransform>
+              <Ellipse Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,3,0,0">
+                <Ellipse.Fill>
+                  <RadialGradientBrush>
+                    <GradientStop Color="#FFE9ECF1" Offset="0" />
+                    <GradientStop Color="#FF8C929C" Offset="1" />
+                  </RadialGradientBrush>
+                </Ellipse.Fill>
+              </Ellipse>
+              <Ellipse Width="12" Height="12" Fill="#FF3A3E45" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,14,0,0" />
+              <Border Width="5" Height="150" CornerRadius="2.5" Background="#FFCDD2D9" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      Margin="0,30,0,0" />
+              <Border Width="16" Height="30" CornerRadius="3" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,170,0,0">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                    <GradientStop Color="#FF9AA0A8" Offset="0" />
+                    <GradientStop Color="#FFE6E9EE" Offset=".5" />
+                    <GradientStop Color="#FF9AA0A8" Offset="1" />
+                  </LinearGradientBrush>
+                </Border.Background>
+              </Border>
+            </Panel>
+          </Canvas>
+        </Panel>
+        </Panel>
+        </Viewbox>
+
+        <!-- 信息 -->
+        <StackPanel x:Name="Info" Spacing="10" VerticalAlignment="Center" MaxWidth="380">
+          <Border x:Name="Badge" Background="#26FFFFFF" CornerRadius="10" Padding="10,3" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="#E6FFFFFF">
+              <PathIcon Data="{DynamicResource Icon.Headphones}" Width="12" Height="12" VerticalAlignment="Center" />
+              <TextBlock Text="听视频" FontSize="11.5" Foreground="#E6FFFFFF" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="26" FontWeight="SemiBold" Foreground="#FFFFFFFF"
+                     TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+          <TextBlock x:Name="SubtitleText" Text="{Binding Subtitle}" FontSize="13.5" Foreground="#B3FFFFFF"
+                     TextTrimming="CharacterEllipsis"
+                     IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <!-- 频谱：竖条按底边缩放，播放时起伏、暂停时缓缓落下 -->
+          <StackPanel x:Name="Bars" Orientation="Horizontal" Spacing="4" Height="34" Margin="0,8,0,0" HorizontalAlignment="Left" />
+          <TextBlock x:Name="StatusText" Text="{Binding AudioStatusText}" FontSize="12" Foreground="#99FFFFFF"
+                     TextWrapping="Wrap" MaxWidth="380" />
+        </StackPanel>
+      </StackPanel>
+    </Panel>
+  </Panel>
+</UserControl>

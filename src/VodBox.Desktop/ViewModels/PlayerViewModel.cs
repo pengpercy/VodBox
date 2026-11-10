@@ -120,6 +120,32 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     [ObservableProperty] private bool _alwaysOnTop;
     [ObservableProperty] private bool _compactMode;
+    /// <summary>「听视频」：关闭视频轨只放声音，界面换成音频播放页。切集/换源保持，关闭播放器后恢复为看视频，不记住。</summary>
+    [ObservableProperty] private bool _audioOnly;
+    /// <summary>当前媒体海报（音频播放页用）。</summary>
+    [ObservableProperty] private string? _poster;
+    partial void OnAudioOnlyChanged(bool value)
+    {
+        if (_current is not null) _ = ApplyControlAsync(() => _engine.SelectTrackAsync(TrackKind.Video, value ? "no" : "auto"));
+        OnPropertyChanged(nameof(AudioStatusText));
+    }
+    [RelayCommand] private void ToggleAudioOnly() => AudioOnly = !AudioOnly;
+
+    /// <summary>音频播放页的状态行。</summary>
+    public string AudioStatusText => State switch
+    {
+        PlaybackState.Resolving or PlaybackState.Loading => LoadingText,
+        PlaybackState.Buffering => "正在缓冲…",
+        PlaybackState.Paused => "已暂停",
+        PlaybackState.Failed => Error ?? "无法播放",
+        PlaybackState.Ended => "播放结束",
+        PlaybackState.Playing => IsLive ? "正在收听直播" : "正在收听",
+        _ => "",
+    };
+    partial void OnErrorChanged(string? value) => OnPropertyChanged(nameof(AudioStatusText));
+
+    /// <summary>播放窗口处于全屏（由 PlayerOverlay 跟随宿主窗口状态写入）。</summary>
+    [ObservableProperty] private bool _isFullscreen;
     [ObservableProperty] private bool _controlsVisible = true;
     public bool IsSeeking => _seekIntent is not null;
     public bool IsPlaying => State is PlaybackState.Playing or PlaybackState.Buffering;
@@ -208,6 +234,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         OnPropertyChanged(nameof(IsBuffering));
         OnPropertyChanged(nameof(IsFailed));
         OnPropertyChanged(nameof(LoadingText));
+        OnPropertyChanged(nameof(AudioStatusText));
         UpdateBufferingHint(value);
         // 播放状态就是排查“点了没反应”的第一现场：带上标题、进度与错误。
         if (value is PlaybackState.Playing or PlaybackState.Failed)
@@ -311,9 +338,45 @@ public sealed partial class PlayerViewModel : ObservableObject
                     _handledEndSession = evt.SessionId;
                     _ = PlayPlaylistIndexAsync(PlaylistIndex + 1);
                 }
-                if(State==PlaybackState.Failed&&_current is {} failed)_main.Live.HandlePlaybackFailure(failed,intent);
+                if(State==PlaybackState.Failed)HandleFailure(intent);
             });
         };
+    }
+
+    /// <summary>
+    /// 点播失败时的自动换源：参数为失败的播放列表序号、已播放位置（毫秒）与失败会话；
+    /// 返回 true 表示已换到另一个播放源重开，false 表示已无可换的源。
+    /// </summary>
+    public delegate Task<bool> PlaybackFallback(int playlistIndex, long positionMs, long sessionId);
+    /// <summary>当前播放列表的换源回调；切集/切地址沿用，外部发起的新播放会替换或清除。</summary>
+    private PlaybackFallback? _fallback;
+    private long _fallbackHandledIntent = -1;
+
+    /// <summary>失败处理入口（引擎报错与打开失败共用）：直播换线路，点播换播放源；同一会话只处理一次。</summary>
+    private void HandleFailure(long intent)
+    {
+        if (_current is { } failed) _main.Live.HandlePlaybackFailure(failed, intent);
+        if (_fallback is not { } fallback || _fallbackHandledIntent == intent || _current is { IsLive: true }) return;
+        _fallbackHandledIntent = intent;
+        var position = Position > TimeSpan.Zero ? (long)Position.TotalMilliseconds : _current?.StartPositionMs ?? 0;
+        _ = RunFallbackAsync(fallback, PlaylistIndex, position, intent);
+    }
+
+    private async Task RunFallbackAsync(PlaybackFallback fallback, int index, long positionMs, long intent)
+    {
+        bool switched;
+        try { switched = await fallback(index, positionMs, intent); }
+        catch (Exception error)
+        {
+            VodBox.Core.VodBoxLog.Error("player", "自动换源失败", error);
+            switched = false;
+        }
+        if (switched) return;
+        await _main.RunOnUiAsync(() =>
+        {
+            if (intent != _intent || State != PlaybackState.Failed) return;
+            Error = $"{Error ?? "无法播放"}（已尝试全部播放源）";
+        });
     }
 
     /// <summary>仅可 seek 的点播、Playing 且已知时长触发；每会话各一次，手动回看片头不会再次跳走。</summary>
@@ -404,11 +467,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (choice.Uri == source.Uri) return Task.CompletedTask;
         var playlist = Playlist.ToArray();
         var position = PlaylistIndex;
-        return PlayResolvedAsync(_ => Task.FromResult(source with { Uri = choice.Uri }), playlist.Length > 0 ? playlist : null, position);
+        return PlayResolvedAsync(_ => Task.FromResult(source with { Uri = choice.Uri }), playlist.Length > 0 ? playlist : null, position, _fallback);
     }
 
     /// <summary>解析也属于播放会话；新播放和关闭都会取消旧解析。</summary>
-    public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve, IReadOnlyList<PlaylistEntry>? playlist = null, int index = -1)
+    /// <param name="fallback">播放失败时的自动换源回调；为 null 时失败即停在失败态。</param>
+    public async Task PlayResolvedAsync(Func<CancellationToken, Task<PlaybackRequest>> resolve, IReadOnlyList<PlaylistEntry>? playlist = null, int index = -1,
+        PlaybackFallback? fallback = null)
     {
         long intent = 0;
         Task open = Task.CompletedTask;
@@ -422,6 +487,7 @@ public sealed partial class PlayerViewModel : ObservableObject
                 Playlist.Clear();
                 if (playlist is not null) foreach (var entry in playlist) Playlist.Add(entry);
                 PlaylistIndex = index;
+                _fallback = fallback;
                 // 在任何 await/清空进度之前截取旧会话；后续写库不再读取可变 VM。
                 var saved = QueueHistory(CaptureHistory());
                 _current = null;
@@ -456,6 +522,7 @@ public sealed partial class PlayerViewModel : ObservableObject
                         OnPropertyChanged(nameof(IsLive));
                         OnPropertyChanged(nameof(LoadingText));
                         Title = request.Title;
+                        Poster = request.Poster;
                         Subtitle = index >= 0 && index < Playlist.Count
                             ? $"{Playlist[index].Title} · {request.SourceName}" : request.SourceName;
                         Position = TimeSpan.Zero;
@@ -464,12 +531,16 @@ public sealed partial class PlayerViewModel : ObservableObject
                     await _engine.SetVolumeAsync(volume, ct);
                     await _engine.SetRateAsync(rate, ct);
                     if (AspectRatio is { } aspect) await _engine.SetAspectRatioAsync(aspect, ct);
+                    // vid 是全局选项：每次打开都按当前模式设一次，切集/换源保持听视频状态。
+                    await _engine.SelectTrackAsync(TrackKind.Video, AudioOnly ? "no" : "auto", ct);
                     ct.ThrowIfCancellationRequested();
                     return request;
                 });
             });
             await open;
             if (intent == _intent) await ApplyControlAsync(() => _engine.SetSubtitleStyleAsync(SubtitleDelay, SubtitleFontSize));
+            // 引擎首次打开才懒建 mpv：打开前的 vid 设置可能落空，打开后再补一次。
+            if (intent == _intent && AudioOnly) await ApplyControlAsync(() => _engine.SelectTrackAsync(TrackKind.Video, "no"));
             if (intent == _intent && DanmakuEnabled && _current?.DanmakuUri is { } danmakuUri) DanmakuLoadingTask = LoadDanmakuAsync(danmakuUri, intent);
         }
         catch (OperationCanceledException) { /* 新请求/关闭取消旧会话，不显示失败。 */ }
@@ -483,7 +554,7 @@ public sealed partial class PlayerViewModel : ObservableObject
                 // 先写 Error 再切状态：状态变化会触发日志/界面读取 Error。
                 Error = $"无法播放：{error.Message}";
                 State = PlaybackState.Failed;
-                if(_current is {} failed)_main.Live.HandlePlaybackFailure(failed,intent);
+                HandleFailure(intent);
             });
         }
     }
@@ -492,7 +563,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         if (index < 0 || index >= Playlist.Count) return Task.CompletedTask;
         var snapshot = Playlist.ToArray();
-        return PlayResolvedAsync(snapshot[index].Resolve, snapshot, index);
+        return PlayResolvedAsync(snapshot[index].Resolve, snapshot, index, _fallback);
     }
 
     /// <summary>数字快捷键按原始播放顺序选第 1—9 集；无列表或越界不触发新会话。</summary>
@@ -596,6 +667,8 @@ public sealed partial class PlayerViewModel : ObservableObject
             OnPropertyChanged(nameof(LoadingText));
             Playlist.Clear();
             PlaylistIndex = -1;
+            _fallback = null;
+            AudioOnly = false; // _current 已清空，不会再去改引擎；下次打开按看视频设 vid。
             stop = _coordinator.CloseAsync(); // 立即取消解析，不等待历史写入。
         });
         await Task.WhenAll(saved, stop,_watchedWrites);
