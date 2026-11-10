@@ -373,9 +373,9 @@
           "Avalonia.Fonts.Inter": "[12.1.4, )",
           "Avalonia.Themes.Fluent": "[12.1.4, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "VodBox.Core": "[0.4.4, )",
-          "VodBox.Infrastructure": "[0.4.4, )",
-          "VodBox.Playback.Mpv": "[0.4.4, )"
+          "VodBox.Core": "[0.4.5, )",
+          "VodBox.Infrastructure": "[0.4.5, )",
+          "VodBox.Playback.Mpv": "[0.4.5, )"
         }
       },
       "vodbox.infrastructure": {
@@ -383,14 +383,14 @@
         "dependencies": {
           "Microsoft.Data.Sqlite.Core": "[10.0.13, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
-          "VodBox.Core": "[0.4.4, )"
+          "VodBox.Core": "[0.4.5, )"
         }
       },
       "vodbox.playback.mpv": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",
-          "VodBox.Core": "[0.4.4, )"
+          "VodBox.Core": "[0.4.5, )"
         }
       },
       "Avalonia": {
