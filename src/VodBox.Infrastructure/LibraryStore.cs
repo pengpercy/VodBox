@@ -75,6 +75,7 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
         ValidateSchema(transaction);
         if (legacyHistory) ImportHistory(transaction, historyColumns);
         if (favoriteColumns.Count > 0) ImportFavorites(transaction, favoriteColumns);
+        using (var dedupe = MigrationQuery(transaction, DedupeHistorySql)) dedupe.ExecuteNonQuery();
         using (var version = MigrationQuery(transaction, $"PRAGMA user_version={SchemaVersion}"))
             version.ExecuteNonQuery();
         transaction.Commit();
@@ -236,11 +237,28 @@ public sealed class LibraryStore : ILibraryStore, IConfigStore, IPreferences, ID
 
     // ---------- 历史 ----------
 
+    /// <summary>
+    /// 同一部片在不同源 / 不同 id 下只保留一条历史：按去空白、忽略大小写的片名归并，点播与直播各自归并。
+    /// 自动换源后同一部片会落到别的 (source_key, media_id)，不归并的话最近播放里会重复出现。
+    /// </summary>
+    private static string HistoryTitleKey(string column) => $"lower(replace(replace(trim({column}),' ',''),'　',''))";
+    private static readonly string HistoryGroupKey = $"(source_key='live') || '|' || {HistoryTitleKey("title")}";
+
+    /// <summary>每组只留最近更新的一条；片名为空的记录不参与归并。</summary>
+    private static readonly string DedupeHistorySql = $"""
+        DELETE FROM history WHERE {HistoryTitleKey("title")} <> '' AND rowid NOT IN (
+            SELECT rowid FROM (SELECT rowid, ROW_NUMBER() OVER (PARTITION BY {HistoryGroupKey} ORDER BY updated_at DESC, rowid DESC) AS rank
+                FROM history WHERE {HistoryTitleKey("title")} <> '') WHERE rank = 1)
+        """;
+
     public async Task SaveHistoryAsync(HistoryEntry entry, CancellationToken ct = default)
     {
         await RunLocked(() =>
         {
-            using var command = Query("""
+            // 先删掉同一部片在其他源 / id 下的旧记录，再写入当前这条。
+            using var command = Query($"""
+                DELETE FROM history WHERE {HistoryTitleKey("$t")} <> '' AND (source_key='live') = ($k='live')
+                    AND {HistoryTitleKey("title")} = {HistoryTitleKey("$t")} AND NOT (source_key=$k AND media_id=$m);
                 INSERT INTO history(source_key, source_name, media_id, title, poster, remarks, line_id, episode_id,
                     position_ms, duration_ms, rate, opening_skip, ending_skip, updated_at)
                 VALUES($k,$sn,$m,$t,$p,$r,$l,$e,$pos,$dur,$rate,$op,$ed,$time)

@@ -20,14 +20,14 @@ public sealed class LibraryStoreTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         for (var i = 0; i < 8; i++)
         {
-            await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = $"m{i}", Title = "片" }, ct);
+            await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = $"m{i}", Title = $"片{i}" }, ct);
             _store.Set($"k{i}", 0);
         }
         // 以读为主：每次写入都要落盘，写多了会在慢磁盘上长时间占住线程池，影响并行运行的其他测试。
         await Task.WhenAll(Enumerable.Range(0, 400).Select(i => Task.Run(async () =>
         {
             var media = $"m{i % 8}";
-            if (i % 40 == 0) await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = media, Title = "片", PositionMs = i }, ct);
+            if (i % 40 == 0) await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "s", SourceName = "站", MediaId = media, Title = $"片{i % 8}", PositionMs = i }, ct);
             if (i % 40 == 20) _store.Set($"k{i % 8}", i);
             Assert.NotNull(await _store.FindHistoryAsync("s", media, ct));
             Assert.InRange(_store.GetInt($"k{i % 8}", -1), 0, 399);
@@ -225,6 +225,45 @@ public sealed class LibraryStoreTests : IDisposable
         Assert.Equal(2, history.Count); // (src1,m1) 覆盖而不是新增
         var resumed = history.Single(h => h.MediaId == "m1");
         Assert.Equal(5000, resumed.PositionMs);
+    }
+
+    [Fact]
+    public async Task HistoryKeepsOneEntryPerTitleAcrossSources()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.Now;
+        await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "a", SourceName = "甲", MediaId = "1", Title = "流浪地球", UpdatedAt = now.AddMinutes(-3) }, ct);
+        await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "b", SourceName = "乙", MediaId = "9", Title = "其他片", UpdatedAt = now.AddMinutes(-2) }, ct);
+        // 换源后同一部片落到另一个 (源, id)，片名只差空白与大小写。
+        await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "c", SourceName = "丙", MediaId = "7", Title = " 流浪 地球", PositionMs = 42, UpdatedAt = now }, ct);
+        // 直播频道与同名点播互不归并。
+        await _store.SaveHistoryAsync(new HistoryEntry { SourceKey = "live", SourceName = "直播", MediaId = "u", Title = "其他片", UpdatedAt = now }, ct);
+
+        var history = await _store.GetHistoryAsync(ct: ct);
+        Assert.Equal(["c", "live", "b"], history.Select(entry => entry.SourceKey).ToArray());
+        Assert.Equal(42, history[0].PositionMs);
+        Assert.Null(await _store.FindHistoryAsync("a", "1", ct));
+    }
+
+    [Fact]
+    public async Task OpeningTheStoreRemovesExistingDuplicateHistory()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var path = Path.Combine(_directory, "dupes.db");
+        using (var seed = new LibraryStore(path))
+        {
+            await seed.SaveHistoryAsync(new HistoryEntry { SourceKey = "a", SourceName = "甲", MediaId = "1", Title = "片", UpdatedAt = DateTimeOffset.Now }, ct);
+        }
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            connection.Open();
+            using var insert = connection.CreateCommand();
+            // 旧版本留下的重复：同名、不同源、更早。
+            insert.CommandText = "INSERT INTO history(source_key,source_name,media_id,title,updated_at) VALUES('b','乙','2','片',1)";
+            insert.ExecuteNonQuery();
+        }
+        using var store = new LibraryStore(path);
+        Assert.Equal("a", Assert.Single(await store.GetHistoryAsync(ct: ct)).SourceKey);
     }
 
     [Fact]
