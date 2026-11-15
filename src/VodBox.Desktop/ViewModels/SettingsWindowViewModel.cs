@@ -36,7 +36,9 @@ public sealed partial class SettingsSectionItem : ObservableObject
 public sealed partial class SettingsWindowViewModel : ObservableObject
 {
     // 声明顺序即左栏显示顺序（对齐设计规格 §5）；ContentSection 是 SettingsViewModel 里的既有分区号。
+    public SettingsSectionItem Subscription { get; }
     public SettingsSectionItem Sources { get; }
+    public SettingsSectionItem LiveSources { get; }
     public SettingsSectionItem Playback { get; }
     public SettingsSectionItem Danmaku { get; }
     public SettingsSectionItem Subtitles { get; }
@@ -56,7 +58,9 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
 
     public SettingsWindowViewModel()
     {
-        Sources = new(this, "源与订阅", 0);
+        Subscription = new(this, "配置订阅", SettingsViewModel.SubscriptionSection);
+        Sources = new(this, "点播与豆瓣", SettingsViewModel.VodSourcesSection);
+        LiveSources = new(this, "直播与节目单", SettingsViewModel.LiveSourcesSection);
         Playback = new(this, "播放", 1);
         Danmaku = new(this, "弹幕", 2);
         Subtitles = new(this, "字幕", 3);
@@ -65,8 +69,8 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
         // 规格把「诊断」排在「关于」之前，但 SettingsViewModel 里 Diagnostics=8 / About=7，这里做映射。
         Diagnostics = new(this, "诊断", 8);
         About = new(this, "关于", 7);
-        _items = [Sources, Playback, Danmaku, Subtitles, Interface, Data, Diagnostics, About];
-        Select(Sources);
+        _items = [Subscription, Sources, LiveSources, Playback, Danmaku, Subtitles, Interface, Data, Diagnostics, About];
+        Select(Subscription);
     }
 
     /// <summary>按分区号选中对应左栏项（窗口已存在时由主窗口调用，保证打开就落在请求的分区）。</summary>

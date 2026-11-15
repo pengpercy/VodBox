@@ -362,11 +362,11 @@ public sealed partial class LiveViewModel : ObservableObject
         _main.StatusMessage = ok ? "节目表已更新" : _epg.StatusLabel;
     }
 
-    /// <summary>定位到设置中的节目表区（源与订阅）。</summary>
+    /// <summary>定位到设置中的节目表区（直播与节目单）。</summary>
     [RelayCommand]
     private void OpenEpgSettings()
     {
-        _main.Settings.Section = 0;
+        _main.Settings.Section = SettingsViewModel.LiveSourcesSection;
         _main.OpenSettings();
     }
 

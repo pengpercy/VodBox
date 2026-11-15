@@ -25,7 +25,7 @@ public sealed class SettingsWindowTests
 
     private static SettingsSectionItem[] Items(SettingsWindowViewModel vm) =>
     [
-        vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface,
+        vm.Subscription, vm.Sources, vm.LiveSources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface,
         vm.Data, vm.Diagnostics, vm.About,
     ];
 
@@ -46,9 +46,9 @@ public sealed class SettingsWindowTests
 
             // 左栏必须复用现成的 NavItemView，而不是自己写一套导航项样式。
             var navItems = window.GetVisualDescendants().OfType<NavItemView>().ToArray();
-            Assert.Equal(8, navItems.Length);
+            Assert.Equal(10, navItems.Length);
             Assert.Equal(
-                new[] { "源与订阅", "播放", "弹幕", "字幕", "界面", "数据", "诊断", "关于" },
+                new[] { "配置订阅", "点播与豆瓣", "直播与节目单", "播放", "弹幕", "字幕", "界面", "数据", "诊断", "关于" },
                 navItems.Select(item => item.Label).ToArray());
 
             // 两栏布局：左栏固定宽度，且导航项确实排在左栏里。
@@ -72,19 +72,19 @@ public sealed class SettingsWindowTests
             var navItems = window.GetVisualDescendants().OfType<NavItemView>().ToArray();
 
             // 默认选中第一项，头部条跟随。
-            Assert.Same(vm.Sources, vm.Selected);
-            Assert.Equal("源与订阅", vm.CurrentTitle);
-            Assert.True(vm.Sources.IsSelected);
+            Assert.Same(vm.Subscription, vm.Selected);
+            Assert.Equal("配置订阅", vm.CurrentTitle);
+            Assert.True(vm.Subscription.IsSelected);
             Assert.Single(Items(vm), item => item.IsSelected);
 
             // 触发「界面」项的 Command（NavItemView 的真实点击路径），单选互斥。
-            var target = navItems[4];
+            var target = navItems[6];
             Assert.NotNull(target.Command);
             target.Command!.Execute(null);
             Pump(window);
             Assert.Equal("界面", vm.CurrentTitle);
             Assert.True(vm.Interface.IsSelected);
-            Assert.False(vm.Sources.IsSelected);
+            Assert.False(vm.Subscription.IsSelected);
             Assert.Single(Items(vm), item => item.IsSelected);
             // 「诊断」排在「关于」之前，但内容分区号仍是 VM 既有取值。
             Assert.Equal(8, vm.Diagnostics.ContentSection);
@@ -115,7 +115,7 @@ public sealed class SettingsWindowTests
             Pump(window);
             var vm = (SettingsWindowViewModel)window.DataContext!;
             vm.Content = main.Settings;
-            foreach (var item in new[] { vm.Sources, vm.Playback, vm.Interface, vm.Diagnostics, vm.About })
+            foreach (var item in new[] { vm.Subscription, vm.Sources, vm.LiveSources, vm.Playback, vm.Interface, vm.Diagnostics, vm.About })
             {
                 item.SelectCommand.Execute(null);
                 Pump(window);
@@ -200,7 +200,7 @@ public sealed class SettingsWindowTests
             var vm = (SettingsWindowViewModel)window.DataContext!;
             vm.Content = main.Settings;
             var widths = new List<double>();
-            foreach (var item in new[] { vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface, vm.Data, vm.Diagnostics, vm.About })
+            foreach (var item in Items(vm))
             {
                 item.SelectCommand.Execute(null);
                 Pump(window);
@@ -375,7 +375,7 @@ public sealed class SettingsWindowTests
             try
             {
                 vm.Content = content;
-                Items(vm)[5].SelectCommand.Execute(null);
+                vm.Data.SelectCommand.Execute(null);
                 Assert.Equal(5, content.Section);
                 Assert.Equal("数据", vm.CurrentTitle);
                 // 骨架阶段未接入内容时，版本号回退到程序集版本，不应为空。

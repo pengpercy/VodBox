@@ -3,6 +3,7 @@
              xmlns:core="clr-namespace:VodBox.Core;assembly=VodBox.Core"
              xmlns:vm="clr-namespace:VodBox.Desktop.ViewModels"
              xmlns:views="clr-namespace:VodBox.Desktop.Views"
+             xmlns:settings="clr-namespace:VodBox.Desktop.Views.Settings"
              x:Class="VodBox.Desktop.Views.Settings.SourcesSettingsView" x:DataType="vm:SettingsViewModel">
   <UserControl.Styles>
     <!-- 状态胶囊：底色是同色 14% 的浅底，圆点与文字用实色；颜色随检测结果过渡。 -->
@@ -35,7 +36,7 @@
   <StackPanel Spacing="20">
 
     <!-- ===== 配置订阅（LunaTV / MoonTV config.json） ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsSubscription}">
       <TextBlock Classes="groupTitle" Text="配置订阅" />
       <Border Classes="card">
         <StackPanel>
@@ -68,7 +69,7 @@
     </StackPanel>
 
     <!-- ===== 采集源 ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsVod}">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Classes="groupTitle" Text="{Binding SourceSummary, StringFormat='采集源 · {0}'}" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
@@ -171,57 +172,59 @@
           <Border Classes="rowSep" />
           <TextBlock Text="没有匹配的采集源" Margin="16,14" FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}"
                      IsVisible="{Binding !FilteredSites.Count}" />
-          <!-- 虚拟化：上百个源时只生成可见行，拉取订阅/筛选不再整表生成控件卡住界面。 -->
-          <ItemsControl Name="SiteRows" ItemsSource="{Binding FilteredSites}">
-            <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:SourceRow">
-                <Border Padding="16,6" MinHeight="44" Opacity="{Binding Enabled, Converter={x:Static views:OpacityConverters.EnabledDim}}">
-                  <Grid ColumnDefinitions="28,30,*,Auto,Auto">
-                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" MinWidth="0" Padding="0" />
-                    <TextBlock Grid.Column="1" Text="{Binding Index}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
-                        <Border CornerRadius="5" Padding="6,1" Background="{DynamicResource CardHoverBrush}" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding OriginLabel}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        </Border>
+          <!-- 虚拟化 + 独立滚动上限：上百个源时只生成可见行，且不把整页无限撑长。 -->
+          <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl Name="SiteRows" ItemsSource="{Binding FilteredSites}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SourceRow">
+                  <Border Padding="16,6" MinHeight="44" Opacity="{Binding Enabled, Converter={x:Static views:OpacityConverters.EnabledDim}}">
+                    <Grid ColumnDefinitions="28,30,*,Auto,Auto">
+                      <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" MinWidth="0" Padding="0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Index}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Classes="rowTitle" Text="{Binding Name}" VerticalAlignment="Center" />
+                          <Border CornerRadius="5" Padding="6,1" Background="{DynamicResource CardHoverBrush}" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding OriginLabel}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Classes="rowSubtitle" Text="{Binding Api}" TextTrimming="CharacterEllipsis" MaxWidth="360" HorizontalAlignment="Left" />
                       </StackPanel>
-                      <TextBlock Classes="rowSubtitle" Text="{Binding Api}" TextTrimming="CharacterEllipsis" MaxWidth="360" HorizontalAlignment="Left" />
-                    </StackPanel>
-                    <!-- 检测状态胶囊：圆点 + 状态 + 延迟，按结果着色（快绿 / 一般黄 / 慢橙 / 无结果灰 / 无效红），悬停看明细与错误原因。 -->
-                    <Panel Grid.Column="3" Margin="12,0" VerticalAlignment="Center" ToolTip.Tip="{Binding StatusDetail}">
-                      <TextBlock Text="检测中…" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding Checking}" VerticalAlignment="Center" />
-                      <Border Classes="statusPill" Classes.fast="{Binding IsFast}" Classes.medium="{Binding IsMedium}" Classes.slow="{Binding IsSlow}"
-                              Classes.empty="{Binding IsEmpty}" Classes.bad="{Binding IsBad}" IsVisible="{Binding HasStatus}">
-                        <Panel>
-                          <Border Classes="tint" />
-                          <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,2">
-                            <Ellipse Classes="dot" Width="6" Height="6" VerticalAlignment="Center" />
-                            <TextBlock Classes="state" Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Classes="state" Text="{Binding LatencyLabel}" FontSize="11" VerticalAlignment="Center"
-                                       IsVisible="{Binding LatencyLabel, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
-                          </StackPanel>
-                        </Panel>
-                      </Border>
-                    </Panel>
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                      <Button Classes="secondary" Padding="10,4" Content="{Binding ToggleLabel}"
-                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteDisabledCommand}" CommandParameter="{Binding}" />
-                      <Button Classes="secondary" Padding="8,4" Content="↑" ToolTip.Tip="上移"
-                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteUpCommand}" CommandParameter="{Binding}" />
-                      <Button Classes="secondary" Padding="8,4" Content="↓" ToolTip.Tip="下移"
-                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteDownCommand}" CommandParameter="{Binding}" />
-                      <Button Classes="secondary" Padding="8,4" Content="置顶"
-                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteToTopCommand}" CommandParameter="{Binding}" />
-                      <Button Classes="danger" Padding="8,4" Content="删除"
-                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).DeleteSiteCommand}" CommandParameter="{Binding}" />
-                    </StackPanel>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+                      <!-- 检测状态胶囊：圆点 + 状态 + 延迟，按结果着色（快绿 / 一般黄 / 慢橙 / 无结果灰 / 无效红），悬停看明细与错误原因。 -->
+                      <Panel Grid.Column="3" Margin="12,0" VerticalAlignment="Center" ToolTip.Tip="{Binding StatusDetail}">
+                        <TextBlock Text="检测中…" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding Checking}" VerticalAlignment="Center" />
+                        <Border Classes="statusPill" Classes.fast="{Binding IsFast}" Classes.medium="{Binding IsMedium}" Classes.slow="{Binding IsSlow}"
+                                Classes.empty="{Binding IsEmpty}" Classes.bad="{Binding IsBad}" IsVisible="{Binding HasStatus}">
+                          <Panel>
+                            <Border Classes="tint" />
+                            <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,2">
+                              <Ellipse Classes="dot" Width="6" Height="6" VerticalAlignment="Center" />
+                              <TextBlock Classes="state" Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                              <TextBlock Classes="state" Text="{Binding LatencyLabel}" FontSize="11" VerticalAlignment="Center"
+                                         IsVisible="{Binding LatencyLabel, Converter={x:Static views:StringConverters.IsNotNullOrEmpty}}" />
+                            </StackPanel>
+                          </Panel>
+                        </Border>
+                      </Panel>
+                      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <Button Classes="secondary" Padding="10,4" Content="{Binding ToggleLabel}"
+                                Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ToggleSiteDisabledCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="secondary" Padding="8,4" Content="↑" ToolTip.Tip="上移"
+                                Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteUpCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="secondary" Padding="8,4" Content="↓" ToolTip.Tip="下移"
+                                Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteDownCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="secondary" Padding="8,4" Content="置顶"
+                                Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveSiteToTopCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="danger" Padding="8,4" Content="删除"
+                                Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).DeleteSiteCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
           <Border Classes="rowSep" />
           <Border Padding="16,10">
             <StackPanel Spacing="8">
@@ -240,7 +243,7 @@
     </StackPanel>
 
     <!-- ===== 豆瓣与播放 ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsVod}">
       <TextBlock Classes="groupTitle" Text="豆瓣与播放" />
       <Border Classes="card">
         <StackPanel>
@@ -336,7 +339,7 @@
     </StackPanel>
 
     <!-- ===== 自定义分类 ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsVod}">
       <TextBlock Classes="groupTitle" Text="自定义分类" />
       <Border Classes="card">
         <StackPanel>
@@ -375,7 +378,7 @@
     </StackPanel>
 
     <!-- ===== 直播源 ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsLive}">
       <TextBlock Classes="groupTitle" Text="直播源" />
       <Border Classes="card">
         <StackPanel>
@@ -430,7 +433,7 @@
     </StackPanel>
 
     <!-- ===== 节目订阅 ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsLive}">
       <TextBlock Classes="groupTitle" Text="节目订阅" />
       <Border Classes="card">
         <StackPanel>
@@ -477,7 +480,7 @@
     </StackPanel>
 
     <!-- ===== 直播订阅历史 ===== -->
-    <StackPanel Spacing="8">
+    <StackPanel Spacing="8" IsVisible="{Binding $parent[settings:SourcesSettingsView].IsLive}">
       <TextBlock Classes="groupTitle" Text="直播订阅历史" />
       <Border Classes="card">
         <StackPanel>

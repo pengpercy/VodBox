@@ -242,6 +242,44 @@ public sealed class SettingsSectionTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void SubscriptionVodLiveSectionsSwitchOnSectionProperty()
+    {
+        var (window, view) = Host<SourcesSettingsView>(_settings,
+            v => v.Section = SourcesSettingsView.SourcesSettingsViewSection.Subscription);
+        try
+        {
+            string[] VisibleGroups() => view.GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.Classes.Contains("groupTitle") && t.IsEffectivelyVisible)
+                .Select(t => t.Text ?? "").ToArray();
+
+            Assert.True(view.IsSubscription);
+            Assert.False(view.IsVod);
+            Assert.False(view.IsLive);
+            Assert.Contains("配置订阅", VisibleGroups());
+            Assert.DoesNotContain("直播源", VisibleGroups());
+
+            view.Section = SourcesSettingsView.SourcesSettingsViewSection.Vod;
+            Pump(window);
+            Assert.False(view.IsSubscription);
+            Assert.True(view.IsVod);
+            Assert.False(view.IsLive);
+            Assert.Contains("豆瓣与播放", VisibleGroups());
+            Assert.DoesNotContain("配置订阅", VisibleGroups());
+            Assert.DoesNotContain("直播源", VisibleGroups());
+
+            view.Section = SourcesSettingsView.SourcesSettingsViewSection.Live;
+            Pump(window);
+            Assert.False(view.IsSubscription);
+            Assert.False(view.IsVod);
+            Assert.True(view.IsLive);
+            Assert.Contains("直播源", VisibleGroups());
+            Assert.Contains("节目订阅", VisibleGroups());
+            Assert.DoesNotContain("豆瓣与播放", VisibleGroups());
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void EverySectionRendersRealContentInsideTheSettingsWindow()
     {
         // 整合验收：窗口接入真实 SettingsViewModel 后，逐个分区都要渲染出可见内容。
@@ -254,7 +292,7 @@ public sealed class SettingsSectionTests : IDisposable
             vm.Content = _settings;
             var items = new[]
             {
-                vm.Sources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface,
+                vm.Subscription, vm.Sources, vm.LiveSources, vm.Playback, vm.Danmaku, vm.Subtitles, vm.Interface,
                 vm.Data, vm.Diagnostics, vm.About,
             };
             foreach (var item in items)

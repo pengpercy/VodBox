@@ -44,9 +44,14 @@
       <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="*,Auto">
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="0,4,0,0">
           <StackPanel>
-            <views:NavItemView Icon="{StaticResource Icon.Broadcast}" Label="源与订阅"
+            <views:NavItemView Icon="{StaticResource Icon.Broadcast}" Label="配置订阅"
+                               IsSelected="{Binding Subscription.IsSelected, Mode=OneWay}" Command="{Binding Subscription.SelectCommand}" />
+            <views:NavItemView Icon="{StaticResource Icon.Movie}" Label="点播与豆瓣"
                                IsSelected="{Binding Sources.IsSelected, Mode=OneWay}" Command="{Binding Sources.SelectCommand}" />
-            <views:NavItemView Icon="{StaticResource Icon.Play}" Label="播放"
+            <views:NavItemView Icon="{StaticResource Icon.Television}" Label="直播与节目单"
+                               IsSelected="{Binding LiveSources.IsSelected, Mode=OneWay}" Command="{Binding LiveSources.SelectCommand}" />
+
+            <views:NavItemView Icon="{StaticResource Icon.Play}" Label="播放" Margin="0,12,0,0"
                                IsSelected="{Binding Playback.IsSelected, Mode=OneWay}" Command="{Binding Playback.SelectCommand}" />
             <views:NavItemView Icon="{StaticResource Icon.Danmaku}" Label="弹幕"
                                IsSelected="{Binding Danmaku.IsSelected, Mode=OneWay}" Command="{Binding Danmaku.SelectCommand}" />
@@ -86,7 +91,9 @@
       <ScrollViewer Grid.Row="1" Grid.Column="1" Padding="24,8,24,24" VerticalScrollBarVisibility="Auto"
                     HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Left">
         <StackPanel MaxWidth="720" HorizontalAlignment="Stretch">
-          <settings:SourcesSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Sources.IsSelected}" DataContext="{Binding Content}" />
+          <settings:SourcesSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Subscription.IsSelected}" DataContext="{Binding Content}" Section="Subscription" />
+          <settings:SourcesSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Sources.IsSelected}" DataContext="{Binding Content}" Section="Vod" />
+          <settings:SourcesSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).LiveSources.IsSelected}" DataContext="{Binding Content}" Section="Live" />
           <settings:PlaybackSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Playback.IsSelected}" DataContext="{Binding Content}" />
           <settings:PlaybackSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Danmaku.IsSelected}" DataContext="{Binding Content}" Section="Danmaku" />
           <settings:PlaybackSettingsView IsVisible="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).Subtitles.IsSelected}" DataContext="{Binding Content}" Section="Subtitles" />

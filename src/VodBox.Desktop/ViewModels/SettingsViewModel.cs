@@ -149,9 +149,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
     }
 
     // ---- 设置分组导航（设计稿 p-setting 左栏） ----
-    /// <summary>当前设置分组：0=源与订阅 1=播放 2=数据 3=关于。</summary>
+    public const int SubscriptionSection = 0;
+    public const int VodSourcesSection = 9;
+    public const int LiveSourcesSection = 10;
+
+    /// <summary>当前设置分组：0=配置订阅 9=点播与豆瓣 10=直播与节目单 1=播放 2=弹幕 3=字幕 4=界面 5=数据 7=关于 8=诊断。</summary>
     [ObservableProperty] private int _section = 0;
     public bool IsSourcesSection=>Section==0;
+    public bool IsVodSourcesSection=>Section==VodSourcesSection;
+    public bool IsLiveSourcesSection=>Section==LiveSourcesSection;
     public bool IsPlaybackSection=>Section==1;
     public bool IsDanmakuSection=>Section==2;
     public bool IsSubtitleSection=>Section==3;
@@ -271,7 +277,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IUpdatePrefere
 
     partial void OnSectionChanged(int value)
     {
-        foreach(var property in new[]{nameof(IsSourcesSection),nameof(IsPlaybackSection),nameof(IsDanmakuSection),nameof(IsSubtitleSection),nameof(IsInterfaceSection),nameof(IsDataSection),nameof(IsAboutSection),nameof(IsDiagnosticsSection),nameof(PlayerSettings)}) OnPropertyChanged(property);
+        foreach(var property in new[]{nameof(IsSourcesSection),nameof(IsVodSourcesSection),nameof(IsLiveSourcesSection),nameof(IsPlaybackSection),nameof(IsDanmakuSection),nameof(IsSubtitleSection),nameof(IsInterfaceSection),nameof(IsDataSection),nameof(IsAboutSection),nameof(IsDiagnosticsSection),nameof(PlayerSettings)}) OnPropertyChanged(property);
     }
 
     // ---- 更改点播配置弹窗（设计稿 ②） ----

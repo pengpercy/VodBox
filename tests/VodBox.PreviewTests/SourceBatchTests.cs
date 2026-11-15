@@ -258,6 +258,7 @@ public sealed class SourceBatchTests : IDisposable
     [AvaloniaFact]
     public void SettingsButtonsCenterTheirText()
     {
+        _settings.Section = SettingsViewModel.VodSourcesSection;
         var window = new VodBox.Desktop.Views.SettingsWindow(_settings) { Width = 1000, Height = 900 };
         window.Show();
         try
